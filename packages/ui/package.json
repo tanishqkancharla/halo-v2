@@ -7,8 +7,15 @@
   },
   "scripts": {
     "lint": "oxlint --deny-warnings .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
     "generate:component": "turbo gen react-component",
-    "check-types": "tsc --noEmit"
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
@@ -16,9 +23,5 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "typescript": "7.0.2"
-  },
-  "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
   }
 }

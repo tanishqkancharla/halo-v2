@@ -5,10 +5,11 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "lint:fix": "oxlint --fix .",
-    "format": "oxfmt \"**/*.{ts,tsx,md}\"",
-    "format:check": "oxfmt --check \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "lint:fix": "turbo run lint:fix",
+    "format": "turbo run format",
+    "format:check": "turbo run format:check",
+    "typecheck": "turbo run typecheck",
+    "check": "turbo run typecheck lint format:check"
   },
   "devDependencies": {
     "oxfmt": "^0.60.0",
@@ -16,7 +17,7 @@
     "turbo": "^2.10.7",
     "typescript": "7.0.2"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@11.17.0",
   "engines": {
     "node": ">=20.19.0"
   }
