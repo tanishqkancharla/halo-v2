@@ -5,6 +5,9 @@ const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    dedupe: ["react", "react-dom", "purse-styles"],
+  },
   clearScreen: false,
   server: {
     port: 1420,

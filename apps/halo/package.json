@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "maui": "github:tanishqkancharla/maui#e025ee9c50c23baef265b66461c5f78bf32c644c",
+    "purse-styles": "^0.2.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
