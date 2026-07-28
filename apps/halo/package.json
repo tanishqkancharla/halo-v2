@@ -1,0 +1,30 @@
+{
+  "name": "@halo/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build && cargo check --manifest-path src-tauri/Cargo.toml",
+    "dev": "tauri dev",
+    "format": "oxfmt src index.html package.json tsconfig.json vite.config.ts src-tauri/tauri.conf.json src-tauri/capabilities",
+    "format:check": "oxfmt --check src index.html package.json tsconfig.json vite.config.ts src-tauri/tauri.conf.json src-tauri/capabilities",
+    "lint": "oxlint --deny-warnings src vite.config.ts",
+    "lint:fix": "oxlint --fix src vite.config.ts",
+    "tauri": "tauri",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "7.0.2",
+    "vite": "^7.3.1"
+  }
+}
