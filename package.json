@@ -9,7 +9,7 @@
     "format": "turbo run format",
     "format:check": "turbo run format:check",
     "typecheck": "turbo run typecheck",
-    "check": "turbo run typecheck lint format:check"
+    "check": "turbo run typecheck lint format:check --affected"
   },
   "devDependencies": {
     "oxfmt": "^0.60.0",
