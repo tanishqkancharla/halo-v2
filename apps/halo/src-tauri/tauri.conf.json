@@ -28,6 +28,10 @@
   "bundle": {
     "active": true,
     "category": "Medical",
+    "externalBin": ["binaries/agentos-sidecar"],
+    "resources": {
+      "../node_modules/@agentos-software/pi/dist/package.aospkg": "agentos/pi.aospkg"
+    },
     "targets": "all",
     "icon": [
       "icons/32x32.png",

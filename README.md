@@ -1,125 +1,56 @@
-# Turborepo starter
+# Halo
 
-This Turborepo starter is maintained by the Turborepo core team.
+Halo is a Tauri 2 desktop app with a React frontend and a Rust backend. The first local AgentOS phase lives in `apps/halo`.
 
-## Using this example
+## Structure
 
-Run the following command:
+- `apps/halo/src`: React developer UI built with Maui and Vite.
+- `apps/halo/src-tauri`: Tauri host and Rust AgentOS service.
+- `packages/ui`: shared React components.
+- `packages/typescript-config`: shared TypeScript settings.
 
-```sh
-npx create-turbo@latest
-```
+The Rust service starts one native AgentOS sidecar and one VM for the local workspace. It stores the VM filesystem and session history in the app-data `agentos.sqlite` file. The sidecar runs Pi from its packed AgentOS package. Halo does not start a Node backend process.
 
-## What's inside?
+Pinned AgentOS versions:
 
-This Turborepo includes the following packages/apps:
+- `agentos-client = 0.2.15`
+- `agentos-vm-config = 0.2.15`
+- `@rivet-dev/agentos-sidecar = 0.2.15`
+- `@agentos-software/pi = 0.2.7`
 
-### Apps and Packages
+## Local development
 
-- `apps/`: currently empty
-- `@repo/ui`: a reusable React component library
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) for code linting
-- [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Install dependencies, then start the app from the repository root:
 
 ```sh
-cd my-turborepo
-turbo build
+pnpm install
+pnpm dev
 ```
 
-Without global `turbo`, use your package manager:
+The normal development command starts Vite, Tauri, the native sidecar, and the AgentOS VM.
+
+File tools work without a model key. To use Pi, set one supported key in the shell that starts Halo:
 
 ```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+export ANTHROPIC_API_KEY=your-key
+pnpm dev
 ```
 
-### Develop
+In development builds, the Rust host also loads the first `.env` file it finds in `apps/halo`, the repository root, or `apps/halo/src-tauri`. Existing shell variables take priority. These files are ignored by Git.
 
-To develop all apps and packages, run the following command:
+Halo also detects `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `OPENROUTER_API_KEY`. The key stays out of the frontend and logs. AgentOS may store session environment values as plain text in `agentos.sqlite`; Halo limits the app-data directory to the current user on Unix systems.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+## Checks
 
 ```sh
-cd my-turborepo
-turbo dev
+pnpm --filter @halo/desktop typecheck
+pnpm --filter @halo/desktop lint
+pnpm --filter @halo/desktop format:check
+cargo test --manifest-path apps/halo/src-tauri/Cargo.toml
 ```
 
-Without global `turbo`, use your package manager:
+Tests do not call a paid model.
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
+## Storage follow-up
 
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+AgentOS currently accepts only `sqlite_file` and `actor_uds` database descriptors. To use encrypted Turso storage, first add a libSQL/Turso descriptor and encrypted connection code to the AgentOS Rust sidecar, contribute that API upstream, then replace Halo's `VmSqliteDescriptor::SqliteFile` setting with the new official descriptor. Keep the encryption key in the operating system's secret store, outside the database.

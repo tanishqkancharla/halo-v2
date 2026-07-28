@@ -2,6 +2,7 @@ import type {
   ButtonHTMLAttributes,
   CSSProperties,
   HTMLAttributes,
+  InputHTMLAttributes,
   ReactNode,
   SVGProps,
 } from "react";
@@ -34,6 +35,7 @@ export const backgroundColor: {
 };
 
 export const radius: {
+  sm: StyleElement;
   md: StyleElement;
   lg: StyleElement;
   circle: StyleElement;
@@ -42,6 +44,15 @@ export const radius: {
 export const shadow: {
   subtle: StyleElement;
 };
+
+export const shadowVars: {
+  subtle: string;
+};
+
+export function focusRing(
+  selector?: string,
+  existingShadow?: string,
+): StyleElement;
 
 export const spacing: {
   padding: (options: {
@@ -77,6 +88,24 @@ export function Button(
   },
 ): ReactNode;
 
+export function TextField(
+  props: Omit<InputHTMLAttributes<HTMLInputElement>, "onChange"> & {
+    onChange?: (value: string) => void;
+  },
+): ReactNode;
+
+export function Select(props: {
+  label?: string;
+  selectedKey?: string | number | null;
+  onSelectionChange?: (key: string | number) => void;
+  children: ReactNode;
+}): ReactNode;
+
+export function SelectItem(props: {
+  id: string | number;
+  children: ReactNode;
+}): ReactNode;
+
 type FlexProps = {
   gap?: Space;
   children?: ReactNode;
@@ -87,6 +116,7 @@ type FlexProps = {
 export function Flex(props: FlexProps): ReactNode;
 export function Spacer(): ReactNode;
 export function H1(props: { children: string }): ReactNode;
+export function H2(props: { children: string }): ReactNode;
 export function P(props: { children: ReactNode }): ReactNode;
 
 export const Icons: {

@@ -2,4 +2,13 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
+  '@google/genai': false
   esbuild: true
+  koffi: false
+  protobufjs: false
+minimumReleaseAgeExclude:
+  - '@rivet-dev/agentos-sidecar-darwin-arm64@0.2.15'
+  - '@rivet-dev/agentos-sidecar-darwin-x64@0.2.15'
+  - '@rivet-dev/agentos-sidecar-linux-arm64-gnu@0.2.15'
+  - '@rivet-dev/agentos-sidecar-linux-x64-gnu@0.2.15'
+  - '@rivet-dev/agentos-sidecar@0.2.15'

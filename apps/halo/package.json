@@ -21,7 +21,9 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@agentos-software/pi": "0.2.7",
     "@repo/typescript-config": "workspace:*",
+    "@rivet-dev/agentos-sidecar": "0.2.15",
     "@tauri-apps/cli": "^2.11.4",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
