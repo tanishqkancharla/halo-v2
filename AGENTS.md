@@ -1,3 +1,25 @@
+# Halo
+
+Halo is an open-source self-modifiable desktop app. It's currently a work-in-progress.
+
+## Commands
+
+- `pnpm run check-affected` - Lint, typecheck, build, format-check, and test affected packages
+
+## Code Style
+
+- Prefer explicit, straightforward code. Don't use fallbacks. Avoid patterns like `||` and `??`.
+- Don't support backwards-compatibility unless explicitly asked to.
+- Simplify as you go. When you touch code, remove nearby indirection, compatibility paths, defensive branches, unused helpers, or duplicated state that no longer serve the current design. Simplification is iterative: after removing one unnecessary condition or abstraction, look again for variables, branches, helpers, or comments that only existed to support it.
+- Don't over-worry. Avoid `try`/`catch`, guard clauses, `if`/`throw`, retries, fallback values, and defensive checks unless the user asked for them or you know a specific error can happen and this layer is responsible for handling it. When handling a known external quirk, add a short comment that names the source of the behavior.
+- Local code should have local worries. Do not compensate in one place for sub-optimal behavior in another place when the link is not direct. Step back, identify the ownership boundary, and consider a cleaner design instead.
+- Prefer explicit types; avoid `any`.
+- TypeScript uses strict mode with `noUncheckedIndexedAccess` enabled.
+- ESM imports use `.js` extensions even for TypeScript files.
+- Workspace packages use the `@repo/*` naming convention.
+- Use `vitest` for tests: `describe`, `test`, `expect`. Don't use `beforeAll` or `afterAll`; use Vitest fixtures instead.
+- Generally, you should avoid adding comments and instead aim to make code readable. The only exception is when there is external context that is not easily traced back (e.g. external dependency behavior, or explicit business logic decisions).
+
 ## Writing Rules
 
 Writing rules, from Orwell, 1946. These govern prose: docs, PR text, messages. Never touch code or technical terms; swap in everyday words only where precision survives.
@@ -11,13 +33,6 @@ Writing rules, from Orwell, 1946. These govern prose: docs, PR text, messages. N
 
 Review every prose output against these rules before delivering.
 
-## Workspace Storage
+## Design Guidance
 
-- One workspace maps to one AgentOS VM and one SQLite database.
-- Halo must not query or change AgentOS SQLite tables.
-- Halo must read and write workspace state through AgentOS VM file APIs.
-- Ask for the username before starting the workspace. Call it the username in user-facing copy and the owner slug in code and storage.
-- Use `/halo/<owner-slug>/` as both the workspace root and the user's home directory.
-- Store Halo workspace state, user files, and normal home dotfiles in the workspace root so both Halo and the agent can see them. Do not create a `.halo/` directory.
-- Keep device settings outside the workspace database.
-- Copying the SQLite database to another machine must restore the whole workspace.
+- Agents and humans should always have access to the same state. Which is why all Halo configuration is just stored in the AgentOS filesystem and Halo shouldn't directly manipulate the underlying Sqlite database.
