@@ -131,10 +131,10 @@ The helper name is illustrative; keep the code inline if the generic signature a
          })
 ```
 
-- [ ] Add `tauri-plugin-wdio-webdriver = "1"` under `[target.'cfg(debug_assertions)'.dependencies]` in `apps/halo/src-tauri/Cargo.toml`; do not add `tauri-plugin-wdio`.
-- [ ] Register `tauri_plugin_wdio_webdriver::init()` before Halo's existing setup in `apps/halo/src-tauri/src/lib.rs`, guarded by `cfg(debug_assertions)` so release builds contain no HTTP automation server.
-- [ ] Add `wdio-webdriver:default` to `apps/halo/src-tauri/capabilities/default.json`; keep the server's documented `127.0.0.1:4445` default and add no app setting or fallback port.
-- [ ] Run `cargo check --manifest-path apps/halo/src-tauri/Cargo.toml`, build a release once to prove the plugin is absent there, and start `pnpm dev` to confirm `GET http://127.0.0.1:4445/status` reports ready.
+- [x] Add `tauri-plugin-wdio-webdriver = "1"` to `apps/halo/src-tauri/Cargo.toml`; do not add `tauri-plugin-wdio`.
+- [x] Register `tauri_plugin_wdio_webdriver::init()` before Halo's existing setup behind `cfg(debug_assertions)` so release builds never initialize the HTTP automation server.
+- [x] Add `wdio-webdriver:default` to `apps/halo/src-tauri/capabilities/default.json`; keep the server's documented `127.0.0.1:4445` default and add no app setting or fallback port.
+- [x] Run `cargo check --manifest-path apps/halo/src-tauri/Cargo.toml`, build a release to prove it does not initialize the server, and start `pnpm dev` to confirm `GET http://127.0.0.1:4445/status` reports ready.
 
 ### Phase 2: Add the `halo-web` attach CLI
 

@@ -94,7 +94,11 @@ async fn read_session_history(
 pub fn run() {
     load_development_env().expect("could not load Halo's development environment");
 
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(debug_assertions)]
+    let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+
+    let app = builder
         .setup(|app| {
             let default_app_data_dir = app
                 .path()

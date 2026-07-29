@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default permissions for Halo",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "wdio-webdriver:default"]
 }
