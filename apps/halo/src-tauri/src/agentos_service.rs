@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 const WORKSPACE_ROOT: &str = "/home/agentos";
 const PI_CONFIG_DIR: &str = "/home/agentos/.pi/agent";
 const PI_SETTINGS_PATH: &str = "/home/agentos/.pi/agent/settings.json";
-const MAX_USERNAME_LENGTH: usize = 64;
+const MAX_OWNER_SLUG_LENGTH: usize = 64;
 
 const PROVIDERS: [Provider; 4] = [
     Provider {
@@ -51,31 +51,28 @@ pub struct StartupConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceLayout {
     root: String,
-    files: String,
     pi_config_dir: String,
     pi_settings_path: String,
 }
 
 impl WorkspaceLayout {
-    pub fn new(username: &str) -> Result<Self, String> {
-        if username.is_empty()
-            || username.len() > MAX_USERNAME_LENGTH
-            || !username.chars().all(|character| {
+    pub fn new(owner_slug: &str) -> Result<Self, String> {
+        if owner_slug.is_empty()
+            || owner_slug.len() > MAX_OWNER_SLUG_LENGTH
+            || !owner_slug.chars().all(|character| {
                 character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
             })
         {
             return Err(format!(
-                "Usernames must be 1 to {MAX_USERNAME_LENGTH} ASCII letters, numbers, '-' or '_' only."
+                "Usernames must be 1 to {MAX_OWNER_SLUG_LENGTH} ASCII letters, numbers, '-' or '_' only."
             ));
         }
 
-        let root = format!("/halo/{username}");
-        let files = format!("{root}/files");
-        let pi_config_dir = format!("{files}/.pi/agent");
+        let root = format!("/halo/{owner_slug}");
+        let pi_config_dir = format!("{root}/.pi/agent");
         let pi_settings_path = format!("{pi_config_dir}/settings.json");
         Ok(Self {
             root,
-            files,
             pi_config_dir,
             pi_settings_path,
         })
@@ -628,30 +625,29 @@ mod tests {
     static SIDECAR_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     #[test]
-    fn workspace_layout_accepts_safe_usernames() {
+    fn workspace_layout_accepts_safe_owner_slugs() {
         let layout = WorkspaceLayout::new("test-user_1").expect("valid workspace layout");
         assert_eq!(layout.root, "/halo/test-user_1");
-        assert_eq!(layout.files, "/halo/test-user_1/files");
-        assert_eq!(layout.pi_config_dir, "/halo/test-user_1/files/.pi/agent");
+        assert_eq!(layout.pi_config_dir, "/halo/test-user_1/.pi/agent");
         assert_eq!(
             layout.pi_settings_path,
-            "/halo/test-user_1/files/.pi/agent/settings.json"
+            "/halo/test-user_1/.pi/agent/settings.json"
         );
     }
 
     #[test]
-    fn workspace_layout_rejects_unsafe_usernames() {
-        for username in [
+    fn workspace_layout_rejects_unsafe_owner_slugs() {
+        for owner_slug in [
             "",
             "..",
             "user/name",
             "user\\name",
             "café",
-            "a-username-that-is-longer-than-sixty-four-characters-and-must-be-rejected",
+            "an-owner-slug-that-is-longer-than-sixty-four-characters-and-is-rejected",
         ] {
             assert!(
-                WorkspaceLayout::new(username).is_err(),
-                "accepted unsafe username: {username}"
+                WorkspaceLayout::new(owner_slug).is_err(),
+                "accepted unsafe owner slug: {owner_slug}"
             );
         }
     }

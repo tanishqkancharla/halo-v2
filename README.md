@@ -46,18 +46,20 @@ Each workspace has one AgentOS VM and one SQLite database. The database is the c
 
 Halo does not query or change AgentOS SQLite tables. It reads and writes all workspace state through AgentOS VM file APIs. This keeps the same state visible to Halo and to agents running in the VM.
 
-Halo asks for the username before it starts the workspace. The username must be one safe path segment. Halo then uses this layout:
+Halo asks for the username before it starts the workspace. Code treats that value as the owner slug, which must be one safe path segment. Halo then uses this layout:
 
 ```text
-/halo/<username>/
-├── files/
+/halo/<owner-slug>/
+├── .pi/
+├── .config/
 ├── workspace.json
 ├── agents/
 ├── tools/
-└── vault.enc
+├── vault.enc
+└── <user files>
 ```
 
-The user's home directory inside the VM is `/halo/<username>/files/`. Halo stores its workspace state beside `files/`; it does not create a hidden `.halo/` directory.
+The workspace root is also the user's home directory inside the VM. Programs may put normal dotfiles there. Halo stores its state beside those dotfiles and the user's files; it does not create a hidden `.halo/` directory.
 
 Device settings do not belong to a workspace. Keep settings that apply to the local Halo install outside the workspace database.
 

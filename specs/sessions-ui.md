@@ -5,13 +5,13 @@
 ```mermaid
 flowchart LR
     Launch[App launch] --> Settings[Load device setting]
-    Settings --> Choice{Saved username is valid}
+    Settings --> Choice{Saved owner slug is valid}
     Choice -- Yes --> Start[start_workspace]
     Choice -- No --> Form[Username form]
     Form --> Start
-    Start --> Layout[Build /halo/username layout]
+    Start --> Layout[Use /halo/owner-slug as home]
     Layout --> Agent[Start AgentOS]
-    Agent --> Save[Save last username]
+    Agent --> Save[Save last owner slug]
     Agent --> Catalog[Load session catalog]
     Catalog --> Shell[Sessions shell]
     Shell --> Transcript[Read transcript]
@@ -44,18 +44,18 @@ sequenceDiagram
 
 Halo now presents AgentOS as a developer dashboard. Saved sessions, raw history, file checks, model settings, and status tools compete for space, and session history appears as JSON instead of a chat.
 
-Halo also starts AgentOS before it knows the username and uses `/home/agentos`. That breaks the workspace rules: Halo must know a valid username first, place the workspace at `/halo/<username>/`, and use `/halo/<username>/files/` as the user's home directory.
+Halo also starts AgentOS before it knows the username and uses `/home/agentos`. That breaks the workspace rules: Halo must get a valid username first, treat it as the owner slug, and use `/halo/<owner-slug>/` as both the workspace root and the user's home directory.
 
 ## Solution overview
 
 Replace the dashboard with a full-height Maui sessions shell. Its sidebar lists durable sessions and opens a local blank draft; its main pane shows a readable transcript and a prompt editor.
 
-Keep a new session local until its first send. That send creates the AgentOS session, waits for the full reply, then reloads the catalog and normalized transcript. Before any session command can run, use the last valid username saved on this device or ask for one, then start AgentOS with the matching workspace paths.
+Keep a new session local until its first send. That send creates the AgentOS session, waits for the full reply, then reloads the catalog and normalized transcript. Before any session command can run, use the last valid username saved on this device or ask for one, then start AgentOS with its owner-slug workspace path.
 
 ## Goals
 
 - Ask for a username before the first workspace start, or when the saved device setting is missing, invalid, or cannot start.
-- Reopen the last successful username and workspace automatically after the app restarts.
+- Reopen the last successful username and workspace after the app restarts.
 - Show saved sessions in a Maui sidebar, newest first, with clear selection and run state.
 - Let the user select a session and read ordered user and assistant text.
 - Let the user open a blank draft and send its first prompt.
@@ -76,7 +76,7 @@ Keep a new session local until its first send. That send creates the AgentOS ses
 
 ## Important files, docs, and websites
 
-- [`AGENTS.md`](../AGENTS.md) — Defines username, workspace layout, storage, and writing rules.
+- [`AGENTS.md`](../AGENTS.md) — Defines the username, owner slug, workspace layout, storage, and writing rules.
 - [`README.md`](../README.md) — Describes the one-VM, one-database model and project checks.
 - [`apps/halo/src/App.tsx`](../apps/halo/src/App.tsx) — Holds the current dashboard, startup polling, session catalog, raw history, and prompt flow that this work replaces.
 - [`apps/halo/src/main.tsx`](../apps/halo/src/main.tsx) — Wraps the app in `MauiProvider`.
@@ -84,7 +84,7 @@ Keep a new session local until its first send. That send creates the AgentOS ses
 - [`apps/halo/src/maui.d.ts`](../apps/halo/src/maui.d.ts) — Shadows Maui types and must cover each new public Maui import.
 - [`apps/halo/src-tauri/src/lib.rs`](../apps/halo/src-tauri/src/lib.rs) — Starts AgentOS during Tauri setup and registers the command surface.
 - [`apps/halo/src-tauri/src/agentos_service.rs`](../apps/halo/src-tauri/src/agentos_service.rs) — Owns workspace paths, AgentOS state, sessions, prompts, history, and Rust tests.
-- `apps/halo/src-tauri/src/device_settings.rs` — New device-only JSON settings helper for the last successful username; it must not write workspace state or AgentOS tables.
+- `apps/halo/src-tauri/src/device_settings.rs` — New device-only JSON settings helper for the last successful username, stored as an owner slug; it must not write workspace state or AgentOS tables.
 - [`apps/halo/package.json`](../apps/halo/package.json) — Owns frontend checks and needs the test command and test packages.
 - [`apps/halo/node_modules/maui/src/patterns/Sidebar.tsx`](../apps/halo/node_modules/maui/src/patterns/Sidebar.tsx) — Defines the public `Sidebar`, `SidebarSection`, and `SidebarItem` API and its 240px width.
 - [`apps/halo/node_modules/maui/src/pages/SidebarPage.tsx`](../apps/halo/node_modules/maui/src/pages/SidebarPage.tsx) — Shows Maui's two-pane sidebar grid.
@@ -94,9 +94,9 @@ Keep a new session local until its first send. That send creates the AgentOS ses
 
 ## Implementation
 
-### Phase 1: Gate AgentOS startup on a valid username
+### Phase 1: Gate AgentOS startup on a valid owner slug
 
-Make the backend idle after Tauri setup and add one command that starts it with a checked workspace layout. After this commit, no workspace command can run before Halo receives a safe username.
+Make the backend idle after Tauri setup and add one command that starts it with a checked workspace layout. After this commit, no workspace command can run before Halo receives a safe username as its owner slug.
 
 #### Important types
 
@@ -104,7 +104,6 @@ Make the backend idle after Tauri setup and add one command that starts it with 
 // apps/halo/src-tauri/src/agentos_service.rs
 struct WorkspaceLayout {
     root: String,
-    files: String,
     pi_config_dir: String,
     pi_settings_path: String,
 }
@@ -130,7 +129,7 @@ enum ServiceState {
 +    └── store StartupConfig in HaloState
 
 +start_workspace command
-+├── WorkspaceLayout::new(username)
++├── WorkspaceLayout::new(owner_slug)
 +└── AgentOsService::initialize(layout, startup)
 ```
 
@@ -153,15 +152,15 @@ enum ServiceState {
  })
 ```
 
-- [ ] Add `WorkspaceLayout::new(username)` with a clear length cap and allow only non-empty ASCII letters, numbers, `-`, and `_`; derive `/halo/<username>/`, `files/`, and Pi settings paths.
+- [ ] Add `WorkspaceLayout::new(owner_slug)` with a clear length cap and allow only non-empty ASCII letters, numbers, `-`, and `_`; derive `/halo/<owner-slug>/` and Pi settings paths.
 - [ ] Start `AgentOsService` in `NotStarted`, keep `StartupConfig` in `HaloState`, and remove the background `initialize` call from Tauri `setup`.
-- [ ] Add and register `start_workspace(username)` so one caller can move `NotStarted` through `Starting` to `Ready`, while repeat or concurrent starts return a clear error.
+- [ ] Add and register `start_workspace(owner_slug)` so one caller can move `NotStarted` through `Starting` to `Ready`, while repeat or concurrent starts return a clear error.
 - [ ] Make `ready()` and every existing workspace command return “start a workspace first” while idle, without reading AgentOS SQLite tables.
-- [ ] Add Rust tests for idle commands and usernames that are empty, non-ASCII, too long, contain a slash, or contain `..`; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml`.
+- [ ] Add Rust tests for idle commands and owner slugs that are empty, non-ASCII, too long, contain a slash, or contain `..`; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml`.
 
-### Phase 2: Apply the selected workspace layout to files and sessions
+### Phase 2: Apply the selected workspace home to files and sessions
 
-Use the chosen layout for all VM paths once AgentOS starts. This commit makes files, Pi settings, session `HOME`, and session `cwd` follow the same workspace contract and proves that the SQLite file restores them.
+Use the chosen root for all VM paths once AgentOS starts. This commit makes the workspace root the Unix home, puts Pi settings and user files there, and proves that the SQLite file restores them.
 
 #### Important types
 
@@ -172,7 +171,6 @@ Use the chosen layout for all VM paths once AgentOS starts. This commit makes fi
 struct HealthStatus {
     status: &'static str,
     workspace_root: String,
-    files_root: String,
     database_path: String,
     // existing credential and sidecar fields remain
 }
@@ -186,7 +184,7 @@ struct HealthStatus {
 -└── open_session(HOME = WORKSPACE_ROOT, cwd = WORKSPACE_ROOT)
 +├── ready -> Ready { os, layout }
 +├── write_pi_settings(os, layout.pi_settings_path)
-+└── open_session(HOME = layout.files, cwd = layout.files)
++└── open_session(HOME = layout.root, cwd = layout.root)
 
  write_file | read_file | list_files
 -└── validate_workspace_path(path, WORKSPACE_ROOT)
@@ -202,24 +200,24 @@ struct HealthStatus {
 
  let mut env = BTreeMap::new();
 -env.insert("HOME".to_owned(), WORKSPACE_ROOT.to_owned());
-+env.insert("HOME".to_owned(), workspace.layout.files.clone());
++env.insert("HOME".to_owned(), workspace.layout.root.clone());
 
  os.open_session(OpenSessionInput {
 -    cwd: Some(WORKSPACE_ROOT.to_owned()),
-+    cwd: Some(workspace.layout.files.clone()),
++    cwd: Some(workspace.layout.root.clone()),
      ...
  })
 ```
 
-- [ ] After AgentOS starts, create `layout.root` and `layout.files` with AgentOS `mkdir`; keep Halo workspace state beside `files/` and never create `.halo/`.
-- [ ] Set Pi config paths from `WorkspaceLayout`, set session `HOME` and `cwd` to `layout.files`, and make file path checks use `layout.root`.
-- [ ] Return the selected root and files path in health data, and remove all `/home/agentos` constants and frontend path use.
-- [ ] Update restart tests to use `/halo/test-user/files/` and assert that a VM file and the session catalog survive a service restart with the same SQLite database.
+- [ ] After AgentOS starts, create `layout.root` with AgentOS `mkdir`; keep Halo state, user files, and home dotfiles directly in that root, and never create `files/` or `.halo/`.
+- [ ] Set Pi config paths from `WorkspaceLayout`, set session `HOME` and `cwd` to `layout.root`, and make file path checks use that root.
+- [ ] Return the selected workspace root in health data, and remove all `/home/agentos` constants and frontend path use.
+- [ ] Update restart tests to use `/halo/test-owner/` and assert that a VM file and the session catalog survive a service restart with the same SQLite database.
 - [ ] Run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml` and ensure the tests make no model call.
 
-### Phase 3: Remember the last successful username on this device
+### Phase 3: Remember the last successful owner slug on this device
 
-Store only the last username in Tauri's per-device app config directory. The next launch can use it before AgentOS starts, while `StartupConfig` remains process memory that Tauri rebuilds on every launch.
+Store only the last owner slug in Tauri's per-device app config directory. The next launch can use it before AgentOS starts, while `StartupConfig` remains process memory that Tauri rebuilds on every launch.
 
 #### Important types
 
@@ -228,13 +226,13 @@ Store only the last username in Tauri's per-device app config directory. The nex
 #[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DeviceSettings {
-    last_username: Option<String>,
+    last_owner_slug: Option<String>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StartupPreference {
-    last_username: Option<String>,
+    last_owner_slug: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -256,11 +254,11 @@ struct StartWorkspaceResult {
 
 +get_startup_preference
 +└── load_device_settings
-+    └── validate saved username
++    └── validate saved owner slug
 
- start_workspace(username)
+ start_workspace(owner_slug)
  └── AgentOsService::initialize
-+    └── on success: save_device_settings(last_username)
++    └── on success: save_device_settings(last_owner_slug)
 ```
 
 #### Code diff preview
@@ -279,7 +277,7 @@ struct StartWorkspaceResult {
 -    Ok(health)
 +    let preference_warning = save_device_settings(
 +        &state.device_settings_path,
-+        &DeviceSettings { last_username: Some(username) },
++        &DeviceSettings { last_owner_slug: Some(owner_slug) },
 +    ).err();
 +    Ok(StartWorkspaceResult {
 +        health,
@@ -290,9 +288,9 @@ struct StartWorkspaceResult {
 ```
 
 - [ ] Resolve `app.path().app_config_dir()?.join("device-settings.json")` during Tauri setup and keep that path in `HaloState`; keep `StartupConfig` in Rust memory and rebuild it each launch.
-- [ ] Add `device_settings.rs` with serde load and atomic save helpers; treat a missing, corrupt, or invalid saved username as no preference and validate it with `WorkspaceLayout::new` before use.
-- [ ] Register `get_startup_preference` as a device-only command that can run before AgentOS starts and returns only a valid `lastUsername` or null.
-- [ ] Save the username only after AgentOS starts; do not write it to `tauri.conf.json`, AgentOS SQLite, or `/halo/<username>/`, and return a non-blocking warning instead of undoing a live workspace when the device-setting write fails.
+- [ ] Add `device_settings.rs` with serde load and atomic save helpers; treat a missing, corrupt, or invalid saved owner slug as no preference and validate it with `WorkspaceLayout::new` before use.
+- [ ] Register `get_startup_preference` as a device-only command that can run before AgentOS starts and returns only a valid `lastOwnerSlug` or null.
+- [ ] Save the owner slug only after AgentOS starts; do not write it to `tauri.conf.json`, AgentOS SQLite, or `/halo/<owner-slug>/`, and return a warning instead of undoing a live workspace when the device-setting write fails.
 - [ ] Test missing, valid, corrupt, and invalid settings, atomic replacement, failed-start retention, and save failure after startup; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml`.
 
 ### Phase 4: Add the frontend workspace gate and typed Tauri client
@@ -305,18 +303,17 @@ Replace startup polling with an explicit frontend state machine and a small type
 // apps/halo/src/workspace/types.ts
 type WorkspaceState =
   | { status: "restoring" }
-  | { status: "needs-username"; username: string }
-  | { status: "starting"; username: string }
-  | { status: "error"; username: string; message: string }
+  | { status: "needs-owner-slug"; ownerSlug: string }
+  | { status: "starting"; ownerSlug: string }
+  | { status: "error"; ownerSlug: string; message: string }
   | { status: "ready"; health: WorkspaceHealth; preferenceWarning?: string };
 
 type WorkspaceHealth = {
   workspaceRoot: string;
-  filesRoot: string;
   status: "ready";
 };
 
-type StartupPreference = { lastUsername?: string };
+type StartupPreference = { lastOwnerSlug?: string };
 ```
 
 #### Call stack diff
@@ -329,12 +326,12 @@ type StartupPreference = { lastUsername?: string };
 -│   └── list_sessions
 -└── start health polling interval
 +└── api.getStartupPreference
-+    ├── saved username -> api.startWorkspace(username)
++    ├── saved owner slug -> api.startWorkspace(ownerSlug)
 +    │   ├── success -> api.listSessions
 +    │   └── failure -> render WorkspaceStart with error
-+    └── no valid username -> render WorkspaceStart
-+        └── submit(username)
-+            └── api.startWorkspace(username)
++    └── no valid owner slug -> render WorkspaceStart
++        └── submit(ownerSlug)
++            └── api.startWorkspace(ownerSlug)
 ```
 
 #### Code diff preview
@@ -365,8 +362,8 @@ type StartupPreference = { lastUsername?: string };
 
 - [ ] Add `vitest`, `jsdom`, React Testing Library, and `user-event` to `apps/halo`, configure jsdom, add `test: "vitest run"`, and provide a typed mock for Tauri `invoke`.
 - [ ] Move shared Tauri DTOs and command wrappers into `apps/halo/src/api.ts`, including `getStartupPreference`, `startWorkspace`, `listSessions`, `readSessionTranscript`, `createSession`, and `sendPrompt`.
-- [ ] Build an accessible Maui `WorkspaceStart` form that submits on Enter, disables only during startup, keeps the username after failure, and places the error by the field.
-- [ ] On mount, auto-start a valid saved username; show `WorkspaceStart` when none exists or restore fails, then enter a minimal ready view and load the catalog after success.
+- [ ] Build an accessible Maui `WorkspaceStart` form labeled “Username” that submits on Enter, disables only during startup, keeps the username after failure, and places the error by the field.
+- [ ] On mount, auto-start a valid saved owner slug; show `WorkspaceStart` when none exists or restore fails, then enter a minimal ready view and load the catalog after success.
 - [ ] Run `pnpm --filter @halo/desktop typecheck`; manually check that first launch asks for a username, the next launch restores it, and a bad saved value returns to the form. Do not add automated tests for this gate.
 
 ### Phase 5: Normalize AgentOS history into transcript DTOs

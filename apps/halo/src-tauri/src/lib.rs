@@ -18,9 +18,9 @@ struct HaloState {
 #[tauri::command]
 async fn start_workspace(
     state: State<'_, HaloState>,
-    username: String,
+    owner_slug: String,
 ) -> Result<HealthStatus, String> {
-    let layout = WorkspaceLayout::new(&username)?;
+    let layout = WorkspaceLayout::new(&owner_slug)?;
     state
         .agentos
         .initialize(layout, state.startup.clone())

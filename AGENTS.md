@@ -16,8 +16,8 @@ Review every prose output against these rules before delivering.
 - One workspace maps to one AgentOS VM and one SQLite database.
 - Halo must not query or change AgentOS SQLite tables.
 - Halo must read and write workspace state through AgentOS VM file APIs.
-- Ask for the username before starting the workspace.
-- Use `/halo/<username>/` as the workspace root and `/halo/<username>/files/` as the user's home directory.
-- Store Halo workspace state in the workspace root, beside `files/`, so both Halo and the agent can see it. Do not create a `.halo/` directory.
+- Ask for the username before starting the workspace. Call it the username in user-facing copy and the owner slug in code and storage.
+- Use `/halo/<owner-slug>/` as both the workspace root and the user's home directory.
+- Store Halo workspace state, user files, and normal home dotfiles in the workspace root so both Halo and the agent can see them. Do not create a `.halo/` directory.
 - Keep device settings outside the workspace database.
 - Copying the SQLite database to another machine must restore the whole workspace.
