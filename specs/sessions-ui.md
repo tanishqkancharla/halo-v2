@@ -1,0 +1,667 @@
+# Sessions UI
+
+## System flow
+
+```mermaid
+flowchart LR
+    Launch[App launch] --> Settings[Load device setting]
+    Settings --> Choice{Saved username is valid}
+    Choice -- Yes --> Start[start_workspace]
+    Choice -- No --> Form[Username form]
+    Form --> Start
+    Start --> Layout[Build /halo/username layout]
+    Layout --> Agent[Start AgentOS]
+    Agent --> Save[Save last username]
+    Agent --> Catalog[Load session catalog]
+    Catalog --> Shell[Sessions shell]
+    Shell --> Transcript[Read transcript]
+    Shell --> Draft[Open local draft]
+    Draft --> Durable[Create durable session]
+    Durable --> Prompt[Send prompt]
+    Prompt --> Refresh[Refresh catalog and transcript]
+```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Pane as SessionPane
+    participant Tauri
+    participant AgentOS
+
+    User->>Pane: Send first draft prompt
+    Pane->>Tauri: create_or_reopen_session(null, null, null)
+    Tauri->>AgentOS: open_session
+    AgentOS-->>Pane: SessionSummary
+    Pane->>Tauri: send_prompt(sessionId, text)
+    Tauri->>AgentOS: prompt
+    AgentOS-->>Pane: Complete response
+    Pane->>Tauri: list_sessions + read_session_transcript
+    Tauri->>AgentOS: catalog + durable history
+    AgentOS-->>Pane: Updated row + normalized transcript
+```
+
+## Problem overview
+
+Halo now presents AgentOS as a developer dashboard. Saved sessions, raw history, file checks, model settings, and status tools compete for space, and session history appears as JSON instead of a chat.
+
+Halo also starts AgentOS before it knows the username and uses `/home/agentos`. That breaks the workspace rules: Halo must know a valid username first, place the workspace at `/halo/<username>/`, and use `/halo/<username>/files/` as the user's home directory.
+
+## Solution overview
+
+Replace the dashboard with a full-height Maui sessions shell. Its sidebar lists durable sessions and opens a local blank draft; its main pane shows a readable transcript and a prompt editor.
+
+Keep a new session local until its first send. That send creates the AgentOS session, waits for the full reply, then reloads the catalog and normalized transcript. Before any session command can run, use the last valid username saved on this device or ask for one, then start AgentOS with the matching workspace paths.
+
+## Goals
+
+- Ask for a username before the first workspace start, or when the saved device setting is missing, invalid, or cannot start.
+- Reopen the last successful username and workspace automatically after the app restarts.
+- Show saved sessions in a Maui sidebar, newest first, with clear selection and run state.
+- Let the user select a session and read ordered user and assistant text.
+- Let the user open a blank draft and send its first prompt.
+- Turn a draft into a selected durable session only when the first prompt is sent.
+- Keep loading, empty, sending, partial-history, and error states local to the session pane.
+- Keep other session rows usable while a prompt or transcript request runs.
+- Use Maui components, tokens, focus styles, and two-pane layout rules.
+
+## Non-goals
+
+- No streamed messages, AgentOS event subscription, or partial reply UI.
+- No rename, delete, archive, search, pagination controls, routes, or deep links.
+- No rich tool, thought, plan, image, audio, or permission views; show user and assistant text only.
+- No provider or model picker in the sessions shell; keep backend default selection.
+- No workspace switcher or multi-workspace picker in the sessions shell.
+- No file browser, developer proof controls, or saved prompt drafts.
+- No migrations or backfills. Do not copy old `/home/agentos` files.
+
+## Important files, docs, and websites
+
+- [`AGENTS.md`](../AGENTS.md) — Defines username, workspace layout, storage, and writing rules.
+- [`README.md`](../README.md) — Describes the one-VM, one-database model and project checks.
+- [`apps/halo/src/App.tsx`](../apps/halo/src/App.tsx) — Holds the current dashboard, startup polling, session catalog, raw history, and prompt flow that this work replaces.
+- [`apps/halo/src/main.tsx`](../apps/halo/src/main.tsx) — Wraps the app in `MauiProvider`.
+- [`apps/halo/src/styles.css`](../apps/halo/src/styles.css) — Sets root height and base element styles.
+- [`apps/halo/src/maui.d.ts`](../apps/halo/src/maui.d.ts) — Shadows Maui types and must cover each new public Maui import.
+- [`apps/halo/src-tauri/src/lib.rs`](../apps/halo/src-tauri/src/lib.rs) — Starts AgentOS during Tauri setup and registers the command surface.
+- [`apps/halo/src-tauri/src/agentos_service.rs`](../apps/halo/src-tauri/src/agentos_service.rs) — Owns workspace paths, AgentOS state, sessions, prompts, history, and Rust tests.
+- `apps/halo/src-tauri/src/device_settings.rs` — New device-only JSON settings helper for the last successful username; it must not write workspace state or AgentOS tables.
+- [`apps/halo/package.json`](../apps/halo/package.json) — Owns frontend checks and needs the test command and test packages.
+- [`apps/halo/node_modules/maui/src/patterns/Sidebar.tsx`](../apps/halo/node_modules/maui/src/patterns/Sidebar.tsx) — Defines the public `Sidebar`, `SidebarSection`, and `SidebarItem` API and its 240px width.
+- [`apps/halo/node_modules/maui/src/pages/SidebarPage.tsx`](../apps/halo/node_modules/maui/src/pages/SidebarPage.tsx) — Shows Maui's two-pane sidebar grid.
+- [`apps/halo/node_modules/maui/src/apps/EmailClient/EmailClient.tsx`](../apps/halo/node_modules/maui/src/apps/EmailClient/EmailClient.tsx) — Shows scroll ownership, `minWidth: 0`, and pane overflow rules.
+- [`apps/halo/node_modules/maui/src/patterns/MessageList.tsx`](../apps/halo/node_modules/maui/src/patterns/MessageList.tsx) — Supplies message-feed markup and tokens to copy into Halo; Maui does not export it.
+- `agentos-client 0.2.15/src/session.rs` in the local Cargo registry — Defines `DurableSessionEvent`, `DurableSessionEventEntry`, `ContentBlock`, and `HistoryPage`.
+
+## Implementation
+
+### Phase 1: Gate AgentOS startup on a valid username
+
+Make the backend idle after Tauri setup and add one command that starts it with a checked workspace layout. After this commit, no workspace command can run before Halo receives a safe username.
+
+#### Important types
+
+```rust
+// apps/halo/src-tauri/src/agentos_service.rs
+struct WorkspaceLayout {
+    root: String,
+    files: String,
+    pi_config_dir: String,
+    pi_settings_path: String,
+}
+
+enum ServiceState {
+    NotStarted,
+    Starting,
+    Ready { os: AgentOs, layout: WorkspaceLayout },
+    Failed(String),
+    Stopped,
+}
+```
+
+#### Call stack diff
+
+```diff
+ run
+ └── Tauri setup
+-    ├── AgentOsService::new -> Starting
+-    └── spawn AgentOsService::initialize
+-        └── AgentOsService::start
++    ├── AgentOsService::new -> NotStarted
++    └── store StartupConfig in HaloState
+
++start_workspace command
++├── WorkspaceLayout::new(username)
++└── AgentOsService::initialize(layout, startup)
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src-tauri/src/lib.rs
+ struct HaloState {
+     agentos: Arc<AgentOsService>,
++    startup: StartupConfig,
+ }
+
+ .setup(|app| {
+     let service = AgentOsService::new(&app_data_dir);
+-    tauri::async_runtime::spawn(async move {
+-        service.initialize(startup).await;
+-    });
++    app.manage(HaloState { agentos: service, startup });
+     Ok(())
+ })
+```
+
+- [ ] Add `WorkspaceLayout::new(username)` with a clear length cap and allow only non-empty ASCII letters, numbers, `-`, and `_`; derive `/halo/<username>/`, `files/`, and Pi settings paths.
+- [ ] Start `AgentOsService` in `NotStarted`, keep `StartupConfig` in `HaloState`, and remove the background `initialize` call from Tauri `setup`.
+- [ ] Add and register `start_workspace(username)` so one caller can move `NotStarted` through `Starting` to `Ready`, while repeat or concurrent starts return a clear error.
+- [ ] Make `ready()` and every existing workspace command return “start a workspace first” while idle, without reading AgentOS SQLite tables.
+- [ ] Add Rust tests for idle commands and usernames that are empty, non-ASCII, too long, contain a slash, or contain `..`; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml`.
+
+### Phase 2: Apply the selected workspace layout to files and sessions
+
+Use the chosen layout for all VM paths once AgentOS starts. This commit makes files, Pi settings, session `HOME`, and session `cwd` follow the same workspace contract and proves that the SQLite file restores them.
+
+#### Important types
+
+```rust
+// apps/halo/src-tauri/src/agentos_service.rs
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HealthStatus {
+    status: &'static str,
+    workspace_root: String,
+    files_root: String,
+    database_path: String,
+    // existing credential and sidecar fields remain
+}
+```
+
+#### Call stack diff
+
+```diff
+ create_or_reopen_session
+-├── write_pi_settings(WORKSPACE_ROOT constants)
+-└── open_session(HOME = WORKSPACE_ROOT, cwd = WORKSPACE_ROOT)
++├── ready -> Ready { os, layout }
++├── write_pi_settings(os, layout.pi_settings_path)
++└── open_session(HOME = layout.files, cwd = layout.files)
+
+ write_file | read_file | list_files
+-└── validate_workspace_path(path, WORKSPACE_ROOT)
++└── validate_workspace_path(path, ready.layout.root)
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src-tauri/src/agentos_service.rs
+-const WORKSPACE_ROOT: &str = "/home/agentos";
+-const PI_SETTINGS_PATH: &str = "/home/agentos/.pi/agent/settings.json";
+
+ let mut env = BTreeMap::new();
+-env.insert("HOME".to_owned(), WORKSPACE_ROOT.to_owned());
++env.insert("HOME".to_owned(), workspace.layout.files.clone());
+
+ os.open_session(OpenSessionInput {
+-    cwd: Some(WORKSPACE_ROOT.to_owned()),
++    cwd: Some(workspace.layout.files.clone()),
+     ...
+ })
+```
+
+- [ ] After AgentOS starts, create `layout.root` and `layout.files` with AgentOS `mkdir`; keep Halo workspace state beside `files/` and never create `.halo/`.
+- [ ] Set Pi config paths from `WorkspaceLayout`, set session `HOME` and `cwd` to `layout.files`, and make file path checks use `layout.root`.
+- [ ] Return the selected root and files path in health data, and remove all `/home/agentos` constants and frontend path use.
+- [ ] Update restart tests to use `/halo/test-user/files/` and assert that a VM file and the session catalog survive a service restart with the same SQLite database.
+- [ ] Run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml` and ensure the tests make no model call.
+
+### Phase 3: Remember the last successful username on this device
+
+Store only the last username in Tauri's per-device app config directory. The next launch can use it before AgentOS starts, while `StartupConfig` remains process memory that Tauri rebuilds on every launch.
+
+#### Important types
+
+```rust
+// apps/halo/src-tauri/src/device_settings.rs
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeviceSettings {
+    last_username: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StartupPreference {
+    last_username: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StartWorkspaceResult {
+    health: HealthStatus,
+    preference_saved: bool,
+    preference_warning: Option<String>,
+}
+```
+
+#### Call stack diff
+
+```diff
+ Tauri setup
+ ├── build StartupConfig in memory
++├── app.path().app_config_dir/device-settings.json
++└── store device_settings_path in HaloState
+
++get_startup_preference
++└── load_device_settings
++    └── validate saved username
+
+ start_workspace(username)
+ └── AgentOsService::initialize
++    └── on success: save_device_settings(last_username)
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src-tauri/src/lib.rs
+ struct HaloState {
+     agentos: Arc<AgentOsService>,
+     startup: StartupConfig,
++    device_settings_path: PathBuf,
+ }
+
+-async fn start_workspace(...) -> Result<HealthStatus, String> {
++async fn start_workspace(...) -> Result<StartWorkspaceResult, String> {
+     let health = state.agentos.initialize(layout, state.startup.clone()).await?;
+-    Ok(health)
++    let preference_warning = save_device_settings(
++        &state.device_settings_path,
++        &DeviceSettings { last_username: Some(username) },
++    ).err();
++    Ok(StartWorkspaceResult {
++        health,
++        preference_saved: preference_warning.is_none(),
++        preference_warning,
++    })
+ }
+```
+
+- [ ] Resolve `app.path().app_config_dir()?.join("device-settings.json")` during Tauri setup and keep that path in `HaloState`; keep `StartupConfig` in Rust memory and rebuild it each launch.
+- [ ] Add `device_settings.rs` with serde load and atomic save helpers; treat a missing, corrupt, or invalid saved username as no preference and validate it with `WorkspaceLayout::new` before use.
+- [ ] Register `get_startup_preference` as a device-only command that can run before AgentOS starts and returns only a valid `lastUsername` or null.
+- [ ] Save the username only after AgentOS starts; do not write it to `tauri.conf.json`, AgentOS SQLite, or `/halo/<username>/`, and return a non-blocking warning instead of undoing a live workspace when the device-setting write fails.
+- [ ] Test missing, valid, corrupt, and invalid settings, atomic replacement, failed-start retention, and save failure after startup; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml`.
+
+### Phase 4: Add the frontend workspace gate and typed Tauri client
+
+Replace startup polling with an explicit frontend state machine and a small typed wrapper around Tauri calls. The app loads the session catalog only after `start_workspace` succeeds.
+
+#### Important types
+
+```tsx
+// apps/halo/src/workspace/types.ts
+type WorkspaceState =
+  | { status: "restoring" }
+  | { status: "needs-username"; username: string }
+  | { status: "starting"; username: string }
+  | { status: "error"; username: string; message: string }
+  | { status: "ready"; health: WorkspaceHealth; preferenceWarning?: string };
+
+type WorkspaceHealth = {
+  workspaceRoot: string;
+  filesRoot: string;
+  status: "ready";
+};
+
+type StartupPreference = { lastUsername?: string };
+```
+
+#### Call stack diff
+
+```diff
+ App mount
+-├── refresh
+-│   ├── sidecar_health
+-│   ├── list_workspace_files
+-│   └── list_sessions
+-└── start health polling interval
++└── api.getStartupPreference
++    ├── saved username -> api.startWorkspace(username)
++    │   ├── success -> api.listSessions
++    │   └── failure -> render WorkspaceStart with error
++    └── no valid username -> render WorkspaceStart
++        └── submit(username)
++            └── api.startWorkspace(username)
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src/App.tsx
+ export function App() {
+-  const [health, setHealth] = useState<HealthStatus>();
+-  useEffect(() => void refresh(), [refresh]);
++  const [workspace, setWorkspace] = useState<WorkspaceState>({
++    status: "restoring",
++  });
++  useEffect(() => {
++    void restoreLastWorkspace().then(setWorkspace);
++  }, []);
+
+-  return (
+-    <main className={classes.app}>
+-      ...
+-    </main>
+-  );
++  if (workspace.status !== "ready") {
++    return <WorkspaceStart state={workspace} onStart={startWorkspace} />;
++  }
++  return <WorkspaceReady health={workspace.health} sessions={sessions} />;
+ }
+```
+
+- [ ] Add `vitest`, `jsdom`, React Testing Library, and `user-event` to `apps/halo`, configure jsdom, add `test: "vitest run"`, and provide a typed mock for Tauri `invoke`.
+- [ ] Move shared Tauri DTOs and command wrappers into `apps/halo/src/api.ts`, including `getStartupPreference`, `startWorkspace`, `listSessions`, `readSessionTranscript`, `createSession`, and `sendPrompt`.
+- [ ] Build an accessible Maui `WorkspaceStart` form that submits on Enter, disables only during startup, keeps the username after failure, and places the error by the field.
+- [ ] On mount, auto-start a valid saved username; show `WorkspaceStart` when none exists or restore fails, then enter a minimal ready view and load the catalog after success.
+- [ ] Run `pnpm --filter @halo/desktop typecheck`; manually check that first launch asks for a username, the next launch restores it, and a bad saved value returns to the form. Do not add automated tests for this gate.
+
+### Phase 5: Normalize AgentOS history into transcript DTOs
+
+Convert typed AgentOS history in Rust, where the event variants are known, instead of sending raw JSON to React. Keep page flags so the UI can say when the first 500 events do not hold the full transcript.
+
+#### Important types
+
+```rust
+// apps/halo/src-tauri/src/agentos_service.rs
+#[derive(Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+enum MessageRole { User, Assistant }
+
+#[derive(Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct SessionMessage { id: String, role: MessageRole, text: String, timestamp: String }
+
+#[derive(Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct SessionTranscript { messages: Vec<SessionMessage>, has_more_before: bool, has_more_after: bool }
+```
+
+#### Call stack diff
+
+```diff
+-read_session_history(session_id)
+-└── AgentOsService::read_history
+-    ├── AgentOs::read_history -> HistoryPage
+-    └── serialize each event -> Vec<Value>
++read_session_transcript(session_id)
++└── AgentOsService::read_transcript
++    ├── AgentOs::read_history -> HistoryPage
++    └── build_transcript(page) -> SessionTranscript
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src-tauri/src/lib.rs
+ #[tauri::command]
+-async fn read_session_history(
++async fn read_session_transcript(
+     state: State<'_, HaloState>,
+     session_id: String,
+-) -> Result<Vec<Value>, String> {
+-    state.agentos.read_history(&session_id).await
++) -> Result<SessionTranscript, String> {
++    state.agentos.read_transcript(&session_id).await
+ }
+```
+
+- [ ] Replace `read_session_history -> Vec<Value>` with `read_session_transcript -> SessionTranscript` and pass `HistoryPage` into a pure `build_transcript` function.
+- [ ] Accept only `UserMessageChunk` and `AgentMessageChunk` events with `ContentBlock::Text`; key chunks by role plus `messageId`, falling back to event sequence when `messageId` is absent.
+- [ ] Join text chunks for one message, preserve first-event timestamp and sequence order, and never merge adjacent messages that have distinct IDs.
+- [ ] Copy `has_more_before` and `has_more_after`; ignore thought, tool, plan, config, usage, permission, image, audio, and resource events.
+- [ ] Test interleaved ignored events, two adjacent assistant messages, multi-chunk text, missing IDs, non-text blocks, order, and both page flags; run the Rust tests.
+
+### Phase 6: Build the Maui sessions shell and local draft selection
+
+Replace the card dashboard with the two-pane sessions layout. A saved row selects its durable ID, while **New session** selects a local draft without calling Tauri.
+
+#### Important types
+
+```tsx
+// apps/halo/src/sessions/types.ts
+type SessionState = "idle" | "running" | "waiting" | "failed";
+
+type SessionSelection =
+  | { kind: "draft"; draftId: string }
+  | { kind: "saved"; sessionId: string };
+
+type SessionSummary = {
+  sessionId: string;
+  title?: string;
+  state: SessionState;
+  updatedAt: string;
+};
+```
+
+#### Call stack diff
+
+```diff
+ App render
+-└── WorkspaceReady
++└── SessionsApp
++    ├── SessionsSidebar
++    │   ├── selectSession -> Saved selection
++    │   └── openDraft -> Draft selection
++    └── SessionPane(selection)
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src/App.tsx
+-<WorkspaceReady health={workspace.health} sessions={sessions} />
++<SessionsApp
++  sessions={sessions}
++  selection={selection}
++  onSelectionChange={setSelection}
++/>
+```
+
+- [ ] Add `SessionsApp`, `SessionsSidebar`, and `SessionPane` with a full-height `240px minmax(0, 1fr)` grid, separate pane overflow, and `minWidth: 0` rules from Maui's sidebar and email examples.
+- [ ] Use public Maui `Sidebar`, `SidebarSection label="Sessions"`, `SidebarItem`, `Button`, and `Icons.Plus`; update `maui.d.ts` for those exports or remove its path override if the package types pass.
+- [ ] Sort rows by `updatedAt` newest first, use `title || sessionId`, mark the selected row with `active`, and show a short trailing label for running, waiting, or failed state.
+- [ ] Make **New session** select a fresh local draft and blank pane without a create call; keep it available for an empty catalog and make the sidebar compact but usable at narrow widths.
+- [ ] Test newest-first rows, saved selection, empty catalog, narrow-shell markup, and draft selection with no Tauri create call; run frontend tests and typecheck.
+
+### Phase 7: Load and render saved transcripts
+
+Give each selected session its own transcript request state and render the normalized messages as a semantic feed. A late response for an old selection must not replace the current pane.
+
+#### Important types
+
+```tsx
+// apps/halo/src/sessions/types.ts
+type TranscriptState =
+  | { status: "idle" }
+  | { status: "loading"; sessionId: string }
+  | { status: "ready"; sessionId: string; transcript: SessionTranscript }
+  | { status: "error"; sessionId: string; message: string };
+
+type SessionMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  timestamp: string;
+};
+```
+
+#### Call stack diff
+
+```diff
+ SessionPane(saved selection)
+-└── empty transcript state
++└── loadTranscript(sessionId)
++    └── api.readSessionTranscript
++        ├── ignore result when selection changed
++        └── setTranscript(ready)
++            └── MessageFeed
++                └── Message for each SessionMessage
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src/sessions/SessionPane.tsx
+ function SessionPane({ selection }: SessionPaneProps) {
++  const sessionId = selection.kind === "saved" ? selection.sessionId : undefined;
++
++  useEffect(() => {
++    if (!sessionId) return;
++    let current = true;
++    void readSessionTranscript(sessionId).then((transcript) => {
++      if (current) setTranscript({ status: "ready", sessionId, transcript });
++    });
++    return () => { current = false; };
++  }, [sessionId]);
+
+-  return <TranscriptStatus state={{ status: "idle" }} />;
++  return transcript.status === "ready"
++    ? <MessageFeed messages={transcript.transcript.messages} />
++    : <TranscriptStatus state={transcript} />;
+ }
+```
+
+- [ ] Load `readSessionTranscript(sessionId)` for saved selections, clear transcript state for drafts, and ignore a result whose session ID no longer matches the selection.
+- [ ] Add local `MessageFeed` and `Message` components based on Maui's unexported message-list pattern, with `role="feed"`, message articles, role labels, timestamps, and preserved text whitespace.
+- [ ] Give the feed its own scroll area and move to the latest message after the first successful load without moving focus.
+- [ ] Render pane-local loading, empty, failed, and partial-history states; state when `hasMoreBefore` or `hasMoreAfter` means the 500-event page is incomplete.
+- [ ] Test message order, empty and partial history, failed loads, stale responses, and draft selection; run frontend tests, lint, and typecheck.
+
+### Phase 8: Send prompts to saved sessions without locking the sidebar
+
+Pin a non-streaming prompt editor below the transcript and support sends to an existing session. Track the request by session ID so the user can switch rows while the old session finishes.
+
+#### Important types
+
+```tsx
+// apps/halo/src/sessions/types.ts
+type PromptDraft = { text: string; error?: string };
+
+type SendState =
+  | { status: "idle" }
+  | { status: "sending"; sessionId: string; submittedText: string }
+  | { status: "failed"; sessionId: string; submittedText: string; message: string };
+```
+
+#### Call stack diff
+
+```diff
+ SessionPane(saved selection)
+-└── MessageFeed
++├── MessageFeed
++└── PromptEditor::submit
++    └── sendSavedPrompt(sessionId, text)
++        ├── api.sendPrompt
++        └── refreshSession(sessionId)
++            ├── api.listSessions
++            └── api.readSessionTranscript
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src/sessions/SessionPane.tsx
++async function sendSavedPrompt(sessionId: string, text: string) {
++  setSendState({ status: "sending", sessionId, submittedText: text });
++  try {
++    await sendPrompt(sessionId, text);
++    await refreshSession(sessionId);
++    setPrompt("");
++  } catch (error) {
++    setSendState({ status: "failed", sessionId, submittedText: text, message: String(error) });
++  }
++}
+
+ return <>
+   <MessageFeed messages={messages} />
++  <PromptEditor onSubmit={(text) => sendSavedPrompt(sessionId, text)} />
+ </>;
+```
+
+- [ ] Add a bottom prompt editor styled with Maui text, background, radius, spacing, `shadow.subtle`, and `focusRing`; submit by button or Cmd/Ctrl+Enter and keep Enter for a new line.
+- [ ] Disable send for blank trimmed text and only for the session now sending; leave the sidebar and other sessions usable.
+- [ ] Call `send_prompt` for a saved session, wait for the full result, then refresh that session's catalog row and transcript without adding fake user or assistant messages.
+- [ ] Clear the prompt and scroll the feed only after success; on failure keep the text and show a retryable pane error, and never pull selection back after the user switches sessions.
+- [ ] Test blank input, keyboard submit, saved-session success, error retention, session switching during send, and the non-streaming busy state; run frontend tests and typecheck.
+
+### Phase 9: Turn the first draft send into a durable session
+
+Finish the new-session path by creating a durable session only when the user sends the draft. Keep the draft text and error visible if creation or prompt delivery fails.
+
+#### Important types
+
+```tsx
+// apps/halo/src/sessions/types.ts
+type DraftSession = {
+  draftId: string;
+  prompt: string;
+  status: "editing" | "creating" | "sending" | "failed";
+  durableSessionId?: string;
+  error?: string;
+};
+
+type CreateSessionInput = {
+  sessionId: null;
+  provider: null;
+  model: null;
+};
+```
+
+#### Call stack diff
+
+```diff
+ SessionsSidebar::openDraft
+-└── SessionPane(draft) -> blank pane
++└── SessionPane(draft)
++    └── PromptEditor::submit
++        └── sendDraft(draft)
++            ├── api.createSession(null, null, null)
++            ├── api.sendPrompt(durableSessionId, text)
++            └── refreshSession(durableSessionId)
++                ├── replace draft selection
++                ├── api.listSessions
++                └── api.readSessionTranscript
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src/sessions/SessionPane.tsx
++async function ensureSession(draft: DraftSession) {
++  if (draft.durableSessionId) return draft.durableSessionId;
++  const session = await createSession({
++    sessionId: null,
++    provider: null,
++    model: null,
++  });
++  rememberDurableId(draft.draftId, session.sessionId);
++  return session.sessionId;
++}
+
+ async function submitDraft(draft: DraftSession) {
+-  return;
++  const sessionId = await ensureSession(draft);
++  await sendPrompt(sessionId, draft.prompt);
++  await selectAndRefresh(sessionId);
+ }
+```
+
+- [ ] Focus the editor when a draft opens and keep its prompt state keyed by `draftId` until the first send completes or the user opens another draft.
+- [ ] On first send, call `create_or_reopen_session` with null session, provider, and model, then send the prompt to the returned ID; do not create a durable session when **New session** is clicked.
+- [ ] After success, replace that draft selection with the durable session, clear its prompt, refresh the catalog and transcript, and place the new or updated row in newest-first order.
+- [ ] On create or send failure, keep the draft text, show a retry action, avoid a second durable session when an ID was already returned, and leave other rows usable.
+- [ ] Test first-send creation, default provider/model input, failure before and after creation, retry without duplicate creation, selection changes, and focus; run all frontend and Rust checks, then check startup, restart persistence, dark theme, keyboard focus, and a narrow Tauri window by hand.
