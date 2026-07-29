@@ -100,7 +100,7 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|error| format!("Could not find the app data directory: {error}"))?;
-            let service = AgentOsService::new(&app_data_dir);
+            let service = Arc::new(AgentOsService::new(&app_data_dir));
             let startup = StartupConfig {
                 app_data_dir,
                 sidecar_path: find_sidecar_path(app.handle())?,

@@ -1,0 +1,5 @@
+{
+  "rust-analyzer.linkedProjects": [
+    "./apps/halo/src-tauri/Cargo.toml"
+  ]
+}

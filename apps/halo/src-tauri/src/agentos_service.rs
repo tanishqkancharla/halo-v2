@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
-use std::sync::Arc;
 
 use agentos_client::{
     AgentOs, AgentOsConfig, ListSessionsInput, MkdirOptions, MountPlugin, OpenSessionInput,
@@ -144,15 +143,15 @@ pub struct PromptResponse {
 }
 
 impl AgentOsService {
-    pub fn new(app_data_dir: &Path) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn new(app_data_dir: &Path) -> Self {
+        Self {
             state: RwLock::new(ServiceState::NotStarted),
             database_path: app_data_dir.join("agentos.sqlite"),
-        })
+        }
     }
 
     pub async fn initialize(
-        self: &Arc<Self>,
+        &self,
         layout: WorkspaceLayout,
         config: StartupConfig,
     ) -> Result<(), String> {
@@ -166,32 +165,21 @@ impl AgentOsService {
                 ServiceState::Ready { .. } => {
                     return Err("A workspace has already started.".to_owned());
                 }
-                ServiceState::Failed(error) => {
-                    return Err(format!("Workspace startup already failed: {error}"));
-                }
+                ServiceState::Failed(_) => *state = ServiceState::Starting,
                 ServiceState::Stopped => return Err("AgentOS has stopped.".to_owned()),
             }
         }
 
         match self.start(config).await {
             Ok(os) => {
-                let should_shutdown = {
-                    let mut state = self.state.write().await;
-                    if matches!(&*state, ServiceState::Starting) {
-                        *state = ServiceState::Ready {
-                            os: os.clone(),
-                            layout,
-                        };
-                        false
-                    } else {
-                        true
-                    }
-                };
-                if should_shutdown {
-                    let _ = os.shutdown().await;
-                    return Err("AgentOS stopped during workspace startup.".to_owned());
+                let mut state = self.state.write().await;
+                if matches!(&*state, ServiceState::Starting) {
+                    *state = ServiceState::Ready { os, layout };
+                    return Ok(());
                 }
-                Ok(())
+                drop(state);
+                let _ = os.shutdown().await;
+                Err("AgentOS stopped during workspace startup.".to_owned())
             }
             Err(error) => {
                 let mut state = self.state.write().await;
@@ -723,6 +711,33 @@ mod tests {
                 .expect_err("history should require startup"),
             "Start a workspace first."
         );
+    }
+
+    #[tokio::test]
+    async fn failed_workspace_start_can_retry() {
+        let data_dir =
+            std::env::temp_dir().join(format!("halo-agentos-retry-test-{}", uuid::Uuid::new_v4()));
+        let service = AgentOsService::new(&data_dir);
+
+        for attempt in 1..=2 {
+            let error = service
+                .initialize(
+                    test_workspace_layout(),
+                    StartupConfig {
+                        app_data_dir: data_dir.clone(),
+                        sidecar_path: data_dir.join("missing-sidecar"),
+                        pi_package_path: data_dir.join("missing-pi-package"),
+                    },
+                )
+                .await
+                .expect_err("missing sidecar should fail startup");
+            assert!(
+                error.contains("AgentOS sidecar is missing"),
+                "attempt {attempt} returned the wrong error: {error}"
+            );
+        }
+
+        std::fs::remove_dir_all(data_dir).expect("remove retry test data directory");
     }
 
     #[test]
