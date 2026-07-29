@@ -45,6 +45,21 @@ export type SessionSummary = {
   updatedAt: string;
 };
 
+export type MessageRole = "user" | "assistant";
+
+export type SessionMessage = {
+  id: string;
+  role: MessageRole;
+  text: string;
+  timestamp: string;
+};
+
+export type SessionTranscript = {
+  messages: SessionMessage[];
+  hasMoreBefore: boolean;
+  hasMoreAfter: boolean;
+};
+
 export type PromptResponse = {
   sessionId: string;
   output: string;
@@ -85,8 +100,10 @@ export function listSessions(): Promise<SessionSummary[]> {
   return invoke("list_sessions");
 }
 
-export function readSessionHistory(sessionId: string): Promise<unknown[]> {
-  return invoke("read_session_history", { sessionId });
+export function readSessionTranscript(
+  sessionId: string,
+): Promise<SessionTranscript> {
+  return invoke("read_session_transcript", { sessionId });
 }
 
 export function createSession(options?: {

@@ -5,12 +5,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use agentos_service::{
-    AgentOsService, HealthStatus, PromptResponse, SessionSummary, StartupConfig, WorkspaceEntry,
-    WorkspaceLayout,
+    AgentOsService, HealthStatus, PromptResponse, SessionSummary, SessionTranscript, StartupConfig,
+    WorkspaceEntry, WorkspaceLayout,
 };
 use device_settings::{load_startup_preference, save_last_owner_slug, StartupPreference};
 use serde::Serialize;
-use serde_json::Value;
 use tauri::{Manager, RunEvent, State};
 
 struct HaloState {
@@ -130,11 +129,11 @@ async fn list_sessions(state: State<'_, HaloState>) -> Result<Vec<SessionSummary
 }
 
 #[tauri::command]
-async fn read_session_history(
+async fn read_session_transcript(
     state: State<'_, HaloState>,
     session_id: String,
-) -> Result<Vec<Value>, String> {
-    state.agentos.read_history(&session_id).await
+) -> Result<SessionTranscript, String> {
+    state.agentos.read_transcript(&session_id).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -180,7 +179,7 @@ pub fn run() {
             create_or_reopen_session,
             send_prompt,
             list_sessions,
-            read_session_history,
+            read_session_transcript,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Halo");

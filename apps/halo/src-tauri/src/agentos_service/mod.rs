@@ -14,7 +14,7 @@ use serde_json::json;
 use tokio::sync::RwLock;
 
 use providers::configured_providers;
-pub use sessions::{PromptResponse, SessionSummary};
+pub use sessions::{PromptResponse, SessionSummary, SessionTranscript};
 use workspace::{ensure_workspace_home, VM_USER_ID};
 pub use workspace::{WorkspaceEntry, WorkspaceLayout};
 
@@ -240,8 +240,8 @@ impl AgentOsService {
         self.ready().await?.list_sessions().await
     }
 
-    pub async fn read_history(&self, session_id: &str) -> Result<Vec<serde_json::Value>, String> {
-        self.ready().await?.read_history(session_id).await
+    pub async fn read_transcript(&self, session_id: &str) -> Result<SessionTranscript, String> {
+        self.ready().await?.read_transcript(session_id).await
     }
 
     pub async fn shutdown(&self) {
@@ -359,7 +359,7 @@ mod tests {
         );
         assert_eq!(
             service
-                .read_history("session-1")
+                .read_transcript("session-1")
                 .await
                 .expect_err("history should require startup"),
             "Start a workspace first."
@@ -525,6 +525,13 @@ mod tests {
             .find(|session| session.session_id == "restart-test")
             .expect("saved restart session");
         assert_eq!(session.cwd, "/halo/test-user");
+        let transcript = restarted
+            .read_transcript("restart-test")
+            .await
+            .expect("read empty saved transcript");
+        assert!(transcript.messages.is_empty());
+        assert!(!transcript.has_more_before);
+        assert!(!transcript.has_more_after);
         restarted.shutdown().await;
         std::fs::remove_dir_all(data_dir).expect("remove test data directory");
     }

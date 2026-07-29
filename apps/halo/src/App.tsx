@@ -34,13 +34,14 @@ import {
   isReadyHealth,
   listSessions,
   listWorkspaceFiles,
-  readSessionHistory,
+  readSessionTranscript,
   readWorkspaceFile,
   sendPrompt,
   startWorkspace as startWorkspaceApi,
   writeWorkspaceFile,
   type ReadyHealthStatus,
   type SessionSummary,
+  type SessionTranscript,
   type StartWorkspaceResult,
   type WorkspaceEntry,
 } from "./api.ts";
@@ -330,7 +331,7 @@ export function App() {
     "Reply with a short greeting and name the current directory.",
   );
   const [output, setOutput] = useState("No prompt sent yet.");
-  const [history, setHistory] = useState<unknown[]>([]);
+  const [transcript, setTranscript] = useState<SessionTranscript>();
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
   const { resolvedTheme, setPreference } = useTheme();
@@ -437,21 +438,22 @@ export function App() {
 
   useEffect(() => {
     if (!selectedSessionId) {
-      setHistory([]);
+      setTranscript(undefined);
       return;
     }
-    void readSessionHistory(selectedSessionId)
-      .then(setHistory)
+    setTranscript(undefined);
+    void readSessionTranscript(selectedSessionId)
+      .then(setTranscript)
       .catch((caught) => setError(String(caught)));
   }, [selectedSessionId]);
 
   const statusLabel = health?.error ?? health?.status ?? "not started";
-  const historyText = useMemo(
+  const transcriptText = useMemo(
     () =>
-      history.length
-        ? JSON.stringify(history, null, 2)
+      transcript
+        ? JSON.stringify(transcript, null, 2)
         : "No completed history yet.",
-    [history],
+    [transcript],
   );
 
   async function writeHello() {
@@ -518,7 +520,7 @@ export function App() {
       const response = await sendPrompt(sessionId, prompt);
       setOutput(response.output || JSON.stringify(response.message, null, 2));
       await refreshSessions();
-      setHistory(await readSessionHistory(sessionId));
+      setTranscript(await readSessionTranscript(sessionId));
     }).catch(() => undefined);
   }
 
@@ -672,7 +674,7 @@ export function App() {
                         </div>
                       )}
                     </div>
-                    <div className={classes.output}>{historyText}</div>
+                    <div className={classes.output}>{transcriptText}</div>
                   </Flex>
                 </section>
               </div>

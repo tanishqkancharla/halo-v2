@@ -83,9 +83,9 @@ Keep a new session local until its first send. That send creates the AgentOS ses
 - [`apps/halo/src/styles.css`](../apps/halo/src/styles.css) — Sets root height and base element styles.
 - [`apps/halo/src/maui.d.ts`](../apps/halo/src/maui.d.ts) — Shadows Maui types and must cover each new public Maui import.
 - [`apps/halo/src-tauri/src/lib.rs`](../apps/halo/src-tauri/src/lib.rs) — Starts AgentOS during Tauri setup and registers the command surface.
-- [`apps/halo/src-tauri/src/agentos_service.rs`](../apps/halo/src-tauri/src/agentos_service.rs) — Owns workspace paths, AgentOS state, sessions, prompts, history, and Rust tests.
+- [`apps/halo/src-tauri/src/agentos_service/`](../apps/halo/src-tauri/src/agentos_service/) — Splits AgentOS lifecycle, workspace, provider, session, prompt, transcript, and Rust test code by concern.
 - `apps/halo/src-tauri/src/device_settings.rs` — New device-only JSON settings helper for the last successful username, stored as an owner slug; it must not write workspace state or AgentOS tables.
-- [`apps/halo/package.json`](../apps/halo/package.json) — Owns frontend checks and needs the test command and test packages.
+- [`apps/halo/package.json`](../apps/halo/package.json) — Owns frontend build, typecheck, lint, and format commands.
 - [`apps/halo/node_modules/maui/src/patterns/Sidebar.tsx`](../apps/halo/node_modules/maui/src/patterns/Sidebar.tsx) — Defines the public `Sidebar`, `SidebarSection`, and `SidebarItem` API and its 240px width.
 - [`apps/halo/node_modules/maui/src/pages/SidebarPage.tsx`](../apps/halo/node_modules/maui/src/pages/SidebarPage.tsx) — Shows Maui's two-pane sidebar grid.
 - [`apps/halo/node_modules/maui/src/apps/EmailClient/EmailClient.tsx`](../apps/halo/node_modules/maui/src/apps/EmailClient/EmailClient.tsx) — Shows scroll ownership, `minWidth: 0`, and pane overflow rules.
@@ -101,13 +101,14 @@ Make the backend idle after Tauri setup and add one command that starts it with 
 #### Important types
 
 ```rust
-// apps/halo/src-tauri/src/agentos_service.rs
+// apps/halo/src-tauri/src/agentos_service/workspace.rs
 struct WorkspaceLayout {
     root: String,
     pi_config_dir: String,
     pi_settings_path: String,
 }
 
+// apps/halo/src-tauri/src/agentos_service/mod.rs
 enum ServiceState {
     NotStarted,
     Starting,
@@ -165,7 +166,7 @@ Use the chosen root for all VM paths once AgentOS starts. This commit makes the 
 #### Important types
 
 ```rust
-// apps/halo/src-tauri/src/agentos_service.rs
+// apps/halo/src-tauri/src/agentos_service/mod.rs
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct HealthStatus {
@@ -194,7 +195,7 @@ struct HealthStatus {
 #### Code diff preview
 
 ```diff
- // apps/halo/src-tauri/src/agentos_service.rs
+ // apps/halo/src-tauri/src/agentos_service/sessions.rs
 -const WORKSPACE_ROOT: &str = "/home/agentos";
 -const PI_SETTINGS_PATH: &str = "/home/agentos/.pi/agent/settings.json";
 
@@ -362,7 +363,7 @@ type StartupPreference = { lastOwnerSlug?: string };
 ```
 
 - [x] Keep the frontend dependency set unchanged; smoke-test the workspace gate through the running Tauri app with `halo-web` instead of adding jsdom or browser unit-test packages.
-- [x] Move shared Tauri DTOs and command wrappers into `apps/halo/src/api.ts`, including `getStartupPreference`, `startWorkspace`, `listSessions`, `readSessionHistory`, `createSession`, and `sendPrompt`.
+- [x] Move shared Tauri DTOs and command wrappers into `apps/halo/src/api.ts`, including `getStartupPreference`, `startWorkspace`, `listSessions`, `readSessionTranscript`, `createSession`, and `sendPrompt`.
 - [x] Build an accessible Maui `WorkspaceStart` form labeled “Username” that submits on Enter, disables only during startup, keeps the username after failure, and places the error by the field.
 - [x] On mount, auto-start a valid saved owner slug; show `WorkspaceStart` when none exists or restore fails, then enter a minimal ready view and load the catalog after success.
 - [x] Run `pnpm --filter @halo/desktop typecheck`; use `halo-web` to check that first launch asks for a username, the next launch restores it, and a bad username keeps the form and shows its error by the field.
@@ -374,7 +375,7 @@ Convert typed AgentOS history in Rust, where the event variants are known, inste
 #### Important types
 
 ```rust
-// apps/halo/src-tauri/src/agentos_service.rs
+// apps/halo/src-tauri/src/agentos_service/sessions.rs
 #[derive(Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 enum MessageRole { User, Assistant }
@@ -417,11 +418,11 @@ struct SessionTranscript { messages: Vec<SessionMessage>, has_more_before: bool,
  }
 ```
 
-- [ ] Replace `read_session_history -> Vec<Value>` with `read_session_transcript -> SessionTranscript` and pass `HistoryPage` into a pure `build_transcript` function.
-- [ ] Accept only `UserMessageChunk` and `AgentMessageChunk` events with `ContentBlock::Text`; key chunks by role plus `messageId`, falling back to event sequence when `messageId` is absent.
-- [ ] Join text chunks for one message, preserve first-event timestamp and sequence order, and never merge adjacent messages that have distinct IDs.
-- [ ] Copy `has_more_before` and `has_more_after`; ignore thought, tool, plan, config, usage, permission, image, audio, and resource events.
-- [ ] Test interleaved ignored events, two adjacent assistant messages, multi-chunk text, missing IDs, non-text blocks, order, and both page flags; run the Rust tests.
+- [x] Replace `read_session_history -> Vec<Value>` with `read_session_transcript -> SessionTranscript` and pass `HistoryPage` into a pure `build_transcript` function.
+- [x] Accept only `UserMessageChunk` and `AgentMessageChunk` events with `ContentBlock::Text`; key chunks by role plus `messageId`, falling back to event sequence when `messageId` is absent.
+- [x] Join text chunks for one message, preserve first-event timestamp and sequence order, and never merge adjacent messages that have distinct IDs.
+- [x] Copy `has_more_before` and `has_more_after`; ignore thought, tool, plan, config, usage, permission, image, audio, and resource events.
+- [x] Test interleaved ignored events, two adjacent assistant messages, multi-chunk text, missing IDs, non-text blocks, order, and both page flags; run the Rust tests.
 
 ### Phase 6: Build the Maui sessions shell and local draft selection
 
