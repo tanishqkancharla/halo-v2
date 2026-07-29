@@ -96,10 +96,11 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .setup(|app| {
-            let app_data_dir = app
+            let default_app_data_dir = app
                 .path()
                 .app_data_dir()
                 .map_err(|error| format!("Could not find the app data directory: {error}"))?;
+            let app_data_dir = resolve_app_data_dir(default_app_data_dir);
             let service = Arc::new(AgentOsService::new(&app_data_dir));
             let startup = StartupConfig {
                 app_data_dir,
@@ -154,9 +155,31 @@ fn load_development_env() -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(debug_assertions)]
+fn resolve_app_data_dir(default: PathBuf) -> PathBuf {
+    let Some(configured) = std::env::var_os("HALO_APP_DATA_DIR").filter(|value| !value.is_empty())
+    else {
+        return default;
+    };
+
+    let configured = PathBuf::from(configured);
+    if configured.is_absolute() {
+        configured
+    } else {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .join(configured)
+    }
+}
+
 #[cfg(not(debug_assertions))]
 fn load_development_env() -> Result<(), String> {
     Ok(())
+}
+
+#[cfg(not(debug_assertions))]
+fn resolve_app_data_dir(default: PathBuf) -> PathBuf {
+    default
 }
 
 fn find_sidecar_path(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {

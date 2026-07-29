@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Badge,
@@ -24,7 +30,7 @@ import {
 import { style, useStyles } from "purse-styles";
 
 type HealthStatus = {
-  status: "starting" | "ready" | "error" | "stopped";
+  status: "not_started" | "starting" | "ready" | "error" | "stopped";
   sidecarState?: string;
   error?: string;
   databasePath: string;
@@ -56,8 +62,6 @@ type PromptResponse = {
   message: unknown;
   stopReason: unknown;
 };
-
-const HELLO_PATH = "/home/agentos/hello.txt";
 
 const appClass = style({
   minHeight: "100vh",
@@ -216,6 +220,7 @@ const errorClass = style(
 
 export function App() {
   const [health, setHealth] = useState<HealthStatus>();
+  const [username, setUsername] = useState("");
   const [files, setFiles] = useState<WorkspaceEntry[]>([]);
   const [fileContent, setFileContent] = useState(
     "Hello from Halo and AgentOS.\n",
@@ -232,6 +237,9 @@ export function App() {
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
   const { resolvedTheme, setPreference } = useTheme();
+  const helloPath = health?.workspaceRoot
+    ? `${health.workspaceRoot}/hello.txt`
+    : "";
 
   const classes = {
     app: useStyles(appClass),
@@ -283,7 +291,7 @@ export function App() {
   const refreshFiles = useCallback(async () => {
     setFiles(
       await invoke<WorkspaceEntry[]>("list_workspace_files", {
-        path: "/home/agentos",
+        path: null,
       }),
     );
   }, []);
@@ -343,18 +351,34 @@ export function App() {
 
   async function writeHello() {
     await run("write", async () => {
+      if (!helloPath) throw new Error("Start a workspace first.");
       await invoke("write_workspace_file", {
-        path: HELLO_PATH,
+        path: helloPath,
         content: fileContent,
       });
       await refreshFiles();
     }).catch(() => undefined);
   }
 
+  async function startWorkspace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const ownerSlug = username.trim();
+    if (!ownerSlug) return;
+
+    await run("workspace", async () => {
+      const nextHealth = await invoke<HealthStatus>("start_workspace", {
+        ownerSlug,
+      });
+      setHealth(nextHealth);
+      await Promise.all([refreshFiles(), refreshSessions()]);
+    }).catch(() => undefined);
+  }
+
   async function readHello() {
     await run("read", async () => {
+      if (!helloPath) throw new Error("Start a workspace first.");
       setFileContent(
-        await invoke<string>("read_workspace_file", { path: HELLO_PATH }),
+        await invoke<string>("read_workspace_file", { path: helloPath }),
       );
       await refreshFiles();
     }).catch(() => undefined);
@@ -447,166 +471,213 @@ export function App() {
           </div>
         )}
 
-        <div className={classes.grid}>
-          <div className={classes.column}>
-            <section className={classes.card}>
+        {health?.status !== "ready" ? (
+          <section className={classes.card}>
+            <form onSubmit={(event) => void startWorkspace(event)}>
               <Flex column gap={8}>
                 <div>
-                  <H2>Workspace file</H2>
-                  <P>Write and read {HELLO_PATH} through the Rust client.</P>
-                </div>
-                <div>
-                  <label className={classes.fieldLabel} htmlFor="file-content">
-                    File content
-                  </label>
-                  <textarea
-                    id="file-content"
-                    className={classes.textarea}
-                    value={fileContent}
-                    onChange={(event) => setFileContent(event.target.value)}
-                  />
-                </div>
-                <Flex row gap={4}>
-                  <Button
-                    onClick={() => void writeHello()}
-                    disabled={Boolean(busy)}
-                  >
-                    {busy === "write" ? "Writing…" : "Write file"}
-                  </Button>
-                  <Button
-                    onClick={() => void readHello()}
-                    disabled={Boolean(busy)}
-                  >
-                    {busy === "read" ? "Reading…" : "Read file"}
-                  </Button>
-                </Flex>
-                <div>
-                  <span className={classes.fieldLabel}>Workspace entries</span>
-                  <ul className={classes.list}>
-                    {files.length ? (
-                      files.map((file) => (
-                        <li className={classes.listRow} key={file.path}>
-                          {file.isDirectory ? "Directory" : "File"}: {file.name}
-                        </li>
-                      ))
-                    ) : (
-                      <li className={classes.listRow}>No files yet.</li>
-                    )}
-                  </ul>
-                </div>
-              </Flex>
-            </section>
-
-            <section className={classes.card}>
-              <Flex column gap={8}>
-                <div>
-                  <H2>Saved sessions</H2>
-                  <P>These rows come from AgentOS SQLite history.</P>
-                </div>
-                <div className={classes.list}>
-                  {sessions.length ? (
-                    sessions.map((session) => (
-                      <button
-                        type="button"
-                        className={classes.sessionButton}
-                        data-selected={session.sessionId === selectedSessionId}
-                        key={session.sessionId}
-                        onClick={() => setSelectedSessionId(session.sessionId)}
-                      >
-                        {session.title || session.sessionId} · {session.state}
-                      </button>
-                    ))
-                  ) : (
-                    <div className={classes.listRow}>No saved sessions.</div>
-                  )}
-                </div>
-                <div className={classes.output}>{historyText}</div>
-              </Flex>
-            </section>
-          </div>
-
-          <div className={classes.column}>
-            <section className={classes.card}>
-              <Flex column gap={8}>
-                <div>
-                  <H1>Pi agent</H1>
+                  <H1>Start workspace</H1>
                   <P>
-                    Choose a provider and optional model, then open a durable
-                    session.
+                    Enter a username. Halo will use it to open your workspace
+                    home.
                   </P>
                 </div>
-                <Select
-                  label="Provider"
-                  selectedKey={provider}
-                  onSelectionChange={(key) => setProvider(String(key))}
-                >
-                  <SelectItem id="anthropic">Anthropic</SelectItem>
-                  <SelectItem id="openai">OpenAI</SelectItem>
-                  <SelectItem id="google">Google Gemini</SelectItem>
-                  <SelectItem id="openrouter">OpenRouter</SelectItem>
-                </Select>
                 <div>
-                  <label className={classes.fieldLabel} htmlFor="model-name">
-                    Model ID (optional)
+                  <label className={classes.fieldLabel} htmlFor="username">
+                    Username
                   </label>
                   <TextField
-                    id="model-name"
-                    value={model}
-                    onChange={setModel}
-                    placeholder="Use Pi's provider default"
+                    id="username"
+                    value={username}
+                    onChange={setUsername}
+                    placeholder="tanishq"
+                    autoFocus
                   />
                 </div>
                 <Button
-                  onClick={() => void openSession()}
-                  disabled={Boolean(busy)}
+                  type="submit"
+                  disabled={busy === "workspace" || !username.trim()}
                 >
-                  {busy === "session"
-                    ? "Opening…"
-                    : selectedSessionId
-                      ? "Reopen selected session"
-                      : "Create session"}
+                  {busy === "workspace" ? "Starting…" : "Start workspace"}
                 </Button>
-                <span className={classes.muted}>
-                  {selectedSessionId
-                    ? `Selected: ${selectedSessionId}`
-                    : "No session selected."}
-                </span>
               </Flex>
-            </section>
-
-            <section className={classes.card}>
-              <Flex column gap={8}>
-                <div>
-                  <H2>Prompt</H2>
-                  <P>The key stays in Rust and never enters browser state.</P>
-                </div>
-                <div>
-                  <label className={classes.fieldLabel} htmlFor="prompt">
-                    Message
-                  </label>
-                  <textarea
-                    id="prompt"
-                    className={classes.textarea}
-                    value={prompt}
-                    onChange={(event) => setPrompt(event.target.value)}
-                  />
-                </div>
-                <Button
-                  onClick={() => void submitPrompt()}
-                  disabled={Boolean(busy)}
-                >
-                  {busy === "prompt" ? "Waiting for Pi…" : "Send prompt"}
-                </Button>
-                <div>
-                  <span className={classes.fieldLabel}>Completed output</span>
-                  <div className={classes.output} role="status">
-                    {output}
+            </form>
+          </section>
+        ) : (
+          <div className={classes.grid}>
+            <div className={classes.column}>
+              <section className={classes.card}>
+                <Flex column gap={8}>
+                  <div>
+                    <H2>Workspace file</H2>
+                    <P>
+                      Write and read {helloPath || "the workspace home"} through
+                      the Rust client.
+                    </P>
                   </div>
-                </div>
-              </Flex>
-            </section>
+                  <div>
+                    <label
+                      className={classes.fieldLabel}
+                      htmlFor="file-content"
+                    >
+                      File content
+                    </label>
+                    <textarea
+                      id="file-content"
+                      className={classes.textarea}
+                      value={fileContent}
+                      onChange={(event) => setFileContent(event.target.value)}
+                    />
+                  </div>
+                  <Flex row gap={4}>
+                    <Button
+                      onClick={() => void writeHello()}
+                      disabled={Boolean(busy)}
+                    >
+                      {busy === "write" ? "Writing…" : "Write file"}
+                    </Button>
+                    <Button
+                      onClick={() => void readHello()}
+                      disabled={Boolean(busy)}
+                    >
+                      {busy === "read" ? "Reading…" : "Read file"}
+                    </Button>
+                  </Flex>
+                  <div>
+                    <span className={classes.fieldLabel}>
+                      Workspace entries
+                    </span>
+                    <ul className={classes.list}>
+                      {files.length ? (
+                        files.map((file) => (
+                          <li className={classes.listRow} key={file.path}>
+                            {file.isDirectory ? "Directory" : "File"}:{" "}
+                            {file.name}
+                          </li>
+                        ))
+                      ) : (
+                        <li className={classes.listRow}>No files yet.</li>
+                      )}
+                    </ul>
+                  </div>
+                </Flex>
+              </section>
+
+              <section className={classes.card}>
+                <Flex column gap={8}>
+                  <div>
+                    <H2>Saved sessions</H2>
+                    <P>These rows come from AgentOS SQLite history.</P>
+                  </div>
+                  <div className={classes.list}>
+                    {sessions.length ? (
+                      sessions.map((session) => (
+                        <button
+                          type="button"
+                          className={classes.sessionButton}
+                          data-selected={
+                            session.sessionId === selectedSessionId
+                          }
+                          key={session.sessionId}
+                          onClick={() =>
+                            setSelectedSessionId(session.sessionId)
+                          }
+                        >
+                          {session.title || session.sessionId} · {session.state}
+                        </button>
+                      ))
+                    ) : (
+                      <div className={classes.listRow}>No saved sessions.</div>
+                    )}
+                  </div>
+                  <div className={classes.output}>{historyText}</div>
+                </Flex>
+              </section>
+            </div>
+
+            <div className={classes.column}>
+              <section className={classes.card}>
+                <Flex column gap={8}>
+                  <div>
+                    <H1>Pi agent</H1>
+                    <P>
+                      Choose a provider and optional model, then open a durable
+                      session.
+                    </P>
+                  </div>
+                  <Select
+                    label="Provider"
+                    selectedKey={provider}
+                    onSelectionChange={(key) => setProvider(String(key))}
+                  >
+                    <SelectItem id="anthropic">Anthropic</SelectItem>
+                    <SelectItem id="openai">OpenAI</SelectItem>
+                    <SelectItem id="google">Google Gemini</SelectItem>
+                    <SelectItem id="openrouter">OpenRouter</SelectItem>
+                  </Select>
+                  <div>
+                    <label className={classes.fieldLabel} htmlFor="model-name">
+                      Model ID (optional)
+                    </label>
+                    <TextField
+                      id="model-name"
+                      value={model}
+                      onChange={setModel}
+                      placeholder="Use Pi's provider default"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => void openSession()}
+                    disabled={Boolean(busy)}
+                  >
+                    {busy === "session"
+                      ? "Opening…"
+                      : selectedSessionId
+                        ? "Reopen selected session"
+                        : "Create session"}
+                  </Button>
+                  <span className={classes.muted}>
+                    {selectedSessionId
+                      ? `Selected: ${selectedSessionId}`
+                      : "No session selected."}
+                  </span>
+                </Flex>
+              </section>
+
+              <section className={classes.card}>
+                <Flex column gap={8}>
+                  <div>
+                    <H2>Prompt</H2>
+                    <P>The key stays in Rust and never enters browser state.</P>
+                  </div>
+                  <div>
+                    <label className={classes.fieldLabel} htmlFor="prompt">
+                      Message
+                    </label>
+                    <textarea
+                      id="prompt"
+                      className={classes.textarea}
+                      value={prompt}
+                      onChange={(event) => setPrompt(event.target.value)}
+                    />
+                  </div>
+                  <Button
+                    onClick={() => void submitPrompt()}
+                    disabled={Boolean(busy)}
+                  >
+                    {busy === "prompt" ? "Waiting for Pi…" : "Send prompt"}
+                  </Button>
+                  <div>
+                    <span className={classes.fieldLabel}>Completed output</span>
+                    <div className={classes.output} role="status">
+                      {output}
+                    </div>
+                  </div>
+                </Flex>
+              </section>
+            </div>
           </div>
-        </div>
+        )}
 
         <p className={classes.muted}>
           {health?.credentialStorage ??
