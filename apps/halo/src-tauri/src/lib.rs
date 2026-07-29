@@ -5,12 +5,27 @@ use std::sync::Arc;
 
 use agentos_service::{
     AgentOsService, HealthStatus, PromptResponse, SessionSummary, StartupConfig, WorkspaceEntry,
+    WorkspaceLayout,
 };
 use serde_json::Value;
 use tauri::{Manager, RunEvent, State};
 
 struct HaloState {
     agentos: Arc<AgentOsService>,
+    startup: StartupConfig,
+}
+
+#[tauri::command]
+async fn start_workspace(
+    state: State<'_, HaloState>,
+    username: String,
+) -> Result<HealthStatus, String> {
+    let layout = WorkspaceLayout::new(&username)?;
+    state
+        .agentos
+        .initialize(layout, state.startup.clone())
+        .await?;
+    Ok(state.agentos.health().await)
 }
 
 #[tauri::command]
@@ -92,14 +107,13 @@ pub fn run() {
                 pi_package_path: find_pi_package_path(app.handle())?,
             };
             app.manage(HaloState {
-                agentos: service.clone(),
-            });
-            tauri::async_runtime::spawn(async move {
-                service.initialize(startup).await;
+                agentos: service,
+                startup,
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            start_workspace,
             sidecar_health,
             write_workspace_file,
             read_workspace_file,

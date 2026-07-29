@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 const WORKSPACE_ROOT: &str = "/home/agentos";
 const PI_CONFIG_DIR: &str = "/home/agentos/.pi/agent";
 const PI_SETTINGS_PATH: &str = "/home/agentos/.pi/agent/settings.json";
+const MAX_USERNAME_LENGTH: usize = 64;
 
 const PROVIDERS: [Provider; 4] = [
     Provider {
@@ -41,10 +42,45 @@ struct Provider {
     env_name: &'static str,
 }
 
+#[derive(Clone)]
 pub struct StartupConfig {
     pub app_data_dir: PathBuf,
     pub sidecar_path: PathBuf,
     pub pi_package_path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceLayout {
+    root: String,
+    files: String,
+    pi_config_dir: String,
+    pi_settings_path: String,
+}
+
+impl WorkspaceLayout {
+    pub fn new(username: &str) -> Result<Self, String> {
+        if username.is_empty()
+            || username.len() > MAX_USERNAME_LENGTH
+            || !username.chars().all(|character| {
+                character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
+            })
+        {
+            return Err(format!(
+                "Usernames must be 1 to {MAX_USERNAME_LENGTH} ASCII letters, numbers, '-' or '_' only."
+            ));
+        }
+
+        let root = format!("/halo/{username}");
+        let files = format!("{root}/files");
+        let pi_config_dir = format!("{files}/.pi/agent");
+        let pi_settings_path = format!("{pi_config_dir}/settings.json");
+        Ok(Self {
+            root,
+            files,
+            pi_config_dir,
+            pi_settings_path,
+        })
+    }
 }
 
 pub struct AgentOsService {
@@ -53,8 +89,13 @@ pub struct AgentOsService {
 }
 
 enum ServiceState {
+    NotStarted,
     Starting,
-    Ready(AgentOs),
+    Ready {
+        os: AgentOs,
+        #[allow(dead_code)]
+        layout: WorkspaceLayout,
+    },
     Failed(String),
     Stopped,
 }
@@ -105,18 +146,64 @@ pub struct PromptResponse {
 impl AgentOsService {
     pub fn new(app_data_dir: &Path) -> Arc<Self> {
         Arc::new(Self {
-            state: RwLock::new(ServiceState::Starting),
+            state: RwLock::new(ServiceState::NotStarted),
             database_path: app_data_dir.join("agentos.sqlite"),
         })
     }
 
-    pub async fn initialize(self: &Arc<Self>, config: StartupConfig) {
-        if let Err(error) = self.start(config).await {
-            *self.state.write().await = ServiceState::Failed(error);
+    pub async fn initialize(
+        self: &Arc<Self>,
+        layout: WorkspaceLayout,
+        config: StartupConfig,
+    ) -> Result<(), String> {
+        {
+            let mut state = self.state.write().await;
+            match &*state {
+                ServiceState::NotStarted => *state = ServiceState::Starting,
+                ServiceState::Starting => {
+                    return Err("AgentOS is already starting.".to_owned());
+                }
+                ServiceState::Ready { .. } => {
+                    return Err("A workspace has already started.".to_owned());
+                }
+                ServiceState::Failed(error) => {
+                    return Err(format!("Workspace startup already failed: {error}"));
+                }
+                ServiceState::Stopped => return Err("AgentOS has stopped.".to_owned()),
+            }
+        }
+
+        match self.start(config).await {
+            Ok(os) => {
+                let should_shutdown = {
+                    let mut state = self.state.write().await;
+                    if matches!(&*state, ServiceState::Starting) {
+                        *state = ServiceState::Ready {
+                            os: os.clone(),
+                            layout,
+                        };
+                        false
+                    } else {
+                        true
+                    }
+                };
+                if should_shutdown {
+                    let _ = os.shutdown().await;
+                    return Err("AgentOS stopped during workspace startup.".to_owned());
+                }
+                Ok(())
+            }
+            Err(error) => {
+                let mut state = self.state.write().await;
+                if matches!(&*state, ServiceState::Starting) {
+                    *state = ServiceState::Failed(error.clone());
+                }
+                Err(error)
+            }
         }
     }
 
-    async fn start(&self, config: StartupConfig) -> Result<(), String> {
+    async fn start(&self, config: StartupConfig) -> Result<AgentOs, String> {
         std::fs::create_dir_all(&config.app_data_dir)
             .map_err(|error| format!("Could not create the Halo data directory: {error}"))?;
         secure_directory(&config.app_data_dir)?;
@@ -160,16 +247,16 @@ impl AgentOsService {
         .map_err(|error| format!("AgentOS failed to start: {error}"))?;
 
         secure_file_if_present(&self.database_path)?;
-        *self.state.write().await = ServiceState::Ready(os);
-        Ok(())
+        Ok(os)
     }
 
     pub async fn health(&self) -> HealthStatus {
         let credentials = configured_providers();
         let state = self.state.read().await;
         let (status, sidecar_state, error) = match &*state {
+            ServiceState::NotStarted => ("not_started", None, None),
             ServiceState::Starting => ("starting", None, None),
-            ServiceState::Ready(os) => (
+            ServiceState::Ready { os, .. } => (
                 "ready",
                 Some(os.sidecar().describe().state.as_str().to_owned()),
                 None,
@@ -195,16 +282,16 @@ impl AgentOsService {
     }
 
     pub async fn write_file(&self, path: &str, content: &str) -> Result<(), String> {
-        let path = validate_workspace_path(path)?;
         let os = self.ready().await?;
+        let path = validate_workspace_path(path)?;
         os.write_file(&path, content)
             .await
             .map_err(|error| safe_client_error("Could not write the file", error))
     }
 
     pub async fn read_file(&self, path: &str) -> Result<String, String> {
-        let path = validate_workspace_path(path)?;
         let os = self.ready().await?;
+        let path = validate_workspace_path(path)?;
         let bytes = os
             .read_file(&path)
             .await
@@ -213,8 +300,8 @@ impl AgentOsService {
     }
 
     pub async fn list_files(&self, path: Option<&str>) -> Result<Vec<WorkspaceEntry>, String> {
-        let path = validate_workspace_path(path.unwrap_or(WORKSPACE_ROOT))?;
         let os = self.ready().await?;
+        let path = validate_workspace_path(path.unwrap_or(WORKSPACE_ROOT))?;
         let mut entries = os
             .read_dir_with_types(&path)
             .await
@@ -287,6 +374,7 @@ impl AgentOsService {
         session_id: &str,
         prompt: &str,
     ) -> Result<PromptResponse, String> {
+        let os = self.ready().await?;
         validate_session_id(session_id)?;
         if prompt.trim().is_empty() {
             return Err("Enter a prompt first.".to_owned());
@@ -295,7 +383,6 @@ impl AgentOsService {
             return Err(missing_credential_error());
         }
 
-        let os = self.ready().await?;
         let content = serde_json::from_value(json!({ "type": "text", "text": prompt }))
             .map_err(|error| format!("Could not build the prompt: {error}"))?;
         let result = os
@@ -334,8 +421,8 @@ impl AgentOsService {
     }
 
     pub async fn read_history(&self, session_id: &str) -> Result<Vec<Value>, String> {
-        validate_session_id(session_id)?;
         let os = self.ready().await?;
+        validate_session_id(session_id)?;
         let page = os
             .read_history(ReadHistoryInput {
                 session_id: Some(session_id.to_owned()),
@@ -359,14 +446,15 @@ impl AgentOsService {
             let mut state = self.state.write().await;
             std::mem::replace(&mut *state, ServiceState::Stopped)
         };
-        if let ServiceState::Ready(os) = previous {
+        if let ServiceState::Ready { os, .. } = previous {
             let _ = os.shutdown().await;
         }
     }
 
     async fn ready(&self) -> Result<AgentOs, String> {
         match &*self.state.read().await {
-            ServiceState::Ready(os) => Ok(os.clone()),
+            ServiceState::NotStarted => Err("Start a workspace first.".to_owned()),
+            ServiceState::Ready { os, .. } => Ok(os.clone()),
             ServiceState::Starting => {
                 Err("AgentOS is still starting. Try again in a moment.".to_owned())
             }
@@ -507,7 +595,7 @@ fn safe_client_error(context: &str, error: impl std::fmt::Display) -> String {
             }
         }
     }
-    format!("{context}: {message}")
+    return format!("{context}: {message}");
 }
 
 #[cfg(unix)]
@@ -544,12 +632,98 @@ mod tests {
 
     use super::{
         collect_text, validate_session_id, validate_workspace_path, AgentOsService, StartupConfig,
-        WORKSPACE_ROOT,
+        WorkspaceLayout, WORKSPACE_ROOT,
     };
     use agentos_client::OpenSessionInput;
     use serde_json::json;
 
     static SIDECAR_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[test]
+    fn workspace_layout_accepts_safe_usernames() {
+        let layout = WorkspaceLayout::new("test-user_1").expect("valid workspace layout");
+        assert_eq!(layout.root, "/halo/test-user_1");
+        assert_eq!(layout.files, "/halo/test-user_1/files");
+        assert_eq!(layout.pi_config_dir, "/halo/test-user_1/files/.pi/agent");
+        assert_eq!(
+            layout.pi_settings_path,
+            "/halo/test-user_1/files/.pi/agent/settings.json"
+        );
+    }
+
+    #[test]
+    fn workspace_layout_rejects_unsafe_usernames() {
+        for username in [
+            "",
+            "..",
+            "user/name",
+            "user\\name",
+            "café",
+            "a-username-that-is-longer-than-sixty-four-characters-and-must-be-rejected",
+        ] {
+            assert!(
+                WorkspaceLayout::new(username).is_err(),
+                "accepted unsafe username: {username}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn workspace_commands_require_start() {
+        let data_dir =
+            std::env::temp_dir().join(format!("halo-agentos-idle-test-{}", uuid::Uuid::new_v4()));
+        let service = AgentOsService::new(&data_dir);
+
+        assert_eq!(
+            service
+                .write_file("/home/agentos/test.txt", "test")
+                .await
+                .expect_err("write should require startup"),
+            "Start a workspace first."
+        );
+        assert_eq!(
+            service
+                .read_file("/home/agentos/test.txt")
+                .await
+                .expect_err("read should require startup"),
+            "Start a workspace first."
+        );
+        assert_eq!(
+            service
+                .list_files(None)
+                .await
+                .expect_err("list files should require startup"),
+            "Start a workspace first."
+        );
+        assert_eq!(
+            service
+                .create_or_reopen_session(None, None, None)
+                .await
+                .expect_err("create session should require startup"),
+            "Start a workspace first."
+        );
+        assert_eq!(
+            service
+                .send_prompt("session-1", "hello")
+                .await
+                .expect_err("prompt should require startup"),
+            "Start a workspace first."
+        );
+        assert_eq!(
+            service
+                .list_sessions()
+                .await
+                .expect_err("list sessions should require startup"),
+            "Start a workspace first."
+        );
+        assert_eq!(
+            service
+                .read_history("session-1")
+                .await
+                .expect_err("history should require startup"),
+            "Start a workspace first."
+        );
+    }
 
     #[test]
     fn workspace_paths_stay_in_workspace() {
@@ -581,7 +755,10 @@ mod tests {
         let data_dir =
             std::env::temp_dir().join(format!("halo-agentos-test-{}", uuid::Uuid::new_v4()));
         let service = AgentOsService::new(&data_dir);
-        service.initialize(test_startup_config(&data_dir)).await;
+        service
+            .initialize(test_workspace_layout(), test_startup_config(&data_dir))
+            .await
+            .expect("start workspace");
         let health = service.health().await;
         assert_eq!(health.status, "ready", "{:?}", health.error);
         service
@@ -591,7 +768,10 @@ mod tests {
         service.shutdown().await;
 
         let restarted = AgentOsService::new(&data_dir);
-        restarted.initialize(test_startup_config(&data_dir)).await;
+        restarted
+            .initialize(test_workspace_layout(), test_startup_config(&data_dir))
+            .await
+            .expect("restart workspace");
         let health = restarted.health().await;
         assert_eq!(health.status, "ready", "{:?}", health.error);
         assert_eq!(
@@ -611,7 +791,10 @@ mod tests {
         let data_dir =
             std::env::temp_dir().join(format!("halo-agentos-test-{}", uuid::Uuid::new_v4()));
         let service = AgentOsService::new(&data_dir);
-        service.initialize(test_startup_config(&data_dir)).await;
+        service
+            .initialize(test_workspace_layout(), test_startup_config(&data_dir))
+            .await
+            .expect("start workspace");
         let health = service.health().await;
         assert_eq!(health.status, "ready", "{:?}", health.error);
 
@@ -640,7 +823,10 @@ mod tests {
         service.shutdown().await;
 
         let restarted = AgentOsService::new(&data_dir);
-        restarted.initialize(test_startup_config(&data_dir)).await;
+        restarted
+            .initialize(test_workspace_layout(), test_startup_config(&data_dir))
+            .await
+            .expect("restart workspace");
         let sessions = restarted
             .list_sessions()
             .await
@@ -662,5 +848,9 @@ mod tests {
             pi_package_path: manifest_dir
                 .join("../node_modules/@agentos-software/pi/dist/package.aospkg"),
         }
+    }
+
+    fn test_workspace_layout() -> WorkspaceLayout {
+        WorkspaceLayout::new("test-user").expect("test workspace layout")
     }
 }
