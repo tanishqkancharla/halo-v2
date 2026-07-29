@@ -10,3 +10,14 @@ Writing rules, from Orwell, 1946. These govern prose: docs, PR text, messages. N
 6. Break any of these rules sooner than say anything outright barbarous.
 
 Review every prose output against these rules before delivering.
+
+## Workspace Storage
+
+- One workspace maps to one AgentOS VM and one SQLite database.
+- Halo must not query or change AgentOS SQLite tables.
+- Halo must read and write workspace state through AgentOS VM file APIs.
+- Ask for the username before starting the workspace.
+- Use `/halo/<username>/` as the workspace root and `/halo/<username>/files/` as the user's home directory.
+- Store Halo workspace state in the workspace root, beside `files/`, so both Halo and the agent can see it. Do not create a `.halo/` directory.
+- Keep device settings outside the workspace database.
+- Copying the SQLite database to another machine must restore the whole workspace.

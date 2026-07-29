@@ -40,6 +40,27 @@ In development builds, the Rust host also loads the first `.env` file it finds i
 
 Halo also detects `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `OPENROUTER_API_KEY`. The key stays out of the frontend and logs. AgentOS may store session environment values as plain text in `agentos.sqlite`; Halo limits the app-data directory to the current user on Unix systems.
 
+## Workspace storage
+
+Each workspace has one AgentOS VM and one SQLite database. The database is the complete portable workspace. Copying it to another machine must restore the workspace files, Halo workspace state, and AgentOS sessions.
+
+Halo does not query or change AgentOS SQLite tables. It reads and writes all workspace state through AgentOS VM file APIs. This keeps the same state visible to Halo and to agents running in the VM.
+
+Halo asks for the username before it starts the workspace. The username must be one safe path segment. Halo then uses this layout:
+
+```text
+/halo/<username>/
+├── files/
+├── workspace.json
+├── agents/
+├── tools/
+└── vault.enc
+```
+
+The user's home directory inside the VM is `/halo/<username>/files/`. Halo stores its workspace state beside `files/`; it does not create a hidden `.halo/` directory.
+
+Device settings do not belong to a workspace. Keep settings that apply to the local Halo install outside the workspace database.
+
 ## Checks
 
 ```sh
@@ -50,7 +71,3 @@ cargo test --manifest-path apps/halo/src-tauri/Cargo.toml
 ```
 
 Tests do not call a paid model.
-
-## Storage follow-up
-
-AgentOS currently accepts only `sqlite_file` and `actor_uds` database descriptors. To use encrypted Turso storage, first add a libSQL/Turso descriptor and encrypted connection code to the AgentOS Rust sidecar, contribute that API upstream, then replace Halo's `VmSqliteDescriptor::SqliteFile` setting with the new official descriptor. Keep the encryption key in the operating system's secret store, outside the database.
