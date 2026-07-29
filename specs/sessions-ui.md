@@ -251,7 +251,7 @@ struct StartWorkspaceResult {
 ```diff
  Tauri setup
  ├── build StartupConfig in memory
-+├── app.path().app_config_dir/device-settings.json
++├── resolved app_data_dir/device-settings.json
 +└── store device_settings_path in HaloState
 
 +get_startup_preference
@@ -289,7 +289,7 @@ struct StartWorkspaceResult {
  }
 ```
 
-- [x] Resolve `app.path().app_config_dir()?.join("device-settings.json")` during Tauri setup and keep that path in `HaloState`; keep `StartupConfig` in Rust memory and rebuild it each launch.
+- [x] Resolve `device-settings.json` under the app data directory during Tauri setup and keep that path in `HaloState`; in debug builds, `HALO_APP_DATA_DIR` moves both the database and device settings. Keep `StartupConfig` in Rust memory and rebuild it each launch.
 - [x] Add `device_settings.rs` with serde load and atomic save helpers; treat a missing, corrupt, or invalid saved owner slug as no preference and validate it with `WorkspaceLayout::new` before use.
 - [x] Register `get_startup_preference` as a device-only command that can run before AgentOS starts and returns only a valid `lastOwnerSlug` or null.
 - [x] Save the owner slug only after AgentOS starts; do not write it to `tauri.conf.json`, AgentOS SQLite, or `/halo/<owner-slug>/`, and return a warning instead of undoing a live workspace when the device-setting write fails.

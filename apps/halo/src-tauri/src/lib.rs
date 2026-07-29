@@ -151,11 +151,7 @@ pub fn run() {
                 .app_data_dir()
                 .map_err(|error| format!("Could not find the app data directory: {error}"))?;
             let app_data_dir = resolve_app_data_dir(default_app_data_dir);
-            let device_settings_path = app
-                .path()
-                .app_config_dir()
-                .map_err(|error| format!("Could not find the app config directory: {error}"))?
-                .join("device-settings.json");
+            let device_settings_path = app_data_dir.join("device-settings.json");
             let service = Arc::new(AgentOsService::new(&app_data_dir));
             let startup = StartupConfig {
                 app_data_dir,
