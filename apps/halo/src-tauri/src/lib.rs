@@ -1,31 +1,78 @@
 mod agentos_service;
+mod device_settings;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use agentos_service::{
     AgentOsService, HealthStatus, PromptResponse, SessionSummary, StartupConfig, WorkspaceEntry,
     WorkspaceLayout,
 };
+use device_settings::{load_startup_preference, save_last_owner_slug, StartupPreference};
+use serde::Serialize;
 use serde_json::Value;
 use tauri::{Manager, RunEvent, State};
 
 struct HaloState {
     agentos: Arc<AgentOsService>,
     startup: StartupConfig,
+    device_settings_path: PathBuf,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StartWorkspaceResult {
+    health: HealthStatus,
+    preference_saved: bool,
+    preference_warning: Option<String>,
+}
+
+#[tauri::command]
+fn get_startup_preference(state: State<'_, HaloState>) -> StartupPreference {
+    load_startup_preference(&state.device_settings_path)
 }
 
 #[tauri::command]
 async fn start_workspace(
     state: State<'_, HaloState>,
     owner_slug: String,
-) -> Result<HealthStatus, String> {
-    let layout = WorkspaceLayout::new(&owner_slug)?;
-    state
-        .agentos
-        .initialize(layout, state.startup.clone())
-        .await?;
-    Ok(state.agentos.health().await)
+) -> Result<StartWorkspaceResult, String> {
+    start_workspace_inner(
+        &state.agentos,
+        state.startup.clone(),
+        &state.device_settings_path,
+        &owner_slug,
+    )
+    .await
+}
+
+async fn start_workspace_inner(
+    agentos: &AgentOsService,
+    startup: StartupConfig,
+    device_settings_path: &Path,
+    owner_slug: &str,
+) -> Result<StartWorkspaceResult, String> {
+    let layout = WorkspaceLayout::new(owner_slug)?;
+    agentos.initialize(layout, startup).await?;
+    let health = agentos.health().await;
+    Ok(finish_workspace_start(
+        health,
+        device_settings_path,
+        owner_slug,
+    ))
+}
+
+fn finish_workspace_start(
+    health: HealthStatus,
+    device_settings_path: &Path,
+    owner_slug: &str,
+) -> StartWorkspaceResult {
+    let preference_warning = save_last_owner_slug(device_settings_path, owner_slug).err();
+    StartWorkspaceResult {
+        health,
+        preference_saved: preference_warning.is_none(),
+        preference_warning,
+    }
 }
 
 #[tauri::command]
@@ -105,6 +152,11 @@ pub fn run() {
                 .app_data_dir()
                 .map_err(|error| format!("Could not find the app data directory: {error}"))?;
             let app_data_dir = resolve_app_data_dir(default_app_data_dir);
+            let device_settings_path = app
+                .path()
+                .app_config_dir()
+                .map_err(|error| format!("Could not find the app config directory: {error}"))?
+                .join("device-settings.json");
             let service = Arc::new(AgentOsService::new(&app_data_dir));
             let startup = StartupConfig {
                 app_data_dir,
@@ -114,10 +166,12 @@ pub fn run() {
             app.manage(HaloState {
                 agentos: service,
                 startup,
+                device_settings_path,
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            get_startup_preference,
             start_workspace,
             sidecar_health,
             write_workspace_file,
@@ -220,4 +274,79 @@ fn find_pi_package_path(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::
         .into_iter()
         .find(|path| path.is_file())
         .ok_or_else(|| "The bundled Pi package is missing.".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+
+    use super::{
+        finish_workspace_start, load_startup_preference, save_last_owner_slug,
+        start_workspace_inner, AgentOsService, HealthStatus, StartupConfig,
+    };
+
+    fn test_directory(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "halo-startup-preference-{name}-{}",
+            uuid::Uuid::new_v4()
+        ))
+    }
+
+    fn ready_health() -> HealthStatus {
+        HealthStatus {
+            status: "ready",
+            sidecar_state: Some("ready".to_owned()),
+            error: None,
+            database_path: "/tmp/agentos.sqlite".to_owned(),
+            workspace_root: "/halo/new-owner".to_owned(),
+            credential_configured: false,
+            credential_providers: Vec::new(),
+            credential_storage: "process environment",
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_start_keeps_the_previous_owner_slug() {
+        let directory = test_directory("failed-start");
+        let settings_path = directory.join("config/device-settings.json");
+        let data_dir = directory.join("data");
+        save_last_owner_slug(&settings_path, "previous-owner").expect("save old preference");
+        let service = AgentOsService::new(&data_dir);
+
+        start_workspace_inner(
+            &service,
+            StartupConfig {
+                app_data_dir: data_dir.clone(),
+                sidecar_path: directory.join("missing-sidecar"),
+                pi_package_path: directory.join("missing-pi-package"),
+            },
+            &settings_path,
+            "new-owner",
+        )
+        .await
+        .expect_err("missing sidecar should fail startup");
+
+        assert_eq!(
+            load_startup_preference(&settings_path)
+                .last_owner_slug
+                .as_deref(),
+            Some("previous-owner")
+        );
+        fs::remove_dir_all(directory).expect("remove failed-start test directory");
+    }
+
+    #[test]
+    fn settings_failure_returns_a_warning_without_losing_health() {
+        let directory = test_directory("save-warning");
+        let settings_path = directory.join("device-settings.json");
+        fs::create_dir_all(&settings_path).expect("create blocking settings directory");
+
+        let result = finish_workspace_start(ready_health(), &settings_path, "new-owner");
+
+        assert_eq!(result.health.status, "ready");
+        assert!(!result.preference_saved);
+        assert!(result.preference_warning.is_some());
+        fs::remove_dir_all(directory).expect("remove save-warning test directory");
+    }
 }

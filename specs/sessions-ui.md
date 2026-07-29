@@ -152,11 +152,11 @@ enum ServiceState {
  })
 ```
 
-- [ ] Add `WorkspaceLayout::new(owner_slug)` with a clear length cap and allow only non-empty ASCII letters, numbers, `-`, and `_`; derive `/halo/<owner-slug>/` and Pi settings paths.
-- [ ] Start `AgentOsService` in `NotStarted`, keep `StartupConfig` in `HaloState`, and remove the background `initialize` call from Tauri `setup`.
-- [ ] Add and register `start_workspace(owner_slug)` so one caller can move `NotStarted` through `Starting` to `Ready`, while repeat or concurrent starts return a clear error.
-- [ ] Make `ready()` and every existing workspace command return “start a workspace first” while idle, without reading AgentOS SQLite tables.
-- [ ] Add Rust tests for idle commands and owner slugs that are empty, non-ASCII, too long, contain a slash, or contain `..`; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml`.
+- [x] Add `WorkspaceLayout::new(owner_slug)` with a clear length cap and allow only non-empty ASCII letters, numbers, `-`, and `_`; derive `/halo/<owner-slug>/` and Pi settings paths.
+- [x] Start `AgentOsService` in `NotStarted`, keep `StartupConfig` in `HaloState`, and remove the background `initialize` call from Tauri `setup`.
+- [x] Add and register `start_workspace(owner_slug)` so one caller can move `NotStarted` through `Starting` to `Ready`, while repeat or concurrent starts return a clear error.
+- [x] Make `ready()` and every existing workspace command return “start a workspace first” while idle, without reading AgentOS SQLite tables.
+- [x] Add Rust tests for idle commands and owner slugs that are empty, non-ASCII, too long, contain a slash, or contain `..`; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml`.
 
 ### Phase 2: Apply the selected workspace home to files and sessions
 
@@ -209,11 +209,11 @@ struct HealthStatus {
  })
 ```
 
-- [ ] After AgentOS starts, create `layout.root` with AgentOS `mkdir`; keep Halo state, user files, and home dotfiles directly in that root, and never create `files/` or `.halo/`.
-- [ ] Set Pi config paths from `WorkspaceLayout`, set session `HOME` and `cwd` to `layout.root`, and make file path checks use that root.
-- [ ] Return the selected workspace root in health data, and remove all `/home/agentos` constants and frontend path use.
-- [ ] Update restart tests to use `/halo/test-owner/` and assert that a VM file and the session catalog survive a service restart with the same SQLite database.
-- [ ] Run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml` and ensure the tests make no model call.
+- [x] After AgentOS starts, create `layout.root` with AgentOS `mkdir`; keep Halo state, user files, and home dotfiles directly in that root, and never create `files/` or `.halo/`.
+- [x] Set Pi config paths from `WorkspaceLayout`, set session `HOME` and `cwd` to `layout.root`, and make file path checks use that root.
+- [x] Return the selected workspace root in health data, and remove all `/home/agentos` constants and frontend path use.
+- [x] Update restart tests to use `/halo/test-owner/` and assert that a VM file and the session catalog survive a service restart with the same SQLite database.
+- [x] Run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml` and ensure the tests make no model call.
 
 ### Phase 3: Remember the last successful owner slug on this device
 
@@ -235,6 +235,7 @@ struct StartupPreference {
     last_owner_slug: Option<String>,
 }
 
+// apps/halo/src-tauri/src/lib.rs
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StartWorkspaceResult {
@@ -287,11 +288,11 @@ struct StartWorkspaceResult {
  }
 ```
 
-- [ ] Resolve `app.path().app_config_dir()?.join("device-settings.json")` during Tauri setup and keep that path in `HaloState`; keep `StartupConfig` in Rust memory and rebuild it each launch.
-- [ ] Add `device_settings.rs` with serde load and atomic save helpers; treat a missing, corrupt, or invalid saved owner slug as no preference and validate it with `WorkspaceLayout::new` before use.
-- [ ] Register `get_startup_preference` as a device-only command that can run before AgentOS starts and returns only a valid `lastOwnerSlug` or null.
-- [ ] Save the owner slug only after AgentOS starts; do not write it to `tauri.conf.json`, AgentOS SQLite, or `/halo/<owner-slug>/`, and return a warning instead of undoing a live workspace when the device-setting write fails.
-- [ ] Test missing, valid, corrupt, and invalid settings, atomic replacement, failed-start retention, and save failure after startup; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml`.
+- [x] Resolve `app.path().app_config_dir()?.join("device-settings.json")` during Tauri setup and keep that path in `HaloState`; keep `StartupConfig` in Rust memory and rebuild it each launch.
+- [x] Add `device_settings.rs` with serde load and atomic save helpers; treat a missing, corrupt, or invalid saved owner slug as no preference and validate it with `WorkspaceLayout::new` before use.
+- [x] Register `get_startup_preference` as a device-only command that can run before AgentOS starts and returns only a valid `lastOwnerSlug` or null.
+- [x] Save the owner slug only after AgentOS starts; do not write it to `tauri.conf.json`, AgentOS SQLite, or `/halo/<owner-slug>/`, and return a warning instead of undoing a live workspace when the device-setting write fails.
+- [x] Test missing, valid, corrupt, and invalid settings, atomic replacement, failed-start retention, and save failure after startup; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml`.
 
 ### Phase 4: Add the frontend workspace gate and typed Tauri client
 

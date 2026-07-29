@@ -40,6 +40,12 @@ type HealthStatus = {
   credentialStorage: string;
 };
 
+type StartWorkspaceResult = {
+  health: HealthStatus;
+  preferenceSaved: boolean;
+  preferenceWarning?: string;
+};
+
 type WorkspaceEntry = {
   path: string;
   name: string;
@@ -366,10 +372,11 @@ export function App() {
     if (!ownerSlug) return;
 
     await run("workspace", async () => {
-      const nextHealth = await invoke<HealthStatus>("start_workspace", {
+      const result = await invoke<StartWorkspaceResult>("start_workspace", {
         ownerSlug,
       });
-      setHealth(nextHealth);
+      setHealth(result.health);
+      if (result.preferenceWarning) setError(result.preferenceWarning);
       await Promise.all([refreshFiles(), refreshSessions()]);
     }).catch(() => undefined);
   }
