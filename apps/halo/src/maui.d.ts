@@ -91,6 +91,8 @@ export function Button(
 export function TextField(
   props: Omit<InputHTMLAttributes<HTMLInputElement>, "onChange"> & {
     onChange?: (value: string) => void;
+    isDisabled?: boolean;
+    isInvalid?: boolean;
   },
 ): ReactNode;
 

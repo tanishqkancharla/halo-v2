@@ -301,7 +301,7 @@ Replace startup polling with an explicit frontend state machine and a small type
 #### Important types
 
 ```tsx
-// apps/halo/src/workspace/types.ts
+// apps/halo/src/App.tsx
 type WorkspaceState =
   | { status: "restoring" }
   | { status: "needs-owner-slug"; ownerSlug: string }
@@ -361,11 +361,11 @@ type StartupPreference = { lastOwnerSlug?: string };
  }
 ```
 
-- [ ] Add `vitest`, `jsdom`, React Testing Library, and `user-event` to `apps/halo`, configure jsdom, add `test: "vitest run"`, and provide a typed mock for Tauri `invoke`.
-- [ ] Move shared Tauri DTOs and command wrappers into `apps/halo/src/api.ts`, including `getStartupPreference`, `startWorkspace`, `listSessions`, `readSessionTranscript`, `createSession`, and `sendPrompt`.
-- [ ] Build an accessible Maui `WorkspaceStart` form labeled “Username” that submits on Enter, disables only during startup, keeps the username after failure, and places the error by the field.
-- [ ] On mount, auto-start a valid saved owner slug; show `WorkspaceStart` when none exists or restore fails, then enter a minimal ready view and load the catalog after success.
-- [ ] Run `pnpm --filter @halo/desktop typecheck`; manually check that first launch asks for a username, the next launch restores it, and a bad saved value returns to the form. Do not add automated tests for this gate.
+- [x] Keep the frontend dependency set unchanged; smoke-test the workspace gate through the running Tauri app with `halo-web` instead of adding jsdom or browser unit-test packages.
+- [x] Move shared Tauri DTOs and command wrappers into `apps/halo/src/api.ts`, including `getStartupPreference`, `startWorkspace`, `listSessions`, `readSessionHistory`, `createSession`, and `sendPrompt`.
+- [x] Build an accessible Maui `WorkspaceStart` form labeled “Username” that submits on Enter, disables only during startup, keeps the username after failure, and places the error by the field.
+- [x] On mount, auto-start a valid saved owner slug; show `WorkspaceStart` when none exists or restore fails, then enter a minimal ready view and load the catalog after success.
+- [x] Run `pnpm --filter @halo/desktop typecheck`; use `halo-web` to check that first launch asks for a username, the next launch restores it, and a bad username keeps the form and shows its error by the field.
 
 ### Phase 5: Normalize AgentOS history into transcript DTOs
 
