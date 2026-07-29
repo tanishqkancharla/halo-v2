@@ -45,7 +45,7 @@ Example use after `pnpm dev`:
 ```sh
 pnpm halo-web status
 pnpm halo-web exec 'return await browser.$("body").getText()'
-pnpm halo-web exec 'await browser.$("button=New session").click()'
+pnpm halo-web exec 'await browser.$("button").click()'
 printf 'await browser.$("textarea").setValue("Hello")' | pnpm halo-web exec --stdin
 ```
 
@@ -54,7 +54,8 @@ printf 'await browser.$("textarea").setValue("Hello")' | pnpm halo-web exec --st
 - Attach to the Halo webview that is already running under `pnpm dev` on macOS.
 - Let an agent use WebdriverIO to read the DOM, find elements, click, type, run JavaScript, and take screenshots.
 - Accept short scripts as an argument and longer scripts on standard input.
-- Print one machine-readable JSON value to standard output and send faults to standard error with a nonzero exit code.
+- Use Incur's token-light TOON output by default and support its built-in `--json`, `--llms`, and output controls.
+- Return call-to-actions that tell agents how to inspect the page or check the connection after each command.
 - Close only the WebDriver session after each command and leave the Halo process and window open.
 - Keep the WebDriver HTTP server out of release builds and bound to localhost.
 
@@ -81,6 +82,7 @@ printf 'await browser.$("textarea").setValue("Hello")' | pnpm halo-web exec --st
 - [Embedded plugin README](https://github.com/webdriverio/desktop-mobile/tree/main/packages/tauri-plugin-webdriver) — Documents standalone `remote()` use, the localhost binding, the default port, supported endpoints, and debug-only setup.
 - [WebdriverIO Tauri plugin setup](https://webdriver.io/docs/desktop-testing/tauri/plugin-setup/) — Documents the two distinct Tauri plugins and the embedded server lifecycle.
 - [WebdriverIO API](https://webdriver.io/docs/api/) — Defines the `browser`, element, script, action, source, and screenshot calls exposed to `exec` scripts.
+- [Incur](https://github.com/wevm/incur#call-to-actions) — Defines the typed command schemas, output formats, agent manifest, and call-to-actions used by the CLI.
 
 ## Implementation
 
@@ -144,33 +146,31 @@ Add a private Node workspace package that talks straight to the embedded W3C end
 
 ```ts
 // packages/halo-web-cli/src/webdriver.ts
-import type { Browser } from "webdriverio";
+import { remote } from "webdriverio";
 
-type Command =
-  | { name: "status" }
-  | { name: "exec"; source: string };
+type ConnectedBrowser = Awaited<ReturnType<typeof remote>>;
+type BrowserScript = (browser: ConnectedBrowser) => Promise<unknown>;
 
-type CommandResult =
-  | { ok: true; result: unknown }
-  | { ok: false; error: string };
-
-type BrowserScript = (browser: Browser) => Promise<unknown>;
+type StatusResponse = {
+  value: { ready: boolean; message: string };
+};
 ```
 
 #### Call stack diff
 
 ```diff
 +pnpm halo-web
-+└── packages/halo-web-cli/src/cli.ts
-+    ├── status
-+    │   └── GET 127.0.0.1:4445/status
-+    └── exec
-+        ├── webdriverio.remote
-+        │   └── POST 127.0.0.1:4445/session
-+        ├── AsyncFunction(browser, source)
-+        │   └── WebdriverIO browser and element commands
-+        ├── print JSON result
-+        └── browser.deleteSession
++└── Incur Cli.serve
++    └── packages/halo-web-cli/src/cli.ts
++        ├── status
++        │   └── GET 127.0.0.1:4445/status
++        └── exec
++            ├── webdriverio.remote
++            │   └── POST 127.0.0.1:4445/session
++            ├── AsyncFunction(browser, source)
++            │   └── WebdriverIO browser and element commands
++            ├── format result and call-to-actions
++            └── browser.deleteSession
 ```
 
 #### Code diff preview
@@ -187,6 +187,7 @@ type BrowserScript = (browser: Browser) => Promise<unknown>;
 +  const browser = await remote({
 +    hostname: WEBDRIVER_HOST,
 +    port: WEBDRIVER_PORT,
++    logLevel: "silent",
 +    capabilities: {},
 +  });
 +  try {
@@ -198,8 +199,8 @@ type BrowserScript = (browser: Browser) => Promise<unknown>;
 +}
 ```
 
-- [ ] Create `packages/halo-web-cli` with strict Node ESM TypeScript, `webdriverio`, `vitest`, `tsx`, `@types/node`, and the same lint, format, typecheck, and test scripts used by the workspace.
-- [ ] Add `status` and `exec` parsing in `src/cli.ts`; require exactly one script argument or `--stdin`, reject empty input, and keep JSON data on stdout while errors go to stderr with a nonzero exit code.
-- [ ] Add `src/webdriver.ts` with the fixed localhost endpoint, `remote({ capabilities: {} })`, an async function body with `browser` in scope, JSON-safe result output, and `deleteSession()` in `finally`; do not start or kill the app process.
-- [ ] Add Vitest coverage that mocks `remote()`, proves a script can call the supplied browser, checks JSON output, and proves `deleteSession()` runs after both success and a script fault. Add a live smoke script or documented check that runs `status`, reads `body` text, clicks one harmless control, and then confirms Halo is still open.
-- [ ] Add the root `halo-web` script and a short README section with the four examples above; run `pnpm --filter @halo/web-cli test`, `pnpm --filter @halo/web-cli typecheck`, and `pnpm run check`.
+- [x] Create `packages/halo-web-cli` with strict Node ESM TypeScript, `incur`, `webdriverio`, `vitest`, `tsx`, `@types/node`, and the same lint, format, typecheck, and test scripts used by the workspace.
+- [x] Define typed Incur `status` and `exec` commands in `src/cli.ts`; require exactly one script argument or `--stdin`, reject empty input, and use Incur's TOON default plus built-in `--json` and `--llms` output.
+- [x] Add `src/webdriver.ts` with the fixed localhost endpoint, `remote({ capabilities: {} })`, an async function body with `browser` in scope, JSON-safe result output, and `deleteSession()` in `finally`; do not start or kill the app process.
+- [x] Return typed Incur call-to-actions from both commands, and add Vitest coverage that mocks `remote()`, proves a script can call the supplied browser, checks status output, and proves `deleteSession()` runs after both success and a script fault.
+- [x] Add the root `halo-web` script and a short README section with the four examples above; run `pnpm --filter @halo/web-cli test`, `pnpm --filter @halo/web-cli typecheck`, and `pnpm run check`.

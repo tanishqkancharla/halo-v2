@@ -1,0 +1,33 @@
+{
+  "name": "@halo/web-cli",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "halo-web": "./dist/cli.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "cli": "node --import tsx src/cli.ts",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint --deny-warnings src",
+    "lint:fix": "oxlint --fix src",
+    "test": "vitest run src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "incur": "^0.4.20",
+    "webdriverio": "^9.30.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "tsx": "^4.21.0",
+    "typescript": "7.0.2",
+    "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

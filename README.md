@@ -29,6 +29,17 @@ pnpm dev
 
 The normal development command starts Vite, Tauri, the native sidecar, and the AgentOS VM.
 
+Debug builds also expose the running Halo webview through WebDriver on `127.0.0.1:4445`. Use the agent-friendly CLI from another terminal:
+
+```sh
+pnpm halo-web status
+pnpm halo-web exec 'return await browser.$("body").getText()'
+pnpm halo-web exec 'await browser.$("button").click()'
+printf 'await browser.$("textarea").setValue("Hello")' | pnpm halo-web exec --stdin
+```
+
+The CLI uses TOON output by default. Pass `--json` for JSON or `--llms` to inspect its command manifest. Release builds do not start the WebDriver server.
+
 File tools work without a model key. To use Pi, set one supported key in the shell that starts Halo:
 
 ```sh
