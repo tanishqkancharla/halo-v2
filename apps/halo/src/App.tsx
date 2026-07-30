@@ -1,20 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useState } from "react";
-import {
-  Button,
-  Flex,
-  H1,
-  P,
-  TextField,
-  backgroundColor,
-  colors,
-  radius,
-  shadow,
-  spacing,
-  text,
-  useTheme,
-} from "maui";
+import { useState } from "react";
+import { colors, spacing, text, useTheme } from "maui";
 import { style, useStyles } from "purse-styles";
+import { MainPane } from "./MainPane.tsx";
+import { Onboarding } from "./Onboarding.tsx";
+import { Sidebar } from "./Sidebar.tsx";
 import {
   getStartupPreference,
   listSessions,
@@ -22,7 +12,10 @@ import {
   type ReadyHealthStatus,
   type StartWorkspaceResult,
 } from "./api.ts";
-import { SessionsApp, type SessionSelection } from "./sessions/SessionsApp.tsx";
+
+export type SessionSelection =
+  | { kind: "draft"; draftId: string }
+  | { kind: "saved"; sessionId: string };
 
 type WorkspaceState =
   | { status: "needs-owner-slug"; ownerSlug: string; message?: string }
@@ -37,7 +30,9 @@ const workspaceQueryKey = ["workspace"] as const;
 async function restoreWorkspace(): Promise<WorkspaceState> {
   let ownerSlug = "";
   try {
-    ownerSlug = (await getStartupPreference()).lastOwnerSlug ?? "";
+    const preference = await getStartupPreference();
+    ownerSlug =
+      preference.lastOwnerSlug === undefined ? "" : preference.lastOwnerSlug;
     if (!ownerSlug) return { status: "needs-owner-slug", ownerSlug };
     return readyWorkspace(await startWorkspaceApi(ownerSlug));
   } catch (error) {
@@ -83,25 +78,35 @@ export function App() {
     queryFn: listSessions,
     enabled: workspace?.status === "ready",
   });
-  const sessions = sessionsQuery.data ?? [];
-  const activeSelection =
-    selection ??
-    (sessions[0]
-      ? { kind: "saved" as const, sessionId: sessions[0].sessionId }
-      : sessionsQuery.isFetched
-        ? emptyDraft
-        : undefined);
+  const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
+  let activeSelection = selection;
+  if (activeSelection === undefined && sessions[0]) {
+    activeSelection = { kind: "saved", sessionId: sessions[0].sessionId };
+  }
+  if (
+    activeSelection === undefined &&
+    sessions[0] === undefined &&
+    sessionsQuery.isFetched
+  ) {
+    activeSelection = emptyDraft;
+  }
   const { resolvedTheme, setPreference } = useTheme();
   const readyApp = useStyles(readyAppClass);
+  const shell = useStyles(shellClass);
   const errorClassName = useStyles(errorClass);
 
-  if (workspaceQuery.isPending || !workspace) {
-    return <WorkspaceLoading />;
+  if (workspaceQuery.isPending) {
+    return <Onboarding status="loading" />;
+  }
+
+  if (!workspace) {
+    return <Onboarding status="loading" />;
   }
 
   if (workspace.status !== "ready") {
     return (
-      <WorkspaceStart
+      <Onboarding
+        status="start"
         ownerSlug={workspace.ownerSlug}
         message={
           startWorkspace.error
@@ -115,103 +120,32 @@ export function App() {
     );
   }
 
+  const alertMessage = workspace.preferenceWarning
+    ? workspace.preferenceWarning
+    : sessionsQuery.error
+      ? String(sessionsQuery.error)
+      : undefined;
+
   return (
     <div className={readyApp}>
-      {(workspace.preferenceWarning || sessionsQuery.error) && (
+      {alertMessage && (
         <div className={errorClassName} role="alert">
-          {workspace.preferenceWarning || String(sessionsQuery.error)}
+          {alertMessage}
         </div>
       )}
-      <SessionsApp
-        sessions={sessions}
-        selection={activeSelection}
-        onSelectionChange={setSelection}
-        onToggleTheme={() =>
-          setPreference(resolvedTheme === "dark" ? "light" : "dark")
-        }
-        themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
-      />
+      <div className={shell} data-testid="sessions-shell">
+        <Sidebar
+          sessions={sessions}
+          selection={activeSelection}
+          onSelectionChange={setSelection}
+          onToggleTheme={() =>
+            setPreference(resolvedTheme === "dark" ? "light" : "dark")
+          }
+          themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
+        />
+        <MainPane selection={activeSelection} sessions={sessions} />
+      </div>
     </div>
-  );
-}
-
-function WorkspaceLoading() {
-  const shell = useStyles(startShellClass);
-  const card = useStyles(startCardClass);
-
-  return (
-    <main className={shell}>
-      <section className={card} aria-live="polite">
-        <H1>Opening workspace</H1>
-        <P>Checking this device for your last username…</P>
-      </section>
-    </main>
-  );
-}
-
-function WorkspaceStart({
-  ownerSlug: initialOwnerSlug,
-  message,
-  isStarting,
-  onStart,
-  onChange,
-}: {
-  ownerSlug: string;
-  message?: string;
-  isStarting: boolean;
-  onStart: (ownerSlug: string) => void;
-  onChange: () => void;
-}) {
-  const [ownerSlug, setOwnerSlug] = useState(initialOwnerSlug);
-  const shell = useStyles(startShellClass);
-  const card = useStyles(startCardClass);
-  const label = useStyles(labelClass);
-  const error = useStyles(errorClass);
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    onStart(ownerSlug);
-  }
-
-  return (
-    <main className={shell}>
-      <section className={card}>
-        <form onSubmit={submit}>
-          <Flex column gap={8}>
-            <div>
-              <H1>Start workspace</H1>
-              <P>Enter a username to open your workspace.</P>
-            </div>
-            <div>
-              <label className={label} htmlFor="username">
-                Username
-              </label>
-              <TextField
-                id="username"
-                value={ownerSlug}
-                onChange={(value) => {
-                  setOwnerSlug(value);
-                  onChange();
-                }}
-                placeholder="tanishq"
-                autoFocus
-                isDisabled={isStarting}
-                aria-describedby={message ? "username-error" : undefined}
-                isInvalid={Boolean(message)}
-              />
-              {message && (
-                <div className={error} id="username-error" role="alert">
-                  {message}
-                </div>
-              )}
-            </div>
-            <Button type="submit" disabled={isStarting}>
-              {isStarting ? "Starting…" : "Start workspace"}
-            </Button>
-          </Flex>
-        </form>
-      </section>
-    </main>
   );
 }
 
@@ -224,28 +158,18 @@ const readyAppClass = style({
   overflow: "hidden",
 });
 
-const startShellClass = style(spacing.padding({ all: 12 }), {
-  boxSizing: "border-box",
+const shellClass = style({
   display: "grid",
-  placeItems: "center",
-  minHeight: "100vh",
-  backgroundColor: colors.gray[2],
-});
-
-const startCardClass = style(
-  shadow.subtle,
-  radius.lg,
-  spacing.padding({ all: 12 }),
-  {
-    width: "min(100%, 440px)",
-    minWidth: 0,
-    backgroundColor: backgroundColor.element,
+  gridTemplateColumns: "240px minmax(0, 1fr)",
+  width: "100%",
+  height: "100vh",
+  minWidth: 0,
+  minHeight: 0,
+  overflow: "hidden",
+  backgroundColor: colors.gray[4],
+  "@media (max-width: 560px)": {
+    gridTemplateColumns: "180px minmax(0, 1fr)",
   },
-);
-
-const labelClass = style(text("xs", 500, "lowContrast"), {
-  display: "block",
-  marginBottom: spacing.value(2),
 });
 
 const errorClass = style(

@@ -8,7 +8,7 @@ import type {
 } from "react";
 import type { StyleElement } from "purse-styles";
 
-type Space = 1 | 2 | 3 | 4 | 6 | 8 | 12 | 16;
+type Space = 0 | 1 | 2 | 3 | 4 | 6 | 8 | 12 | 16;
 type ThemePreference = "system" | "light" | "dark";
 type ResolvedTheme = Exclude<ThemePreference, "system">;
 
@@ -66,6 +66,20 @@ export const spacing: {
   }) => StyleElement;
   value: (step: Space) => string;
 };
+
+export function flex(options?: {
+  direction?: "row" | "column";
+  align?: "start" | "center" | "end" | "stretch" | "baseline";
+  justify?: "start" | "center" | "end" | "between" | "around" | "evenly";
+  gap?: Space;
+  wrap?: boolean;
+}): StyleElement;
+
+export function flexItem(options?: {
+  size?: "hug" | "fill" | "auto";
+  align?: "start" | "center" | "end" | "stretch" | "baseline";
+  order?: number;
+}): StyleElement;
 
 export function text(
   size: "2xs" | "xs" | "sm" | "md" | "lg" | "xl",

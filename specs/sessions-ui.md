@@ -24,7 +24,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     participant User
-    participant Pane as SessionPane
+    participant Pane as MainPane
     participant Tauri
     participant AgentOS
 
@@ -440,7 +440,7 @@ type SessionSummary = {
   updatedAt: string;
 };
 
-// apps/halo/src/sessions/SessionsApp.tsx
+// apps/halo/src/App.tsx
 type SessionSelection =
   | { kind: "draft"; draftId: string }
   | { kind: "saved"; sessionId: string };
@@ -451,11 +451,11 @@ type SessionSelection =
 ```diff
  App render
 -└── WorkspaceReady
-+└── SessionsApp
-+    ├── SessionsSidebar
++└── sessions shell
++    ├── Sidebar
 +    │   ├── selectSession -> Saved selection
 +    │   └── openDraft -> Draft selection
-+    └── SessionPane(selection)
++    └── MainPane(selection)
 ```
 
 #### Code diff preview
@@ -463,16 +463,13 @@ type SessionSelection =
 ```diff
  // apps/halo/src/App.tsx
 -<WorkspaceReady health={workspace.health} sessions={sessions} />
-+<SessionsApp
-+  sessions={sessions}
-+  selection={selection}
-+  onSelectionChange={setSelection}
-+/>
++<Sidebar sessions={sessions} selection={selection} />
++<MainPane sessions={sessions} selection={selection} />
 ```
 
-- [x] Add `SessionsApp`, `SessionsSidebar`, and `SessionPane` with a full-height `240px minmax(0, 1fr)` grid, separate pane overflow, and `minWidth: 0` rules from Maui's sidebar and email examples.
+- [x] Add `Sidebar` and `MainPane` with a full-height `240px minmax(0, 1fr)` grid in `App`, separate pane overflow, and `minWidth: 0` rules from Maui's sidebar and email examples.
 - [x] Use public Maui `Sidebar`, `SidebarSection label="Sessions"`, `SidebarItem`, `Button`, and `Icons.Plus`; update `maui.d.ts` for those exports or remove its path override if the package types pass.
-- [x] Sort rows by `updatedAt` newest first, use `title || sessionId`, mark the selected row with `active`, and show a short trailing label for running, waiting, or failed state.
+- [x] Sort rows by `updatedAt` newest first, use the session ID when the title is empty, mark the selected row with `active`, and show a short trailing label for running, waiting, or failed state.
 - [x] Make **New session** select a fresh local draft and blank pane without a create call; keep it available for an empty catalog and make the sidebar compact but usable at narrow widths.
 - [x] Smoke-test newest-first sorting, saved selection markup, an empty catalog, the narrow shell, and fresh local draft selection with no Tauri create call; run frontend checks without adding a DOM test stack.
 
@@ -547,7 +544,7 @@ type SessionMessage = {
 #### Call stack diff
 
 ```diff
- SessionPane(saved selection)
+ MainPane(saved selection)
 -└── empty transcript state
 +└── useQuery(["session-transcript", sessionId])
 +    └── api.readSessionTranscript
@@ -558,8 +555,8 @@ type SessionMessage = {
 #### Code diff preview
 
 ```diff
- // apps/halo/src/sessions/SessionPane.tsx
- function SessionPane({ selection }: SessionPaneProps) {
+ // apps/halo/src/MainPane.tsx
+ function MainPane({ selection }: MainPaneProps) {
 +  const sessionId = selection.kind === "saved" ? selection.sessionId : undefined;
 +  const transcript = useQuery({
 +    queryKey: ["session-transcript", sessionId],
@@ -574,11 +571,11 @@ type SessionMessage = {
  }
 ```
 
-- [ ] Load `readSessionTranscript(sessionId)` with a session-keyed React Query query enabled only for saved selections; let query keys isolate late results instead of copying request state into effects.
-- [ ] Add local `MessageFeed` and `Message` components based on Maui's unexported message-list pattern, with `role="feed"`, message articles, role labels, timestamps, and preserved text whitespace.
-- [ ] Give the feed its own scroll area and move to the latest message after the first successful load without moving focus.
-- [ ] Render pane-local loading, empty, failed, and partial-history states; state when `hasMoreBefore` or `hasMoreAfter` means the 500-event page is incomplete.
-- [ ] Test message order, empty and partial history, failed loads, stale responses, and draft selection; run frontend tests, lint, and typecheck.
+- [x] Load `readSessionTranscript(sessionId)` with a session-keyed React Query query enabled only for saved selections; let query keys isolate late results instead of copying request state into effects.
+- [x] Add local `MessageFeed` and `Message` components based on Maui's unexported message-list pattern, with `role="feed"`, message articles, role labels, timestamps, and preserved text whitespace.
+- [x] Give the feed its own scroll area and move to the latest message after the first successful load without moving focus.
+- [x] Render pane-local loading, empty, failed, and partial-history states; state when `hasMoreBefore` or `hasMoreAfter` means the 500-event page is incomplete.
+- [x] Smoke-test real message order plus empty, partial, failed, loading, stale-response, scroll, and draft states through the running app; run lint, typecheck, and the production build without adding a DOM test stack.
 
 ### Phase 9: Send prompts to saved sessions without locking the sidebar
 
@@ -587,14 +584,14 @@ Pin a non-streaming prompt editor below the transcript and support sends to an e
 #### Important types
 
 ```tsx
-// apps/halo/src/sessions/SessionPane.tsx
+// apps/halo/src/MainPane.tsx
 type PromptDraft = { text: string; error?: string };
 ```
 
 #### Call stack diff
 
 ```diff
- SessionPane(saved selection)
+ MainPane(saved selection)
 -└── MessageFeed
 +├── MessageFeed
 +└── PromptEditor::submit
@@ -608,7 +605,7 @@ type PromptDraft = { text: string; error?: string };
 #### Code diff preview
 
 ```diff
- // apps/halo/src/sessions/SessionPane.tsx
+ // apps/halo/src/MainPane.tsx
 +async function sendSavedPrompt(sessionId: string, text: string) {
 +  await sendMutation.mutateAsync({ sessionId, text });
 +  await queryClient.invalidateQueries({ queryKey: ["session-transcript", sessionId] });
@@ -633,7 +630,7 @@ Finish the new-session path by creating a durable session only when the user sen
 #### Important types
 
 ```tsx
-// apps/halo/src/sessions/SessionPane.tsx
+// apps/halo/src/MainPane.tsx
 type DraftSession = {
   draftId: string;
   prompt: string;
@@ -653,9 +650,9 @@ type CreateSessionInput = {
 #### Call stack diff
 
 ```diff
- SessionsSidebar::openDraft
--└── SessionPane(draft) -> blank pane
-+└── SessionPane(draft)
+ Sidebar::openDraft
+-└── MainPane(draft) -> blank pane
++└── MainPane(draft)
 +    └── PromptEditor::submit
 +        └── useMutation(sendDraft)
 +            ├── api.createSession(null, null, null)
@@ -669,7 +666,7 @@ type CreateSessionInput = {
 #### Code diff preview
 
 ```diff
- // apps/halo/src/sessions/SessionPane.tsx
+ // apps/halo/src/MainPane.tsx
 +async function ensureSession(draft: DraftSession) {
 +  if (draft.durableSessionId) return draft.durableSessionId;
 +  const session = await createSession({
