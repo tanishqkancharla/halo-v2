@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use agentos_service::{
-    AgentOsService, HealthStatus, PromptResponse, SessionSummary, SessionTranscript, StartupConfig,
-    WorkspaceEntry, WorkspaceLayout,
+    AgentOsService, HealthStatus, PromptResponse, PromptStreamEvent, SessionSummary,
+    SessionTranscript, StartupConfig, WorkspaceEntry, WorkspaceLayout,
 };
 use device_settings::{load_startup_preference, save_last_owner_slug, StartupPreference};
 use serde::Serialize;
@@ -124,8 +124,12 @@ async fn send_prompt(
     state: State<'_, HaloState>,
     session_id: String,
     prompt: String,
+    on_event: tauri::ipc::Channel<PromptStreamEvent>,
 ) -> Result<PromptResponse, String> {
-    state.agentos.send_prompt(&session_id, &prompt).await
+    state
+        .agentos
+        .send_prompt(&session_id, &prompt, on_event)
+        .await
 }
 
 #[tauri::command]

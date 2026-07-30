@@ -130,10 +130,10 @@ export type PromptEventHandler = (event: PromptStreamEvent) => void;
 +};
 ```
 
-- [ ] Add `futures-util`, `PromptStreamEvent`, and a small event mapper in `apps/halo/src-tauri/src/agentos_service/sessions.rs`; forward only text from ephemeral `AgentMessageChunk` entries and map subscription lag to `ResyncRequired`.
-- [ ] Pass `tauri::ipc::Channel<PromptStreamEvent>` from `send_prompt` in `apps/halo/src-tauri/src/lib.rs` through `AgentOsService::send_prompt`, subscribe before `AgentOs::prompt`, and keep prompt completion independent from channel delivery.
-- [ ] Add `PromptStreamEvent` and a required event handler to `SystemApi.sendPrompt`; create `Channel<PromptStreamEvent>` in `apps/halo/src/api/tauri.ts` and update controlled browser mocks to accept the serialized channel.
-- [ ] Add Rust tests for assistant text filtering, ignored thought/tool/durable entries, and lag mapping; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml` and `pnpm check`.
+- [x] Add `futures-util`, `PromptStreamEvent`, and a small event mapper in `apps/halo/src-tauri/src/agentos_service/sessions.rs`; forward only text from ephemeral `AgentMessageChunk` entries and map subscription lag to `ResyncRequired`.
+- [x] Pass `tauri::ipc::Channel<PromptStreamEvent>` from `send_prompt` in `apps/halo/src-tauri/src/lib.rs` through `AgentOsService::send_prompt`, subscribe before `AgentOs::prompt`, and keep prompt completion independent from channel delivery.
+- [x] Add `PromptStreamEvent` and a required event handler to `SystemApi.sendPrompt`; create `Channel<PromptStreamEvent>` in `apps/halo/src/api/tauri.ts` and update controlled browser mocks to accept the serialized channel.
+- [x] Add Rust tests for assistant text filtering, ignored thought/tool/durable entries, and lag mapping; run `cargo test --manifest-path apps/halo/src-tauri/Cargo.toml` and `pnpm check`.
 
 ### Phase 2: Render and reconcile each session's live response
 

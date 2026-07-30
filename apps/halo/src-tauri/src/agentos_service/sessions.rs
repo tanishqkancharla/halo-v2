@@ -1,11 +1,13 @@
 use std::collections::{BTreeMap, HashMap};
 
 use agentos_client::{
-    ContentBlock, DurableSessionEvent, HistoryPage, ListSessionsInput, OpenSessionInput,
-    PromptInput, ReadHistoryInput,
+    ContentBlock, DurableSessionEvent, EphemeralSessionEvent, HistoryPage, ListSessionsInput,
+    OpenSessionInput, PromptInput, ReadHistoryInput, SessionStreamEntry, SessionSubscriptionError,
 };
+use futures_util::StreamExt;
 use serde::Serialize;
 use serde_json::{json, Value};
+use tauri::ipc::Channel;
 
 use super::providers::{
     configured_providers, missing_credential_error, safe_client_error, select_provider,
@@ -32,6 +34,20 @@ pub struct PromptResponse {
     pub output: String,
     pub message: Value,
     pub stop_reason: Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PromptStreamEvent {
+    Delta {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        text: String,
+    },
+    ResyncRequired {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize)]
@@ -130,6 +146,7 @@ impl ReadyWorkspace {
         &self,
         session_id: &str,
         prompt: &str,
+        on_event: Channel<PromptStreamEvent>,
     ) -> Result<PromptResponse, String> {
         validate_session_id(session_id)?;
         if prompt.trim().is_empty() {
@@ -141,15 +158,35 @@ impl ReadyWorkspace {
 
         let content = serde_json::from_value(json!({ "type": "text", "text": prompt }))
             .map_err(|error| format!("Could not build the prompt: {error}"))?;
-        let result = self
-            .os
-            .prompt(PromptInput {
-                session_id: Some(session_id.to_owned()),
-                idempotency_key: Some(uuid::Uuid::new_v4().to_string()),
-                content: vec![content],
-            })
-            .await
-            .map_err(|error| safe_client_error("The Pi prompt failed", error))?;
+        let (mut events, _subscription) = self.os.on_session_event(Some(session_id));
+        let prompt = self.os.prompt(PromptInput {
+            session_id: Some(session_id.to_owned()),
+            idempotency_key: Some(uuid::Uuid::new_v4().to_string()),
+            content: vec![content],
+        });
+        tokio::pin!(prompt);
+        let mut stream_open = true;
+        let result = loop {
+            tokio::select! {
+                result = &mut prompt => {
+                    break result.map_err(|error| safe_client_error("The Pi prompt failed", error))?;
+                }
+                event = events.next(), if stream_open => {
+                    let Some(event) = event else {
+                        stream_open = false;
+                        continue;
+                    };
+                    let resync_required = event.is_err();
+                    if let Some(event) = prompt_stream_event(session_id, event) {
+                        // Tauri closes the channel when its webview reloads; AgentOS still owns the durable prompt.
+                        let _ = on_event.send(event);
+                    }
+                    if resync_required {
+                        stream_open = false;
+                    }
+                }
+            }
+        };
 
         let message = serde_json::to_value(&result.message)
             .map_err(|error| format!("Could not encode the Pi response: {error}"))?;
@@ -193,6 +230,30 @@ impl ReadyWorkspace {
             .await
             .map_err(|error| safe_client_error("Could not read session history", error))?;
         Ok(build_transcript(page))
+    }
+}
+
+fn prompt_stream_event(
+    session_id: &str,
+    event: Result<SessionStreamEntry, SessionSubscriptionError>,
+) -> Option<PromptStreamEvent> {
+    match event {
+        Ok(SessionStreamEntry::Ephemeral(entry)) => match entry.event {
+            EphemeralSessionEvent::AgentMessageChunk(chunk) => match chunk.content {
+                ContentBlock::Text(content) if !content.text.is_empty() => {
+                    Some(PromptStreamEvent::Delta {
+                        session_id: session_id.to_owned(),
+                        text: content.text,
+                    })
+                }
+                _ => None,
+            },
+            EphemeralSessionEvent::AgentThoughtChunk(_) => None,
+        },
+        Ok(SessionStreamEntry::Durable(_)) => None,
+        Err(SessionSubscriptionError::Lagged { .. }) => Some(PromptStreamEvent::ResyncRequired {
+            session_id: session_id.to_owned(),
+        }),
     }
 }
 
@@ -303,10 +364,14 @@ fn collect_text_parts(value: &Value, output: &mut Vec<String>) {
 mod tests {
     use agentos_client::{
         DurableEventKind, DurableSessionEvent, DurableSessionEventEntry, HistoryPage,
+        SessionStreamEntry, SessionSubscriptionError,
     };
     use serde_json::json;
 
-    use super::{build_transcript, collect_text, validate_session_id, MessageRole};
+    use super::{
+        build_transcript, collect_text, prompt_stream_event, validate_session_id, MessageRole,
+        PromptStreamEvent,
+    };
 
     #[test]
     fn session_ids_are_safe() {
@@ -377,6 +442,85 @@ mod tests {
         assert!(!transcript.has_more_after);
     }
 
+    #[test]
+    fn maps_ephemeral_assistant_text_to_a_delta() {
+        let event = stream_event(json!({
+            "durability": "ephemeral",
+            "sessionId": "session-1",
+            "afterSequence": 4,
+            "type": "agent_message_chunk",
+            "content": { "type": "text", "text": "Hello" }
+        }));
+
+        let result = prompt_stream_event("session-1", Ok(event));
+
+        assert_eq!(
+            result,
+            Some(PromptStreamEvent::Delta {
+                session_id: "session-1".to_owned(),
+                text: "Hello".to_owned(),
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(result).expect("serialize prompt stream event"),
+            json!({ "type": "delta", "sessionId": "session-1", "text": "Hello" })
+        );
+    }
+
+    #[test]
+    fn ignores_thought_tool_non_text_and_durable_message_events() {
+        let events = [
+            stream_event(json!({
+                "durability": "ephemeral",
+                "sessionId": "session-1",
+                "afterSequence": 4,
+                "type": "agent_thought_chunk",
+                "content": { "type": "text", "text": "Hidden" }
+            })),
+            stream_event(json!({
+                "durability": "ephemeral",
+                "sessionId": "session-1",
+                "afterSequence": 4,
+                "type": "agent_message_chunk",
+                "content": { "type": "image", "data": "AA==", "mimeType": "image/png" }
+            })),
+            stream_event(json!({
+                "durability": "durable",
+                "sessionId": "session-1",
+                "sequence": 5,
+                "timestamp": "timestamp-5",
+                "type": "tool_call",
+                "toolCallId": "tool-1",
+                "title": "Read file"
+            })),
+            SessionStreamEntry::Durable(history_event(
+                6,
+                "agent_message_chunk",
+                Some("assistant-1"),
+                text("Durable"),
+            )),
+        ];
+
+        for event in events {
+            assert_eq!(prompt_stream_event("session-1", Ok(event)), None);
+        }
+    }
+
+    #[test]
+    fn maps_subscription_lag_to_resync_required() {
+        let result = prompt_stream_event(
+            "session-1",
+            Err(SessionSubscriptionError::Lagged { skipped: 3 }),
+        );
+
+        assert_eq!(
+            result,
+            Some(PromptStreamEvent::ResyncRequired {
+                session_id: "session-1".to_owned(),
+            })
+        );
+    }
+
     fn history_event(
         sequence: u64,
         event_type: &str,
@@ -406,5 +550,9 @@ mod tests {
 
     fn image() -> serde_json::Value {
         json!({ "type": "image", "data": "AA==", "mimeType": "image/png" })
+    }
+
+    fn stream_event(value: serde_json::Value) -> SessionStreamEntry {
+        serde_json::from_value(value).expect("decode session stream event")
     }
 }

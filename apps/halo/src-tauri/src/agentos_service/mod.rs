@@ -14,7 +14,7 @@ use serde_json::json;
 use tokio::sync::RwLock;
 
 use providers::configured_providers;
-pub use sessions::{PromptResponse, SessionSummary, SessionTranscript};
+pub use sessions::{PromptResponse, PromptStreamEvent, SessionSummary, SessionTranscript};
 use workspace::{ensure_workspace_home, VM_USER_ID};
 pub use workspace::{WorkspaceEntry, WorkspaceLayout};
 
@@ -232,8 +232,12 @@ impl AgentOsService {
         &self,
         session_id: &str,
         prompt: &str,
+        on_event: tauri::ipc::Channel<PromptStreamEvent>,
     ) -> Result<PromptResponse, String> {
-        self.ready().await?.send_prompt(session_id, prompt).await
+        self.ready()
+            .await?
+            .send_prompt(session_id, prompt, on_event)
+            .await
     }
 
     pub async fn list_sessions(&self) -> Result<Vec<SessionSummary>, String> {
@@ -345,7 +349,7 @@ mod tests {
         );
         assert_eq!(
             service
-                .send_prompt("session-1", "hello")
+                .send_prompt("session-1", "hello", tauri::ipc::Channel::new(|_| Ok(())),)
                 .await
                 .expect_err("prompt should require startup"),
             "Start a workspace first."

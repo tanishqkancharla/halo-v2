@@ -1489,6 +1489,7 @@ dependencies = [
  "agentos-client",
  "agentos-vm-config",
  "dotenvy",
+ "futures-util",
  "serde",
  "serde_json",
  "tauri",

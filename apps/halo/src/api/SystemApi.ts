@@ -68,6 +68,12 @@ export type PromptResponse = {
   stopReason: unknown;
 };
 
+export type PromptStreamEvent =
+  | { type: "delta"; sessionId: string; text: string }
+  | { type: "resyncRequired"; sessionId: string };
+
+export type PromptEventHandler = (event: PromptStreamEvent) => void;
+
 export type CreateSessionInput = {
   sessionId: null;
   provider: null;
@@ -84,5 +90,9 @@ export type SystemApi = {
   listSessions: () => Promise<SessionSummary[]>;
   readSessionTranscript: (sessionId: string) => Promise<SessionTranscript>;
   createSession: (input: CreateSessionInput) => Promise<SessionSummary>;
-  sendPrompt: (sessionId: string, prompt: string) => Promise<PromptResponse>;
+  sendPrompt: (
+    sessionId: string,
+    prompt: string,
+    onEvent: PromptEventHandler,
+  ) => Promise<PromptResponse>;
 };

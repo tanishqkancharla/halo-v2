@@ -9,6 +9,7 @@ import {
 import { createContext, useContext, useState, type ReactNode } from "react";
 import {
   isReadyHealth,
+  type PromptStreamEvent,
   type ReadyHealthStatus,
   type StartWorkspaceResult,
   type SystemApi,
@@ -32,6 +33,13 @@ const workspaceQueryKey = ["workspace"] as const;
 const sendPromptMutationKey = ["send-prompt"] as const;
 
 type SendPromptInput = { sessionId: string; text: string };
+
+export type LivePrompt = {
+  sessionId: string;
+  userText: string;
+  assistantText: string;
+  status: "sending" | "resyncRequired" | "failed";
+};
 
 export function ApiProvider({
   api,
@@ -99,7 +107,7 @@ export function useSessionsQuery(workspace: WorkspaceState | undefined) {
 export function useSessionTranscriptQuery(sessionId: string | null) {
   const api = useApi();
   return useQuery({
-    queryKey: ["session-transcript", sessionId],
+    queryKey: sessionTranscriptKey(sessionId),
     queryFn:
       sessionId === null
         ? skipToken
@@ -107,19 +115,47 @@ export function useSessionTranscriptQuery(sessionId: string | null) {
   });
 }
 
+export function useLivePrompt(sessionId: string | null) {
+  return useQuery<LivePrompt>({
+    queryKey: livePromptKey(sessionId),
+    queryFn: skipToken,
+  }).data;
+}
+
 export function useSendPromptMutation() {
   const { api, queryClient } = useContext(ApiContext);
   return useMutation({
     mutationKey: sendPromptMutationKey,
     mutationFn: ({ sessionId, text }: SendPromptInput) =>
-      api.sendPrompt(sessionId, text),
+      api.sendPrompt(sessionId, text, (event) => {
+        const key = livePromptKey(sessionId);
+        const current = queryClient.getQueryData<LivePrompt>(key)!;
+        queryClient.setQueryData(key, applyPromptStreamEvent(current, event));
+      }),
+    onMutate: ({ sessionId, text }) => {
+      queryClient.setQueryData<LivePrompt>(livePromptKey(sessionId), {
+        sessionId,
+        userText: text,
+        assistantText: "",
+        status: "sending",
+      });
+    },
     onSuccess: async (_, { sessionId }) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["sessions"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["session-transcript", sessionId],
-        }),
-      ]);
+      const transcript = await api.readSessionTranscript(sessionId);
+      queryClient.setQueryData(sessionTranscriptKey(sessionId), transcript);
+      await queryClient.invalidateQueries({
+        queryKey: ["sessions"],
+        refetchType: "all",
+      });
+      queryClient.removeQueries({
+        queryKey: livePromptKey(sessionId),
+        exact: true,
+      });
+    },
+    onError: (_, { sessionId }) => {
+      const key = livePromptKey(sessionId);
+      const current = queryClient.getQueryData<LivePrompt>(key)!;
+      queryClient.setQueryData(key, { ...current, status: "failed" });
     },
   });
 }
@@ -139,6 +175,29 @@ export function useIsSendingPrompt(sessionId: string | null) {
       (mutation.state.variables as SendPromptInput).sessionId === sessionId,
   });
   return count > 0;
+}
+
+export function applyPromptStreamEvent(
+  current: LivePrompt,
+  event: PromptStreamEvent,
+): LivePrompt {
+  switch (event.type) {
+    case "delta":
+      return {
+        ...current,
+        assistantText: current.assistantText + event.text,
+      };
+    case "resyncRequired":
+      return { ...current, status: "resyncRequired" };
+  }
+}
+
+function livePromptKey(sessionId: string | null) {
+  return ["live-prompt", sessionId] as const;
+}
+
+function sessionTranscriptKey(sessionId: string | null) {
+  return ["session-transcript", sessionId] as const;
 }
 
 async function restoreWorkspace(api: SystemApi): Promise<WorkspaceState> {

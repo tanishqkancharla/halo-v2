@@ -1,8 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
   CreateSessionInput,
   HealthStatus,
+  PromptEventHandler,
   PromptResponse,
+  PromptStreamEvent,
   SessionSummary,
   SessionTranscript,
   StartWorkspaceResult,
@@ -60,7 +62,12 @@ export const tauriApi: SystemApi = {
     });
   },
 
-  sendPrompt(sessionId, prompt) {
-    return invoke<PromptResponse>("send_prompt", { sessionId, prompt });
+  sendPrompt(sessionId, prompt, onEvent: PromptEventHandler) {
+    const channel = new Channel<PromptStreamEvent>(onEvent);
+    return invoke<PromptResponse>("send_prompt", {
+      sessionId,
+      prompt,
+      onEvent: channel,
+    });
   },
 };

@@ -9,6 +9,7 @@ import {
 import {
   Button,
   H1,
+  H3,
   P,
   backgroundColor,
   colors,
@@ -25,16 +26,16 @@ import { style, useStyles } from "purse-styles";
 import {
   useCreateSessionMutation,
   useIsSendingPrompt,
+  useLivePrompt,
   useSendPromptMutation,
   useSessionTranscriptQuery,
+  type LivePrompt,
 } from "./api/ApiProvider.tsx";
 import {
-  type SessionMessage,
   type SessionSummary,
   type SessionTranscript,
 } from "./api/SystemApi.ts";
 import type { SessionSelection } from "./App.tsx";
-import { H3 } from "maui";
 
 export function MainPane({
   selection,
@@ -51,6 +52,7 @@ export function MainPane({
   const status = useStyles(styles.status);
   const sessionId = selection?.kind === "saved" ? selection.sessionId : null;
   const transcript = useSessionTranscriptQuery(sessionId);
+  const livePrompt = useLivePrompt(sessionId);
   const sendPrompt = useSendPromptMutation();
   const isSending = useIsSendingPrompt(sessionId);
   if (!selection) {
@@ -83,10 +85,11 @@ export function MainPane({
           <div className={status} role="alert">
             Could not load transcript: {String(transcript.error)}
           </div>
-        ) : transcript.data.messages.length === 0 ? (
+        ) : transcript.data.messages.length === 0 &&
+          livePrompt === undefined ? (
           <div className={status}>No messages yet.</div>
         ) : (
-          <MessageFeed transcript={transcript.data} />
+          <MessageFeed transcript={transcript.data} livePrompt={livePrompt} />
         )}
         <PromptEditor
           key={selection.sessionId}
@@ -113,6 +116,9 @@ function DraftPane({
   const [durableSessionId, setDurableSessionId] = useState<string>();
   const createSession = useCreateSessionMutation();
   const sendPrompt = useSendPromptMutation();
+  const livePrompt = useLivePrompt(
+    durableSessionId === undefined ? null : durableSessionId,
+  );
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);
   const header = useStyles(styles.header);
@@ -135,6 +141,9 @@ function DraftPane({
           <H1>New session</H1>
           <P>Send a message to start this session.</P>
         </header>
+        {livePrompt === undefined ? null : (
+          <MessageFeed transcript={emptyTranscript} livePrompt={livePrompt} />
+        )}
         <PromptEditor
           key={draftId}
           autoFocus
@@ -224,10 +233,17 @@ function submitFromKeyboard(event: KeyboardEvent<HTMLTextAreaElement>) {
   event.currentTarget.form?.requestSubmit();
 }
 
-function MessageFeed({ transcript }: { transcript: SessionTranscript }) {
+function MessageFeed({
+  transcript,
+  livePrompt,
+}: {
+  transcript: SessionTranscript;
+  livePrompt: LivePrompt | undefined;
+}) {
   const feedRef = useRef<HTMLDivElement>(null);
   const feed = useStyles(styles.feed);
   const partial = useStyles(styles.partial);
+  const liveStatus = useStyles(styles.liveStatus);
   const hasPartialHistory = transcript.hasMoreBefore
     ? true
     : transcript.hasMoreAfter;
@@ -235,7 +251,7 @@ function MessageFeed({ transcript }: { transcript: SessionTranscript }) {
   useLayoutEffect(() => {
     const element = feedRef.current;
     if (element) element.scrollTop = element.scrollHeight;
-  }, [transcript]);
+  }, [transcript, livePrompt]);
 
   return (
     <div
@@ -250,22 +266,45 @@ function MessageFeed({ transcript }: { transcript: SessionTranscript }) {
         </div>
       )}
       {transcript.messages.map((message) => (
-        <Message key={message.id} message={message} />
+        <Message key={message.id} role={message.role} text={message.text} />
       ))}
+      {livePrompt === undefined ? null : (
+        <>
+          <Message role="user" text={livePrompt.userText} />
+          {livePrompt.assistantText.length === 0 ? null : (
+            <Message role="assistant" text={livePrompt.assistantText} />
+          )}
+          {livePrompt.status === "resyncRequired" ? (
+            <div className={liveStatus} role="status">
+              Updating from session history…
+            </div>
+          ) : livePrompt.status === "failed" ? (
+            <div className={liveStatus} role="status">
+              Response stopped.
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
 
-function Message({ message }: { message: SessionMessage }) {
+function Message({
+  role,
+  text: messageText,
+}: {
+  role: "user" | "assistant";
+  text: string;
+}) {
   const messageClass = useStyles(
-    message.role === "user" ? styles.userMessage : styles.assistantMessage,
+    role === "user" ? styles.userMessage : styles.assistantMessage,
   );
   const body = useStyles(styles.messageBody);
-  const roleLabel = message.role === "user" ? "You" : "Assistant";
+  const roleLabel = role === "user" ? "You" : "Assistant";
 
   return (
     <div className={messageClass} aria-label={`${roleLabel} message`}>
-      <div className={body}>{message.text}</div>
+      <div className={body}>{messageText}</div>
     </div>
   );
 }
@@ -282,6 +321,12 @@ function partialHistoryText({
         : "Later messages are not shown.";
   return `This transcript is one 500-event page. ${missing}`;
 }
+
+const emptyTranscript: SessionTranscript = {
+  messages: [],
+  hasMoreBefore: false,
+  hasMoreAfter: false,
+};
 
 const styles = {
   pane: style(
@@ -331,6 +376,7 @@ const styles = {
       backgroundColor: colors.gray[3],
     },
   ),
+  liveStatus: style(flexItem({ size: "hug" }), text("xs", 400, "lowContrast")),
   userMessage: style(radius.lg, spacing.padding({ x: 4, y: 2 }), {
     alignSelf: "flex-end",
     width: "fit-content",
