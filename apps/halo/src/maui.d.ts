@@ -88,6 +88,25 @@ export function Button(
   },
 ): ReactNode;
 
+export function Sidebar(
+  props: HTMLAttributes<HTMLElement> & { children: ReactNode },
+): ReactNode;
+
+export function SidebarSection(props: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}): ReactNode;
+
+export function SidebarItem(
+  props: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> & {
+    active?: boolean;
+    children: ReactNode;
+    icon?: (props: SVGProps<SVGSVGElement>) => ReactNode;
+    trailing?: ReactNode;
+  },
+): ReactNode;
+
 export function TextField(
   props: Omit<InputHTMLAttributes<HTMLInputElement>, "onChange"> & {
     onChange?: (value: string) => void;
@@ -123,4 +142,5 @@ export function P(props: { children: ReactNode }): ReactNode;
 
 export const Icons: {
   Clock: (props: SVGProps<SVGSVGElement>) => ReactNode;
+  Plus: (props: SVGProps<SVGSVGElement>) => ReactNode;
 };

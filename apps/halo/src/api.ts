@@ -35,11 +35,13 @@ export type WorkspaceEntry = {
   isDirectory: boolean;
 };
 
+export type SessionState = "idle" | "running" | "waiting" | "failed";
+
 export type SessionSummary = {
   sessionId: string;
   agent: string;
   cwd: string;
-  state: string;
+  state: SessionState;
   title?: string;
   createdAt: string;
   updatedAt: string;
@@ -96,8 +98,13 @@ export function listWorkspaceFiles(path?: string): Promise<WorkspaceEntry[]> {
   return invoke("list_workspace_files", { path: path ?? null });
 }
 
-export function listSessions(): Promise<SessionSummary[]> {
-  return invoke("list_sessions");
+export async function listSessions(): Promise<SessionSummary[]> {
+  const sessions = await invoke<SessionSummary[]>("list_sessions");
+  // The app's TypeScript target does not include Array.prototype.toSorted.
+  // oxlint-disable-next-line unicorn/no-array-sort
+  return sessions.sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt),
+  );
 }
 
 export function readSessionTranscript(

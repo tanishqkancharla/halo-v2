@@ -431,19 +431,19 @@ Replace the card dashboard with the two-pane sessions layout. A saved row select
 #### Important types
 
 ```tsx
-// apps/halo/src/sessions/types.ts
+// apps/halo/src/api.ts
 type SessionState = "idle" | "running" | "waiting" | "failed";
-
-type SessionSelection =
-  | { kind: "draft"; draftId: string }
-  | { kind: "saved"; sessionId: string };
-
 type SessionSummary = {
   sessionId: string;
   title?: string;
   state: SessionState;
   updatedAt: string;
 };
+
+// apps/halo/src/sessions/SessionsApp.tsx
+type SessionSelection =
+  | { kind: "draft"; draftId: string }
+  | { kind: "saved"; sessionId: string };
 ```
 
 #### Call stack diff
@@ -470,11 +470,11 @@ type SessionSummary = {
 +/>
 ```
 
-- [ ] Add `SessionsApp`, `SessionsSidebar`, and `SessionPane` with a full-height `240px minmax(0, 1fr)` grid, separate pane overflow, and `minWidth: 0` rules from Maui's sidebar and email examples.
-- [ ] Use public Maui `Sidebar`, `SidebarSection label="Sessions"`, `SidebarItem`, `Button`, and `Icons.Plus`; update `maui.d.ts` for those exports or remove its path override if the package types pass.
-- [ ] Sort rows by `updatedAt` newest first, use `title || sessionId`, mark the selected row with `active`, and show a short trailing label for running, waiting, or failed state.
-- [ ] Make **New session** select a fresh local draft and blank pane without a create call; keep it available for an empty catalog and make the sidebar compact but usable at narrow widths.
-- [ ] Test newest-first rows, saved selection, empty catalog, narrow-shell markup, and draft selection with no Tauri create call; run frontend tests and typecheck.
+- [x] Add `SessionsApp`, `SessionsSidebar`, and `SessionPane` with a full-height `240px minmax(0, 1fr)` grid, separate pane overflow, and `minWidth: 0` rules from Maui's sidebar and email examples.
+- [x] Use public Maui `Sidebar`, `SidebarSection label="Sessions"`, `SidebarItem`, `Button`, and `Icons.Plus`; update `maui.d.ts` for those exports or remove its path override if the package types pass.
+- [x] Sort rows by `updatedAt` newest first, use `title || sessionId`, mark the selected row with `active`, and show a short trailing label for running, waiting, or failed state.
+- [x] Make **New session** select a fresh local draft and blank pane without a create call; keep it available for an empty catalog and make the sidebar compact but usable at narrow widths.
+- [x] Smoke-test newest-first sorting, saved selection markup, an empty catalog, the narrow shell, and fresh local draft selection with no Tauri create call; run frontend checks without adding a DOM test stack.
 
 ### Phase 7: Load and render saved transcripts
 
@@ -483,13 +483,14 @@ Give each selected session its own transcript request state and render the norma
 #### Important types
 
 ```tsx
-// apps/halo/src/sessions/types.ts
+// apps/halo/src/sessions/SessionPane.tsx
 type TranscriptState =
   | { status: "idle" }
   | { status: "loading"; sessionId: string }
   | { status: "ready"; sessionId: string; transcript: SessionTranscript }
   | { status: "error"; sessionId: string; message: string };
 
+// apps/halo/src/api.ts
 type SessionMessage = {
   id: string;
   role: "user" | "assistant";
@@ -547,7 +548,7 @@ Pin a non-streaming prompt editor below the transcript and support sends to an e
 #### Important types
 
 ```tsx
-// apps/halo/src/sessions/types.ts
+// apps/halo/src/sessions/SessionPane.tsx
 type PromptDraft = { text: string; error?: string };
 
 type SendState =
@@ -604,7 +605,7 @@ Finish the new-session path by creating a durable session only when the user sen
 #### Important types
 
 ```tsx
-// apps/halo/src/sessions/types.ts
+// apps/halo/src/sessions/SessionPane.tsx
 type DraftSession = {
   draftId: string;
   prompt: string;
@@ -613,6 +614,7 @@ type DraftSession = {
   error?: string;
 };
 
+// apps/halo/src/api.ts
 type CreateSessionInput = {
   sessionId: null;
   provider: null;
