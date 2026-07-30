@@ -68,10 +68,10 @@ export type PromptResponse = {
   stopReason: unknown;
 };
 
-export type CreateSessionOptions = {
-  sessionId?: string;
-  provider?: string;
-  model?: string;
+export type CreateSessionInput = {
+  sessionId: null;
+  provider: null;
+  model: null;
 };
 
 export type SystemApi = {
@@ -83,6 +83,6 @@ export type SystemApi = {
   listWorkspaceFiles: (path?: string) => Promise<WorkspaceEntry[]>;
   listSessions: () => Promise<SessionSummary[]>;
   readSessionTranscript: (sessionId: string) => Promise<SessionTranscript>;
-  createSession: (options?: CreateSessionOptions) => Promise<SessionSummary>;
+  createSession: (input: CreateSessionInput) => Promise<SessionSummary>;
   sendPrompt: (sessionId: string, prompt: string) => Promise<PromptResponse>;
 };

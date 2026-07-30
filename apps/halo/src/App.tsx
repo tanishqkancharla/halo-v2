@@ -89,7 +89,17 @@ export function App() {
           }
           themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
         />
-        <MainPane selection={activeSelection} sessions={sessions} />
+        <MainPane
+          selection={activeSelection}
+          sessions={sessions}
+          onDraftSent={(draftId, sessionId) =>
+            setSelection((current) =>
+              current?.kind === "draft" && current.draftId === draftId
+                ? { kind: "saved", sessionId }
+                : current,
+            )
+          }
+        />
       </div>
     </div>
   );

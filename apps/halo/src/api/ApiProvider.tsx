@@ -2,6 +2,7 @@ import {
   QueryClient,
   QueryClientProvider,
   skipToken,
+  useIsMutating,
   useMutation,
   useQuery,
 } from "@tanstack/react-query";
@@ -28,6 +29,9 @@ type ApiContextValue = {
 
 const ApiContext = createContext<ApiContextValue>(undefined!);
 const workspaceQueryKey = ["workspace"] as const;
+const sendPromptMutationKey = ["send-prompt"] as const;
+
+type SendPromptInput = { sessionId: string; text: string };
 
 export function ApiProvider({
   api,
@@ -101,6 +105,40 @@ export function useSessionTranscriptQuery(sessionId: string | null) {
         ? skipToken
         : () => api.readSessionTranscript(sessionId),
   });
+}
+
+export function useSendPromptMutation() {
+  const { api, queryClient } = useContext(ApiContext);
+  return useMutation({
+    mutationKey: sendPromptMutationKey,
+    mutationFn: ({ sessionId, text }: SendPromptInput) =>
+      api.sendPrompt(sessionId, text),
+    onSuccess: async (_, { sessionId }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["sessions"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["session-transcript", sessionId],
+        }),
+      ]);
+    },
+  });
+}
+
+export function useCreateSessionMutation() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: () =>
+      api.createSession({ sessionId: null, provider: null, model: null }),
+  });
+}
+
+export function useIsSendingPrompt(sessionId: string | null) {
+  const count = useIsMutating({
+    mutationKey: sendPromptMutationKey,
+    predicate: (mutation) =>
+      (mutation.state.variables as SendPromptInput).sessionId === sessionId,
+  });
+  return count > 0;
 }
 
 async function restoreWorkspace(api: SystemApi): Promise<WorkspaceState> {

@@ -30,8 +30,8 @@ importers:
         specifier: ^2.11.1
         version: 2.11.1
       maui:
-        specifier: github:tanishqkancharla/maui#e025ee9c50c23baef265b66461c5f78bf32c644c
-        version: https://codeload.github.com/tanishqkancharla/maui/tar.gz/e025ee9c50c23baef265b66461c5f78bf32c644c(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)
+        specifier: github:tanishqkancharla/maui#8fb6ba3a4d58ed2da1a783f088995d041a57f458
+        version: https://codeload.github.com/tanishqkancharla/maui/tar.gz/8fb6ba3a4d58ed2da1a783f088995d041a57f458(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)
       purse-styles:
         specifier: ^0.2.1
         version: 0.2.1(react@19.2.8)
@@ -63,6 +63,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.7.0
         version: 4.7.0(supports-color@7.2.0)(vite@7.3.6(@types/node@22.15.3)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0))
+      agentation:
+        specifier: ^3.0.2
+        version: 3.0.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -1794,6 +1797,17 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
+  agentation@3.0.2:
+    resolution: {integrity: sha512-iGzBxFVTuZEIKzLY6AExSLAQH6i6SwxV4pAu7v7m3X6bInZ7qlZXAwrEqyc4+EfP4gM7z2RXBF6SF4DeH0f2lA==}
+    peerDependencies:
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
+
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
     peerDependencies:
@@ -2609,8 +2623,8 @@ packages:
     engines: {node: '>= 18'}
     hasBin: true
 
-  maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/e025ee9c50c23baef265b66461c5f78bf32c644c:
-    resolution: {gitHosted: true, integrity: sha512-otg1F0b8X09gUuDFYhc0JexNnqHUSp0viJX+wD4330TK0BnRM4In1m/48DY8nWaY3i+LaHMNRy+QherFq6WIHA==, tarball: https://codeload.github.com/tanishqkancharla/maui/tar.gz/e025ee9c50c23baef265b66461c5f78bf32c644c}
+  maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/8fb6ba3a4d58ed2da1a783f088995d041a57f458:
+    resolution: {gitHosted: true, integrity: sha512-d1xtKGAhVmsB1ni8sHKUhJAuHuGOl2pdHGLpS4ML2s+3wxSmMK5XzQ/ObymDkfnOBYlQO/MXy8byk6fohA1LmA==, tarball: https://codeload.github.com/tanishqkancharla/maui/tar.gz/8fb6ba3a4d58ed2da1a783f088995d041a57f458}
     version: 0.0.1
 
   md5@2.3.0:
@@ -5014,6 +5028,11 @@ snapshots:
 
   agent-base@7.1.4: {}
 
+  agentation@3.0.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+    optionalDependencies:
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+
   ajv-formats@3.0.1(ajv@8.20.0):
     optionalDependencies:
       ajv: 8.20.0
@@ -5853,7 +5872,7 @@ snapshots:
 
   marked@15.0.12: {}
 
-  maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/e025ee9c50c23baef265b66461c5f78bf32c644c(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2):
+  maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/8fb6ba3a4d58ed2da1a783f088995d041a57f458(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2):
     dependencies:
       '@radix-ui/colors': 3.0.0
       '@react-spring/web': 10.1.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

@@ -615,11 +615,11 @@ type PromptDraft = { text: string; error?: string };
  </>;
 ```
 
-- [ ] Add a bottom prompt editor styled with Maui text, background, radius, spacing, `shadow.subtle`, and `focusRing`; submit by button or Cmd/Ctrl+Enter and keep Enter for a new line.
-- [ ] Disable send for blank trimmed text and only for the session now sending; leave the sidebar and other sessions usable.
-- [ ] Call `send_prompt` through a React Query mutation, wait for the full result, then invalidate that session's catalog row and transcript without adding fake user or assistant messages.
-- [ ] Clear the prompt and scroll the feed only after success; on failure keep the text and show a retryable pane error, and never pull selection back after the user switches sessions.
-- [ ] Test blank input, keyboard submit, saved-session success, error retention, session switching during send, and the non-streaming busy state; run frontend tests and typecheck.
+- [x] Add a bottom prompt editor styled with Maui text, background, radius, spacing, `shadow.subtle`, and `focusRing`; submit by button or Cmd/Ctrl+Enter and keep Enter for a new line.
+- [x] Disable send for blank trimmed text and only for the session now sending; leave the sidebar and other sessions usable.
+- [x] Call `send_prompt` through a React Query mutation, wait for the full result, then invalidate that session's catalog row and transcript without adding fake user or assistant messages.
+- [x] Clear the prompt and scroll the feed only after success; on failure keep the text and show a retryable pane error, and never pull selection back after the user switches sessions.
+- [x] Test blank input, keyboard submit, saved-session success, error retention, session switching during send, and the non-streaming busy state; run frontend tests and typecheck.
 
 ### Phase 10: Turn the first draft send into a durable session
 
@@ -684,8 +684,8 @@ type CreateSessionInput = {
  }
 ```
 
-- [ ] Focus the editor when a draft opens and keep its prompt state keyed by `draftId` until the first send completes or the user opens another draft.
-- [ ] On first send, call `create_or_reopen_session` with null session, provider, and model, then send the prompt to the returned ID; do not create a durable session when **New session** is clicked.
-- [ ] After mutation success, replace that draft selection with the durable session, clear its prompt, invalidate the catalog and transcript queries, and place the new or updated row in newest-first order.
-- [ ] On create or send failure, keep the draft text, show a retry action, avoid a second durable session when an ID was already returned, and leave other rows usable.
+- [x] Focus the editor when a draft opens and keep its prompt state keyed by `draftId` until the first send completes or the user opens another draft.
+- [x] On first send, call `create_or_reopen_session` with null session, provider, and model, then send the prompt to the returned ID; do not create a durable session when **New session** is clicked.
+- [x] After mutation success, replace that draft selection with the durable session, clear its prompt, invalidate the catalog and transcript queries, and place the new or updated row in newest-first order.
+- [x] On create or send failure, keep the draft text, show a retry action, avoid a second durable session when an ID was already returned, and leave other rows usable.
 - [ ] Test first-send creation, default provider/model input, failure before and after creation, retry without duplicate creation, selection changes, and focus; run all frontend and Rust checks, then check startup, restart persistence, dark theme, keyboard focus, and a narrow Tauri window by hand.

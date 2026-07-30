@@ -10,7 +10,12 @@ use agentos_service::{
 };
 use device_settings::{load_startup_preference, save_last_owner_slug, StartupPreference};
 use serde::Serialize;
+#[cfg(target_os = "macos")]
+use tauri::menu::{Menu, MenuItemBuilder};
 use tauri::{Manager, RunEvent, State};
+
+#[cfg(target_os = "macos")]
+const RELOAD_MENU_ID: &str = "reload";
 
 struct HaloState {
     agentos: Arc<AgentOsService>,
@@ -143,6 +148,27 @@ pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(debug_assertions)]
     let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .menu(|app| {
+            let menu = Menu::default(app)?;
+            let reload = MenuItemBuilder::with_id(RELOAD_MENU_ID, "Reload")
+                .accelerator("CmdOrCtrl+R")
+                .build(app)?;
+            // Tauri's macOS default menu orders App, File, Edit, View, Window, Help.
+            let default_items = menu.items()?;
+            let view_menu = default_items[3].as_submenu_unchecked();
+            view_menu.insert(&reload, 0)?;
+            Ok(menu)
+        })
+        .on_menu_event(|app, event| {
+            if event.id() == RELOAD_MENU_ID {
+                app.get_webview_window("main")
+                    .expect("main webview window")
+                    .reload()
+                    .expect("reload main webview");
+            }
+        });
 
     let app = builder
         .setup(|app| {

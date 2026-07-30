@@ -16,7 +16,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
     "@tauri-apps/api": "^2.11.1",
-    "maui": "github:tanishqkancharla/maui#e025ee9c50c23baef265b66461c5f78bf32c644c",
+    "maui": "github:tanishqkancharla/maui#8fb6ba3a4d58ed2da1a783f088995d041a57f458",
     "purse-styles": "^0.2.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
@@ -29,6 +29,7 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "^4.7.0",
+    "agentation": "^3.0.2",
     "typescript": "7.0.2",
     "vite": "^7.3.1"
   }

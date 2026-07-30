@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
-  CreateSessionOptions,
+  CreateSessionInput,
   HealthStatus,
   PromptResponse,
   SessionSummary,
@@ -51,12 +51,12 @@ export const tauriApi: SystemApi = {
     return invoke<SessionTranscript>("read_session_transcript", { sessionId });
   },
 
-  createSession(options) {
-    const values: CreateSessionOptions = options === undefined ? {} : options;
+  createSession(input) {
+    const values: CreateSessionInput = input;
     return invoke<SessionSummary>("create_or_reopen_session", {
-      sessionId: values.sessionId === undefined ? null : values.sessionId,
-      provider: values.provider === undefined ? null : values.provider,
-      model: values.model === undefined ? null : values.model,
+      sessionId: values.sessionId,
+      provider: values.provider,
+      model: values.model,
     });
   },
 
