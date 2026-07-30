@@ -363,7 +363,7 @@ type StartupPreference = { lastOwnerSlug?: string };
 ```
 
 - [x] Keep the frontend dependency set unchanged; smoke-test the workspace gate through the running Tauri app with `halo-web` instead of adding jsdom or browser unit-test packages.
-- [x] Move shared Tauri DTOs and command wrappers into `apps/halo/src/api.ts`, including `getStartupPreference`, `startWorkspace`, `listSessions`, `readSessionTranscript`, `createSession`, and `sendPrompt`.
+- [x] Put shared Tauri DTOs and the `SystemApi` contract in `apps/halo/src/api/SystemApi.ts`, then implement the commands in `apps/halo/src/api/tauri.ts`.
 - [x] Build an accessible Maui `WorkspaceStart` form labeled “Username” that submits on Enter, disables only during startup, keeps the username after failure, and places the error by the field.
 - [x] On mount, auto-start a valid saved owner slug; show `WorkspaceStart` when none exists or restore fails, then enter a minimal ready view and load the catalog after success.
 - [x] Run `pnpm --filter @halo/desktop typecheck`; use `halo-web` to check that first launch asks for a username, the next launch restores it, and a bad username keeps the form and shows its error by the field.
@@ -431,7 +431,7 @@ Replace the card dashboard with the two-pane sessions layout. A saved row select
 #### Important types
 
 ```tsx
-// apps/halo/src/api.ts
+// apps/halo/src/api/SystemApi.ts
 type SessionState = "idle" | "running" | "waiting" | "failed";
 type SessionSummary = {
   sessionId: string;
@@ -480,7 +480,7 @@ Use TanStack Query for Tauri reads and writes so request state, caching, and lat
 #### Important types
 
 ```tsx
-// apps/halo/src/App.tsx
+// apps/halo/src/api/ApiProvider.tsx
 type WorkspaceState =
   | { status: "needs-owner-slug"; ownerSlug: string; message?: string }
   | { status: "ready"; health: ReadyHealthStatus; preferenceWarning?: string };
@@ -508,19 +508,17 @@ type SessionsQueryKey = readonly ["sessions", string | null];
 ```diff
  // apps/halo/src/main.tsx
 -<MauiProvider><App /></MauiProvider>
-+<QueryClientProvider client={queryClient}>
++<ApiProvider api={tauriApi}>
 +  <MauiProvider><App /></MauiProvider>
-+</QueryClientProvider>
++</ApiProvider>
 
  // apps/halo/src/App.tsx
 -useEffect(() => { void restoreWorkspace().then(setWorkspace); }, []);
-+const workspace = useQuery({
-+  queryKey: ["workspace"],
-+  queryFn: restoreWorkspace,
-+});
++const workspace = useWorkspaceQuery();
 ```
 
-- [x] Add `@tanstack/react-query`, create one app-lifetime `QueryClient`, and wrap Halo in `QueryClientProvider`.
+- [x] Add `@tanstack/react-query`; let `ApiProvider` create the app-lifetime `QueryClient` and provide it with `SystemApi` through React context.
+- [x] Keep query keys and helper hooks in `ApiProvider` so components do not import Tauri or create queries from transport methods.
 - [x] Replace workspace restore state and effects with a no-retry query plus a start mutation that writes the ready result into the workspace cache.
 - [x] Replace catalog state and effects with a workspace-keyed query enabled only after startup; derive the initial saved or draft selection from query data.
 - [x] Update later phases to use session-keyed transcript queries, prompt mutations, and targeted invalidation; run frontend checks and the startup, restart, catalog, draft, theme, and narrow-shell E2E checks.
@@ -532,7 +530,7 @@ Give each selected session its own transcript query and render the normalized me
 #### Important types
 
 ```tsx
-// apps/halo/src/api.ts
+// apps/halo/src/api/SystemApi.ts
 type SessionMessage = {
   id: string;
   role: "user" | "assistant";
@@ -639,7 +637,7 @@ type DraftSession = {
   error?: string;
 };
 
-// apps/halo/src/api.ts
+// apps/halo/src/api/SystemApi.ts
 type CreateSessionInput = {
   sessionId: null;
   provider: null;

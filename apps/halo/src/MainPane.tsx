@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { useLayoutEffect, useRef } from "react";
 import {
   H1,
@@ -13,12 +12,12 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
+import { useSessionTranscriptQuery } from "./api/ApiProvider.tsx";
 import {
-  readSessionTranscript,
   type SessionMessage,
   type SessionSummary,
   type SessionTranscript,
-} from "./api.ts";
+} from "./api/SystemApi.ts";
 import type { SessionSelection } from "./App.tsx";
 
 export function MainPane({
@@ -32,11 +31,7 @@ export function MainPane({
   const header = useStyles(headerClass);
   const status = useStyles(statusClass);
   const sessionId = selection?.kind === "saved" ? selection.sessionId : null;
-  const transcript = useQuery({
-    queryKey: ["session-transcript", sessionId],
-    queryFn: () => readSessionTranscript(sessionId!),
-    enabled: Boolean(sessionId),
-  });
+  const transcript = useSessionTranscriptQuery(sessionId);
   if (!selection) {
     return (
       <main className={pane} aria-label="Session">

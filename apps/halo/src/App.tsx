@@ -1,4 +1,3 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { colors, spacing, text, useTheme } from "maui";
 import { style, useStyles } from "purse-styles";
@@ -6,51 +5,14 @@ import { MainPane } from "./MainPane.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import {
-  getStartupPreference,
-  listSessions,
-  startWorkspace as startWorkspaceApi,
-  type ReadyHealthStatus,
-  type StartWorkspaceResult,
-} from "./api.ts";
+  useSessionsQuery,
+  useStartWorkspaceMutation,
+  useWorkspaceQuery,
+} from "./api/ApiProvider.tsx";
 
 export type SessionSelection =
   | { kind: "draft"; draftId: string }
   | { kind: "saved"; sessionId: string };
-
-type WorkspaceState =
-  | { status: "needs-owner-slug"; ownerSlug: string; message?: string }
-  | {
-      status: "ready";
-      health: ReadyHealthStatus;
-      preferenceWarning?: string;
-    };
-
-const workspaceQueryKey = ["workspace"] as const;
-
-async function restoreWorkspace(): Promise<WorkspaceState> {
-  let ownerSlug = "";
-  try {
-    const preference = await getStartupPreference();
-    ownerSlug =
-      preference.lastOwnerSlug === undefined ? "" : preference.lastOwnerSlug;
-    if (!ownerSlug) return { status: "needs-owner-slug", ownerSlug };
-    return readyWorkspace(await startWorkspaceApi(ownerSlug));
-  } catch (error) {
-    return {
-      status: "needs-owner-slug",
-      ownerSlug,
-      message: String(error),
-    };
-  }
-}
-
-function readyWorkspace(result: StartWorkspaceResult): WorkspaceState {
-  return {
-    status: "ready",
-    health: result.health,
-    preferenceWarning: result.preferenceWarning,
-  };
-}
 
 export function App() {
   const [selection, setSelection] = useState<SessionSelection>();
@@ -58,26 +20,10 @@ export function App() {
     kind: "draft",
     draftId: crypto.randomUUID(),
   }));
-  const queryClient = useQueryClient();
-  const workspaceQuery = useQuery({
-    queryKey: workspaceQueryKey,
-    queryFn: restoreWorkspace,
-  });
+  const workspaceQuery = useWorkspaceQuery();
   const workspace = workspaceQuery.data;
-  const startWorkspace = useMutation({
-    mutationFn: (ownerSlug: string) => startWorkspaceApi(ownerSlug.trim()),
-    onSuccess: (result) => {
-      queryClient.setQueryData(workspaceQueryKey, readyWorkspace(result));
-    },
-  });
-  const sessionsQuery = useQuery({
-    queryKey: [
-      "sessions",
-      workspace?.status === "ready" ? workspace.health.workspaceRoot : null,
-    ],
-    queryFn: listSessions,
-    enabled: workspace?.status === "ready",
-  });
+  const startWorkspace = useStartWorkspaceMutation();
+  const sessionsQuery = useSessionsQuery(workspace);
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
   let activeSelection = selection;
   if (activeSelection === undefined && sessions[0]) {

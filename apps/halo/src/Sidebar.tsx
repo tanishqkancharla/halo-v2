@@ -9,7 +9,7 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import type { SessionSelection } from "./App.tsx";
-import type { SessionState, SessionSummary } from "./api.ts";
+import type { SessionState, SessionSummary } from "./api/SystemApi.ts";
 
 type SidebarProps = {
   sessions: SessionSummary[];
