@@ -79,7 +79,7 @@ Keep a new session local until its first send. That send creates the AgentOS ses
 - [`AGENTS.md`](../AGENTS.md) — Defines the username, owner slug, workspace layout, storage, and writing rules.
 - [`README.md`](../README.md) — Describes the one-VM, one-database model and project checks.
 - [`apps/halo/src/App.tsx`](../apps/halo/src/App.tsx) — Holds the current dashboard, startup polling, session catalog, raw history, and prompt flow that this work replaces.
-- [`apps/halo/src/main.tsx`](../apps/halo/src/main.tsx) — Wraps the app in `MauiProvider`.
+- [`apps/halo/src/main.tsx`](../apps/halo/src/main.tsx) — Wraps the app in `QueryClientProvider` and `MauiProvider`.
 - [`apps/halo/src/styles.css`](../apps/halo/src/styles.css) — Sets root height and base element styles.
 - [`apps/halo/src/maui.d.ts`](../apps/halo/src/maui.d.ts) — Shadows Maui types and must cover each new public Maui import.
 - [`apps/halo/src-tauri/src/lib.rs`](../apps/halo/src-tauri/src/lib.rs) — Starts AgentOS during Tauri setup and registers the command surface.
@@ -476,20 +476,65 @@ type SessionSelection =
 - [x] Make **New session** select a fresh local draft and blank pane without a create call; keep it available for an empty catalog and make the sidebar compact but usable at narrow widths.
 - [x] Smoke-test newest-first sorting, saved selection markup, an empty catalog, the narrow shell, and fresh local draft selection with no Tauri create call; run frontend checks without adding a DOM test stack.
 
-### Phase 7: Load and render saved transcripts
+### Phase 7: Move frontend async state to React Query
 
-Give each selected session its own transcript request state and render the normalized messages as a semantic feed. A late response for an old selection must not replace the current pane.
+Use TanStack Query for Tauri reads and writes so request state, caching, and late responses do not need hand-written effects.
 
 #### Important types
 
 ```tsx
-// apps/halo/src/sessions/SessionPane.tsx
-type TranscriptState =
-  | { status: "idle" }
-  | { status: "loading"; sessionId: string }
-  | { status: "ready"; sessionId: string; transcript: SessionTranscript }
-  | { status: "error"; sessionId: string; message: string };
+// apps/halo/src/App.tsx
+type WorkspaceState =
+  | { status: "needs-owner-slug"; ownerSlug: string; message?: string }
+  | { status: "ready"; health: ReadyHealthStatus; preferenceWarning?: string };
 
+type WorkspaceQueryKey = readonly ["workspace"];
+type SessionsQueryKey = readonly ["sessions", string | null];
+```
+
+#### Call stack diff
+
+```diff
+ App
+-├── useEffect -> restoreWorkspace -> setWorkspace
+-└── useEffect -> listSessions -> setSessions
++├── useQuery(["workspace"])
++│   └── getStartupPreference -> startWorkspace
++├── useMutation(startWorkspace)
++│   └── setQueryData(["workspace"])
++└── useQuery(["sessions", workspaceRoot], enabled: workspace ready)
+    └── listSessions
+```
+
+#### Code diff preview
+
+```diff
+ // apps/halo/src/main.tsx
+-<MauiProvider><App /></MauiProvider>
++<QueryClientProvider client={queryClient}>
++  <MauiProvider><App /></MauiProvider>
++</QueryClientProvider>
+
+ // apps/halo/src/App.tsx
+-useEffect(() => { void restoreWorkspace().then(setWorkspace); }, []);
++const workspace = useQuery({
++  queryKey: ["workspace"],
++  queryFn: restoreWorkspace,
++});
+```
+
+- [x] Add `@tanstack/react-query`, create one app-lifetime `QueryClient`, and wrap Halo in `QueryClientProvider`.
+- [x] Replace workspace restore state and effects with a no-retry query plus a start mutation that writes the ready result into the workspace cache.
+- [x] Replace catalog state and effects with a workspace-keyed query enabled only after startup; derive the initial saved or draft selection from query data.
+- [x] Update later phases to use session-keyed transcript queries, prompt mutations, and targeted invalidation; run frontend checks and the startup, restart, catalog, draft, theme, and narrow-shell E2E checks.
+
+### Phase 8: Load and render saved transcripts
+
+Give each selected session its own transcript query and render the normalized messages as a semantic feed. Query keys keep a late response for an old selection out of the current pane.
+
+#### Important types
+
+```tsx
 // apps/halo/src/api.ts
 type SessionMessage = {
   id: string;
@@ -504,12 +549,10 @@ type SessionMessage = {
 ```diff
  SessionPane(saved selection)
 -└── empty transcript state
-+└── loadTranscript(sessionId)
++└── useQuery(["session-transcript", sessionId])
 +    └── api.readSessionTranscript
-+        ├── ignore result when selection changed
-+        └── setTranscript(ready)
-+            └── MessageFeed
-+                └── Message for each SessionMessage
++        └── MessageFeed
++            └── Message for each SessionMessage
 ```
 
 #### Code diff preview
@@ -518,43 +561,34 @@ type SessionMessage = {
  // apps/halo/src/sessions/SessionPane.tsx
  function SessionPane({ selection }: SessionPaneProps) {
 +  const sessionId = selection.kind === "saved" ? selection.sessionId : undefined;
-+
-+  useEffect(() => {
-+    if (!sessionId) return;
-+    let current = true;
-+    void readSessionTranscript(sessionId).then((transcript) => {
-+      if (current) setTranscript({ status: "ready", sessionId, transcript });
-+    });
-+    return () => { current = false; };
-+  }, [sessionId]);
++  const transcript = useQuery({
++    queryKey: ["session-transcript", sessionId],
++    queryFn: () => readSessionTranscript(sessionId!),
++    enabled: Boolean(sessionId),
++  });
 
 -  return <TranscriptStatus state={{ status: "idle" }} />;
-+  return transcript.status === "ready"
-+    ? <MessageFeed messages={transcript.transcript.messages} />
++  return transcript.data
++    ? <MessageFeed messages={transcript.data.messages} />
 +    : <TranscriptStatus state={transcript} />;
  }
 ```
 
-- [ ] Load `readSessionTranscript(sessionId)` for saved selections, clear transcript state for drafts, and ignore a result whose session ID no longer matches the selection.
+- [ ] Load `readSessionTranscript(sessionId)` with a session-keyed React Query query enabled only for saved selections; let query keys isolate late results instead of copying request state into effects.
 - [ ] Add local `MessageFeed` and `Message` components based on Maui's unexported message-list pattern, with `role="feed"`, message articles, role labels, timestamps, and preserved text whitespace.
 - [ ] Give the feed its own scroll area and move to the latest message after the first successful load without moving focus.
 - [ ] Render pane-local loading, empty, failed, and partial-history states; state when `hasMoreBefore` or `hasMoreAfter` means the 500-event page is incomplete.
 - [ ] Test message order, empty and partial history, failed loads, stale responses, and draft selection; run frontend tests, lint, and typecheck.
 
-### Phase 8: Send prompts to saved sessions without locking the sidebar
+### Phase 9: Send prompts to saved sessions without locking the sidebar
 
-Pin a non-streaming prompt editor below the transcript and support sends to an existing session. Track the request by session ID so the user can switch rows while the old session finishes.
+Pin a non-streaming prompt editor below the transcript and support sends to an existing session. Pass the session ID as the mutation input so the user can switch rows while the old session finishes.
 
 #### Important types
 
 ```tsx
 // apps/halo/src/sessions/SessionPane.tsx
 type PromptDraft = { text: string; error?: string };
-
-type SendState =
-  | { status: "idle" }
-  | { status: "sending"; sessionId: string; submittedText: string }
-  | { status: "failed"; sessionId: string; submittedText: string; message: string };
 ```
 
 #### Call stack diff
@@ -564,11 +598,11 @@ type SendState =
 -└── MessageFeed
 +├── MessageFeed
 +└── PromptEditor::submit
-+    └── sendSavedPrompt(sessionId, text)
++    └── useMutation(sendPrompt)
 +        ├── api.sendPrompt
-+        └── refreshSession(sessionId)
-+            ├── api.listSessions
-+            └── api.readSessionTranscript
++        └── invalidateQueries
++            ├── ["sessions", workspaceRoot]
++            └── ["session-transcript", sessionId]
 ```
 
 #### Code diff preview
@@ -576,14 +610,8 @@ type SendState =
 ```diff
  // apps/halo/src/sessions/SessionPane.tsx
 +async function sendSavedPrompt(sessionId: string, text: string) {
-+  setSendState({ status: "sending", sessionId, submittedText: text });
-+  try {
-+    await sendPrompt(sessionId, text);
-+    await refreshSession(sessionId);
-+    setPrompt("");
-+  } catch (error) {
-+    setSendState({ status: "failed", sessionId, submittedText: text, message: String(error) });
-+  }
++  await sendMutation.mutateAsync({ sessionId, text });
++  await queryClient.invalidateQueries({ queryKey: ["session-transcript", sessionId] });
 +}
 
  return <>
@@ -594,11 +622,11 @@ type SendState =
 
 - [ ] Add a bottom prompt editor styled with Maui text, background, radius, spacing, `shadow.subtle`, and `focusRing`; submit by button or Cmd/Ctrl+Enter and keep Enter for a new line.
 - [ ] Disable send for blank trimmed text and only for the session now sending; leave the sidebar and other sessions usable.
-- [ ] Call `send_prompt` for a saved session, wait for the full result, then refresh that session's catalog row and transcript without adding fake user or assistant messages.
+- [ ] Call `send_prompt` through a React Query mutation, wait for the full result, then invalidate that session's catalog row and transcript without adding fake user or assistant messages.
 - [ ] Clear the prompt and scroll the feed only after success; on failure keep the text and show a retryable pane error, and never pull selection back after the user switches sessions.
 - [ ] Test blank input, keyboard submit, saved-session success, error retention, session switching during send, and the non-streaming busy state; run frontend tests and typecheck.
 
-### Phase 9: Turn the first draft send into a durable session
+### Phase 10: Turn the first draft send into a durable session
 
 Finish the new-session path by creating a durable session only when the user sends the draft. Keep the draft text and error visible if creation or prompt delivery fails.
 
@@ -629,13 +657,13 @@ type CreateSessionInput = {
 -└── SessionPane(draft) -> blank pane
 +└── SessionPane(draft)
 +    └── PromptEditor::submit
-+        └── sendDraft(draft)
++        └── useMutation(sendDraft)
 +            ├── api.createSession(null, null, null)
 +            ├── api.sendPrompt(durableSessionId, text)
-+            └── refreshSession(durableSessionId)
++            └── invalidateQueries
 +                ├── replace draft selection
-+                ├── api.listSessions
-+                └── api.readSessionTranscript
++                ├── ["sessions", workspaceRoot]
++                └── ["session-transcript", durableSessionId]
 ```
 
 #### Code diff preview
@@ -663,6 +691,6 @@ type CreateSessionInput = {
 
 - [ ] Focus the editor when a draft opens and keep its prompt state keyed by `draftId` until the first send completes or the user opens another draft.
 - [ ] On first send, call `create_or_reopen_session` with null session, provider, and model, then send the prompt to the returned ID; do not create a durable session when **New session** is clicked.
-- [ ] After success, replace that draft selection with the durable session, clear its prompt, refresh the catalog and transcript, and place the new or updated row in newest-first order.
+- [ ] After mutation success, replace that draft selection with the durable session, clear its prompt, invalidate the catalog and transcript queries, and place the new or updated row in newest-first order.
 - [ ] On create or send failure, keep the draft text, show a retry action, avoid a second durable session when an ID was already returned, and leave other rows usable.
 - [ ] Test first-send creation, default provider/model input, failure before and after creation, retry without duplicate creation, selection changes, and focus; run all frontend and Rust checks, then check startup, restart persistence, dark theme, keyboard focus, and a narrow Tauri window by hand.

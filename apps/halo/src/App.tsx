@@ -1,4 +1,5 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
 import {
   Button,
   Flex,
@@ -19,47 +20,33 @@ import {
   listSessions,
   startWorkspace as startWorkspaceApi,
   type ReadyHealthStatus,
-  type SessionSummary,
   type StartWorkspaceResult,
 } from "./api.ts";
 import { SessionsApp, type SessionSelection } from "./sessions/SessionsApp.tsx";
 
 type WorkspaceState =
-  | { status: "restoring" }
-  | { status: "needs-owner-slug"; ownerSlug: string }
-  | { status: "starting"; ownerSlug: string }
-  | { status: "error"; ownerSlug: string; message: string }
+  | { status: "needs-owner-slug"; ownerSlug: string; message?: string }
   | {
       status: "ready";
       health: ReadyHealthStatus;
       preferenceWarning?: string;
     };
 
-let initialWorkspacePromise: Promise<WorkspaceState> | undefined;
+const workspaceQueryKey = ["workspace"] as const;
 
-function loadInitialWorkspace(): Promise<WorkspaceState> {
-  initialWorkspacePromise ??= getStartupPreference().then(
-    async ({ lastOwnerSlug }) => {
-      if (!lastOwnerSlug) {
-        return { status: "needs-owner-slug", ownerSlug: "" };
-      }
-      try {
-        return readyWorkspace(await startWorkspaceApi(lastOwnerSlug));
-      } catch (error) {
-        return {
-          status: "error",
-          ownerSlug: lastOwnerSlug,
-          message: String(error),
-        };
-      }
-    },
-    (error) => ({
-      status: "error",
-      ownerSlug: "",
+async function restoreWorkspace(): Promise<WorkspaceState> {
+  let ownerSlug = "";
+  try {
+    ownerSlug = (await getStartupPreference()).lastOwnerSlug ?? "";
+    if (!ownerSlug) return { status: "needs-owner-slug", ownerSlug };
+    return readyWorkspace(await startWorkspaceApi(ownerSlug));
+  } catch (error) {
+    return {
+      status: "needs-owner-slug",
+      ownerSlug,
       message: String(error),
-    }),
-  );
-  return initialWorkspacePromise;
+    };
+  }
 }
 
 function readyWorkspace(result: StartWorkspaceResult): WorkspaceState {
@@ -71,86 +58,73 @@ function readyWorkspace(result: StartWorkspaceResult): WorkspaceState {
 }
 
 export function App() {
-  const [workspace, setWorkspace] = useState<WorkspaceState>({
-    status: "restoring",
-  });
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selection, setSelection] = useState<SessionSelection>();
-  const [catalogError, setCatalogError] = useState<string>();
+  const [emptyDraft] = useState<SessionSelection>(() => ({
+    kind: "draft",
+    draftId: crypto.randomUUID(),
+  }));
+  const queryClient = useQueryClient();
+  const workspaceQuery = useQuery({
+    queryKey: workspaceQueryKey,
+    queryFn: restoreWorkspace,
+  });
+  const workspace = workspaceQuery.data;
+  const startWorkspace = useMutation({
+    mutationFn: (ownerSlug: string) => startWorkspaceApi(ownerSlug.trim()),
+    onSuccess: (result) => {
+      queryClient.setQueryData(workspaceQueryKey, readyWorkspace(result));
+    },
+  });
+  const sessionsQuery = useQuery({
+    queryKey: [
+      "sessions",
+      workspace?.status === "ready" ? workspace.health.workspaceRoot : null,
+    ],
+    queryFn: listSessions,
+    enabled: workspace?.status === "ready",
+  });
+  const sessions = sessionsQuery.data ?? [];
+  const activeSelection =
+    selection ??
+    (sessions[0]
+      ? { kind: "saved" as const, sessionId: sessions[0].sessionId }
+      : sessionsQuery.isFetched
+        ? emptyDraft
+        : undefined);
   const { resolvedTheme, setPreference } = useTheme();
   const readyApp = useStyles(readyAppClass);
   const errorClassName = useStyles(errorClass);
 
-  useEffect(() => {
-    let active = true;
-    void loadInitialWorkspace().then((state) => {
-      if (active) setWorkspace(state);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const loadSessions = useCallback(async () => {
-    try {
-      const next = await listSessions();
-      setSessions(next);
-      setSelection(
-        (current) =>
-          current ??
-          (next[0]
-            ? { kind: "saved", sessionId: next[0].sessionId }
-            : { kind: "draft", draftId: crypto.randomUUID() }),
-      );
-    } catch (error) {
-      setCatalogError(String(error));
-      setSelection(
-        (current) => current ?? { kind: "draft", draftId: crypto.randomUUID() },
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    if (workspace.status === "ready") void loadSessions();
-  }, [loadSessions, workspace.status]);
-
-  function changeOwnerSlug(ownerSlug: string) {
-    setWorkspace((current) =>
-      current.status === "ready" || current.status === "restoring"
-        ? current
-        : { status: "needs-owner-slug", ownerSlug },
-    );
-  }
-
-  async function startWorkspace(ownerSlug: string) {
-    setWorkspace({ status: "starting", ownerSlug });
-    try {
-      setWorkspace(readyWorkspace(await startWorkspaceApi(ownerSlug.trim())));
-    } catch (error) {
-      setWorkspace({ status: "error", ownerSlug, message: String(error) });
-    }
+  if (workspaceQuery.isPending || !workspace) {
+    return <WorkspaceLoading />;
   }
 
   if (workspace.status !== "ready") {
     return (
       <WorkspaceStart
-        state={workspace}
-        onOwnerSlugChange={changeOwnerSlug}
-        onStart={(ownerSlug) => void startWorkspace(ownerSlug)}
+        ownerSlug={workspace.ownerSlug}
+        message={
+          startWorkspace.error
+            ? String(startWorkspace.error)
+            : workspace.message
+        }
+        isStarting={startWorkspace.isPending}
+        onStart={startWorkspace.mutate}
+        onChange={startWorkspace.reset}
       />
     );
   }
 
   return (
     <div className={readyApp}>
-      {(workspace.preferenceWarning || catalogError) && (
+      {(workspace.preferenceWarning || sessionsQuery.error) && (
         <div className={errorClassName} role="alert">
-          {workspace.preferenceWarning || catalogError}
+          {workspace.preferenceWarning || String(sessionsQuery.error)}
         </div>
       )}
       <SessionsApp
         sessions={sessions}
-        selection={selection}
+        selection={activeSelection}
         onSelectionChange={setSelection}
         onToggleTheme={() =>
           setPreference(resolvedTheme === "dark" ? "light" : "dark")
@@ -161,36 +135,38 @@ export function App() {
   );
 }
 
-type WorkspaceStartState = Exclude<WorkspaceState, { status: "ready" }>;
+function WorkspaceLoading() {
+  const shell = useStyles(startShellClass);
+  const card = useStyles(startCardClass);
+
+  return (
+    <main className={shell}>
+      <section className={card} aria-live="polite">
+        <H1>Opening workspace</H1>
+        <P>Checking this device for your last username…</P>
+      </section>
+    </main>
+  );
+}
 
 function WorkspaceStart({
-  state,
-  onOwnerSlugChange,
+  ownerSlug: initialOwnerSlug,
+  message,
+  isStarting,
   onStart,
+  onChange,
 }: {
-  state: WorkspaceStartState;
-  onOwnerSlugChange: (ownerSlug: string) => void;
+  ownerSlug: string;
+  message?: string;
+  isStarting: boolean;
   onStart: (ownerSlug: string) => void;
+  onChange: () => void;
 }) {
+  const [ownerSlug, setOwnerSlug] = useState(initialOwnerSlug);
   const shell = useStyles(startShellClass);
   const card = useStyles(startCardClass);
   const label = useStyles(labelClass);
   const error = useStyles(errorClass);
-
-  if (state.status === "restoring") {
-    return (
-      <main className={shell}>
-        <section className={card} aria-live="polite">
-          <H1>Opening workspace</H1>
-          <P>Checking this device for your last username…</P>
-        </section>
-      </main>
-    );
-  }
-
-  const isStarting = state.status === "starting";
-  const message = state.status === "error" ? state.message : undefined;
-  const ownerSlug = state.ownerSlug;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -213,7 +189,10 @@ function WorkspaceStart({
               <TextField
                 id="username"
                 value={ownerSlug}
-                onChange={onOwnerSlugChange}
+                onChange={(value) => {
+                  setOwnerSlug(value);
+                  onChange();
+                }}
                 placeholder="tanishq"
                 autoFocus
                 isDisabled={isStarting}

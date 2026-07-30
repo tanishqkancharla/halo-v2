@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.4",
     "@tauri-apps/api": "^2.11.1",
     "maui": "github:tanishqkancharla/maui#e025ee9c50c23baef265b66461c5f78bf32c644c",
     "purse-styles": "^0.2.1",
