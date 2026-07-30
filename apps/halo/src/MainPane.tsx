@@ -46,6 +46,7 @@ export function MainPane({
   onDraftSent: (draftId: string, sessionId: string) => void;
 }) {
   const pane = useStyles(styles.pane);
+  const content = useStyles(styles.content);
   const header = useStyles(styles.header);
   const status = useStyles(styles.status);
   const sessionId = selection?.kind === "saved" ? selection.sessionId : null;
@@ -70,15 +71,7 @@ export function MainPane({
   const title = session?.title ? session.title : selection.sessionId;
   return (
     <main className={pane} aria-label={title}>
-      <div
-        style={{
-          width: "72ch",
-          display: "flex",
-          flexDirection: "column",
-          flex: 1,
-          margin: "auto",
-        }}
-      >
+      <div className={content}>
         <header className={header}>
           <H3>{title}</H3>
         </header>
@@ -121,6 +114,7 @@ function DraftPane({
   const createSession = useCreateSessionMutation();
   const sendPrompt = useSendPromptMutation();
   const pane = useStyles(styles.pane);
+  const content = useStyles(styles.content);
   const header = useStyles(styles.header);
 
   async function submit(prompt: string) {
@@ -136,16 +130,18 @@ function DraftPane({
 
   return (
     <main className={pane} aria-label="New session" data-draft-id={draftId}>
-      <header className={header}>
-        <H1>New session</H1>
-        <P>Send a message to start this session.</P>
-      </header>
-      <PromptEditor
-        key={draftId}
-        autoFocus
-        isSending={createSession.isPending ? true : sendPrompt.isPending}
-        onSubmit={submit}
-      />
+      <div className={content}>
+        <header className={header}>
+          <H1>New session</H1>
+          <P>Send a message to start this session.</P>
+        </header>
+        <PromptEditor
+          key={draftId}
+          autoFocus
+          isSending={createSession.isPending ? true : sendPrompt.isPending}
+          onSubmit={submit}
+        />
+      </div>
     </main>
   );
 }
@@ -162,6 +158,7 @@ function PromptEditor({
   onSubmit: (prompt: string) => Promise<unknown>;
 }) {
   const [draft, setDraft] = useState<PromptDraft>({ text: "" });
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const errorId = useId();
   const editor = useStyles(styles.promptEditor);
   const textarea = useStyles(styles.textarea);
@@ -169,6 +166,10 @@ function PromptEditor({
   const error = useStyles(styles.promptError);
   const trimmedText = draft.text.trim();
   const sendDisabled = isSending ? true : trimmedText.length === 0;
+
+  useLayoutEffect(() => {
+    if (autoFocus) textareaRef.current!.focus();
+  }, [autoFocus]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -193,7 +194,7 @@ function PromptEditor({
   return (
     <form className={editor} onSubmit={submit}>
       <textarea
-        autoFocus={autoFocus}
+        ref={textareaRef}
         className={textarea}
         value={draft.text}
         onChange={(event) => setDraft({ text: event.currentTarget.value })}
@@ -284,7 +285,7 @@ function partialHistoryText({
 
 const styles = {
   pane: style(
-    flex({ direction: "column", gap: 6 }),
+    flex({ direction: "column" }),
     spacing.padding({ x: 12, y: 12 }),
     {
       width: "100%",
@@ -295,6 +296,14 @@ const styles = {
       backgroundColor: backgroundColor.app,
     },
   ),
+  content: style(flex({ direction: "column", gap: 6 }), {
+    flex: "1 1 auto",
+    width: "100%",
+    maxWidth: "70ch",
+    minWidth: 0,
+    minHeight: 0,
+    marginInline: "auto",
+  }),
   header: style(flexItem({ size: "hug" }), {
     minWidth: 0,
   }),
