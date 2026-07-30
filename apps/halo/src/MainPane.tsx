@@ -27,9 +27,9 @@ export function MainPane({
   selection?: SessionSelection;
   sessions: SessionSummary[];
 }) {
-  const pane = useStyles(paneClass);
-  const header = useStyles(headerClass);
-  const status = useStyles(statusClass);
+  const pane = useStyles(styles.pane);
+  const header = useStyles(styles.header);
+  const status = useStyles(styles.status);
   const sessionId = selection?.kind === "saved" ? selection.sessionId : null;
   const transcript = useSessionTranscriptQuery(sessionId);
   if (!selection) {
@@ -83,8 +83,8 @@ export function MainPane({
 
 function MessageFeed({ transcript }: { transcript: SessionTranscript }) {
   const feedRef = useRef<HTMLDivElement>(null);
-  const feed = useStyles(feedClass);
-  const partial = useStyles(partialClass);
+  const feed = useStyles(styles.feed);
+  const partial = useStyles(styles.partial);
   const hasPartialHistory = transcript.hasMoreBefore
     ? true
     : transcript.hasMoreAfter;
@@ -114,11 +114,11 @@ function MessageFeed({ transcript }: { transcript: SessionTranscript }) {
 }
 
 function Message({ message }: { message: SessionMessage }) {
-  const article = useStyles(messageClass);
-  const messageHeader = useStyles(messageHeaderClass);
-  const role = useStyles(roleClass);
-  const timestamp = useStyles(timestampClass);
-  const body = useStyles(messageBodyClass);
+  const article = useStyles(styles.message);
+  const messageHeader = useStyles(styles.messageHeader);
+  const role = useStyles(styles.role);
+  const timestamp = useStyles(styles.timestamp);
+  const body = useStyles(styles.messageBody);
   const roleLabel = message.role === "user" ? "You" : "Assistant";
 
   return (
@@ -156,73 +156,63 @@ function formatTimestamp(timestamp: string): string {
   }).format(date);
 }
 
-const paneClass = style(
-  flex({ direction: "column", gap: 6 }),
-  spacing.padding({ x: 12, y: 12 }),
-  {
+const styles = {
+  pane: style(
+    flex({ direction: "column", gap: 6 }),
+    spacing.padding({ x: 12, y: 12 }),
+    {
+      minWidth: 0,
+      minHeight: 0,
+      overflow: "hidden",
+      backgroundColor: backgroundColor.app,
+    },
+  ),
+  header: style(flexItem({ size: "hug" }), {
     minWidth: 0,
-    minHeight: 0,
-    overflow: "hidden",
-    backgroundColor: backgroundColor.app,
-  },
-);
-
-const headerClass = style(flexItem({ size: "hug" }), {
-  minWidth: 0,
-});
-
-const statusClass = style(text("sm", 400, "lowContrast"), {
-  margin: 0,
-});
-
-const feedClass = style(
-  flex({ direction: "column", gap: 6 }),
-  flexItem({
-    size: "auto",
   }),
-  {
-    minWidth: 0,
-    minHeight: 0,
-    overflowY: "auto",
-    overscrollBehavior: "contain",
-  },
-);
-
-const partialClass = style(
-  flexItem({ size: "hug" }),
-  text("xs", 400, "lowContrast"),
-  radius.md,
-  spacing.padding({ all: 4 }),
-  {
-    backgroundColor: colors.gray[3],
-  },
-);
-
-const messageClass = style(
-  flexItem({ size: "hug" }),
-  radius.lg,
-  shadow.subtle,
-  spacing.padding({ all: 8 }),
-  {
-    width: "min(100%, 760px)",
-    minWidth: 0,
-    backgroundColor: colors.gray[2],
-  },
-);
-
-const messageHeaderClass = style(
-  flex({ align: "center", gap: 2, wrap: true }),
-  {
+  status: style(text("sm", 400, "lowContrast"), {
+    margin: 0,
+  }),
+  feed: style(
+    flex({ direction: "column", gap: 6 }),
+    flexItem({
+      size: "auto",
+    }),
+    {
+      minWidth: 0,
+      minHeight: 0,
+      overflowY: "auto",
+      overscrollBehavior: "contain",
+    },
+  ),
+  partial: style(
+    flexItem({ size: "hug" }),
+    text("xs", 400, "lowContrast"),
+    radius.md,
+    spacing.padding({ all: 4 }),
+    {
+      backgroundColor: colors.gray[3],
+    },
+  ),
+  message: style(
+    flexItem({ size: "hug" }),
+    radius.lg,
+    shadow.subtle,
+    spacing.padding({ all: 8 }),
+    {
+      width: "min(100%, 760px)",
+      minWidth: 0,
+      backgroundColor: colors.gray[2],
+    },
+  ),
+  messageHeader: style(flex({ align: "center", gap: 2, wrap: true }), {
     marginBottom: spacing.value(4),
-  },
-);
-
-const roleClass = style(text("sm", 500, "highContrast"));
-
-const timestampClass = style(text("xs", 400, "lowContrast"));
-
-const messageBodyClass = style(text("sm", 400, "highContrast"), {
-  minWidth: 0,
-  whiteSpace: "pre-wrap",
-  overflowWrap: "anywhere",
-});
+  }),
+  role: style(text("sm", 500, "highContrast")),
+  timestamp: style(text("xs", 400, "lowContrast")),
+  messageBody: style(text("sm", 400, "highContrast"), {
+    minWidth: 0,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+  }),
+};

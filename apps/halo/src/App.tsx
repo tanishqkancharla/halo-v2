@@ -37,9 +37,9 @@ export function App() {
     activeSelection = emptyDraft;
   }
   const { resolvedTheme, setPreference } = useTheme();
-  const readyApp = useStyles(readyAppClass);
-  const shell = useStyles(shellClass);
-  const errorClassName = useStyles(errorClass);
+  const readyApp = useStyles(styles.readyApp);
+  const shell = useStyles(styles.shell);
+  const errorClassName = useStyles(styles.error);
 
   if (workspaceQuery.isPending) {
     return <Onboarding status="loading" />;
@@ -95,36 +95,32 @@ export function App() {
   );
 }
 
-const readyAppClass = style({
-  position: "relative",
-  width: "100%",
-  height: "100vh",
-  minWidth: 0,
-  minHeight: 0,
-  overflow: "hidden",
-});
-
-const shellClass = style({
-  display: "grid",
-  gridTemplateColumns: "240px minmax(0, 1fr)",
-  width: "100%",
-  height: "100vh",
-  minWidth: 0,
-  minHeight: 0,
-  overflow: "hidden",
-  backgroundColor: colors.gray[4],
-  "@media (max-width: 560px)": {
-    gridTemplateColumns: "180px minmax(0, 1fr)",
-  },
-});
-
-const errorClass = style(
-  text("xs", 500, "highContrast"),
-  spacing.padding({ all: 4 }),
-  {
+const styles = {
+  readyApp: style({
+    position: "relative",
+    width: "100%",
+    height: "100vh",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
+  }),
+  shell: style({
+    display: "grid",
+    gridTemplateColumns: "240px minmax(0, 1fr)",
+    width: "100%",
+    height: "100vh",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
+    backgroundColor: colors.gray[4],
+    "@media (max-width: 560px)": {
+      gridTemplateColumns: "180px minmax(0, 1fr)",
+    },
+  }),
+  error: style(text("xs", 500, "highContrast"), spacing.padding({ all: 4 }), {
     position: "relative",
     zIndex: 1,
     color: "light-dark(#b42318, #ff9592)",
     backgroundColor: "light-dark(#ffebe9, #3b1219)",
-  },
-);
+  }),
+};

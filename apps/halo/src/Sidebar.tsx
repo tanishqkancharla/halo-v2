@@ -26,10 +26,10 @@ export function Sidebar({
   onToggleTheme,
   themeLabel,
 }: SidebarProps) {
-  const sidebar = useStyles(sidebarClass);
-  const header = useStyles(headerClass);
-  const brand = useStyles(brandClass);
-  const newButton = useStyles(newButtonClass);
+  const sidebar = useStyles(styles.sidebar);
+  const header = useStyles(styles.header);
+  const brand = useStyles(styles.brand);
+  const newButton = useStyles(styles.newButton);
 
   return (
     <MauiSidebar className={sidebar} aria-label="Sessions">
@@ -85,22 +85,21 @@ function stateLabel(state: SessionState) {
   }
 }
 
-const sidebarClass = style({
-  width: "100%",
-  minWidth: 0,
-  height: "100%",
-  minHeight: 0,
-  overflowY: "auto",
-  borderRadius: 0,
-});
-
-const headerClass = style(flex({ align: "center", justify: "between" }), {
-  minWidth: 0,
-});
-
-const brandClass = style(text("sm", 600, "highContrast"));
-
-const newButtonClass = style(flex({ align: "center", gap: 3 }), {
-  width: "100%",
-  "& svg": { width: "16px", height: "16px" },
-});
+const styles = {
+  sidebar: style({
+    width: "100%",
+    minWidth: 0,
+    height: "100%",
+    minHeight: 0,
+    overflowY: "auto",
+    borderRadius: 0,
+  }),
+  header: style(flex({ align: "center", justify: "between" }), {
+    minWidth: 0,
+  }),
+  brand: style(text("sm", 600, "highContrast")),
+  newButton: style(flex({ align: "center", gap: 3 }), {
+    width: "100%",
+    "& svg": { width: "16px", height: "16px" },
+  }),
+};

@@ -26,8 +26,8 @@ type OnboardingProps =
     };
 
 export function Onboarding(props: OnboardingProps) {
-  const shell = useStyles(shellClass);
-  const card = useStyles(cardClass);
+  const shell = useStyles(styles.shell);
+  const card = useStyles(styles.card);
 
   if (props.status === "loading") {
     return (
@@ -56,8 +56,8 @@ function WorkspaceForm({
   card: string;
 }) {
   const [ownerSlug, setOwnerSlug] = useState(initialOwnerSlug);
-  const label = useStyles(labelClass);
-  const error = useStyles(errorClass);
+  const label = useStyles(styles.label);
+  const error = useStyles(styles.error);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,34 +106,24 @@ function WorkspaceForm({
   );
 }
 
-const shellClass = style(spacing.padding({ all: 12 }), {
-  display: "grid",
-  placeItems: "center",
-  minHeight: "100vh",
-  backgroundColor: colors.gray[2],
-});
-
-const cardClass = style(
-  shadow.subtle,
-  radius.lg,
-  spacing.padding({ all: 12 }),
-  {
+const styles = {
+  shell: style(spacing.padding({ all: 12 }), {
+    display: "grid",
+    placeItems: "center",
+    minHeight: "100vh",
+    backgroundColor: colors.gray[2],
+  }),
+  card: style(shadow.subtle, radius.lg, spacing.padding({ all: 12 }), {
     width: "min(100%, 440px)",
     minWidth: 0,
     backgroundColor: backgroundColor.element,
-  },
-);
-
-const labelClass = style(text("xs", 500, "lowContrast"), {
-  display: "block",
-  marginBottom: spacing.value(2),
-});
-
-const errorClass = style(
-  text("xs", 500, "highContrast"),
-  spacing.padding({ all: 4 }),
-  {
+  }),
+  label: style(text("xs", 500, "lowContrast"), {
+    display: "block",
+    marginBottom: spacing.value(2),
+  }),
+  error: style(text("xs", 500, "highContrast"), spacing.padding({ all: 4 }), {
     color: "light-dark(#b42318, #ff9592)",
     backgroundColor: "light-dark(#ffebe9, #3b1219)",
-  },
-);
+  }),
+};
