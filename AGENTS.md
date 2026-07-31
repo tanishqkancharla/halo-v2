@@ -1,6 +1,6 @@
 # Halo
 
-Halo is an open-source self-modifiable desktop app. It's currently a work-in-progress.
+Halo is an open-source self-modifiable desktop app built using Tauri, AgentOS and Turso. It's currently a work-in-progress.
 
 ## Commands
 
