@@ -10,9 +10,9 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import haloLogo from "../src-tauri/icons/32x32.png";
 import type { SessionSelection } from "./App.tsx";
 import type { SessionState, SessionSummary } from "./api/SystemApi.ts";
+import { HaloLogo } from "./HaloLogo.tsx";
 
 type SidebarProps = {
   sessions: SessionSummary[];
@@ -43,7 +43,7 @@ export function Sidebar({
   return (
     <nav className={sidebar} aria-label="Sessions">
       <div className={header}>
-        <span className={logo} aria-label="Halo" role="img" />
+        <HaloLogo className={logo} />
         <Button variant="quiet" onClick={onToggleTheme}>
           {themeLabel}
         </Button>
@@ -112,7 +112,7 @@ const styles = {
   sidebar: style(
     shadow.medium,
     spacing.padding({ x: 2, bottom: 2 }),
-    flex({ direction: "column", gap: 6 }),
+    flex({ direction: "column", gap: 4 }),
     {
       width: "100%",
       minWidth: 0,
@@ -127,18 +127,17 @@ const styles = {
   header: style(flex({ align: "center", justify: "between" }), {
     minWidth: 0,
     minHeight: "42px",
-    paddingLeft: "84px",
+    paddingLeft: "67px",
   }),
   logo: style({
     display: "block",
-    width: "28px",
-    height: "28px",
-    backgroundImage: `url(${haloLogo})`,
-    backgroundRepeat: "no-repeat",
-    backgroundSize: "contain",
+    width: "20px",
+    height: "20px",
+    transform: "translateX(-1px) translateY(-3px)",
   }),
   newButton: style(flex({ align: "center", gap: 3 }), {
     alignSelf: "stretch",
+    width: `calc(100% - ${spacing.value(4)} - ${spacing.value(4)})`,
     marginInline: spacing.value(4),
     "& svg": { width: "16px", height: "16px" },
   }),

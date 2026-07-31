@@ -16,10 +16,12 @@
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
     "@tauri-apps/api": "^2.11.1",
+    "@types/three": "^0.185.1",
     "maui": "github:tanishqkancharla/maui#cb99be2b6872afff0d865f9aba48cffa93ac6f98",
     "purse-styles": "^0.2.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@agentos-software/pi": "0.2.7",

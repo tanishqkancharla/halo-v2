@@ -22,7 +22,7 @@
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": {
-          "x": 18,
+          "x": 11,
           "y": 16
         }
       }
@@ -47,6 +47,7 @@
       "icons/icon.ico"
     ],
     "macOS": {
+      "bundleName": "Halo",
       "minimumSystemVersion": "10.15"
     }
   }

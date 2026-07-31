@@ -374,7 +374,9 @@ const styles = {
       minHeight: 0,
       overflowY: "auto",
       overscrollBehavior: "contain",
+      scrollbarWidth: "none",
       paddingBottom: spacing.value(6),
+      "&::-webkit-scrollbar": { display: "none" },
     },
   ),
   editorArea: style(flexItem({ size: "hug" }), {
@@ -383,7 +385,7 @@ const styles = {
     position: "relative",
     zIndex: 1,
     overflow: "visible",
-    paddingTop: spacing.value(4),
+    paddingTop: "2px",
     "&::before": {
       position: "absolute",
       right: 0,
@@ -405,7 +407,7 @@ const styles = {
     },
   ),
   liveStatus: style(flexItem({ size: "hug" }), text("xs", 400, "lowContrast")),
-  userMessage: style(radius.md, spacing.padding({ x: 4, y: 2 }), {
+  userMessage: style(radius.lg, spacing.padding({ x: 4, y: 2 }), {
     alignSelf: "flex-end",
     width: "fit-content",
     maxWidth: "80%",
