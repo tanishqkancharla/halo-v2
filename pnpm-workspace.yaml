@@ -7,7 +7,8 @@ allowBuilds:
   esbuild: true
   geckodriver: false
   koffi: false
-  maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/8fb6ba3a4d58ed2da1a783f088995d041a57f458: true
+  maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/8fb6ba3a4d58ed2da1a783f088995d041a57f458: false
+  maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/cb99be2b6872afff0d865f9aba48cffa93ac6f98: true
   protobufjs: false
 minimumReleaseAgeExclude:
   - '@rivet-dev/agentos-sidecar-darwin-arm64@0.2.15'

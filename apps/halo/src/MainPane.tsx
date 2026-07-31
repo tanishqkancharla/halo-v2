@@ -1,23 +1,17 @@
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-} from "react";
-import {
+  AssistantMessage,
   Button,
+  Editor,
   H1,
   H3,
+  Loader,
   P,
   backgroundColor,
   colors,
   flex,
   flexItem,
-  focusRing,
   radius,
-  shadow,
   shadowVars,
   spacing,
   text,
@@ -49,6 +43,7 @@ export function MainPane({
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);
   const header = useStyles(styles.header);
+  const editorArea = useStyles(styles.editorArea);
   const status = useStyles(styles.status);
   const sessionId = selection?.kind === "saved" ? selection.sessionId : null;
   const transcript = useSessionTranscriptQuery(sessionId);
@@ -91,16 +86,18 @@ export function MainPane({
         ) : (
           <MessageFeed transcript={transcript.data} livePrompt={livePrompt} />
         )}
-        <PromptEditor
-          key={selection.sessionId}
-          isSending={isSending}
-          onSubmit={(prompt) =>
-            sendPrompt.mutateAsync({
-              sessionId: selection.sessionId,
-              text: prompt,
-            })
-          }
-        />
+        <div className={editorArea}>
+          <PromptEditor
+            key={selection.sessionId}
+            isSending={isSending}
+            onSubmit={(prompt) =>
+              sendPrompt.mutateAsync({
+                sessionId: selection.sessionId,
+                text: prompt,
+              })
+            }
+          />
+        </div>
       </div>
     </main>
   );
@@ -122,6 +119,7 @@ function DraftPane({
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);
   const header = useStyles(styles.header);
+  const editorArea = useStyles(styles.editorArea);
 
   async function submit(prompt: string) {
     let sessionId = durableSessionId;
@@ -144,12 +142,13 @@ function DraftPane({
         {livePrompt === undefined ? null : (
           <MessageFeed transcript={emptyTranscript} livePrompt={livePrompt} />
         )}
-        <PromptEditor
-          key={draftId}
-          autoFocus
-          isSending={createSession.isPending ? true : sendPrompt.isPending}
-          onSubmit={submit}
-        />
+        <div className={editorArea}>
+          <PromptEditor
+            key={draftId}
+            isSending={createSession.isPending ? true : sendPrompt.isPending}
+            onSubmit={submit}
+          />
+        </div>
       </div>
     </main>
   );
@@ -158,30 +157,21 @@ function DraftPane({
 type PromptDraft = { text: string; error?: string };
 
 function PromptEditor({
-  autoFocus = false,
   isSending,
   onSubmit,
 }: {
-  autoFocus?: boolean;
   isSending: boolean;
   onSubmit: (prompt: string) => Promise<unknown>;
 }) {
   const [draft, setDraft] = useState<PromptDraft>({ text: "" });
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const errorId = useId();
   const editor = useStyles(styles.promptEditor);
-  const textarea = useStyles(styles.textarea);
-  const actions = useStyles(styles.promptActions);
+  const editorSurface = useStyles(styles.editorSurface);
   const error = useStyles(styles.promptError);
   const trimmedText = draft.text.trim();
   const sendDisabled = isSending ? true : trimmedText.length === 0;
 
-  useLayoutEffect(() => {
-    if (autoFocus) textareaRef.current!.focus();
-  }, [autoFocus]);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit() {
     if (isSending) return;
     if (!trimmedText) return;
 
@@ -201,36 +191,29 @@ function PromptEditor({
   }
 
   return (
-    <form className={editor} onSubmit={submit}>
-      <textarea
-        ref={textareaRef}
-        className={textarea}
-        value={draft.text}
-        onChange={(event) => setDraft({ text: event.currentTarget.value })}
-        onKeyDown={submitFromKeyboard}
+    <div className={editor}>
+      <Editor
+        content={draft.text}
+        onChange={(markdown) => setDraft({ text: markdown })}
+        onSubmit={submit}
+        editable={!isSending}
         placeholder="Message Halo"
         aria-label="Message"
-        aria-describedby={draft.error ? errorId : undefined}
+        size="sm"
+        className={editorSurface}
+        actions={
+          <Button onClick={submit} disabled={sendDisabled}>
+            {isSending ? "Sending…" : "Send"}
+          </Button>
+        }
       />
       {draft.error && (
         <div className={error} id={errorId} role="alert">
           {draft.error}
         </div>
       )}
-      <div className={actions}>
-        <Button variant="quiet" type="submit" disabled={sendDisabled}>
-          {isSending ? "Sending…" : "Send"}
-        </Button>
-      </div>
-    </form>
+    </div>
   );
-}
-
-function submitFromKeyboard(event: KeyboardEvent<HTMLTextAreaElement>) {
-  if (event.key !== "Enter") return;
-  if (!event.metaKey && !event.ctrlKey) return;
-  event.preventDefault();
-  event.currentTarget.form?.requestSubmit();
 }
 
 function MessageFeed({
@@ -256,8 +239,9 @@ function MessageFeed({
   return (
     <div
       className={feed}
-      role="feed"
+      role="log"
       aria-label="Session transcript"
+      aria-relevant="additions"
       ref={feedRef}
     >
       {hasPartialHistory && (
@@ -272,7 +256,11 @@ function MessageFeed({
         <>
           <Message role="user" text={livePrompt.userText} />
           {livePrompt.assistantText.length === 0 ? null : (
-            <Message role="assistant" text={livePrompt.assistantText} />
+            <Message
+              role="assistant"
+              text={livePrompt.assistantText}
+              isAnimating={livePrompt.status === "sending"}
+            />
           )}
           {livePrompt.status === "resyncRequired" ? (
             <div className={liveStatus} role="status">
@@ -292,20 +280,40 @@ function MessageFeed({
 function Message({
   role,
   text: messageText,
+  isAnimating = false,
 }: {
   role: "user" | "assistant";
   text: string;
+  isAnimating?: boolean;
 }) {
   const messageClass = useStyles(
     role === "user" ? styles.userMessage : styles.assistantMessage,
   );
   const body = useStyles(styles.messageBody);
+  const thinking = useStyles(styles.thinking);
   const roleLabel = role === "user" ? "You" : "Assistant";
 
+  if (role === "assistant") {
+    return (
+      <article className={messageClass} aria-label={`${roleLabel} message`}>
+        {messageText ? (
+          <AssistantMessage size="sm" isAnimating={isAnimating}>
+            {messageText}
+          </AssistantMessage>
+        ) : isAnimating ? (
+          <span className={thinking}>
+            <Loader size="0.75em" variant="muted" aria-label="Generating" />
+            Thinking…
+          </span>
+        ) : null}
+      </article>
+    );
+  }
+
   return (
-    <div className={messageClass} aria-label={`${roleLabel} message`}>
+    <article className={messageClass} aria-label={`${roleLabel} message`}>
       <div className={body}>{messageText}</div>
-    </div>
+    </article>
   );
 }
 
@@ -341,16 +349,17 @@ const styles = {
       backgroundColor: backgroundColor.app,
     },
   ),
-  content: style(flex({ direction: "column", gap: 6 }), {
+  content: style(flex({ direction: "column" }), {
     flex: "1 1 auto",
     width: "100%",
-    maxWidth: "70ch",
+    maxWidth: "72ch",
     minWidth: 0,
     minHeight: 0,
     marginInline: "auto",
   }),
   header: style(flexItem({ size: "hug" }), {
     minWidth: 0,
+    marginBottom: spacing.value(6),
   }),
   status: style(text("sm", 400, "lowContrast"), {
     margin: 0,
@@ -365,8 +374,27 @@ const styles = {
       minHeight: 0,
       overflowY: "auto",
       overscrollBehavior: "contain",
+      paddingBottom: spacing.value(6),
     },
   ),
+  editorArea: style(flexItem({ size: "hug" }), {
+    width: "100%",
+    minWidth: 0,
+    position: "relative",
+    zIndex: 1,
+    overflow: "visible",
+    paddingTop: spacing.value(4),
+    "&::before": {
+      position: "absolute",
+      right: 0,
+      bottom: "100%",
+      left: 0,
+      height: spacing.value(6),
+      content: "''",
+      pointerEvents: "none",
+      background: `linear-gradient(to bottom, transparent, ${backgroundColor.app})`,
+    },
+  }),
   partial: style(
     flexItem({ size: "hug" }),
     text("xs", 400, "lowContrast"),
@@ -377,7 +405,7 @@ const styles = {
     },
   ),
   liveStatus: style(flexItem({ size: "hug" }), text("xs", 400, "lowContrast")),
-  userMessage: style(radius.lg, spacing.padding({ x: 4, y: 2 }), {
+  userMessage: style(radius.md, spacing.padding({ x: 4, y: 2 }), {
     alignSelf: "flex-end",
     width: "fit-content",
     maxWidth: "80%",
@@ -388,36 +416,22 @@ const styles = {
     width: "100%",
     minWidth: 0,
   }),
-  messageBody: style(text("sm", 400, "highContrast"), {
+  thinking: style(
+    text("xs", 400, "lowContrast"),
+    flex({ align: "center", gap: 2 }),
+  ),
+  messageBody: style(text("md", 400, "highContrast"), {
     minWidth: 0,
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
   }),
-  promptEditor: style(
-    flexItem({ size: "hug" }),
-    radius.lg,
-    shadow.subtle,
-    focusRing("&:focus-within", shadowVars.subtle),
-    spacing.padding({ all: 2 }),
-    {
-      width: "min(100%, 760px)",
-      minWidth: 0,
-      backgroundColor: backgroundColor.element,
-    },
-  ),
-  textarea: style(text("sm", 400, "highContrast"), {
-    display: "block",
+  promptEditor: style(flex({ direction: "column", gap: 2 }), {
     width: "100%",
-    minHeight: "56px",
-    padding: `${spacing.value(2)} ${spacing.value(4)}`,
-    resize: "vertical",
-    border: 0,
-    outline: 0,
-    color: "inherit",
-    backgroundColor: "transparent",
+    minWidth: 0,
   }),
-  promptActions: style(flex({ justify: "end" }), {
-    marginTop: spacing.value(2),
+  editorSurface: style({
+    "&&": { boxShadow: shadowVars.medium },
+    backgroundColor: "transparent",
   }),
   promptError: style(
     text("xs", 500, "highContrast"),

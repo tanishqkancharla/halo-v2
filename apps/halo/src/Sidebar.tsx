@@ -1,13 +1,16 @@
 import {
   Button,
   Icons,
-  Sidebar as MauiSidebar,
-  SidebarItem,
-  SidebarSection,
+  backgroundColor,
+  colors,
   flex,
+  radius,
+  shadow,
+  spacing,
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
+import haloLogo from "../src-tauri/icons/32x32.png";
 import type { SessionSelection } from "./App.tsx";
 import type { SessionState, SessionSummary } from "./api/SystemApi.ts";
 
@@ -28,13 +31,19 @@ export function Sidebar({
 }: SidebarProps) {
   const sidebar = useStyles(styles.sidebar);
   const header = useStyles(styles.header);
-  const brand = useStyles(styles.brand);
+  const logo = useStyles(styles.logo);
   const newButton = useStyles(styles.newButton);
+  const sessionLink = useStyles(styles.sessionLink);
+  const section = useStyles(styles.section);
+  const sectionLabel = useStyles(styles.sectionLabel);
+  const sessionList = useStyles(styles.sessionList);
+  const sessionTitle = useStyles(styles.sessionTitle);
+  const sessionState = useStyles(styles.sessionState);
 
   return (
-    <MauiSidebar className={sidebar} aria-label="Sessions">
+    <nav className={sidebar} aria-label="Sessions">
       <div className={header}>
-        <span className={brand}>Halo</span>
+        <span className={logo} aria-label="Halo" role="img" />
         <Button variant="quiet" onClick={onToggleTheme}>
           {themeLabel}
         </Button>
@@ -48,27 +57,41 @@ export function Sidebar({
         <Icons.Plus aria-hidden="true" />
         New session
       </Button>
-      <SidebarSection label="Sessions">
-        {sessions.map((session) => (
-          <SidebarItem
-            key={session.sessionId}
-            active={
+      <section className={section} aria-labelledby="sessions-label">
+        <div className={sectionLabel} id="sessions-label">
+          Sessions
+        </div>
+        <ul className={sessionList}>
+          {sessions.map((session) => {
+            const active =
               selection?.kind === "saved" &&
-              selection.sessionId === session.sessionId
-            }
-            trailing={stateLabel(session.state)}
-            onClick={() =>
-              onSelectionChange({
-                kind: "saved",
-                sessionId: session.sessionId,
-              })
-            }
-          >
-            {session.title ? session.title : session.sessionId}
-          </SidebarItem>
-        ))}
-      </SidebarSection>
-    </MauiSidebar>
+              selection.sessionId === session.sessionId;
+            const state = stateLabel(session.state);
+
+            return (
+              <li key={session.sessionId}>
+                <button
+                  className={sessionLink}
+                  type="button"
+                  aria-current={active ? "page" : undefined}
+                  onClick={() =>
+                    onSelectionChange({
+                      kind: "saved",
+                      sessionId: session.sessionId,
+                    })
+                  }
+                >
+                  <span className={sessionTitle}>
+                    {session.title ? session.title : session.sessionId}
+                  </span>
+                  {state ? <span className={sessionState}>{state}</span> : null}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </nav>
   );
 }
 
@@ -86,20 +109,84 @@ function stateLabel(state: SessionState) {
 }
 
 const styles = {
-  sidebar: style({
-    width: "100%",
-    minWidth: 0,
-    height: "100%",
-    minHeight: 0,
-    overflowY: "auto",
-    borderRadius: 0,
-  }),
+  sidebar: style(
+    shadow.medium,
+    spacing.padding({ x: 2, bottom: 2 }),
+    flex({ direction: "column", gap: 6 }),
+    {
+      width: "100%",
+      minWidth: 0,
+      height: "100%",
+      minHeight: 0,
+      overflowY: "auto",
+      position: "relative",
+      zIndex: 1,
+      backgroundColor: colors.gray[1],
+    },
+  ),
   header: style(flex({ align: "center", justify: "between" }), {
     minWidth: 0,
+    minHeight: "42px",
+    paddingLeft: "84px",
   }),
-  brand: style(text("sm", 600, "highContrast")),
+  logo: style({
+    display: "block",
+    width: "28px",
+    height: "28px",
+    backgroundImage: `url(${haloLogo})`,
+    backgroundRepeat: "no-repeat",
+    backgroundSize: "contain",
+  }),
   newButton: style(flex({ align: "center", gap: 3 }), {
-    width: "100%",
+    alignSelf: "stretch",
+    marginInline: spacing.value(4),
     "& svg": { width: "16px", height: "16px" },
+  }),
+  sessionLink: style(
+    spacing.padding({ x: 4, y: 2 }),
+    text("sm", 400, "highContrast"),
+    radius.sm,
+    flex({ align: "center", gap: 3 }),
+    {
+      width: "100%",
+      minWidth: 0,
+      border: 0,
+      outline: "none",
+      cursor: "default",
+      background: "transparent",
+      textAlign: "left",
+      "& svg": { width: "16px", height: "16px", flexShrink: 0 },
+      "&:hover": { background: backgroundColor.elementHover },
+      "&[aria-current='page']": {
+        color: colors.accent[9],
+        fontWeight: 500,
+      },
+    },
+  ),
+  section: style(flex({ direction: "column", gap: 4 }), {
+    minWidth: 0,
+  }),
+  sectionLabel: style(
+    text("xs", 500, "lowContrast"),
+    spacing.padding({ x: 4 }),
+    {
+      letterSpacing: "0.02em",
+    },
+  ),
+  sessionList: style(flex({ direction: "column" }), {
+    listStyleType: "none",
+    padding: 0,
+    margin: 0,
+    gap: "1px",
+  }),
+  sessionTitle: style({
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  }),
+  sessionState: style(text("xs", 400, "lowContrast"), {
+    marginLeft: "auto",
+    flexShrink: 0,
   }),
 };
