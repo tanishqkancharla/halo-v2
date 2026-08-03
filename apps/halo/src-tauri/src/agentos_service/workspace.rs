@@ -12,12 +12,14 @@ use super::ReadyWorkspace;
 const MAX_OWNER_SLUG_LENGTH: usize = 64;
 pub(super) const VM_USER_ID: u32 = 1000;
 const VM_HOME_STAGING_DIR: &str = "/tmp";
+const CODE_MODE_TOOLS: &str = include_str!("../../agentos/halo-tools.mjs");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceLayout {
     pub(super) root: String,
     pi_config_dir: String,
     pub(super) pi_settings_path: String,
+    pub(super) tools_module_path: String,
 }
 
 impl WorkspaceLayout {
@@ -36,12 +38,28 @@ impl WorkspaceLayout {
         let root = format!("/halo/{owner_slug}");
         let pi_config_dir = format!("{root}/.pi/agent");
         let pi_settings_path = format!("{pi_config_dir}/settings.json");
+        let tools_module_path = format!("{root}/tools/index.mjs");
         Ok(Self {
             root,
             pi_config_dir,
             pi_settings_path,
+            tools_module_path,
         })
     }
+}
+
+pub(super) async fn install_code_mode_tools(
+    os: &AgentOs,
+    layout: &WorkspaceLayout,
+) -> Result<(), String> {
+    write_text_file_as_vm_user(
+        os,
+        &layout.root,
+        &layout.tools_module_path,
+        CODE_MODE_TOOLS,
+        "Could not install the code-mode tools",
+    )
+    .await
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -231,6 +249,10 @@ mod tests {
         assert_eq!(
             layout.pi_settings_path,
             "/halo/test-user_1/.pi/agent/settings.json"
+        );
+        assert_eq!(
+            layout.tools_module_path,
+            "/halo/test-user_1/tools/index.mjs"
         );
     }
 

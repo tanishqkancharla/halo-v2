@@ -25,6 +25,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@agentos-software/coreutils": "0.3.4",
     "@agentos-software/pi": "0.2.7",
     "@repo/typescript-config": "workspace:*",
     "@rivet-dev/agentos-sidecar": "0.2.15",

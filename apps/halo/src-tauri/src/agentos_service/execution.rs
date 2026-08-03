@@ -27,17 +27,20 @@ struct ExecBindingOutput {
 #[derive(Clone)]
 pub(super) struct ExecutionBridge {
     os: Arc<RwLock<Option<AgentOs>>>,
+    tools_module_path: String,
 }
 
 impl ExecutionBridge {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(tools_module_path: String) -> Self {
         Self {
             os: Arc::new(RwLock::new(None)),
+            tools_module_path,
         }
     }
 
     pub(super) fn bindings(&self) -> Vec<Bindings> {
         let os = Arc::downgrade(&self.os);
+        let tools_module_path = self.tools_module_path.clone();
         vec![Bindings {
             name: "halo".to_owned(),
             description: "Halo execution tools.".to_owned(),
@@ -56,7 +59,8 @@ impl ExecutionBridge {
                 timeout_ms: None,
                 execute: Arc::new(move |input| {
                     let os = os.clone();
-                    Box::pin(async move { execute(os, input).await })
+                    let tools_module_path = tools_module_path.clone();
+                    Box::pin(async move { execute(os, &tools_module_path, input).await })
                 }),
             }],
         }]
@@ -71,7 +75,11 @@ impl ExecutionBridge {
     }
 }
 
-async fn execute(os: Weak<RwLock<Option<AgentOs>>>, input: Value) -> Result<Value, String> {
+async fn execute(
+    os: Weak<RwLock<Option<AgentOs>>>,
+    tools_module_path: &str,
+    input: Value,
+) -> Result<Value, String> {
     let input: ExecBindingInput =
         serde_json::from_value(input).map_err(|error| format!("Invalid exec input: {error}"))?;
     let os = os
@@ -81,7 +89,13 @@ async fn execute(os: Weak<RwLock<Option<AgentOs>>>, input: Value) -> Result<Valu
         .await
         .clone()
         .ok_or_else(|| "Halo execution bridge is not ready.".to_owned())?;
-    let expression = format!("(async () => {{ {} }})()", input.source);
+    let expression = format!(
+        "(async () => {{ const {{ createTools }} = await import({module_path}); const tools = createTools({cwd}); return await (async () => {{ {source} }})(); }})()",
+        module_path = serde_json::to_string(tools_module_path)
+            .expect("tools module path is valid JSON"),
+        cwd = serde_json::to_string(&input.cwd).expect("cwd is valid JSON"),
+        source = input.source,
+    );
     let evaluation = os
         .evaluate_typescript(
             expression,

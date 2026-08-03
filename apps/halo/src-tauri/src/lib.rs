@@ -187,6 +187,7 @@ pub fn run() {
                 app_data_dir,
                 sidecar_path: find_sidecar_path(app.handle())?,
                 pi_package_path: find_pi_package_path(app.handle())?,
+                coreutils_package_path: find_coreutils_package_path(app.handle())?,
             };
             app.manage(HaloState {
                 agentos: service,
@@ -301,6 +302,18 @@ fn find_pi_package_path(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::
         .ok_or_else(|| "The bundled Pi package is missing.".into())
 }
 
+fn find_coreutils_package_path(
+    app: &tauri::AppHandle,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let resource_path = app.path().resource_dir()?.join("agentos/coreutils.aospkg");
+    let development_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../node_modules/@agentos-software/coreutils/dist/package.aospkg");
+    [resource_path, development_path]
+        .into_iter()
+        .find(|path| path.is_file())
+        .ok_or_else(|| "The bundled AgentOS coreutils package is missing.".into())
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -345,6 +358,7 @@ mod tests {
                 app_data_dir: data_dir.clone(),
                 sidecar_path: directory.join("missing-sidecar"),
                 pi_package_path: directory.join("missing-pi-package"),
+                coreutils_package_path: directory.join("missing-coreutils-package"),
             },
             &settings_path,
             "new-owner",

@@ -48,6 +48,9 @@ importers:
         specifier: ^0.185.1
         version: 0.185.1
     devDependencies:
+      '@agentos-software/coreutils':
+        specifier: 0.3.4
+        version: 0.3.4
       '@agentos-software/pi':
         specifier: 0.2.7
         version: 0.2.7(supports-color@7.2.0)(ws@8.21.1)(zod@4.4.3)
@@ -137,6 +140,9 @@ packages:
     resolution: {integrity: sha512-1ad+Sc/0sCtZGHthxxvgEUo5Wsbw16I+aF+YwdiLnPwkZG8KAGUEAPK6LM6Pf69lCyJPt1Aomk1d+8oE3C4ZEw==}
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
+
+  '@agentos-software/coreutils@0.3.4':
+    resolution: {integrity: sha512-tGd0gQjUjHnm+5KgOBwidwUtlkKnl9biQuD7X2sZl15VOhYqUJpnyLF33h/nF3r9WtOTclSiLj/dc2xCxmAXnw==}
 
   '@agentos-software/pi@0.2.7':
     resolution: {integrity: sha512-nOdwksByJgTqt92Ya84CzTGxpVFwGI6gkGWaCD/mmvP11JRA++1nshNdbig2mtiaxT7VG3ovWJmK7ZLTTzkhPA==}
@@ -4413,6 +4419,8 @@ snapshots:
   '@agentclientprotocol/sdk@0.16.1(zod@4.4.3)':
     dependencies:
       zod: 4.4.3
+
+  '@agentos-software/coreutils@0.3.4': {}
 
   '@agentos-software/pi@0.2.7(supports-color@7.2.0)(ws@8.21.1)(zod@4.4.3)':
     dependencies:

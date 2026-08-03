@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 use execution::ExecutionBridge;
 use providers::configured_providers;
 pub use sessions::{PromptResponse, PromptStreamEvent, SessionSummary, SessionTranscript};
-use workspace::{ensure_workspace_home, VM_USER_ID};
+use workspace::{ensure_workspace_home, install_code_mode_tools, VM_USER_ID};
 pub use workspace::{WorkspaceEntry, WorkspaceLayout};
 
 #[derive(Clone)]
@@ -25,6 +25,7 @@ pub struct StartupConfig {
     pub app_data_dir: PathBuf,
     pub sidecar_path: PathBuf,
     pub pi_package_path: PathBuf,
+    pub coreutils_package_path: PathBuf,
 }
 
 pub struct AgentOsService {
@@ -134,8 +135,14 @@ impl AgentOsService {
                 config.pi_package_path.display()
             ));
         }
+        if !config.coreutils_package_path.is_file() {
+            return Err(format!(
+                "AgentOS coreutils package is missing at {}",
+                config.coreutils_package_path.display()
+            ));
+        }
 
-        let execution = ExecutionBridge::new();
+        let execution = ExecutionBridge::new(layout.tools_module_path.clone());
         let os = AgentOs::create(AgentOsConfig {
             database: Some(VmSqliteDescriptor::SqliteFile {
                 path: self.database_path.to_string_lossy().into_owned(),
@@ -156,9 +163,14 @@ impl AgentOsService {
                 }),
                 ..Default::default()
             },
-            packages: vec![PackageRef {
-                path: config.pi_package_path.to_string_lossy().into_owned(),
-            }],
+            packages: vec![
+                PackageRef {
+                    path: config.pi_package_path.to_string_lossy().into_owned(),
+                },
+                PackageRef {
+                    path: config.coreutils_package_path.to_string_lossy().into_owned(),
+                },
+            ],
             bindings: execution.bindings(),
             permissions: Some(Permissions {
                 network: Some(PatternPermissions::Mode(PermissionMode::Allow)),
@@ -172,6 +184,10 @@ impl AgentOsService {
         execution.attach(os.clone()).await;
 
         if let Err(error) = ensure_workspace_home(&os, layout).await {
+            let _ = os.shutdown().await;
+            return Err(error);
+        }
+        if let Err(error) = install_code_mode_tools(&os, layout).await {
             let _ = os.shutdown().await;
             return Err(error);
         }
@@ -317,14 +333,14 @@ mod tests {
     use agentos_client::{
         AgentOs, AgentOsConfig, Bindings, ExecOptions, InlineExecutionOptions,
         JavaScriptExecutionOptions, JavaScriptModuleFormat, LanguageExecutionOptions, MountPlugin,
-        OpenSessionInput, RootFilesystemConfig, RootFilesystemKind, VmUserConfig,
+        OpenSessionInput, PackageRef, RootFilesystemConfig, RootFilesystemKind, VmUserConfig,
     };
     use agentos_vm_config::VmSqliteDescriptor;
     use serde_json::json;
 
     use super::execution::ExecutionBridge;
     use super::providers::write_pi_settings;
-    use super::workspace::{ensure_workspace_home, VM_USER_ID};
+    use super::workspace::{ensure_workspace_home, install_code_mode_tools, VM_USER_ID};
     use super::{AgentOsService, StartupConfig, WorkspaceLayout};
 
     static SIDECAR_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -400,6 +416,7 @@ mod tests {
                         app_data_dir: data_dir.clone(),
                         sidecar_path: data_dir.join("missing-sidecar"),
                         pi_package_path: data_dir.join("missing-pi-package"),
+                        coreutils_package_path: data_dir.join("missing-coreutils-package"),
                     },
                 )
                 .await
@@ -458,7 +475,7 @@ mod tests {
             std::env::temp_dir().join(format!("halo-agentos-exec-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&data_dir).expect("create execution test data directory");
         let layout = test_workspace_layout();
-        let execution = ExecutionBridge::new();
+        let execution = ExecutionBridge::new(layout.tools_module_path.clone());
         let os = AgentOs::create(test_agentos_config(
             &data_dir,
             &layout,
@@ -470,6 +487,9 @@ mod tests {
         ensure_workspace_home(&os, &layout)
             .await
             .expect("create workspace home");
+        install_code_mode_tools(&os, &layout)
+            .await
+            .expect("install code-mode tools");
 
         let input = json!({
             "source": "console.log(process.cwd()); console.error('phase-one-stderr'); return 40 + 2;",
@@ -528,6 +548,88 @@ mod tests {
         execution.detach().await;
         os.shutdown().await.expect("shut down AgentOS");
         std::fs::remove_dir_all(data_dir).expect("remove execution test data directory");
+    }
+
+    #[tokio::test]
+    async fn code_mode_tools_share_workspace() {
+        let _guard = SIDECAR_TEST_LOCK.lock().await;
+        let data_dir =
+            std::env::temp_dir().join(format!("halo-agentos-tools-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&data_dir).expect("create tools test data directory");
+        let layout = test_workspace_layout();
+        let execution = ExecutionBridge::new(layout.tools_module_path.clone());
+        let os = AgentOs::create(test_agentos_config(
+            &data_dir,
+            &layout,
+            execution.bindings(),
+        ))
+        .await
+        .expect("start AgentOS");
+        execution.attach(os.clone()).await;
+        ensure_workspace_home(&os, &layout)
+            .await
+            .expect("create workspace home");
+        install_code_mode_tools(&os, &layout)
+            .await
+            .expect("install code-mode tools");
+
+        let input = json!({
+            "source": r#"
+                await tools.files.write("notes.txt", "alpha\nbeta\n");
+                const initial = await tools.files.read("notes.txt");
+                await tools.files.edit("notes.txt", "beta", "edited");
+                const patch = await tools.files.patch(`*** Begin Patch
+*** Update File: notes.txt
+@@
+-alpha
++patched
+*** End Patch`);
+                const shell = await tools.shell.bash("printf shell-output");
+                return {
+                    initial,
+                    final: await tools.files.read("notes.txt"),
+                    patch,
+                    shell,
+                };
+            "#,
+            "cwd": layout.root
+        })
+        .to_string();
+        let result = os
+            .exec_argv_process(
+                "agentos-halo",
+                &["exec".to_owned(), "--json".to_owned(), input],
+                ExecOptions {
+                    cwd: Some("/halo/test-user".to_owned()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("invoke code-mode tools");
+
+        assert_eq!(result.exit_code, 0, "{}", result.stderr);
+        let output: serde_json::Value =
+            serde_json::from_str(result.stdout.trim()).expect("parse tools output");
+        let value = &output["result"]["value"];
+        assert_eq!(value["initial"], json!("alpha\nbeta\n"));
+        assert_eq!(value["final"], json!("patched\nedited\n"));
+        assert_eq!(
+            value["patch"],
+            json!("Updated the following files:\nM notes.txt")
+        );
+        assert_eq!(value["shell"]["stdout"], json!("shell-output"));
+        assert_eq!(value["shell"]["stderr"], json!(""));
+        assert_eq!(value["shell"]["exitCode"], json!(0));
+        assert_eq!(
+            os.read_file("/halo/test-user/notes.txt")
+                .await
+                .expect("read tools result"),
+            b"patched\nedited\n"
+        );
+
+        execution.detach().await;
+        os.shutdown().await.expect("shut down AgentOS");
+        std::fs::remove_dir_all(data_dir).expect("remove tools test data directory");
     }
 
     #[tokio::test]
@@ -644,6 +746,8 @@ mod tests {
                 .join(format!("agentos-sidecar-{}", env!("HALO_TARGET"))),
             pi_package_path: manifest_dir
                 .join("../node_modules/@agentos-software/pi/dist/package.aospkg"),
+            coreutils_package_path: manifest_dir
+                .join("../node_modules/@agentos-software/coreutils/dist/package.aospkg"),
         }
     }
 
@@ -682,6 +786,12 @@ mod tests {
                     .to_string_lossy()
                     .into_owned(),
             ),
+            packages: vec![PackageRef {
+                path: test_startup_config(data_dir)
+                    .coreutils_package_path
+                    .to_string_lossy()
+                    .into_owned(),
+            }],
             ..Default::default()
         }
     }
