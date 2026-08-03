@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build && cargo check --manifest-path src-tauri/Cargo.toml",
+    "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --lib",
     "dev": "tauri dev",
     "format": "oxfmt src index.html package.json tsconfig.json vite.config.ts src-tauri/tauri.conf.json src-tauri/capabilities",
     "format:check": "oxfmt --check src index.html package.json tsconfig.json vite.config.ts src-tauri/tauri.conf.json src-tauri/capabilities",

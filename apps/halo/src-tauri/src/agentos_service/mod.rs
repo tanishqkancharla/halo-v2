@@ -1,3 +1,4 @@
+mod execution;
 mod providers;
 mod sessions;
 mod workspace;
@@ -13,6 +14,7 @@ use serde::Serialize;
 use serde_json::json;
 use tokio::sync::RwLock;
 
+use execution::ExecutionBridge;
 use providers::configured_providers;
 pub use sessions::{PromptResponse, PromptStreamEvent, SessionSummary, SessionTranscript};
 use workspace::{ensure_workspace_home, VM_USER_ID};
@@ -41,6 +43,7 @@ enum ServiceState {
 #[derive(Clone)]
 struct ReadyWorkspace {
     os: AgentOs,
+    execution: ExecutionBridge,
     layout: WorkspaceLayout,
 }
 
@@ -86,10 +89,14 @@ impl AgentOsService {
         }
 
         match self.start(&layout, config).await {
-            Ok(os) => {
+            Ok((os, execution)) => {
                 let mut state = self.state.write().await;
                 if matches!(&*state, ServiceState::Starting) {
-                    *state = ServiceState::Ready(ReadyWorkspace { os, layout });
+                    *state = ServiceState::Ready(ReadyWorkspace {
+                        os,
+                        execution,
+                        layout,
+                    });
                     return Ok(());
                 }
                 drop(state);
@@ -110,7 +117,7 @@ impl AgentOsService {
         &self,
         layout: &WorkspaceLayout,
         config: StartupConfig,
-    ) -> Result<AgentOs, String> {
+    ) -> Result<(AgentOs, ExecutionBridge), String> {
         std::fs::create_dir_all(&config.app_data_dir)
             .map_err(|error| format!("Could not create the Halo data directory: {error}"))?;
         secure_directory(&config.app_data_dir)?;
@@ -128,6 +135,7 @@ impl AgentOsService {
             ));
         }
 
+        let execution = ExecutionBridge::new();
         let os = AgentOs::create(AgentOsConfig {
             database: Some(VmSqliteDescriptor::SqliteFile {
                 path: self.database_path.to_string_lossy().into_owned(),
@@ -151,6 +159,7 @@ impl AgentOsService {
             packages: vec![PackageRef {
                 path: config.pi_package_path.to_string_lossy().into_owned(),
             }],
+            bindings: execution.bindings(),
             permissions: Some(Permissions {
                 network: Some(PatternPermissions::Mode(PermissionMode::Allow)),
                 ..Default::default()
@@ -160,6 +169,7 @@ impl AgentOsService {
         })
         .await
         .map_err(|error| format!("AgentOS failed to start: {error}"))?;
+        execution.attach(os.clone()).await;
 
         if let Err(error) = ensure_workspace_home(&os, layout).await {
             let _ = os.shutdown().await;
@@ -169,7 +179,7 @@ impl AgentOsService {
             let _ = os.shutdown().await;
             return Err(error);
         }
-        Ok(os)
+        Ok((os, execution))
     }
 
     pub async fn health(&self) -> HealthStatus {
@@ -254,6 +264,7 @@ impl AgentOsService {
             std::mem::replace(&mut *state, ServiceState::Stopped)
         };
         if let ServiceState::Ready(workspace) = previous {
+            workspace.execution.detach().await;
             let _ = workspace.os.shutdown().await;
         }
     }
@@ -304,11 +315,16 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use agentos_client::{
-        InlineExecutionOptions, JavaScriptExecutionOptions, JavaScriptModuleFormat,
-        LanguageExecutionOptions, OpenSessionInput,
+        AgentOs, AgentOsConfig, Bindings, ExecOptions, InlineExecutionOptions,
+        JavaScriptExecutionOptions, JavaScriptModuleFormat, LanguageExecutionOptions, MountPlugin,
+        OpenSessionInput, RootFilesystemConfig, RootFilesystemKind, VmUserConfig,
     };
+    use agentos_vm_config::VmSqliteDescriptor;
+    use serde_json::json;
 
+    use super::execution::ExecutionBridge;
     use super::providers::write_pi_settings;
+    use super::workspace::{ensure_workspace_home, VM_USER_ID};
     use super::{AgentOsService, StartupConfig, WorkspaceLayout};
 
     static SIDECAR_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -436,6 +452,85 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn execution_binding_evaluates_typescript() {
+        let _guard = SIDECAR_TEST_LOCK.lock().await;
+        let data_dir =
+            std::env::temp_dir().join(format!("halo-agentos-exec-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&data_dir).expect("create execution test data directory");
+        let layout = test_workspace_layout();
+        let execution = ExecutionBridge::new();
+        let os = AgentOs::create(test_agentos_config(
+            &data_dir,
+            &layout,
+            execution.bindings(),
+        ))
+        .await
+        .expect("start AgentOS");
+        execution.attach(os.clone()).await;
+        ensure_workspace_home(&os, &layout)
+            .await
+            .expect("create workspace home");
+
+        let input = json!({
+            "source": "console.log(process.cwd()); console.error('phase-one-stderr'); return 40 + 2;",
+            "cwd": layout.root
+        })
+        .to_string();
+        let result = os
+            .exec_argv_process(
+                "agentos-halo",
+                &["exec".to_owned(), "--json".to_owned(), input],
+                ExecOptions {
+                    cwd: Some("/halo/test-user".to_owned()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("invoke Halo execution binding");
+
+        assert_eq!(result.exit_code, 0, "{}", result.stderr);
+        let output: serde_json::Value =
+            serde_json::from_str(result.stdout.trim()).expect("parse binding output");
+        assert_eq!(output["result"]["value"], json!(42));
+        assert_eq!(
+            output["result"]["execution"]["stdout"],
+            json!(b"/halo/test-user\n")
+        );
+        assert_eq!(
+            output["result"]["execution"]["stderr"],
+            json!(b"phase-one-stderr\n")
+        );
+
+        let failure_input = json!({
+            "source": "throw new Error('phase-one-failure');",
+            "cwd": "/halo/test-user"
+        })
+        .to_string();
+        let failure = os
+            .exec_argv_process(
+                "agentos-halo",
+                &["exec".to_owned(), "--json".to_owned(), failure_input],
+                ExecOptions {
+                    cwd: Some("/halo/test-user".to_owned()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("invoke failing Halo execution binding");
+
+        assert_eq!(failure.exit_code, 1);
+        assert!(
+            failure.stderr.contains("phase-one-failure"),
+            "{}",
+            failure.stderr
+        );
+
+        execution.detach().await;
+        os.shutdown().await.expect("shut down AgentOS");
+        std::fs::remove_dir_all(data_dir).expect("remove execution test data directory");
+    }
+
+    #[tokio::test]
     async fn session_catalog_survives_restart_without_model_call() {
         let _guard = SIDECAR_TEST_LOCK.lock().await;
         let data_dir =
@@ -549,6 +644,45 @@ mod tests {
                 .join(format!("agentos-sidecar-{}", env!("HALO_TARGET"))),
             pi_package_path: manifest_dir
                 .join("../node_modules/@agentos-software/pi/dist/package.aospkg"),
+        }
+    }
+
+    fn test_agentos_config(
+        data_dir: &Path,
+        layout: &WorkspaceLayout,
+        bindings: Vec<Bindings>,
+    ) -> AgentOsConfig {
+        AgentOsConfig {
+            database: Some(VmSqliteDescriptor::SqliteFile {
+                path: data_dir
+                    .join("agentos.sqlite")
+                    .to_string_lossy()
+                    .into_owned(),
+            }),
+            user: Some(VmUserConfig {
+                uid: Some(VM_USER_ID),
+                gid: Some(VM_USER_ID),
+                euid: Some(VM_USER_ID),
+                egid: Some(VM_USER_ID),
+                homedir: Some(layout.root.clone()),
+                ..Default::default()
+            }),
+            root_filesystem: RootFilesystemConfig {
+                kind: RootFilesystemKind::Native,
+                native_plugin: Some(MountPlugin {
+                    id: "chunked_actor_sqlite".to_owned(),
+                    config: Some(json!({ "namespace": "halo-execution-test" })),
+                }),
+                ..Default::default()
+            },
+            bindings,
+            sidecar_binary_path: Some(
+                test_startup_config(data_dir)
+                    .sidecar_path
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
+            ..Default::default()
         }
     }
 
