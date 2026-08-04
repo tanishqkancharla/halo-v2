@@ -121,7 +121,7 @@ const styles = {
       overflowY: "auto",
       position: "relative",
       zIndex: 1,
-      backgroundColor: colors.gray[1],
+      backgroundColor: `light-dark(${colors.gray[1]}, ${colors.gray[2]})`,
     },
   ),
   header: style(flex({ align: "center", justify: "between" }), {

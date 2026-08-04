@@ -1,0 +1,4 @@
+interface:
+  display_name: "Halo Web"
+  short_description: "Drive and test the running Halo webview"
+  default_prompt: "Use $halo-web to inspect and test the running Halo Tauri app."

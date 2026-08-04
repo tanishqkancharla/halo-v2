@@ -433,7 +433,7 @@ const styles = {
   }),
   editorSurface: style({
     "&&": { boxShadow: shadowVars.medium },
-    backgroundColor: "transparent",
+    backgroundColor: `light-dark(transparent, ${colors.gray[2]})`,
   }),
   promptError: style(
     text("xs", 500, "highContrast"),

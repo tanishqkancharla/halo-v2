@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 use execution::ExecutionBridge;
 use providers::configured_providers;
 pub use sessions::{PromptResponse, PromptStreamEvent, SessionSummary, SessionTranscript};
-use workspace::{ensure_workspace_home, install_code_mode_tools, VM_USER_ID};
+use workspace::{ensure_workspace_home, install_code_mode, VM_USER_ID};
 pub use workspace::{WorkspaceEntry, WorkspaceLayout};
 
 #[derive(Clone)]
@@ -187,7 +187,7 @@ impl AgentOsService {
             let _ = os.shutdown().await;
             return Err(error);
         }
-        if let Err(error) = install_code_mode_tools(&os, layout).await {
+        if let Err(error) = install_code_mode(&os, layout).await {
             let _ = os.shutdown().await;
             return Err(error);
         }
@@ -340,7 +340,7 @@ mod tests {
 
     use super::execution::ExecutionBridge;
     use super::providers::write_pi_settings;
-    use super::workspace::{ensure_workspace_home, install_code_mode_tools, VM_USER_ID};
+    use super::workspace::{ensure_workspace_home, install_code_mode, VM_USER_ID};
     use super::{AgentOsService, StartupConfig, WorkspaceLayout};
 
     static SIDECAR_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -487,7 +487,7 @@ mod tests {
         ensure_workspace_home(&os, &layout)
             .await
             .expect("create workspace home");
-        install_code_mode_tools(&os, &layout)
+        install_code_mode(&os, &layout)
             .await
             .expect("install code-mode tools");
 
@@ -569,7 +569,7 @@ mod tests {
         ensure_workspace_home(&os, &layout)
             .await
             .expect("create workspace home");
-        install_code_mode_tools(&os, &layout)
+        install_code_mode(&os, &layout)
             .await
             .expect("install code-mode tools");
 
@@ -647,6 +647,16 @@ mod tests {
 
         let mut env = BTreeMap::new();
         let workspace = service.ready().await.expect("ready workspace");
+        let installed_tools = service
+            .read_file("/halo/test-user/tools/index.mjs")
+            .await
+            .expect("read installed code-mode tools");
+        let installed_extension = service
+            .read_file("/halo/test-user/.pi/agent/extensions/halo-exec.js")
+            .await
+            .expect("read installed Pi extension");
+        assert!(installed_tools.contains("export function createTools"));
+        assert!(installed_extension.contains("pi.setActiveTools([\"exec\"]);"));
         write_pi_settings(
             &workspace.os,
             &workspace.layout,
@@ -717,6 +727,20 @@ mod tests {
             .initialize(test_workspace_layout(), test_startup_config(&data_dir))
             .await
             .expect("restart workspace");
+        assert_eq!(
+            restarted
+                .read_file("/halo/test-user/tools/index.mjs")
+                .await
+                .expect("read restarted code-mode tools"),
+            installed_tools
+        );
+        assert_eq!(
+            restarted
+                .read_file("/halo/test-user/.pi/agent/extensions/halo-exec.js")
+                .await
+                .expect("read restarted Pi extension"),
+            installed_extension
+        );
         let sessions = restarted
             .list_sessions()
             .await
@@ -733,6 +757,36 @@ mod tests {
         assert!(transcript.messages.is_empty());
         assert!(!transcript.has_more_before);
         assert!(!transcript.has_more_after);
+
+        let restarted_workspace = restarted.ready().await.expect("ready restarted workspace");
+        let input = json!({
+            "source": "await tools.files.write('after-restart.txt', 'written through exec'); return await tools.files.read('after-restart.txt');",
+            "cwd": restarted_workspace.layout.root
+        })
+        .to_string();
+        let result = restarted_workspace
+            .os
+            .exec_argv_process(
+                "agentos-halo",
+                &["exec".to_owned(), "--json".to_owned(), input],
+                ExecOptions {
+                    cwd: Some("/halo/test-user".to_owned()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("invoke execution binding after restart");
+        assert_eq!(result.exit_code, 0, "{}", result.stderr);
+        let output: serde_json::Value =
+            serde_json::from_str(result.stdout.trim()).expect("parse restarted binding output");
+        assert_eq!(output["result"]["value"], json!("written through exec"));
+        assert_eq!(
+            restarted
+                .read_file("/halo/test-user/after-restart.txt")
+                .await
+                .expect("read restarted binding write"),
+            "written through exec"
+        );
         restarted.shutdown().await;
         std::fs::remove_dir_all(data_dir).expect("remove test data directory");
     }
