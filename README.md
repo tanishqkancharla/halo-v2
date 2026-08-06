@@ -4,8 +4,8 @@ Halo is an Electron desktop app with a React renderer and Pi in the main process
 
 ## Structure
 
-- `apps/halo/src`: React UI built with Maui and Vite.
-- `apps/halo/electron`: Electron main process, preload bridge, workspace service, and Pi service.
+- `apps/electron/src`: React UI built with Maui and Vite.
+- `apps/electron/electron`: Electron main process, preload bridge, workspace service, and Pi service.
 - `packages/halo-web-cli`: Debug UI control through Libretto Browser Tools.
 - `packages/ui`: Shared React components.
 - `packages/typescript-config`: Shared TypeScript settings.
@@ -26,12 +26,14 @@ export HALO_USE_SWIFTSHADER=1
 pnpm --filter @halo/desktop dev
 ```
 
-Set a model provider key for the same process (Cursor can inject these as environment secrets):
+Set a model provider key for the same process:
 
 ```sh
 export OPENAI_API_KEY=your-key
 # or ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY
 ```
+
+In Cursor cloud agents, add the key as an environment secret named `OPENAI_API_KEY` (or another provider key above) in the Secrets panel. The dev terminal inherits it, so Pi picks it up with no extra step. Halo builds, tests, and launches without a key; you only need one to chat with a model.
 
 Each new app process asks you to choose a workspace folder the first time. Halo saves that choice in app data and reopens it on the next launch. In development, app data lives at `<repo>/.halo/`. Packaged builds use Electron's default userData path.
 
@@ -69,7 +71,7 @@ pnpm --filter @halo/desktop build
 pnpm --filter @halo/desktop make
 ```
 
-Electron Forge writes packaged apps to `apps/halo/out`.
+Electron Forge writes packaged apps to `apps/electron/out`.
 
 ## Checks
 
