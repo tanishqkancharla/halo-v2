@@ -1,0 +1,11 @@
+{
+  "name": "halo-v2",
+  "install": "pnpm install && node node_modules/electron/install.js",
+  "terminals": [
+    {
+      "name": "halo-dev",
+      "command": "export HALO_USE_SWIFTSHADER=1 && pnpm --filter @halo/desktop dev",
+      "description": "Halo Electron app; HALO_USE_SWIFTSHADER is always on in this environment"
+    }
+  ]
+}

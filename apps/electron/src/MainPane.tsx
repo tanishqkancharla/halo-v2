@@ -185,7 +185,10 @@ function PromptEditor({
     } catch (submitError) {
       setDraft((current) => ({
         text: current.text,
-        error: String(submitError),
+        error:
+          submitError instanceof Error
+            ? submitError.message
+            : String(submitError),
       }));
     }
   }
@@ -254,8 +257,10 @@ function MessageFeed({
             />
           )}
           {livePrompt.status === "failed" ? (
-            <div className={liveStatus} role="status">
-              Response stopped.
+            <div className={liveStatus} role="alert">
+              {livePrompt.error === undefined
+                ? "The response stopped before it finished."
+                : livePrompt.error}
             </div>
           ) : null}
         </>
@@ -369,7 +374,18 @@ const styles = {
       background: `linear-gradient(to bottom, transparent, ${backgroundColor.app})`,
     },
   }),
-  liveStatus: style(flexItem({ size: "hug" }), text("xs", 400, "lowContrast")),
+  liveStatus: style(
+    flexItem({ size: "hug" }),
+    text("xs", 500, "highContrast"),
+    spacing.padding({ x: 4, y: 2 }),
+    {
+      color: "light-dark(#b42318, #ff9592)",
+      backgroundColor: "light-dark(#ffebe9, #3b1219)",
+      borderRadius: "8px",
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere",
+    },
+  ),
   userMessage: style(radius.lg, spacing.padding({ x: 4, y: 2 }), {
     alignSelf: "flex-end",
     width: "fit-content",

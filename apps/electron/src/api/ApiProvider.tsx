@@ -33,6 +33,7 @@ export type LivePrompt = {
   userText: string;
   assistantText: string;
   status: "sending" | "failed";
+  error?: string;
 };
 
 export function ApiProvider({
@@ -148,10 +149,14 @@ export function useSendPromptMutation() {
         exact: true,
       });
     },
-    onError: (_, { sessionId }) => {
+    onError: (error, { sessionId }) => {
       const key = livePromptKey(sessionId);
       const current = queryClient.getQueryData<LivePrompt>(key)!;
-      queryClient.setQueryData(key, { ...current, status: "failed" });
+      queryClient.setQueryData(key, {
+        ...current,
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
     },
   });
 }

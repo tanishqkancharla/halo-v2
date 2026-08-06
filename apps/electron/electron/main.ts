@@ -18,20 +18,31 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
+const isDevelopment = Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL);
 
 if (started) app.quit();
 
 loadDevelopmentEnvironment();
-if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+configureUserDataPath();
+if (isDevelopment) {
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", "4445");
 }
+if (process.env.HALO_USE_SWIFTSHADER === "1") {
+  // Software WebGL for headless / Xvfb hosts where Mesa llvmpipe is blocklisted.
+  app.commandLine.appendSwitch("ignore-gpu-blocklist");
+  app.commandLine.appendSwitch("enable-webgl");
+  app.commandLine.appendSwitch("use-gl", "angle");
+  app.commandLine.appendSwitch("use-angle", "swiftshader");
+  app.commandLine.appendSwitch("disable-gpu-sandbox");
+}
 
-const workspaceService = new WorkspaceService();
+const workspaceService = new WorkspaceService(app.getPath("userData"));
 const piService = new PiService(workspaceService);
 let mainWindow: BrowserWindow | null = null;
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await workspaceService.restore();
   registerIpcHandlers();
   installMenu();
   openMainWindow();
@@ -163,13 +174,18 @@ function installMenu(): void {
   Menu.setApplicationMenu(menu);
 }
 
-function loadDevelopmentEnvironment(): void {
-  if (!MAIN_WINDOW_VITE_DEV_SERVER_URL) return;
+function configureUserDataPath(): void {
+  if (!isDevelopment) return;
   const appDirectory = join(currentDirectory, "../..");
-  const repositoryRoot = join(appDirectory, "../..");
+  app.setPath("userData", join(appDirectory, "../..", ".halo"));
+}
+
+function loadDevelopmentEnvironment(): void {
+  if (!isDevelopment) return;
+  const appDirectory = join(currentDirectory, "../..");
   const environmentFile = [
     join(appDirectory, ".env"),
-    join(repositoryRoot, ".env"),
+    join(appDirectory, "../../.env"),
   ].find(existsSync);
   if (environmentFile !== undefined) process.loadEnvFile(environmentFile);
 }
