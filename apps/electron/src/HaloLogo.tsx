@@ -28,11 +28,18 @@ export function HaloLogo({ className }: HaloLogoProps) {
   const canvas = useStyles(styles.canvas);
 
   useEffect(() => {
-    const renderer = new WebGLRenderer({
-      canvas: canvasRef.current!,
-      alpha: true,
-      antialias: true,
-    });
+    // Chromium blocks WebGL on some software GL stacks (Xvfb/llvmpipe) unless
+    // SwiftShader is forced. Keep the chrome UI up when the logo cannot draw.
+    let renderer: WebGLRenderer;
+    try {
+      renderer = new WebGLRenderer({
+        canvas: canvasRef.current!,
+        alpha: true,
+        antialias: true,
+      });
+    } catch {
+      return;
+    }
     const scene = new Scene();
     const camera = new PerspectiveCamera(40, 1, 0.1, 100);
     const gradient = new DataTexture(

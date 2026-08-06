@@ -26,12 +26,21 @@ if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", "4445");
 }
+if (process.env.HALO_USE_SWIFTSHADER === "1") {
+  // Software WebGL for headless / Xvfb hosts where Mesa llvmpipe is blocklisted.
+  app.commandLine.appendSwitch("ignore-gpu-blocklist");
+  app.commandLine.appendSwitch("enable-webgl");
+  app.commandLine.appendSwitch("use-gl", "angle");
+  app.commandLine.appendSwitch("use-angle", "swiftshader");
+  app.commandLine.appendSwitch("disable-gpu-sandbox");
+}
 
 const workspaceService = new WorkspaceService();
 const piService = new PiService(workspaceService);
 let mainWindow: BrowserWindow | null = null;
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await bootstrapWorkspaceFromEnv();
   registerIpcHandlers();
   installMenu();
   openMainWindow();
@@ -172,4 +181,10 @@ function loadDevelopmentEnvironment(): void {
     join(repositoryRoot, ".env"),
   ].find(existsSync);
   if (environmentFile !== undefined) process.loadEnvFile(environmentFile);
+}
+
+async function bootstrapWorkspaceFromEnv(): Promise<void> {
+  const workspaceRoot = process.env.HALO_WORKSPACE;
+  if (workspaceRoot === undefined || workspaceRoot === "") return;
+  await workspaceService.select(workspaceRoot);
 }

@@ -19,7 +19,15 @@ pnpm install
 pnpm dev
 ```
 
-Each new app process asks you to choose a workspace folder. Halo uses that folder as Pi's working directory and stores Pi data here:
+On Linux hosts without a real GPU (including cloud agents on Xvfb), force software WebGL and optionally skip the folder dialog:
+
+```sh
+export HALO_USE_SWIFTSHADER=1
+export HALO_WORKSPACE=/path/to/workspace
+pnpm --filter @halo/desktop dev
+```
+
+Each new app process asks you to choose a workspace folder unless `HALO_WORKSPACE` is set. Halo uses that folder as Pi's working directory and stores Pi data here:
 
 ```text
 <workspace>/.pi/agent/
