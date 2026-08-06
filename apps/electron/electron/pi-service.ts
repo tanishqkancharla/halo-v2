@@ -74,7 +74,7 @@ export class PiService {
     onEvent: PromptEventHandler,
   ): Promise<void> {
     return this.sendPromptInner(sessionId, prompt, onEvent).catch((error) => {
-      throw new Error(redactProviderKeys(error));
+      throw new Error(describePromptError(error));
     });
   }
 
@@ -201,6 +201,14 @@ function collectText(content: unknown): string {
       return [part.text];
     })
     .join("");
+}
+
+function describePromptError(error: unknown): string {
+  const message = redactProviderKeys(error);
+  if (message.includes("No model selected")) {
+    return "No model provider is configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY for the process that starts Halo, then restart the app.";
+  }
+  return message;
 }
 
 function redactProviderKeys(error: unknown): string {

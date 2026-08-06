@@ -123,6 +123,21 @@ describe("PiService", () => {
     ).resolves.toBeUndefined();
   });
 
+  test("maps a missing model to a provider key message", async () => {
+    const workspace = await workspaceService();
+    const factory = vi.fn(async () => {
+      throw new Error(
+        "No model selected.\n\nUse /login or set an API key environment variable.",
+      );
+    }) as AgentSessionFactory;
+    const service = new PiService(workspace, factory);
+    const session = await service.createNewSession();
+
+    await expect(
+      service.sendPrompt(session.sessionId, "Hello", vi.fn()),
+    ).rejects.toThrow("No model provider is configured");
+  });
+
   test("rejects concurrent prompts and aborts on shutdown", async () => {
     const workspace = await workspaceService();
     let finishPrompt: (() => void) | undefined;

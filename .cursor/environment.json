@@ -4,8 +4,8 @@
   "terminals": [
     {
       "name": "halo-dev",
-      "command": "HALO_USE_SWIFTSHADER=1 pnpm --filter @halo/desktop dev",
-      "description": "Halo Electron app with software WebGL for headless hosts"
+      "command": "export HALO_USE_SWIFTSHADER=1 && pnpm --filter @halo/desktop dev",
+      "description": "Halo Electron app; HALO_USE_SWIFTSHADER is always on in this environment"
     }
   ]
 }
