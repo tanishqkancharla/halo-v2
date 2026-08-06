@@ -30,6 +30,7 @@ export class PiService {
 
   async createNewSession(): Promise<SessionSummary> {
     const layout = this.workspace.getLayout();
+    if (layout instanceof Error) throw layout;
     const manager = SessionManager.create(layout.root, layout.sessionDir);
     const header = manager.getHeader()!;
     this.draftSessions.set(manager.getSessionId(), manager);
@@ -45,6 +46,7 @@ export class PiService {
 
   async listSessions(): Promise<SessionSummary[]> {
     const layout = this.workspace.getLayout();
+    if (layout instanceof Error) throw layout;
     const sessions = await SessionManager.list(layout.root, layout.sessionDir);
     return sessions
       .map((session) => this.sessionSummary(session))
@@ -53,6 +55,7 @@ export class PiService {
 
   async readTranscript(sessionId: string): Promise<SessionTranscript> {
     const layout = this.workspace.getLayout();
+    if (layout instanceof Error) throw layout;
     const manager = await this.getSessionManager(layout, sessionId);
     const messages = manager
       .getBranch()
@@ -74,6 +77,7 @@ export class PiService {
     }
 
     const layout = this.workspace.getLayout();
+    if (layout instanceof Error) throw layout;
     const manager = await this.getSessionManager(layout, sessionId);
     const authStorage = AuthStorage.create(join(layout.agentDir, "auth.json"));
     const modelRegistry = new ModelRegistry(

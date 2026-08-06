@@ -19,7 +19,8 @@ async function workspaceService(): Promise<WorkspaceService> {
   const root = await mkdtemp(join(tmpdir(), "halo-pi-service-"));
   const appDataDir = await mkdtemp(join(tmpdir(), "halo-pi-app-data-"));
   const workspace = new WorkspaceService(appDataDir);
-  await workspace.select(root);
+  const selected = await workspace.select(root);
+  if (selected instanceof Error) throw selected;
   return workspace;
 }
 

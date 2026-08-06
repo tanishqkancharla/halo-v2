@@ -114,7 +114,10 @@ function registerIpcHandlers(): void {
       properties: ["openDirectory"],
     });
     if (selection.canceled) return null;
-    return workspaceService.select(selection.filePaths[0]!);
+    // Electron IPC transports failures as rejections; throw only at this edge.
+    const workspace = await workspaceService.select(selection.filePaths[0]!);
+    if (workspace instanceof Error) throw workspace;
+    return workspace;
   });
   ipcMain.handle(IPC.listSessions, (event) => {
     assertTrustedSender(event);
