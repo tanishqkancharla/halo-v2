@@ -1,84 +1,74 @@
 ---
 name: halo-web
-description: Drive and test the webview in a running Halo Tauri debug app with the project-local halo-web CLI and WebdriverIO. Use when an agent needs to inspect Halo's rendered UI, click controls, enter text, read state or errors, take screenshots, or verify an end-to-end UI change against the live desktop app.
+description: Drive and test the renderer in a running Halo Electron debug app with the project-local halo-web CLI and Libretto Browser Tools. Use when an agent needs to inspect Halo's UI, click controls, enter text, read state or errors, take screenshots, or verify an end-to-end UI change.
 ---
 
 # Halo Web
 
-Use `pnpm halo-web` from the repository root to control the webview in the running Halo debug app. The CLI attaches to the app; it does not build, launch, restart, or stop Halo.
+Use `pnpm halo-web` from the repository root. The CLI attaches to a running debug app. It does not build, launch, restart, or stop Halo.
 
 ## Test workflow
 
-1. Check the existing app before starting a process:
+1. Check the app:
 
    ```sh
    pnpm halo-web status
    ```
 
-2. If the server is not ready and the task calls for live app testing, start `pnpm dev` in a long-running terminal. Wait for the app to open, then run `status` again. Only debug builds expose WebDriver, at `127.0.0.1:4445`.
-3. Inspect the current page before acting:
+2. If the app is not ready and the task calls for live testing, start `pnpm dev` in a long-running terminal. Development builds expose Electron's Chrome DevTools Protocol on `127.0.0.1:4445`.
+3. Inspect the accessibility tree:
 
    ```sh
-   pnpm halo-web exec 'return await browser.$("body").getText()'
+   pnpm halo-web snapshot
    ```
 
-4. Act through stable, user-visible selectors. Prefer `data-testid`, accessible names, labels, and roles over CSS classes or DOM position.
-5. Wait for the state caused by the action and return the value that proves the requested behavior. Do not treat a successful click as proof that the UI changed.
+4. Act through stable, visible selectors. Prefer test IDs, accessible names, labels, and roles over CSS classes or DOM position.
+5. Wait for the state caused by the action and return the value that proves the behavior.
 
-Keep a short inspect-act-verify sequence in one `exec` call when the steps belong to one test. Each call opens a fresh WebDriver session, closes that session afterward, and leaves Halo running.
+Each command connects with Libretto Browser Tools, detaches afterward, and leaves Halo running.
 
-## Run scripts
+## Run code
 
-Pass a short async function body as one shell argument. The `browser` WebdriverIO object is already in scope:
+Pass an async function body with Playwright's `page` in scope:
 
 ```sh
-pnpm halo-web exec 'return await browser.getTitle()'
-pnpm halo-web exec 'await browser.$("button").click()'
+pnpm halo-web exec 'return await page.title()'
+pnpm halo-web exec "await page.getByRole('button', { name: 'New session' }).click()"
 ```
 
-Use `--stdin` for scripts that need several statements or awkward shell quoting:
+Use `--stdin` for longer code:
 
 ```sh
 printf '%s\n' \
-  'const input = await browser.$("textarea[aria-label=Message]");' \
-  'await input.setValue("Hello");' \
-  'await browser.$("button[type=submit]").click();' \
-  'const transcript = await browser.$("[role=log]");' \
-  'await transcript.waitForDisplayed();' \
-  'return await transcript.getText();' \
+  "const editor = page.getByLabel('Message');" \
+  "await editor.fill('Hello');" \
+  "await page.getByRole('button', { name: 'Send' }).click();" \
+  "await page.getByRole('log').waitFor();" \
+  "return await page.getByRole('log').innerText();" \
   | pnpm halo-web exec --stdin
 ```
 
-The source is a function body, not a full function declaration. Use `await` directly. Add `return` when the caller needs a result; a script with no return produces `null`.
+Use `await` directly. Add `return` when you need a result. `browser_exec` also returns console output, errors, and the accessibility-tree change caused by the code.
 
 ## Inspect and verify
 
-Use focused queries first, then broaden to the page body when the current structure is unknown:
-
 ```sh
-pnpm halo-web exec 'return await browser.$("[role=alert]").getText()'
-pnpm halo-web exec 'return await browser.$("[data-testid=sessions-shell]").isDisplayed()'
-pnpm halo-web exec 'const buttons = await browser.$$("button"); return await Promise.all(buttons.map(async (element) => await element.getText()))'
+pnpm halo-web snapshot
+pnpm halo-web exec "return await page.getByRole('alert').innerText()"
+pnpm halo-web exec "return await page.getByTestId('sessions-shell').isVisible()"
+pnpm halo-web exec "return await page.getByRole('button').allTextContents()"
 ```
 
-Wait on the expected element or text when an action triggers async work:
-
-```js
-const alert = await browser.$("[role=alert]");
-await alert.waitForDisplayed();
-return await alert.getText();
-```
-
-For visual evidence, save a screenshot to a clear path and report that path:
+For visual evidence, use the snapshot screenshot option:
 
 ```sh
-pnpm halo-web exec 'await browser.saveScreenshot("/tmp/halo.png")'
+pnpm halo-web snapshot --screenshot --json
 ```
 
 ## CLI details
 
-- Use `pnpm halo-web --llms-full` to read the current command manifest.
-- Use `pnpm halo-web exec --schema` to inspect the script input schema.
-- Output uses TOON by default. Add Incur's `--json` flag when another command must parse the result.
-- A failed `status` means no compatible debug app is listening. Do not hide it with a fallback port or another browser tool.
-- Keep app lifecycle ownership separate: `halo-web` must not start, restart, or stop Halo.
+- Use `pnpm halo-web --llms-full` to read the command manifest.
+- Use `pnpm halo-web exec --schema` to inspect script input.
+- Output uses TOON by default. Add `--json` when another command must parse it.
+- A failed `status` means no compatible debug app is listening. Do not hide it with another port or browser tool.
+- Keep app lifecycle ownership separate from the CLI.

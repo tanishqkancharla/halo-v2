@@ -101,10 +101,6 @@ function stateLabel(state: SessionState) {
       return undefined;
     case "running":
       return "Running";
-    case "waiting":
-      return "Waiting";
-    case "failed":
-      return "Failed";
   }
 }
 

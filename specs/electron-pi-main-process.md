@@ -119,8 +119,7 @@ export type WorkspaceInfo = {
 };
 
 type WorkspaceState =
-  | { status: "notStarted" }
-  | { status: "ready"; layout: WorkspaceLayout };
+  { status: "notStarted" } | { status: "ready"; layout: WorkspaceLayout };
 ```
 
 #### Call stack diff
@@ -152,10 +151,10 @@ type WorkspaceState =
 +}
 ```
 
-- [ ] Add `apps/halo/electron/workspace-service.ts`; resolve the selected directory with `realpath`, verify it is a directory, and derive `<selected>/.pi/agent/sessions` with `node:path`.
-- [ ] Create only `.pi/agent/sessions` on selection and leave all other workspace files alone; surface filesystem errors from the owning operation instead of substituting another directory.
-- [ ] Keep one explicit `notStarted | ready` state, reject selection of a second different directory, and expose the active layout to main-process consumers without a workspace switch or remembered-workspace path.
-- [ ] Add `apps/halo/electron/workspace-service.test.ts` coverage for a valid directory, a missing path, a file path, symlink resolution, layout paths, and repeat selection; run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/desktop typecheck`.
+- [x] Add `apps/halo/electron/workspace-service.ts`; resolve the selected directory with `realpath`, verify it is a directory, and derive `<selected>/.pi/agent/sessions` with `node:path`.
+- [x] Create only `.pi/agent/sessions` on selection and leave all other workspace files alone; surface filesystem errors from the owning operation instead of substituting another directory.
+- [x] Keep one explicit `notStarted | ready` state, reject selection of a second different directory, and expose the active layout to main-process consumers without a workspace switch or remembered-workspace path.
+- [x] Add `apps/halo/electron/workspace-service.test.ts` coverage for a valid directory, a missing path, a file path, symlink resolution, layout paths, and repeat selection; run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/desktop typecheck`.
 
 ### Phase 2: Run durable Pi sessions directly in Node
 
@@ -232,11 +231,11 @@ export type PromptEventSink = (event: PromptEvent) => void;
 +session.dispose();
 ```
 
-- [ ] Add direct production dependencies on `@mariozechner/pi-coding-agent` `0.60.0`; construct `AuthStorage` and `ModelRegistry` in `PiService` so Pi resolves API keys from the main-process environment and reads optional settings from the workspace `agentDir`.
-- [ ] Implement create, exact-ID lookup, newest-first list, current-branch transcript mapping, and text-only assistant streaming with `SessionManager.create`, `list`, `open`, and `getBranch`; do not parse JSONL by hand.
-- [ ] Bind `createCodingTools(layout.root)` and Pi resource discovery to the same root; exclude tool results and thinking from the UI transcript, use session entry IDs and timestamps, and use the first user text as the row title.
-- [ ] Track active `AgentSession` objects by session ID, reject a second prompt for the same session, remove and dispose them after completion, and abort and dispose any active sessions during app shutdown.
-- [ ] Add Vitest tests with a small injected Pi session factory for ordered deltas, prompt failure, concurrent-send rejection, cleanup, shutdown, transcript filtering, and persistence across a new service instance; use real `SessionManager` files but no paid model call, then run `pnpm --filter @halo/desktop test`.
+- [x] Add direct production dependencies on `@mariozechner/pi-coding-agent` `0.60.0`; construct `AuthStorage` and `ModelRegistry` in `PiService` so Pi resolves API keys from the main-process environment and reads optional settings from the workspace `agentDir`.
+- [x] Implement create, exact-ID lookup, newest-first list, current-branch transcript mapping, and text-only assistant streaming with `SessionManager.create`, `list`, `open`, and `getBranch`; do not parse JSONL by hand.
+- [x] Bind `createCodingTools(layout.root)` and Pi resource discovery to the same root; exclude tool results and thinking from the UI transcript, use session entry IDs and timestamps, and use the first user text as the row title.
+- [x] Track active `AgentSession` objects by session ID, reject a second prompt for the same session, remove and dispose them after completion, and abort and dispose any active sessions during app shutdown.
+- [x] Add Vitest tests with a small injected Pi session factory for ordered deltas, prompt failure, concurrent-send rejection, cleanup, shutdown, transcript filtering, and persistence across a new service instance; use real `SessionManager` files but no paid model call, then run `pnpm --filter @halo/desktop test`.
 
 ### Phase 3: Switch the running app to a secure Electron bridge
 
@@ -326,28 +325,22 @@ export type PromptEventEnvelope = {
 +});
 ```
 
-- [ ] Add `electron/main.ts`, `preload.ts`, and `ipc.ts`; build one 1100×720 window with the current minimum size and macOS traffic-light placement, recreate the reload menu, implement `chooseWorkspace` with a parented `showOpenDialog({ properties: ["openDirectory"] })`, and call `PiService.shutdown()` from `before-quit`.
-- [ ] Set `contextIsolation: true`, `sandbox: true`, and `nodeIntegration: false`; expose one typed method per `SystemApi` operation and use a generated request ID plus one fixed event channel for prompt deltas. Never expose raw IPC or accept a path from the renderer.
-- [ ] Replace username onboarding with a **Choose workspace** gate in `Onboarding.tsx`; on a fresh process, have `ApiProvider` open the picker once, show the gate after cancel, and let its button reopen the picker. Remove startup preferences, owner-slug input, Tauri health, sidecar, file, prompt-response, resync, and unused pagination fields, then add the `window.halo` adapter and declaration.
-- [ ] Add `forge.config.ts`, main/preload/renderer Vite configs, Electron Forge, the Vite and native-unpack plugins, platform makers, Electron, and `electron-squirrel-startup`; externalize the Pi package from the main Vite bundle so Forge packages its runtime files and production dependencies.
-- [ ] Change `@halo/desktop` scripts to `electron-forge start`, `package`, and `make`; run its tests and checks, then smoke-test picker cancel, folder selection, reload reuse, new-process re-prompt, session restore, first send, streaming, failure, and retry in Electron.
+- [x] Add `electron/main.ts`, `preload.ts`, and `ipc.ts`; build one 1100×720 window with the current minimum size and macOS traffic lights at `{ x: 11, y: 11 }`, recreate the reload menu, implement `chooseWorkspace` with a parented `showOpenDialog({ properties: ["openDirectory"] })`, and call `PiService.shutdown()` from `before-quit`.
+- [x] Set `contextIsolation: true`, `sandbox: true`, and `nodeIntegration: false`; expose one typed method per `SystemApi` operation and use a generated request ID plus one fixed event channel for prompt deltas. Never expose raw IPC or accept a path from the renderer.
+- [x] Replace username onboarding with a **Choose workspace** gate in `Onboarding.tsx`; on a fresh process, have `ApiProvider` open the picker once, show the gate after cancel, and let its button reopen the picker. Remove startup preferences, owner-slug input, Tauri health, sidecar, file, prompt-response, resync, and unused pagination fields, then add the `window.halo` adapter and declaration.
+- [x] Add `forge.config.ts`, main/preload/renderer Vite configs, Electron Forge, the Vite and native-unpack plugins, platform makers, Electron, and `electron-squirrel-startup`; bundle the main-process Pi SDK so Forge packages it in the app.
+- [x] Change `@halo/desktop` scripts to `electron-forge start`, `package`, and `make`; run its tests and checks, then smoke-test picker cancel, folder selection, reload reuse, new-process re-prompt, session restore, first send, streaming, failure, and retry in Electron.
 
 ### Phase 4: Move live-app automation to Electron's debug endpoint
 
-Expose Chromium's DevTools Protocol only in Forge development, then attach the existing `halo-web` CLI to the already-running renderer with `playwright-core`. This keeps lifecycle ownership unchanged: the CLI inspects Halo but does not launch or stop it.
+Expose Chromium's DevTools Protocol only in Forge development, then attach the existing `halo-web` CLI to the already-running renderer with Libretto Browser Tools. The CLI inspects Halo but does not launch or stop it.
 
 #### Important types
 
 ```ts
-// packages/halo-web-cli/src/electron.ts
-import type { Browser, Page } from "playwright-core";
-
-type PageScript = (page: Page) => Promise<unknown>;
-
-type DebugStatus = {
-  ready: boolean;
-  message: string;
-};
+// packages/halo-web-cli/src/browser-tools.ts
+type DebuggerVersion = { webSocketDebuggerUrl: string };
+type ConnectedTools = { sessionId: string; toolkit: BrowserToolkit };
 ```
 
 #### Call stack diff
@@ -356,32 +349,35 @@ type DebugStatus = {
  pnpm halo-web exec
 -└── webdriverio.remote(127.0.0.1:4445)
 -    └── Tauri embedded WebDriver -> WKWebView
-+└── chromium.connectOverCDP(http://127.0.0.1:4445)
-+    └── existing Electron browser
-+        └── first BrowserContext -> Halo Page
-+            └── AsyncFunction(page, source)
++└── GET http://127.0.0.1:4445/json/version
++    └── createBrowserTools(LocalBrowserProvider)
++        └── browser_connect(webSocketDebuggerUrl)
++            └── browser_exec(code) -> Halo Page
 ```
 
 #### Code diff preview
 
 ```diff
- // packages/halo-web-cli/src/electron.ts
+ // packages/halo-web-cli/src/browser-tools.ts
 -const browser = await remote({ hostname, port, capabilities: {} });
-+const browser = await chromium.connectOverCDP(endpoint);
++const toolkit = createBrowserTools(new LocalBrowserProvider());
++const connection = await toolkit.tools.browser_connect.execute({ cdpUrl });
  try {
 -  return await new AsyncFunction("browser", source)(browser);
-+  const page = browser.contexts()[0]!.pages()[0]!;
-+  return await new AsyncFunction("page", source)(page);
++  return await toolkit.tools.browser_exec.execute({
++    sessionId: connection.sessionId,
++    code: source,
++  });
  } finally {
 -  await browser.deleteSession();
-+  await browser.close();
++  await toolkit.dispose();
  }
 ```
 
-- [ ] In `electron/main.ts`, set `remote-debugging-address=127.0.0.1` and port `4445` before `app.ready` only when the Forge renderer dev-server global is present; release packages must not open the port.
-- [ ] Replace `webdriverio` with `playwright-core` in `@halo/web-cli`, rename `webdriver.ts` to `electron.ts`, make `status` read `/json/version`, and have `exec` supply the first Halo `Page` as `page` while disconnecting without closing the app.
-- [ ] Update CLI text, examples, tests, and `.agents/skills/halo-web/SKILL.md` from WebdriverIO selectors to Playwright locators; keep argument/stdin handling, TOON output, localhost-only attachment, and the rule that the CLI does not own app startup.
-- [ ] Run `pnpm --filter @halo/web-cli test`, `typecheck`, `lint`, and `format:check`; with `pnpm dev` running, verify `status`, body text, an accessible click, text entry, and a screenshot through `pnpm halo-web exec`.
+- [x] In `electron/main.ts`, set `remote-debugging-address=127.0.0.1` and port `4445` before `app.ready` only when the Forge renderer dev-server global is present; release packages must not open the port.
+- [x] Replace `webdriverio` with `libretto-browser-tools` in `@halo/web-cli`, rename `webdriver.ts` to `browser-tools.ts`, read `/json/version`, and attach Libretto's local provider to Halo's CDP WebSocket without closing the app.
+- [x] Add `status`, `snapshot`, and `exec` commands with Playwright `page` code through Libretto Browser Tools; keep argument/stdin handling, TOON output, localhost-only attachment, and the rule that the CLI does not own app startup.
+- [x] Update CLI text, examples, tests, and `.agents/skills/halo-web/SKILL.md`; run all CLI checks and verify `status`, `snapshot`, and `exec` against the running Electron app.
 
 ### Phase 5: Remove Tauri and AgentOS and finish the package
 
@@ -434,8 +430,8 @@ Delete the unused host after Electron covers the full runtime. Clean package met
 +"@mariozechner/pi-coding-agent": "0.60.0",
 ```
 
-- [ ] Delete `apps/halo/src-tauri`, `src/api/tauri.ts`, Tauri capabilities, AgentOS assets, Rust manifests and locks, sidecar build logic, and the unfinished AgentOS code-mode files; do not port the binding or evaluator.
-- [ ] Remove Tauri, AgentOS, coreutils, sidecar, Rust, and WebdriverIO dependencies plus the sidecar release-age exceptions; refresh `pnpm-lock.yaml` and confirm `rg -n "tauri|src-tauri|agentos|agentos.sqlite|webdriverio"` finds no active runtime, script, or dependency references.
-- [ ] Remove `check:rust` from root scripts and Turbo tasks, add Electron `.vite` and `out` build outputs where needed, and keep `pnpm check` as the full repository check.
-- [ ] Rewrite `README.md` with Electron development, main-process Pi, host permission scope, filesystem workspace layout, credentials, Playwright `halo-web` examples, packaging, and checks; state plainly that old AgentOS databases are not imported.
-- [ ] Run `pnpm check`, `pnpm --filter @halo/desktop package`, and all `@halo/web-cli` tests; inspect the packaged app to confirm Pi's package files exist, choose a temporary workspace, complete a prompt with streaming, restart the app, choose the same folder again, and confirm the transcript survives.
+- [x] Delete `apps/halo/src-tauri`, `src/api/tauri.ts`, Tauri capabilities, AgentOS assets, Rust manifests and locks, sidecar build logic, and the unfinished AgentOS code-mode files; do not port the binding or evaluator.
+- [x] Remove Tauri, AgentOS, coreutils, sidecar, Rust, and WebdriverIO dependencies plus the sidecar release-age exceptions; refresh `pnpm-lock.yaml` and confirm no active runtime, script, or dependency references remain.
+- [x] Remove `check:rust` from root scripts and Turbo tasks, add Electron `.vite` and `out` build outputs where needed, and keep `pnpm check` as the full repository check.
+- [x] Rewrite `README.md` with Electron development, main-process Pi, host permission scope, filesystem workspace layout, credentials, Libretto `halo-web` examples, packaging, and checks; state plainly that old AgentOS databases are not imported.
+- [x] Run `pnpm run check-affected`, build the packaged app, run all `@halo/web-cli` tests, inspect the live app through Libretto Browser Tools, and prove Pi session persistence with real `SessionManager` files in tests.

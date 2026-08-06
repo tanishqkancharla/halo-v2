@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "incur": "^0.4.20",
-    "webdriverio": "^9.30.0"
+    "libretto-browser-tools": "^0.1.2"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

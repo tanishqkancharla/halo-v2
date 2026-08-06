@@ -7,21 +7,15 @@ import {
   useQuery,
 } from "@tanstack/react-query";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import {
-  isReadyHealth,
-  type PromptStreamEvent,
-  type ReadyHealthStatus,
-  type StartWorkspaceResult,
-  type SystemApi,
-} from "./SystemApi.ts";
+import type {
+  PromptStreamEvent,
+  SystemApi,
+  WorkspaceInfo,
+} from "./SystemApi.js";
 
 export type WorkspaceState =
-  | { status: "needs-owner-slug"; ownerSlug: string; message?: string }
-  | {
-      status: "ready";
-      health: ReadyHealthStatus;
-      preferenceWarning?: string;
-    };
+  | { status: "needs-workspace"; message?: string }
+  | { status: "ready"; workspace: WorkspaceInfo };
 
 type ApiContextValue = {
   api: SystemApi;
@@ -38,7 +32,7 @@ export type LivePrompt = {
   sessionId: string;
   userText: string;
   assistantText: string;
-  status: "sending" | "resyncRequired" | "failed";
+  status: "sending" | "failed";
 };
 
 export function ApiProvider({
@@ -82,12 +76,14 @@ export function useWorkspaceQuery() {
   });
 }
 
-export function useStartWorkspaceMutation() {
+export function useChooseWorkspaceMutation() {
   const { api, queryClient } = useContext(ApiContext);
   return useMutation({
-    mutationFn: (ownerSlug: string) => api.startWorkspace(ownerSlug.trim()),
-    onSuccess: (result) => {
-      queryClient.setQueryData(workspaceQueryKey, readyWorkspace(result));
+    mutationFn: api.chooseWorkspace,
+    onSuccess: (workspace) => {
+      if (workspace !== null) {
+        queryClient.setQueryData(workspaceQueryKey, readyWorkspace(workspace));
+      }
     },
   });
 }
@@ -95,7 +91,7 @@ export function useStartWorkspaceMutation() {
 export function useSessionsQuery(workspace: WorkspaceState | undefined) {
   const api = useApi();
   const workspaceRoot =
-    workspace?.status === "ready" ? workspace.health.workspaceRoot : null;
+    workspace?.status === "ready" ? workspace.workspace.workspaceRoot : null;
 
   return useQuery({
     queryKey: ["sessions", workspaceRoot],
@@ -162,10 +158,7 @@ export function useSendPromptMutation() {
 
 export function useCreateSessionMutation() {
   const api = useApi();
-  return useMutation({
-    mutationFn: () =>
-      api.createSession({ sessionId: null, provider: null, model: null }),
-  });
+  return useMutation({ mutationFn: api.createSession });
 }
 
 export function useIsSendingPrompt(sessionId: string | null) {
@@ -181,15 +174,10 @@ export function applyPromptStreamEvent(
   current: LivePrompt,
   event: PromptStreamEvent,
 ): LivePrompt {
-  switch (event.type) {
-    case "delta":
-      return {
-        ...current,
-        assistantText: current.assistantText + event.text,
-      };
-    case "resyncRequired":
-      return { ...current, status: "resyncRequired" };
-  }
+  return {
+    ...current,
+    assistantText: current.assistantText + event.text,
+  };
 }
 
 function livePromptKey(sessionId: string | null) {
@@ -201,31 +189,18 @@ function sessionTranscriptKey(sessionId: string | null) {
 }
 
 async function restoreWorkspace(api: SystemApi): Promise<WorkspaceState> {
-  let ownerSlug = "";
   try {
-    const health = await api.getHealth();
-    if (isReadyHealth(health)) {
-      return { status: "ready", health };
-    }
-
-    const preference = await api.getStartupPreference();
-    ownerSlug =
-      preference.lastOwnerSlug === undefined ? "" : preference.lastOwnerSlug;
-    if (!ownerSlug) return { status: "needs-owner-slug", ownerSlug };
-    return readyWorkspace(await api.startWorkspace(ownerSlug));
+    const active = await api.getWorkspace();
+    if (active !== null) return readyWorkspace(active);
+    const selected = await api.chooseWorkspace();
+    return selected === null
+      ? { status: "needs-workspace" }
+      : readyWorkspace(selected);
   } catch (error) {
-    return {
-      status: "needs-owner-slug",
-      ownerSlug,
-      message: String(error),
-    };
+    return { status: "needs-workspace", message: String(error) };
   }
 }
 
-function readyWorkspace(result: StartWorkspaceResult): WorkspaceState {
-  return {
-    status: "ready",
-    health: result.health,
-    preferenceWarning: result.preferenceWarning,
-  };
+function readyWorkspace(workspace: WorkspaceInfo): WorkspaceState {
+  return { status: "ready", workspace };
 }

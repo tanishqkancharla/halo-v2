@@ -10,7 +10,8 @@
     "format": "turbo run format",
     "format:check": "turbo run format:check",
     "typecheck": "turbo run typecheck",
-    "check": "turbo run typecheck lint format:check check:rust --affected"
+    "check": "turbo run typecheck lint format:check test --affected",
+    "check-affected": "pnpm run check"
   },
   "devDependencies": {
     "oxfmt": "^0.60.0",
@@ -18,8 +19,8 @@
     "turbo": "^2.10.7",
     "typescript": "7.0.2"
   },
-  "packageManager": "pnpm@11.17.0",
   "engines": {
     "node": ">=22"
-  }
+  },
+  "packageManager": "pnpm@11.17.0"
 }

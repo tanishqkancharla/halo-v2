@@ -225,11 +225,7 @@ function MessageFeed({
 }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const feed = useStyles(styles.feed);
-  const partial = useStyles(styles.partial);
   const liveStatus = useStyles(styles.liveStatus);
-  const hasPartialHistory = transcript.hasMoreBefore
-    ? true
-    : transcript.hasMoreAfter;
 
   useLayoutEffect(() => {
     const element = feedRef.current;
@@ -244,11 +240,6 @@ function MessageFeed({
       aria-relevant="additions"
       ref={feedRef}
     >
-      {hasPartialHistory && (
-        <div className={partial} role="status">
-          {partialHistoryText(transcript)}
-        </div>
-      )}
       {transcript.messages.map((message) => (
         <Message key={message.id} role={message.role} text={message.text} />
       ))}
@@ -262,11 +253,7 @@ function MessageFeed({
               isAnimating={livePrompt.status === "sending"}
             />
           )}
-          {livePrompt.status === "resyncRequired" ? (
-            <div className={liveStatus} role="status">
-              Updating from session history…
-            </div>
-          ) : livePrompt.status === "failed" ? (
+          {livePrompt.status === "failed" ? (
             <div className={liveStatus} role="status">
               Response stopped.
             </div>
@@ -317,23 +304,8 @@ function Message({
   );
 }
 
-function partialHistoryText({
-  hasMoreBefore,
-  hasMoreAfter,
-}: SessionTranscript): string {
-  const missing =
-    hasMoreBefore && hasMoreAfter
-      ? "Earlier and later messages are not shown."
-      : hasMoreBefore
-        ? "Earlier messages are not shown."
-        : "Later messages are not shown.";
-  return `This transcript is one 500-event page. ${missing}`;
-}
-
 const emptyTranscript: SessionTranscript = {
   messages: [],
-  hasMoreBefore: false,
-  hasMoreAfter: false,
 };
 
 const styles = {
@@ -397,15 +369,6 @@ const styles = {
       background: `linear-gradient(to bottom, transparent, ${backgroundColor.app})`,
     },
   }),
-  partial: style(
-    flexItem({ size: "hug" }),
-    text("xs", 400, "lowContrast"),
-    radius.md,
-    spacing.padding({ all: 4 }),
-    {
-      backgroundColor: colors.gray[3],
-    },
-  ),
   liveStatus: style(flexItem({ size: "hug" }), text("xs", 400, "lowContrast")),
   userMessage: style(radius.lg, spacing.padding({ x: 4, y: 2 }), {
     alignSelf: "flex-end",

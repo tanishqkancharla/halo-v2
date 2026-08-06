@@ -28,9 +28,7 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
-    "check:rust": {
-      "cache": false
-    },
+    "test": {},
     "dev": {
       "cache": false,
       "persistent": true

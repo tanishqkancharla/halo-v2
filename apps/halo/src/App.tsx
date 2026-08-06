@@ -6,7 +6,7 @@ import { Onboarding } from "./Onboarding.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import {
   useSessionsQuery,
-  useStartWorkspaceMutation,
+  useChooseWorkspaceMutation,
   useWorkspaceQuery,
 } from "./api/ApiProvider.tsx";
 
@@ -22,7 +22,7 @@ export function App() {
   }));
   const workspaceQuery = useWorkspaceQuery();
   const workspace = workspaceQuery.data;
-  const startWorkspace = useStartWorkspaceMutation();
+  const chooseWorkspace = useChooseWorkspaceMutation();
   const sessionsQuery = useSessionsQuery(workspace);
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
   let activeSelection = selection;
@@ -52,25 +52,21 @@ export function App() {
   if (workspace.status !== "ready") {
     return (
       <Onboarding
-        status="start"
-        ownerSlug={workspace.ownerSlug}
+        status="choose"
         message={
-          startWorkspace.error
-            ? String(startWorkspace.error)
+          chooseWorkspace.error
+            ? String(chooseWorkspace.error)
             : workspace.message
         }
-        isStarting={startWorkspace.isPending}
-        onStart={startWorkspace.mutate}
-        onChange={startWorkspace.reset}
+        isChoosing={chooseWorkspace.isPending}
+        onChoose={() => chooseWorkspace.mutate()}
       />
     );
   }
 
-  const alertMessage = workspace.preferenceWarning
-    ? workspace.preferenceWarning
-    : sessionsQuery.error
-      ? String(sessionsQuery.error)
-      : undefined;
+  const alertMessage = sessionsQuery.error
+    ? String(sessionsQuery.error)
+    : undefined;
 
   return (
     <div className={readyApp}>

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { Cli, z } from "incur";
-import { execute, getStatus } from "./webdriver.js";
+import { execute, getStatus, snapshot } from "./browser-tools.js";
 
-const readPageSource = 'return await browser.$("body").getText()';
+const readPageSource = "return await page.locator('body').innerText()";
 const readPageCommand = `exec '${readPageSource}'`;
 
 async function readStdin(): Promise<string> {
@@ -20,7 +20,7 @@ Cli.create("halo-web", {
   version: "0.1.0",
 })
   .command("status", {
-    description: "Check whether Halo's debug WebDriver is ready",
+    description: "Check whether Halo's debug browser is ready",
     output: z.object({
       ready: z.boolean(),
       message: z.string(),
@@ -39,18 +39,39 @@ Cli.create("halo-web", {
       });
     },
   })
+  .command("snapshot", {
+    description: "Read Halo's accessibility tree",
+    options: z.object({
+      screenshot: z.boolean().optional().describe("Include a PNG screenshot"),
+    }),
+    output: z.object({
+      screenshot: z
+        .object({ base64: z.string(), mimeType: z.literal("image/png") })
+        .optional(),
+      tree: z.string(),
+    }),
+    async run(c) {
+      const includeScreenshot = c.options.screenshot === true;
+      return c.ok(await snapshot(includeScreenshot));
+    },
+  })
   .command("exec", {
-    description: "Run an async WebdriverIO script against Halo",
+    description: "Run Browser Tools code against Halo",
     args: z.object({
       source: z
         .string()
         .optional()
-        .describe("Async function body with browser in scope"),
+        .describe("Async function body with page in scope"),
     }),
     options: z.object({
       stdin: z.boolean().optional().describe("Read the script from stdin"),
     }),
-    output: z.object({ result: z.unknown() }),
+    output: z.object({
+      result: z.unknown(),
+      snapshotDiff: z.string(),
+      stderr: z.string(),
+      stdout: z.string(),
+    }),
     async run(c) {
       let source: string;
       if (c.options.stdin) {
@@ -80,7 +101,10 @@ Cli.create("halo-web", {
 
       const result = await execute(source);
       return c.ok(
-        { result: result === undefined ? null : result },
+        {
+          ...result,
+          result: result.result === undefined ? null : result.result,
+        },
         {
           cta: {
             commands: [

@@ -1,18 +1,18 @@
 packages:
   - "apps/*"
   - "packages/*"
+nodeLinker: hoisted
+blockExoticSubdeps: false
 allowBuilds:
-  '@google/genai': false
+  "@google/genai": false
   edgedriver: false
+  electron: true
+  electron-winstaller: true
   esbuild: true
+  fs-xattr: true
   geckodriver: false
   koffi: false
+  macos-alias: true
   maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/8fb6ba3a4d58ed2da1a783f088995d041a57f458: false
   maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/cb99be2b6872afff0d865f9aba48cffa93ac6f98: true
   protobufjs: false
-minimumReleaseAgeExclude:
-  - '@rivet-dev/agentos-sidecar-darwin-arm64@0.2.15'
-  - '@rivet-dev/agentos-sidecar-darwin-x64@0.2.15'
-  - '@rivet-dev/agentos-sidecar-linux-arm64-gnu@0.2.15'
-  - '@rivet-dev/agentos-sidecar-linux-x64-gnu@0.2.15'
-  - '@rivet-dev/agentos-sidecar@0.2.15'

@@ -2,22 +2,26 @@
   "name": "@halo/desktop",
   "version": "0.1.0",
   "private": true,
+  "description": "Halo desktop app",
+  "author": "Saffron Health",
   "type": "module",
+  "main": ".vite/build/main.js",
   "scripts": {
-    "build": "vite build && cargo check --manifest-path src-tauri/Cargo.toml",
-    "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --lib",
-    "dev": "tauri dev",
-    "format": "oxfmt src index.html package.json tsconfig.json vite.config.ts src-tauri/tauri.conf.json src-tauri/capabilities",
-    "format:check": "oxfmt --check src index.html package.json tsconfig.json vite.config.ts src-tauri/tauri.conf.json src-tauri/capabilities",
-    "lint": "oxlint --deny-warnings src vite.config.ts",
-    "lint:fix": "oxlint --fix src vite.config.ts",
-    "tauri": "tauri",
-    "typecheck": "tsc --noEmit"
+    "build": "electron-forge package",
+    "dev": "electron-forge start",
+    "make": "electron-forge make",
+    "format": "oxfmt src electron index.html package.json tsconfig.json tsconfig.electron.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "format:check": "oxfmt --check src electron index.html package.json tsconfig.json tsconfig.electron.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "lint": "oxlint --deny-warnings src electron forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "lint:fix": "oxlint --fix src electron forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "test": "vitest run electron",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.electron.json"
   },
   "dependencies": {
+    "@mariozechner/pi-coding-agent": "0.60.0",
     "@tanstack/react-query": "^5.101.4",
-    "@tauri-apps/api": "^2.11.1",
     "@types/three": "^0.185.1",
+    "electron-squirrel-startup": "^1.0.1",
     "maui": "github:tanishqkancharla/maui#cb99be2b6872afff0d865f9aba48cffa93ac6f98",
     "purse-styles": "^0.2.1",
     "react": "^19.2.8",
@@ -25,16 +29,25 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
-    "@agentos-software/coreutils": "0.3.4",
-    "@agentos-software/pi": "0.2.7",
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-dmg": "^7.11.2",
+    "@electron-forge/maker-rpm": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
+    "@electron-forge/plugin-vite": "^7.11.2",
+    "@electron-forge/shared-types": "^7.11.2",
     "@repo/typescript-config": "workspace:*",
-    "@rivet-dev/agentos-sidecar": "0.2.15",
-    "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "^4.7.0",
     "agentation": "^3.0.2",
+    "electron": "^43.2.0",
     "typescript": "7.0.2",
-    "vite": "^7.3.1"
-  }
+    "vite": "^7.3.1",
+    "vitest": "^4.1.10"
+  },
+  "productName": "Halo"
 }

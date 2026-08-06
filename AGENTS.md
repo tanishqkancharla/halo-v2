@@ -1,6 +1,6 @@
 # Halo
 
-Halo is an open-source self-modifiable desktop app built using Tauri, AgentOS and Turso. It's currently a work-in-progress.
+Halo is an open-source self-modifiable desktop app built with Electron and Pi. It's currently a work-in-progress.
 
 ## Commands
 
@@ -35,4 +35,4 @@ Review every prose output against these rules before delivering.
 
 ## Design Guidance
 
-- Agents and humans should always have access to the same state. Which is why all Halo configuration is just stored in the AgentOS filesystem and Halo shouldn't directly manipulate the underlying Sqlite database.
+- Agents and humans should always have access to the same state. Store Halo and Pi state in the chosen workspace filesystem.

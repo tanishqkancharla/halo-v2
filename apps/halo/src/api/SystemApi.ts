@@ -1,44 +1,13 @@
-export type HealthStatus = {
-  status: "not_started" | "starting" | "ready" | "error" | "stopped";
-  sidecarState?: string;
-  error?: string;
-  databasePath: string;
-  workspaceRoot: string;
-  credentialConfigured: boolean;
-  credentialProviders: string[];
-  credentialStorage: string;
-};
-
-export type ReadyHealthStatus = HealthStatus & { status: "ready" };
-
-export function isReadyHealth(
-  health: HealthStatus,
-): health is ReadyHealthStatus {
-  return health.status === "ready";
-}
-
-export type StartupPreference = {
-  lastOwnerSlug?: string;
-};
-
-export type StartWorkspaceResult = {
-  health: ReadyHealthStatus;
-  preferenceSaved: boolean;
-  preferenceWarning?: string;
-};
-
-export type WorkspaceEntry = {
-  path: string;
+export type WorkspaceInfo = {
   name: string;
-  isDirectory: boolean;
-  isSymbolicLink: boolean;
+  workspaceRoot: string;
 };
 
-export type SessionState = "idle" | "running" | "waiting" | "failed";
+export type SessionState = "idle" | "running";
 
 export type SessionSummary = {
   sessionId: string;
-  agent: string;
+  agent: "pi";
   cwd: string;
   state: SessionState;
   title?: string;
@@ -57,42 +26,25 @@ export type SessionMessage = {
 
 export type SessionTranscript = {
   messages: SessionMessage[];
-  hasMoreBefore: boolean;
-  hasMoreAfter: boolean;
 };
 
-export type PromptResponse = {
+export type PromptStreamEvent = {
+  type: "delta";
   sessionId: string;
-  output: string;
-  message: unknown;
-  stopReason: unknown;
+  text: string;
 };
-
-export type PromptStreamEvent =
-  | { type: "delta"; sessionId: string; text: string }
-  | { type: "resyncRequired"; sessionId: string };
 
 export type PromptEventHandler = (event: PromptStreamEvent) => void;
 
-export type CreateSessionInput = {
-  sessionId: null;
-  provider: null;
-  model: null;
-};
-
 export type SystemApi = {
-  getStartupPreference: () => Promise<StartupPreference>;
-  startWorkspace: (ownerSlug: string) => Promise<StartWorkspaceResult>;
-  getHealth: () => Promise<HealthStatus>;
-  writeWorkspaceFile: (path: string, content: string) => Promise<void>;
-  readWorkspaceFile: (path: string) => Promise<string>;
-  listWorkspaceFiles: (path?: string) => Promise<WorkspaceEntry[]>;
+  getWorkspace: () => Promise<WorkspaceInfo | null>;
+  chooseWorkspace: () => Promise<WorkspaceInfo | null>;
   listSessions: () => Promise<SessionSummary[]>;
   readSessionTranscript: (sessionId: string) => Promise<SessionTranscript>;
-  createSession: (input: CreateSessionInput) => Promise<SessionSummary>;
+  createSession: () => Promise<SessionSummary>;
   sendPrompt: (
     sessionId: string,
     prompt: string,
     onEvent: PromptEventHandler,
-  ) => Promise<PromptResponse>;
+  ) => Promise<void>;
 };
