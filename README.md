@@ -19,15 +19,16 @@ pnpm install
 pnpm dev
 ```
 
-On Linux hosts without a real GPU (including cloud agents on Xvfb), force software WebGL and optionally skip the folder dialog:
+On Linux hosts without a real GPU (including cloud agents on Xvfb), force software WebGL:
 
 ```sh
 export HALO_USE_SWIFTSHADER=1
-export HALO_WORKSPACE=/path/to/workspace
 pnpm --filter @halo/desktop dev
 ```
 
-Each new app process asks you to choose a workspace folder unless `HALO_WORKSPACE` is set. Halo uses that folder as Pi's working directory and stores Pi data here:
+Each new app process asks you to choose a workspace folder the first time. Halo saves that choice in app data and reopens it on the next launch. In development, app data lives at `<repo>/.halo/`. Packaged builds use Electron's default userData path.
+
+Halo uses the chosen folder as Pi's working directory and stores Pi data here:
 
 ```text
 <workspace>/.pi/agent/
@@ -36,8 +37,6 @@ Each new app process asks you to choose a workspace folder unless `HALO_WORKSPAC
 └── sessions/
     └── *.jsonl
 ```
-
-Halo does not remember the chosen folder across app launches. It may reuse it after a renderer reload in the same process.
 
 Pi's file and shell tools run on the host with the same rights as Halo. Halo does not import old AgentOS SQLite workspaces.
 

@@ -17,7 +17,8 @@ type SessionListener = Parameters<AgentSession["subscribe"]>[0];
 
 async function workspaceService(): Promise<WorkspaceService> {
   const root = await mkdtemp(join(tmpdir(), "halo-pi-service-"));
-  const workspace = new WorkspaceService();
+  const appDataDir = await mkdtemp(join(tmpdir(), "halo-pi-app-data-"));
+  const workspace = new WorkspaceService(appDataDir);
   await workspace.select(root);
   return workspace;
 }

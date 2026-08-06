@@ -4,8 +4,8 @@
   "terminals": [
     {
       "name": "halo-dev",
-      "command": "mkdir -p \"$HOME/halo-workspace\" && HALO_WORKSPACE=\"$HOME/halo-workspace\" HALO_USE_SWIFTSHADER=1 pnpm --filter @halo/desktop dev",
-      "description": "Halo Electron app with software WebGL and a preselected workspace"
+      "command": "HALO_USE_SWIFTSHADER=1 pnpm --filter @halo/desktop dev",
+      "description": "Halo Electron app with software WebGL for headless hosts"
     }
   ]
 }
