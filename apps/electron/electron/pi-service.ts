@@ -19,13 +19,6 @@ import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
 
 type AgentSessionFactory = typeof createAgentSession;
 
-const PROVIDER_ENV_NAMES = [
-  "ANTHROPIC_API_KEY",
-  "OPENAI_API_KEY",
-  "GEMINI_API_KEY",
-  "OPENROUTER_API_KEY",
-] as const;
-
 export class PiService {
   private readonly runningSessions = new Map<string, AgentSession>();
   private readonly draftSessions = new Map<string, SessionManager>();
@@ -69,25 +62,6 @@ export class PiService {
   }
 
   async sendPrompt(
-    sessionId: string,
-    prompt: string,
-    onEvent: PromptEventHandler,
-  ): Promise<void> {
-    return this.sendPromptInner(sessionId, prompt, onEvent).catch((error) => {
-      throw new Error(describePromptError(error));
-    });
-  }
-
-  async shutdown(): Promise<void> {
-    const sessions = [...this.runningSessions.values()];
-    for (const session of sessions) {
-      await session.abort();
-      session.dispose();
-    }
-    this.runningSessions.clear();
-  }
-
-  private async sendPromptInner(
     sessionId: string,
     prompt: string,
     onEvent: PromptEventHandler,
@@ -136,6 +110,15 @@ export class PiService {
       this.runningSessions.delete(sessionId);
       session.dispose();
     }
+  }
+
+  async shutdown(): Promise<void> {
+    const sessions = [...this.runningSessions.values()];
+    for (const session of sessions) {
+      await session.abort();
+      session.dispose();
+    }
+    this.runningSessions.clear();
   }
 
   private async findSession(
@@ -201,23 +184,4 @@ function collectText(content: unknown): string {
       return [part.text];
     })
     .join("");
-}
-
-function describePromptError(error: unknown): string {
-  const message = redactProviderKeys(error);
-  if (message.includes("No model selected")) {
-    return "No model provider is configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY for the process that starts Halo, then restart the app.";
-  }
-  return message;
-}
-
-function redactProviderKeys(error: unknown): string {
-  let message = error instanceof Error ? error.message : String(error);
-  for (const envName of PROVIDER_ENV_NAMES) {
-    const key = process.env[envName];
-    if (key !== undefined && key.length > 0) {
-      message = message.replaceAll(key, "[redacted]");
-    }
-  }
-  return message;
 }

@@ -155,22 +155,10 @@ export function useSendPromptMutation() {
       queryClient.setQueryData(key, {
         ...current,
         status: "failed",
-        error: promptFailureMessage(error),
+        error: error instanceof Error ? error.message : String(error),
       });
     },
   });
-}
-
-export function promptFailureMessage(error: unknown): string {
-  let message = error instanceof Error ? error.message : String(error);
-  const remotePrefix = "Error invoking remote method 'halo:send-prompt': ";
-  if (message.startsWith(remotePrefix)) {
-    message = message.slice(remotePrefix.length);
-  }
-  if (message.startsWith("Error: ")) {
-    message = message.slice("Error: ".length);
-  }
-  return message;
 }
 
 export function useCreateSessionMutation() {

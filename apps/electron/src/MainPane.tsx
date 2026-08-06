@@ -23,7 +23,6 @@ import {
   useLivePrompt,
   useSendPromptMutation,
   useSessionTranscriptQuery,
-  promptFailureMessage,
   type LivePrompt,
 } from "./api/ApiProvider.tsx";
 import {
@@ -186,7 +185,10 @@ function PromptEditor({
     } catch (submitError) {
       setDraft((current) => ({
         text: current.text,
-        error: promptFailureMessage(submitError),
+        error:
+          submitError instanceof Error
+            ? submitError.message
+            : String(submitError),
       }));
     }
   }

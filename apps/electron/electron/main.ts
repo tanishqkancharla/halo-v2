@@ -174,14 +174,10 @@ function installMenu(): void {
   Menu.setApplicationMenu(menu);
 }
 
-function repositoryRoot(): string {
-  const appDirectory = join(currentDirectory, "../..");
-  return join(appDirectory, "../..");
-}
-
 function configureUserDataPath(): void {
   if (!isDevelopment) return;
-  app.setPath("userData", join(repositoryRoot(), ".halo"));
+  const appDirectory = join(currentDirectory, "../..");
+  app.setPath("userData", join(appDirectory, "../..", ".halo"));
 }
 
 function loadDevelopmentEnvironment(): void {
@@ -189,7 +185,7 @@ function loadDevelopmentEnvironment(): void {
   const appDirectory = join(currentDirectory, "../..");
   const environmentFile = [
     join(appDirectory, ".env"),
-    join(repositoryRoot(), ".env"),
+    join(appDirectory, "../../.env"),
   ].find(existsSync);
   if (environmentFile !== undefined) process.loadEnvFile(environmentFile);
 }
