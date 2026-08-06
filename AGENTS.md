@@ -4,7 +4,7 @@ Halo is an open-source self-modifiable desktop app built with Electron and Pi. I
 
 ## Commands
 
-- `pnpm run check-affected` - Lint, typecheck, build, format-check, and test affected packages
+- `pnpm run check-affected` - Lint, typecheck, format-check, and test affected packages. Run this after edits before you treat the work as done.
 
 ## Code Style
 
@@ -49,7 +49,7 @@ Review every prose output against these rules before delivering.
 
 ## Cursor Cloud specific instructions
 
-The one service is the Halo Electron app. Start it from the repo root with `pnpm --filter @halo/desktop dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo-web` (see the halo-web skill). Lint, typecheck, build, and test commands live in the root and per-package `package.json`; `pnpm run check-affected` runs them.
+The one service is the Halo Electron app. Start it from the repo root with `pnpm --filter @halo/desktop dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo-web` (see the halo-web skill). After edits, run `pnpm run check-affected` (see Commands).
 
 Headless hosts (Xvfb/VNC) need `HALO_USE_SWIFTSHADER=1`, which the `halo-dev` terminal exports. Without it the renderer cannot start WebGL.
 
