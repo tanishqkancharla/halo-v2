@@ -7,7 +7,11 @@ import {
   type SessionManager,
 } from "@mariozechner/pi-coding-agent";
 import { describe, expect, test, vi } from "vitest";
-import { PiService } from "./pi-service.js";
+import {
+  PiService,
+  PromptFailedError,
+  SessionBusyError,
+} from "./pi-service.js";
 import { WorkspaceService } from "./workspace-service.js";
 
 type AgentSessionFactory = typeof createAgentSession;
@@ -72,11 +76,18 @@ describe("PiService", () => {
     const fake = successfulFactory();
     const service = new PiService(workspace, fake.factory);
     const session = await service.createNewSession();
+    expect(session).not.toBeInstanceOf(Error);
+    if (session instanceof Error) return;
     const deltas: string[] = [];
 
-    await service.sendPrompt(session.sessionId, "Say hello", (event) => {
-      deltas.push(event.text);
-    });
+    const sent = await service.sendPrompt(
+      session.sessionId,
+      "Say hello",
+      (event) => {
+        deltas.push(event.text);
+      },
+    );
+    expect(sent).toBeUndefined();
 
     expect(deltas).toEqual(["Hello", " there"]);
     expect(fake.unsubscribe).toHaveBeenCalledOnce();
@@ -114,14 +125,22 @@ describe("PiService", () => {
       .mockImplementation(succeeding.factory) as AgentSessionFactory;
     const service = new PiService(workspace, factory);
     const session = await service.createNewSession();
+    expect(session).not.toBeInstanceOf(Error);
+    if (session instanceof Error) return;
 
-    await expect(
-      service.sendPrompt(session.sessionId, "First", vi.fn()),
-    ).rejects.toThrow("provider failed");
+    const failed = await service.sendPrompt(
+      session.sessionId,
+      "First",
+      vi.fn(),
+    );
+    expect(failed).toBeInstanceOf(PromptFailedError);
     expect(failedDispose).toHaveBeenCalledOnce();
-    await expect(
-      service.sendPrompt(session.sessionId, "Retry", vi.fn()),
-    ).resolves.toBeUndefined();
+    const retried = await service.sendPrompt(
+      session.sessionId,
+      "Retry",
+      vi.fn(),
+    );
+    expect(retried).toBeUndefined();
   });
 
   test("rejects concurrent prompts and aborts on shutdown", async () => {
@@ -146,12 +165,17 @@ describe("PiService", () => {
       .mockResolvedValue({ session }) as AgentSessionFactory;
     const service = new PiService(workspace, factory);
     const created = await service.createNewSession();
+    expect(created).not.toBeInstanceOf(Error);
+    if (created instanceof Error) return;
     const running = service.sendPrompt(created.sessionId, "Wait", vi.fn());
     await vi.waitFor(() => expect(session.prompt).toHaveBeenCalledOnce());
 
-    await expect(
-      service.sendPrompt(created.sessionId, "Again", vi.fn()),
-    ).rejects.toThrow("already running");
+    const concurrent = await service.sendPrompt(
+      created.sessionId,
+      "Again",
+      vi.fn(),
+    );
+    expect(concurrent).toBeInstanceOf(SessionBusyError);
     await service.shutdown();
     await running;
 
