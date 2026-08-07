@@ -1,5 +1,6 @@
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { dialog, type BrowserWindow } from "electron";
+import fs from "node:fs";
 import {
   AgentSessionApi,
   HaloApi,
@@ -38,6 +39,12 @@ export class HaloRpc extends HaloApi {
   async listSessions() {
     const sessions = await this.pi.listSessions();
     if (sessions instanceof Error) throw sessions;
+    // #region agent log
+    fs.appendFileSync(
+      "/opt/cursor/logs/debug.log",
+      `${JSON.stringify({ hypothesisId: "A", location: "main/rpc.ts:listSessions", message: "list result shapes", data: { arrayPrototype: Object.getPrototypeOf(sessions)?.constructor?.name, sessions: sessions.map((session) => Object.fromEntries(Object.entries(session).map(([key, value]) => [key, { type: typeof value, prototype: value === null || value === undefined ? null : Object.getPrototypeOf(value)?.constructor?.name }]))) }, timestamp: Date.now() })}\n`,
+    );
+    // #endregion
     return sessions;
   }
 
@@ -50,7 +57,14 @@ export class HaloRpc extends HaloApi {
   async newAgentSession() {
     const session = await this.pi.newAgentSession();
     if (session instanceof Error) throw session;
-    return new AgentSessionRpc(session);
+    const target = new AgentSessionRpc(session);
+    // #region agent log
+    fs.appendFileSync(
+      "/opt/cursor/logs/debug.log",
+      `${JSON.stringify({ hypothesisId: "B", location: "main/rpc.ts:newAgentSession", message: "created RPC target", data: { constructor: target.constructor.name, agentSessionApi: target instanceof AgentSessionApi }, timestamp: Date.now() })}\n`,
+    );
+    // #endregion
+    return target;
   }
 
   async openAgentSession(sessionId: string) {
@@ -86,7 +100,24 @@ export class AgentSessionRpc extends AgentSessionApi {
       };
       const listener = this.listener;
       if (listener === null) return;
-      this.deliveries = this.deliveries.then(() => listener(streamEvent));
+      this.deliveries = this.deliveries
+        .then(() => {
+          // #region agent log
+          fs.appendFileSync(
+            "/opt/cursor/logs/debug.log",
+            `${JSON.stringify({ hypothesisId: "C", location: "main/rpc.ts:delivery", message: "calling retained listener", data: { listenerType: typeof listener, listenerPrototype: Object.getPrototypeOf(listener)?.constructor?.name, hasDispose: Symbol.dispose in listener }, timestamp: Date.now() })}\n`,
+          );
+          // #endregion
+          return listener(streamEvent);
+        })
+        .then((result) => {
+          // #region agent log
+          fs.appendFileSync(
+            "/opt/cursor/logs/debug.log",
+            `${JSON.stringify({ hypothesisId: "C", location: "main/rpc.ts:delivery", message: "listener resolved", data: { resultType: typeof result, resultPrototype: result === null || result === undefined ? null : Object.getPrototypeOf(result)?.constructor?.name }, timestamp: Date.now() })}\n`,
+          );
+          // #endregion
+        });
     });
   }
 
@@ -96,17 +127,42 @@ export class AgentSessionRpc extends AgentSessionApi {
 
   subscribe(callback: PromptListener) {
     // Cap'n Web releases arg stubs when the call returns unless we dup().
-    this.listener =
+    const retained =
       typeof callback.dup === "function" ? callback.dup() : callback;
+    // #region agent log
+    fs.appendFileSync(
+      "/opt/cursor/logs/debug.log",
+      `${JSON.stringify({ hypothesisId: "C", location: "main/rpc.ts:subscribe", message: "retained listener", data: { callbackType: typeof callback, callbackPrototype: Object.getPrototypeOf(callback)?.constructor?.name, retainedType: typeof retained, retainedPrototype: Object.getPrototypeOf(retained)?.constructor?.name, duplicated: retained !== callback }, timestamp: Date.now() })}\n`,
+    );
+    // #endregion
+    this.listener = retained;
   }
 
   async prompt(text: string) {
     if (text.trim().length === 0) throw new EmptyPromptError();
+    // #region agent log
+    fs.appendFileSync(
+      "/opt/cursor/logs/debug.log",
+      `${JSON.stringify({ hypothesisId: "C,D", location: "main/rpc.ts:prompt", message: "prompt entered", data: { textLength: text.length, hasListener: this.listener !== null }, timestamp: Date.now() })}\n`,
+    );
+    // #endregion
     const prompted = await this.session
       .prompt(text)
       .catch((e) => new PromptFailedError({ cause: e }));
+    // #region agent log
+    fs.appendFileSync(
+      "/opt/cursor/logs/debug.log",
+      `${JSON.stringify({ hypothesisId: "D", location: "main/rpc.ts:prompt", message: "Pi prompt settled", data: { failed: prompted instanceof Error, errorName: prompted instanceof Error ? prompted.name : null }, timestamp: Date.now() })}\n`,
+    );
+    // #endregion
     if (prompted instanceof Error) throw prompted;
     await this.deliveries;
+    // #region agent log
+    fs.appendFileSync(
+      "/opt/cursor/logs/debug.log",
+      `${JSON.stringify({ hypothesisId: "C", location: "main/rpc.ts:prompt", message: "deliveries settled", data: {}, timestamp: Date.now() })}\n`,
+    );
+    // #endregion
   }
 
   [Symbol.dispose]() {
