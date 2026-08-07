@@ -6,9 +6,9 @@
     "moduleResolution": "Bundler",
     "noEmit": true,
     "paths": {
-      "maui": ["./src/maui.d.ts"]
+      "maui": ["./src/renderer/maui.d.ts"]
     },
     "types": ["vite/client"]
   },
-  "include": ["src", "vite.renderer.config.ts"]
+  "include": ["src/renderer", "vite.renderer.config.ts"]
 }

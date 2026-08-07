@@ -9,11 +9,11 @@
     "types": ["node", "vitest"]
   },
   "include": [
-    "electron/**/*.ts",
+    "src/main/**/*.ts",
     "forge.config.ts",
     "vite.main.config.ts",
     "vite.preload.config.ts",
     "vite.renderer.config.ts",
-    "src/api/SystemApi.ts"
+    "src/renderer/api/SystemApi.ts"
   ]
 }
