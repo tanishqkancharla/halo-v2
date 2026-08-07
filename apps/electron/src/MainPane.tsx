@@ -1,3 +1,4 @@
+import * as errore from "errore";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
   AssistantMessage,
@@ -30,6 +31,11 @@ import {
   type SessionTranscript,
 } from "./api/SystemApi.ts";
 import type { SessionSelection } from "./App.tsx";
+
+class PromptSubmitError extends errore.createTaggedError({
+  name: "PromptSubmitError",
+  message: "Failed to send prompt: $reason",
+}) {}
 
 export function MainPane({
   selection,
@@ -177,20 +183,23 @@ function PromptEditor({
 
     const submittedText = trimmedText;
     setDraft({ text: draft.text });
-    try {
-      await onSubmit(submittedText);
-      setDraft((current) =>
-        current.text === draft.text ? { text: "" } : current,
-      );
-    } catch (submitError) {
+    const result = await onSubmit(submittedText).catch(
+      (e) =>
+        new PromptSubmitError({
+          reason: e instanceof Error ? e.message : String(e),
+          cause: e,
+        }),
+    );
+    if (result instanceof Error) {
       setDraft((current) => ({
         text: current.text,
-        error:
-          submitError instanceof Error
-            ? submitError.message
-            : String(submitError),
+        error: result.message,
       }));
+      return;
     }
+    setDraft((current) =>
+      current.text === draft.text ? { text: "" } : current,
+    );
   }
 
   return (
