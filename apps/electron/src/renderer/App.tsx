@@ -88,12 +88,8 @@ export function App() {
         <MainPane
           selection={activeSelection}
           sessions={sessions}
-          onDraftSent={(draftId, sessionId) =>
-            setSelection((current) =>
-              current?.kind === "draft" && current.draftId === draftId
-                ? { kind: "saved", sessionId }
-                : current,
-            )
+          onDraftSent={(_draftId, sessionId) =>
+            setSelection({ kind: "saved", sessionId })
           }
         />
       </div>

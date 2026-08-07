@@ -126,7 +126,7 @@ export function useWorkspaceQuery() {
 export function useChooseWorkspaceMutation() {
   const { api, queryClient } = useContext(ApiContext);
   return useMutation({
-    mutationFn: api.chooseWorkspace,
+    mutationFn: () => api.chooseWorkspace(),
     onSuccess: (workspace) => {
       if (workspace !== null) {
         queryClient.setQueryData(workspaceQueryKey, readyWorkspace(workspace));
@@ -142,7 +142,7 @@ export function useSessionsQuery(workspace: WorkspaceState | undefined) {
 
   return useQuery({
     queryKey: ["sessions", workspaceRoot],
-    queryFn: api.listSessions,
+    queryFn: () => api.listSessions(),
     enabled: workspaceRoot !== null,
   });
 }
