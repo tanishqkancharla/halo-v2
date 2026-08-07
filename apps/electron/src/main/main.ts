@@ -1,17 +1,19 @@
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   app,
   BrowserWindow,
-  dialog,
   ipcMain,
   Menu,
-  type IpcMainInvokeEvent,
+  MessageChannelMain,
+  type IpcMainEvent,
 } from "electron";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import started from "electron-squirrel-startup";
-import { IPC } from "./ipc.js";
+import { RPC_CHANNELS } from "../shared/channels.js";
+import { newMessagePortMainRpcSession } from "./MessagePortMainTransport.js";
 import { PiService } from "./pi-service.js";
+import { HaloRpc } from "./rpc.js";
 import { WorkspaceService } from "./workspace-service.js";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -43,7 +45,7 @@ let mainWindow: BrowserWindow | null = null;
 
 app.whenReady().then(async () => {
   await workspaceService.restore();
-  registerIpcHandlers();
+  registerRpcBridge();
   installMenu();
   openMainWindow();
 
@@ -101,61 +103,28 @@ function createWindow(): BrowserWindow {
   return window;
 }
 
-function registerIpcHandlers(): void {
-  ipcMain.handle(IPC.getWorkspace, (event) => {
+function registerRpcBridge(): void {
+  ipcMain.on(RPC_CHANNELS.requestRpc, (event) => {
     assertTrustedSender(event);
-    return workspaceService.getWorkspace();
+    const frame = event.senderFrame;
+    if (frame === null) {
+      throw new Error("Halo rejected RPC without a sender frame.");
+    }
+    const { port1, port2 } = new MessageChannelMain();
+    newMessagePortMainRpcSession(
+      port1,
+      new HaloRpc(workspaceService, piService, () => {
+        if (mainWindow === null) {
+          throw new Error("Halo main window is not open.");
+        }
+        return mainWindow;
+      }),
+    );
+    frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);
   });
-  ipcMain.handle(IPC.chooseWorkspace, async (event) => {
-    const window = assertTrustedSender(event);
-    const selection = await dialog.showOpenDialog(window, {
-      title: "Choose a Halo workspace",
-      buttonLabel: "Choose workspace",
-      properties: ["openDirectory"],
-    });
-    if (selection.canceled) return null;
-    return throwIfError(await workspaceService.select(selection.filePaths[0]!));
-  });
-  ipcMain.handle(IPC.listSessions, async (event) => {
-    assertTrustedSender(event);
-    return throwIfError(await piService.listSessions());
-  });
-  ipcMain.handle(
-    IPC.readSessionTranscript,
-    async (event, sessionId: string) => {
-      assertTrustedSender(event);
-      return throwIfError(await piService.readTranscript(sessionId));
-    },
-  );
-  ipcMain.handle(IPC.createSession, async (event) => {
-    assertTrustedSender(event);
-    return throwIfError(await piService.createNewSession());
-  });
-  ipcMain.handle(
-    IPC.sendPrompt,
-    async (event, requestId: string, sessionId: string, prompt: string) => {
-      assertTrustedSender(event);
-      return throwIfError(
-        await piService.sendPrompt(sessionId, prompt, (promptEvent) => {
-          if (!event.sender.isDestroyed()) {
-            event.sender.send(IPC.promptEvent, {
-              requestId,
-              event: promptEvent,
-            });
-          }
-        }),
-      );
-    },
-  );
 }
 
-// Electron IPC transports failures as rejections.
-function throwIfError<T>(result: T): Exclude<T, Error> {
-  if (result instanceof Error) throw result;
-  return result as Exclude<T, Error>;
-}
-
-function assertTrustedSender(event: IpcMainInvokeEvent): BrowserWindow {
+function assertTrustedSender(event: IpcMainEvent): BrowserWindow {
   const senderWindow = BrowserWindow.fromWebContents(event.sender);
   if (senderWindow === null || senderWindow !== mainWindow) {
     throw new Error("Halo rejected IPC from an unknown renderer.");
