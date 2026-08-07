@@ -6,12 +6,18 @@ import {
   useMutation,
   useQuery,
 } from "@tanstack/react-query";
+import * as errore from "errore";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type {
   PromptStreamEvent,
   SystemApi,
   WorkspaceInfo,
 } from "./SystemApi.js";
+
+class WorkspaceRestoreError extends errore.createTaggedError({
+  name: "WorkspaceRestoreError",
+  message: "Workspace restore failed",
+}) {}
 
 export type WorkspaceState =
   | { status: "needs-workspace"; message?: string }
@@ -155,7 +161,7 @@ export function useSendPromptMutation() {
       queryClient.setQueryData(key, {
         ...current,
         status: "failed",
-        error: error instanceof Error ? error.message : String(error),
+        error: error.message,
       });
     },
   });
@@ -194,16 +200,23 @@ function sessionTranscriptKey(sessionId: string | null) {
 }
 
 async function restoreWorkspace(api: SystemApi): Promise<WorkspaceState> {
-  try {
-    const active = await api.getWorkspace();
-    if (active !== null) return readyWorkspace(active);
-    const selected = await api.chooseWorkspace();
-    return selected === null
-      ? { status: "needs-workspace" }
-      : readyWorkspace(selected);
-  } catch (error) {
-    return { status: "needs-workspace", message: String(error) };
+  const active = await api
+    .getWorkspace()
+    .catch((e) => new WorkspaceRestoreError({ cause: e }));
+  if (active instanceof Error) {
+    return { status: "needs-workspace", message: active.message };
   }
+  if (active !== null) return readyWorkspace(active);
+
+  const selected = await api
+    .chooseWorkspace()
+    .catch((e) => new WorkspaceRestoreError({ cause: e }));
+  if (selected instanceof Error) {
+    return { status: "needs-workspace", message: selected.message };
+  }
+  return selected === null
+    ? { status: "needs-workspace" }
+    : readyWorkspace(selected);
 }
 
 function readyWorkspace(workspace: WorkspaceInfo): WorkspaceState {

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import * as errore from "errore";
 import type {
   PromptEventHandler,
   SystemApi,
@@ -36,6 +37,7 @@ async function invokePrompt(
   prompt: string,
   onEvent: PromptEventHandler,
 ): Promise<void> {
+  await using cleanup = new errore.AsyncDisposableStack();
   const requestId = crypto.randomUUID();
   const listener = (
     _event: IpcRendererEvent,
@@ -44,11 +46,10 @@ async function invokePrompt(
     if (envelope.requestId === requestId) onEvent(envelope.event);
   };
   ipcRenderer.on(IPC.promptEvent, listener);
-  try {
-    await ipcRenderer.invoke(IPC.sendPrompt, requestId, sessionId, prompt);
-  } finally {
+  cleanup.defer(() => {
     ipcRenderer.off(IPC.promptEvent, listener);
-  }
+  });
+  await ipcRenderer.invoke(IPC.sendPrompt, requestId, sessionId, prompt);
 }
 
 contextBridge.exposeInMainWorld("halo", haloApi);
