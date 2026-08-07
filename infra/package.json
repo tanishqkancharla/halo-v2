@@ -1,0 +1,28 @@
+{
+  "name": "@halo/infra",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "NODE_OPTIONS=--experimental-strip-types alchemy deploy",
+    "destroy": "NODE_OPTIONS=--experimental-strip-types alchemy destroy",
+    "dev": "NODE_OPTIONS=--experimental-strip-types alchemy dev",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint --deny-warnings .",
+    "lint:fix": "oxlint --fix .",
+    "login": "NODE_OPTIONS=--experimental-strip-types alchemy login",
+    "plan": "NODE_OPTIONS=--experimental-strip-types alchemy plan",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.0-beta.103",
+    "alchemy": "2.0.0-beta.70",
+    "effect": "4.0.0-beta.103"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "typescript": "7.0.2"
+  }
+}

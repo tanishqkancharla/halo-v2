@@ -43,5 +43,9 @@ yarn-error.log*
 # Development Electron userData
 .halo/
 
+# Alchemy local state
+.alchemy/
+infra/.alchemy/
+
 # Riptide artifacts (cloud-synced)
 .humanlayer/tasks/

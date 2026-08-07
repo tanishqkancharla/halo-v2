@@ -6,6 +6,7 @@ Halo is an Electron desktop app with a React renderer and Pi in the main process
 
 - `apps/electron/src/renderer`: React UI built with Maui and Vite.
 - `apps/electron/src/main`: Electron main process, preload bridge, workspace service, and Pi service.
+- `infra`: Cloudflare infrastructure via [Alchemy](https://alchemy.run/) (`alchemy.run.ts`).
 - `packages/halo-web-cli`: Debug UI control through Libretto Browser Tools.
 - `packages/ui`: Shared React components.
 - `packages/typescript-config`: Shared TypeScript settings.
@@ -63,6 +64,24 @@ pnpm halo-web exec "await page.getByRole('button', { name: 'New session' }).clic
 ```
 
 Pass `--stdin` for longer scripts. Output uses TOON by default; pass `--json` for JSON. Packaged builds do not expose the debug port.
+
+## Cloudflare infrastructure
+
+Cloudflare is the cloud target. Alchemy owns the stack under `infra/`.
+
+| Need | Cloudflare product | Alchemy resource |
+| --- | --- | --- |
+| Secrets manager | [Secrets Store](https://developers.cloudflare.com/secrets-store/) | `Cloudflare.SecretsStore.Store` |
+| App release artifacts | [R2](https://developers.cloudflare.com/r2/) object storage | `Cloudflare.R2.Bucket` (`Releases`) |
+
+```sh
+pnpm infra:login
+pnpm infra:plan
+pnpm infra:deploy
+pnpm infra:dev
+```
+
+First login stores Cloudflare credentials in `~/.alchemy/profiles.json`. CI uses `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN` instead.
 
 ## Packaging
 
