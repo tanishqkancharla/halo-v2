@@ -2,7 +2,8 @@ import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Effect from "effect/Effect";
 
-import Api from "./src/Api.ts";
+import { Releases } from "./src/Releases.ts";
+import { SecretsStore } from "./src/SecretsStore.ts";
 
 export default Alchemy.Stack(
   "Halo",
@@ -11,10 +12,13 @@ export default Alchemy.Stack(
     state: Cloudflare.state(),
   },
   Effect.gen(function* () {
-    const api = yield* Api;
+    const secretsStore = yield* SecretsStore;
+    const releases = yield* Releases;
 
     return {
-      url: api.url.as<string>(),
+      secretsStoreId: secretsStore.storeId,
+      secretsStoreName: secretsStore.storeName,
+      releasesBucket: releases.bucketName,
     };
   }),
 );
