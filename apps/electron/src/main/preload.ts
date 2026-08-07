@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
-import type { PromptEventHandler, SystemApi } from "../src/api/SystemApi.js";
+import type { PromptEventHandler, SystemApi } from "../renderer/api/SystemApi.js";
 import { IPC, type PromptEventEnvelope } from "./ipc.js";
 
 const haloApi: SystemApi = {

@@ -1,4 +1,4 @@
-import type { PromptStreamEvent } from "../src/api/SystemApi.js";
+import type { PromptStreamEvent } from "../renderer/api/SystemApi.js";
 
 export const IPC = {
   getWorkspace: "halo:get-workspace",

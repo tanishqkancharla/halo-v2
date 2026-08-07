@@ -10,12 +10,12 @@
     "build": "electron-forge package",
     "dev": "electron-forge start",
     "make": "electron-forge make",
-    "format": "oxfmt src electron index.html package.json tsconfig.json tsconfig.electron.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "format:check": "oxfmt --check src electron index.html package.json tsconfig.json tsconfig.electron.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "lint": "oxlint --deny-warnings src electron forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "lint:fix": "oxlint --fix src electron forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "test": "vitest run electron",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.electron.json"
+    "format": "oxfmt src index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "format:check": "oxfmt --check src index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "lint": "oxlint --deny-warnings src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "lint:fix": "oxlint --fix src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "test": "vitest run src/main",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.main.json"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "0.60.0",

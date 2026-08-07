@@ -49,11 +49,11 @@ const config: ForgeConfig = {
       config: {
         build: [
           {
-            entry: "electron/main.ts",
+            entry: "src/main/main.ts",
             config: "vite.main.config.ts",
           },
           {
-            entry: "electron/preload.ts",
+            entry: "src/main/preload.ts",
             config: "vite.preload.config.ts",
           },
         ],

@@ -14,7 +14,7 @@ import type {
   SessionMessage,
   SessionSummary,
   SessionTranscript,
-} from "../src/api/SystemApi.js";
+} from "../renderer/api/SystemApi.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
 
 type AgentSessionFactory = typeof createAgentSession;
