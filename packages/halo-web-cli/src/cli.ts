@@ -27,6 +27,12 @@ Cli.create("halo-web", {
     }),
     async run(c) {
       const status = await getStatus();
+      if (status instanceof Error) {
+        return c.error({
+          code: "BROWSER_TOOLS",
+          message: status.message,
+        });
+      }
       return c.ok(status, {
         cta: {
           commands: [
@@ -52,7 +58,14 @@ Cli.create("halo-web", {
     }),
     async run(c) {
       const includeScreenshot = c.options.screenshot === true;
-      return c.ok(await snapshot(includeScreenshot));
+      const result = await snapshot(includeScreenshot);
+      if (result instanceof Error) {
+        return c.error({
+          code: "BROWSER_TOOLS",
+          message: result.message,
+        });
+      }
+      return c.ok(result);
     },
   })
   .command("exec", {
@@ -100,6 +113,12 @@ Cli.create("halo-web", {
       }
 
       const result = await execute(source);
+      if (result instanceof Error) {
+        return c.error({
+          code: "BROWSER_TOOLS",
+          message: result.message,
+        });
+      }
       return c.ok(
         {
           ...result,
