@@ -11,10 +11,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import started from "electron-squirrel-startup";
 import { HaloRpc } from "./halo-rpc.js";
-import { IPC } from "./ipc.js";
 import { newMessagePortMainRpcSession } from "./message-port-main-transport.js";
 import { PiService } from "./pi-service.js";
 import { WorkspaceService } from "./workspace-service.js";
+import { RPC_CHANNELS } from "../shared/rpc-channels.js";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -104,7 +104,7 @@ function createWindow(): BrowserWindow {
 }
 
 function registerRpcBridge(): void {
-  ipcMain.on(IPC.requestRpc, (event) => {
+  ipcMain.on(RPC_CHANNELS.requestRpc, (event) => {
     assertTrustedSender(event);
     const frame = event.senderFrame;
     if (frame === null) {
@@ -120,7 +120,7 @@ function registerRpcBridge(): void {
         return mainWindow;
       }),
     );
-    frame.postMessage(IPC.provideRpc, null, [port2]);
+    frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);
   });
 }
 

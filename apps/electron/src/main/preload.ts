@@ -1,5 +1,5 @@
 import { ipcRenderer } from "electron";
-import { IPC } from "./ipc.js";
+import { RPC_CHANNELS } from "../shared/rpc-channels.js";
 
 const windowLoaded = new Promise<void>((resolve) => {
   window.addEventListener("load", () => resolve());
@@ -8,12 +8,12 @@ const windowLoaded = new Promise<void>((resolve) => {
 // Renderer requests a Cap'n Web MessagePort; we forward it into the main world.
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
-  if (event.data !== IPC.requestRpc) return;
-  ipcRenderer.postMessage(IPC.requestRpc, null);
+  if (event.data !== RPC_CHANNELS.requestRpc) return;
+  ipcRenderer.postMessage(RPC_CHANNELS.requestRpc, null);
 });
 
-ipcRenderer.on(IPC.provideRpc, (event) => {
+ipcRenderer.on(RPC_CHANNELS.provideRpc, (event) => {
   void windowLoaded.then(() => {
-    window.postMessage(IPC.provideRpc, "*", event.ports);
+    window.postMessage(RPC_CHANNELS.provideRpc, "*", event.ports);
   });
 });
