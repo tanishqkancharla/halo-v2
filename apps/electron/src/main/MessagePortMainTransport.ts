@@ -24,48 +24,46 @@ export function newMessagePortMainRpcSession<T extends object>(
 class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
   readonly encodingLevel = "structuredClonable" as const;
 
-  #port: MessagePortMain;
-  #receiveResolver: ((message: unknown) => void) | undefined;
-  #receiveRejecter: ((err: unknown) => void) | undefined;
-  #receiveQueue: unknown[] = [];
-  #error: unknown;
+  private receiveResolver: ((message: unknown) => void) | undefined;
+  private receiveRejecter: ((err: unknown) => void) | undefined;
+  private receiveQueue: unknown[] = [];
+  private error: unknown;
 
-  constructor(port: MessagePortMain) {
-    this.#port = port;
+  constructor(private port: MessagePortMain) {
     port.start();
     port.on("message", (event) => {
-      if (this.#error !== undefined) return;
+      if (this.error !== undefined) return;
       if (event.data === null) {
-        this.#receivedError(new Error("Peer closed MessagePort connection."));
+        this.receivedError(new Error("Peer closed MessagePort connection."));
         return;
       }
-      if (this.#receiveResolver !== undefined) {
-        this.#receiveResolver(event.data);
-        this.#receiveResolver = undefined;
-        this.#receiveRejecter = undefined;
+      if (this.receiveResolver !== undefined) {
+        this.receiveResolver(event.data);
+        this.receiveResolver = undefined;
+        this.receiveRejecter = undefined;
         return;
       }
-      this.#receiveQueue.push(event.data);
+      this.receiveQueue.push(event.data);
     });
     port.on("close", () => {
-      this.#receivedError(new Error("MessagePort closed."));
+      this.receivedError(new Error("MessagePort closed."));
     });
   }
 
   send(message: unknown): void {
-    if (this.#error !== undefined) throw this.#error;
+    if (this.error !== undefined) throw this.error;
     // MessagePortMain.postMessage has no targetOrigin (unlike window.postMessage).
     // oxlint-disable-next-line unicorn/require-post-message-target-origin
-    this.#port.postMessage(message);
+    this.port.postMessage(message);
   }
 
   async receive(): Promise<unknown> {
-    const queued = this.#receiveQueue.shift();
+    const queued = this.receiveQueue.shift();
     if (queued !== undefined) return queued;
-    if (this.#error !== undefined) throw this.#error;
+    if (this.error !== undefined) throw this.error;
     return new Promise((resolve, reject) => {
-      this.#receiveResolver = resolve;
-      this.#receiveRejecter = reject;
+      this.receiveResolver = resolve;
+      this.receiveRejecter = reject;
     });
   }
 
@@ -75,7 +73,7 @@ class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
       try: () => {
         // MessagePortMain.postMessage has no targetOrigin (unlike window.postMessage).
         // oxlint-disable-next-line unicorn/require-post-message-target-origin
-        this.#port.postMessage(null);
+        this.port.postMessage(null);
       },
       catch: (e) =>
         new Error("MessagePortMain close signal failed", { cause: e }),
@@ -83,17 +81,17 @@ class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
     if (signaled instanceof Error) {
       console.warn(signaled.message);
     }
-    this.#port.close();
-    if (this.#error === undefined) this.#error = reason;
+    this.port.close();
+    if (this.error === undefined) this.error = reason;
   }
 
-  #receivedError(reason: unknown): void {
-    if (this.#error !== undefined) return;
-    this.#error = reason;
-    if (this.#receiveRejecter !== undefined) {
-      this.#receiveRejecter(reason);
-      this.#receiveResolver = undefined;
-      this.#receiveRejecter = undefined;
+  private receivedError(reason: unknown): void {
+    if (this.error !== undefined) return;
+    this.error = reason;
+    if (this.receiveRejecter !== undefined) {
+      this.receiveRejecter(reason);
+      this.receiveResolver = undefined;
+      this.receiveRejecter = undefined;
     }
   }
 }

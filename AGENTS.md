@@ -14,9 +14,11 @@ Halo is an open-source self-modifiable desktop app built with Electron and Pi. I
 - Don't over-worry. Avoid guard clauses, `if`/`throw`, retries, fallback values, and defensive checks unless the user asked for them or you know a specific error can happen and this layer is responsible for handling it. When handling a known external quirk, add a short comment that names the source of the behavior.
 - Local code should have local worries. Do not compensate in one place for sub-optimal behavior in another place when the link is not direct. Step back, identify the ownership boundary, and consider a cleaner design instead.
 - Prefer explicit types; avoid `any`.
+- Prefer TypeScript `private` / `private readonly` over `#` private fields, matching the rest of the codebase.
 - TypeScript uses strict mode with `noUncheckedIndexedAccess` enabled.
 - ESM imports use `.js` extensions even for TypeScript files.
 - Workspace packages use the `@repo/*` naming convention.
+- File names: no hyphens. Name the file after the main abstraction it implements, in ClassNameCase (e.g. `MessagePortMainTransport.ts`). For a small bundle of related exports with no single primary type, use a lowercase single name (e.g. `rpc.ts`, `channels.ts`).
 - Use `vitest` for tests: `describe`, `test`, `expect`. Don't use `beforeAll` or `afterAll`; use Vitest fixtures instead.
 - Generally, you should avoid adding comments and instead aim to make code readable. The only exception is when there is external context that is not easily traced back (e.g. external dependency behavior, or explicit business logic decisions).
 

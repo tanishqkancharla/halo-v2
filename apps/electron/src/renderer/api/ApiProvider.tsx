@@ -5,9 +5,11 @@ import {
   useIsMutating,
   useMutation,
   useQuery,
+  useQueryClient,
 } from "@tanstack/react-query";
 import * as errore from "errore";
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { Onboarding } from "../Onboarding.tsx";
 import type {
   PromptStreamEvent,
   SystemApi,
@@ -29,6 +31,7 @@ type ApiContextValue = {
 };
 
 const ApiContext = createContext<ApiContextValue>(undefined!);
+const systemApiQueryKey = ["system-api"] as const;
 const workspaceQueryKey = ["workspace"] as const;
 const sendPromptMutationKey = ["send-prompt"] as const;
 
@@ -43,10 +46,10 @@ export type LivePrompt = {
 };
 
 export function ApiProvider({
-  api,
+  createApi,
   children,
 }: {
-  api: SystemApi;
+  createApi: () => Promise<SystemApi>;
   children: ReactNode;
 }) {
   const [queryClient] = useState(
@@ -65,8 +68,31 @@ export function ApiProvider({
   );
 
   return (
-    <ApiContext value={{ api, queryClient }}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <ResolveApi createApi={createApi}>{children}</ResolveApi>
+    </QueryClientProvider>
+  );
+}
+
+function ResolveApi({
+  createApi,
+  children,
+}: {
+  createApi: () => Promise<SystemApi>;
+  children: ReactNode;
+}) {
+  const queryClient = useQueryClient();
+  const apiQuery = useQuery({
+    queryKey: systemApiQueryKey,
+    queryFn: createApi,
+  });
+
+  if (apiQuery.isPending) return <Onboarding status="loading" />;
+  if (apiQuery.isError) throw apiQuery.error;
+
+  return (
+    <ApiContext value={{ api: apiQuery.data, queryClient }}>
+      {children}
     </ApiContext>
   );
 }

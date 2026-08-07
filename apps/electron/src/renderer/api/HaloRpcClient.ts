@@ -1,6 +1,6 @@
 import { newMessagePortRpcSession, type RpcStub } from "capnweb";
 import * as errore from "errore";
-import { RPC_CHANNELS } from "../../shared/rpc-channels.js";
+import { RPC_CHANNELS } from "../../shared/channels.js";
 import type {
   HaloRpcApi,
   SessionSummary,

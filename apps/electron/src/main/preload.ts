@@ -1,5 +1,5 @@
 import { ipcRenderer } from "electron";
-import { RPC_CHANNELS } from "../shared/rpc-channels.js";
+import { RPC_CHANNELS } from "../shared/channels.js";
 
 const windowLoaded = new Promise<void>((resolve) => {
   window.addEventListener("load", () => resolve());

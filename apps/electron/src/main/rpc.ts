@@ -60,7 +60,7 @@ type PromptListener = PromptEventHandler & {
  * Temporary stand-in until PiService is flattened to this shape.
  */
 export class AgentSessionRpc extends RpcTarget {
-  #listeners = new Set<PromptEventHandler>();
+  private listeners = new Set<PromptEventHandler>();
 
   constructor(
     private readonly sessionId: string,
@@ -73,9 +73,9 @@ export class AgentSessionRpc extends RpcTarget {
     // Cap'n Web releases arg stubs when the call returns unless we dup().
     const retained =
       typeof callback.dup === "function" ? callback.dup() : callback;
-    this.#listeners.add(retained);
+    this.listeners.add(retained);
     return () => {
-      this.#listeners.delete(retained);
+      this.listeners.delete(retained);
       const dispose = retained[Symbol.dispose];
       if (typeof dispose === "function") dispose.call(retained);
     };
@@ -84,7 +84,7 @@ export class AgentSessionRpc extends RpcTarget {
   async prompt(text: string) {
     const pending: Promise<unknown>[] = [];
     const result = await this.pi.sendPrompt(this.sessionId, text, (event) => {
-      for (const listener of this.#listeners) {
+      for (const listener of this.listeners) {
         pending.push(Promise.resolve(listener(event)));
       }
     });
