@@ -1,15 +1,16 @@
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
-import { RpcTarget } from "capnweb";
 import { dialog, type BrowserWindow } from "electron";
-import type {
-  PromptEventHandler,
-  WorkspaceInfo,
-} from "../renderer/api/SystemApi.js";
+import {
+  AgentSessionApi,
+  HaloApi,
+  type PromptEventHandler,
+  type WorkspaceInfo,
+} from "../shared/rpc.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
-import type { CreateAgentSessionOptions, PiService } from "./pi-service.js";
+import type { PiService } from "./pi-service.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
-export class HaloRpc extends RpcTarget {
+export class HaloRpc extends HaloApi {
   constructor(
     private readonly workspace: WorkspaceService,
     private readonly pi: PiService,
@@ -29,24 +30,33 @@ export class HaloRpc extends RpcTarget {
       properties: ["openDirectory"],
     });
     if (selection.canceled) return null;
-    return this.workspace.select(selection.filePaths[0]!);
+    const workspace = await this.workspace.select(selection.filePaths[0]!);
+    if (workspace instanceof Error) throw workspace;
+    return workspace;
   }
 
-  listSessions() {
-    return this.pi.listSessions();
+  async listSessions() {
+    const sessions = await this.pi.listSessions();
+    if (sessions instanceof Error) throw sessions;
+    return sessions;
   }
 
-  readSessionTranscript(sessionId: string) {
-    return this.pi.readTranscript(sessionId);
+  async readSessionTranscript(sessionId: string) {
+    const transcript = await this.pi.readTranscript(sessionId);
+    if (transcript instanceof Error) throw transcript;
+    return transcript;
   }
 
-  async createAgentSession(options: CreateAgentSessionOptions = {}) {
-    const session = await this.pi.createAgentSession(options);
-    if (session instanceof Error) return session;
-    return {
-      sessionId: session.sessionId,
-      session: new AgentSessionRpc(session),
-    };
+  async newAgentSession() {
+    const session = await this.pi.newAgentSession();
+    if (session instanceof Error) throw session;
+    return new AgentSessionRpc(session);
+  }
+
+  async openAgentSession(sessionId: string) {
+    const session = await this.pi.openAgentSession(sessionId);
+    if (session instanceof Error) throw session;
+    return new AgentSessionRpc(session);
   }
 }
 
@@ -55,9 +65,9 @@ type PromptListener = PromptEventHandler & {
 } & Partial<Disposable>;
 
 /** Cap'n Web stub wrapping a live Pi AgentSession. */
-export class AgentSessionRpc extends RpcTarget {
-  private listeners = new Set<PromptListener>();
-  private pendingDeliveries: Promise<unknown>[] | null = null;
+export class AgentSessionRpc extends AgentSessionApi {
+  private listener: PromptListener | null = null;
+  private deliveries = Promise.resolve();
   private readonly unsubscribePi: () => void;
 
   constructor(private readonly session: AgentSession) {
@@ -74,50 +84,42 @@ export class AgentSessionRpc extends RpcTarget {
         sessionId: this.session.sessionId,
         text: event.assistantMessageEvent.delta,
       };
-      for (const listener of this.listeners) {
-        const delivery = Promise.resolve(listener(streamEvent));
-        if (this.pendingDeliveries !== null) {
-          this.pendingDeliveries.push(delivery);
-        }
-      }
+      const listener = this.listener;
+      if (listener === null) return;
+      this.deliveries = this.deliveries.then(() => listener(streamEvent));
     });
+  }
+
+  getSessionId() {
+    return this.session.sessionId;
   }
 
   subscribe(callback: PromptListener) {
     // Cap'n Web releases arg stubs when the call returns unless we dup().
-    const retained =
+    this.listener =
       typeof callback.dup === "function" ? callback.dup() : callback;
-    this.listeners.add(retained);
-    return () => {
-      this.listeners.delete(retained);
-      const dispose = retained[Symbol.dispose];
-      if (typeof dispose === "function") dispose.call(retained);
-    };
   }
 
   async prompt(text: string) {
-    if (text.trim().length === 0) return new EmptyPromptError();
-    this.pendingDeliveries = [];
+    if (text.trim().length === 0) throw new EmptyPromptError();
     const prompted = await this.session
       .prompt(text)
       .catch((e) => new PromptFailedError({ cause: e }));
-    await Promise.all(this.pendingDeliveries);
-    this.pendingDeliveries = null;
-    return prompted;
-  }
-
-  send(text: string) {
-    return this.prompt(text);
+    if (prompted instanceof Error) throw prompted;
+    await this.deliveries;
   }
 
   [Symbol.dispose]() {
     this.unsubscribePi();
-    for (const listener of this.listeners) {
+    const listener = this.listener;
+    if (listener !== null) {
       const dispose = listener[Symbol.dispose];
       if (typeof dispose === "function") dispose.call(listener);
     }
-    this.listeners.clear();
-    void this.session.abort();
+    this.listener = null;
+    void this.session.abort().catch((error) => {
+      console.warn("Failed to abort disposed agent session:", error);
+    });
     this.session.dispose();
   }
 }

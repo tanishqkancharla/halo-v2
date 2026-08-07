@@ -76,8 +76,8 @@ Expose `newAgentSession()` and `openAgentSession(sessionId)` from `HaloRpc`. Eac
 
 - [`apps/electron/src/main/pi-service.ts`](../apps/electron/src/main/pi-service.ts) — Delegate SDK-owned services to Pi and create/open per-chat managers.
 - [`apps/electron/src/main/rpc.ts`](../apps/electron/src/main/rpc.ts) — Return `AgentSessionRpc` directly and keep the one required Pi-to-Cap'n-Web adapter.
-- [`apps/electron/src/renderer/api/SystemApi.ts`](../apps/electron/src/renderer/api/SystemApi.ts) — Remove `AgentSessionHandle`, `CreateAgentSessionResult`, and the duplicate RPC interface.
-- [`apps/electron/src/renderer/api/HaloRpcClient.ts`](../apps/electron/src/renderer/api/HaloRpcClient.ts) — Return the root `RpcStub<HaloRpc>` without wrapping its methods.
+- [`apps/electron/src/shared/rpc.ts`](../apps/electron/src/shared/rpc.ts) — Define shared Cap'n Web target classes and serializable values without importing Electron main code into the renderer.
+- [`apps/electron/src/renderer/api/HaloRpcClient.ts`](../apps/electron/src/renderer/api/HaloRpcClient.ts) — Return the root `RpcStub<HaloApi>` without wrapping its methods.
 - [`apps/electron/src/renderer/api/electron.ts`](../apps/electron/src/renderer/api/electron.ts) — Cache the root Cap'n Web stub.
 - [`apps/electron/src/renderer/api/ApiProvider.tsx`](../apps/electron/src/renderer/api/ApiProvider.tsx) — Own direct session stubs for draft and saved-chat lifetimes.
 - [`apps/electron/src/renderer/MainPane.tsx`](../apps/electron/src/renderer/MainPane.tsx) — Send prompts through the direct session stub.
@@ -183,12 +183,19 @@ Simplify `AgentSessionRpc` to one retained renderer subscriber because each rend
 #### Important types
 
 ```ts
-// apps/electron/src/main/rpc.ts
-class HaloRpc extends RpcTarget {
-  newAgentSession(): Promise<AgentSessionRpc>;
-  openAgentSession(sessionId: string): Promise<AgentSessionRpc>;
+// apps/electron/src/shared/rpc.ts
+abstract class HaloApi extends RpcTarget {
+  abstract newAgentSession(): Promise<AgentSessionApi>;
+  abstract openAgentSession(sessionId: string): Promise<AgentSessionApi>;
 }
 
+abstract class AgentSessionApi extends RpcTarget {
+  abstract getSessionId(): string;
+  abstract subscribe(callback: PromptEventHandler): void;
+  abstract prompt(text: string): Promise<void>;
+}
+
+// apps/electron/src/main/rpc.ts
 type PromptListener = PromptEventHandler & {
   dup(): PromptListener;
   [Symbol.dispose](): void;
@@ -202,8 +209,8 @@ class AgentSessionRpc extends RpcTarget {
 }
 
 // Renderer types are inferred from the server targets.
-type HaloApi = RpcStub<HaloRpc>;
-type LiveAgentSession = RpcStub<AgentSessionRpc>;
+type HaloApiStub = RpcStub<HaloApi>;
+type LiveAgentSession = RpcStub<AgentSessionApi>;
 ```
 
 `newAgentSession()` and `openAgentSession()` use a private helper in `HaloRpc` or `PiService`; they do not duplicate SDK setup. The methods throw only after an `instanceof Error` check at the RPC boundary, as required by the repository's legacy-boundary rule.
@@ -274,16 +281,16 @@ type LiveAgentSession = RpcStub<AgentSessionRpc>;
 -}
 -
 -export async function connectHaloRpc(): Promise<RpcStub<HaloRpcApi>> {
-+export async function connectHaloRpc(): Promise<RpcStub<HaloRpc>> {
++export async function connectHaloRpc(): Promise<RpcStub<HaloApi>> {
    const port = await requestRpcPort();
 -  return newMessagePortRpcSession<HaloRpcApi>(port);
-+  return newMessagePortRpcSession<HaloRpc>(port);
++  return newMessagePortRpcSession<HaloApi>(port);
  }
 ```
 
 - [ ] Replace `HaloRpc.createAgentSession()` with `newAgentSession()` and `openAgentSession(sessionId)`, return `AgentSessionRpc` directly, and throw returned service errors only at this RPC boundary.
 - [ ] Simplify `AgentSessionRpc` to one duplicated callback, one ordered delivery chain, and one disposer; remove the listener set, result wrapper, and `send()` alias.
-- [ ] Delete `AgentSessionHandle`, `CreateAgentSessionResult`, `HaloRpcApi`, and `systemApiFromHaloRpc()`; make `createElectronApi()` and `ApiProvider` use `RpcStub<HaloRpc>` and `RpcStub<AgentSessionRpc>` directly.
+- [ ] Delete `AgentSessionHandle`, `CreateAgentSessionResult`, `HaloRpcApi`, `SystemApi`, and `systemApiFromHaloRpc()`; make `createElectronApi()` and `ApiProvider` use `RpcStub<HaloApi>` and `RpcStub<AgentSessionApi>` directly.
 - [ ] Update `useDraftAgentSession`, `useOpenAgentSession`, `useSendPromptMutation`, and `MainPane` so drafts call `newAgentSession()` only on first send, saved chats call `openAgentSession()`, later prompts reuse the same stub, and cleanup disposes it.
 - [ ] Add focused RPC lifecycle tests where practical, run `pnpm run check-affected`, verify first-send/reuse/open/dispose with `pnpm halo-web`, then commit and push this phase.
 

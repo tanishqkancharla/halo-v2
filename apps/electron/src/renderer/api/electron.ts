@@ -1,11 +1,10 @@
-import { systemApiFromHaloRpc, connectHaloRpc } from "./HaloRpcClient.js";
-import type { SystemApi } from "./SystemApi.js";
+import { connectHaloRpc, type HaloApiStub } from "./HaloRpcClient.js";
 
-let electronApiPromise: Promise<SystemApi> | undefined;
+let electronApiPromise: Promise<HaloApiStub> | undefined;
 
-export function createElectronApi(): Promise<SystemApi> {
+export function createElectronApi(): Promise<HaloApiStub> {
   if (electronApiPromise === undefined) {
-    electronApiPromise = connectHaloRpc().then(systemApiFromHaloRpc);
+    electronApiPromise = connectHaloRpc();
   }
   return electronApiPromise;
 }

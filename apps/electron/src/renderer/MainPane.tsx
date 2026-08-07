@@ -27,10 +27,7 @@ import {
   useSessionTranscriptQuery,
   type LivePrompt,
 } from "./api/ApiProvider.tsx";
-import {
-  type SessionSummary,
-  type SessionTranscript,
-} from "./api/SystemApi.ts";
+import { type SessionSummary, type SessionTranscript } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
@@ -117,6 +114,7 @@ function SavedPane({
               }
               return sendPrompt.mutateAsync({
                 session: agentSession,
+                sessionId,
                 text: prompt,
               });
             }}
@@ -145,9 +143,14 @@ function DraftPane({
 
   async function submit(prompt: string) {
     const session = await ensureSession();
-    setSessionId(session.sessionId);
-    await sendPrompt.mutateAsync({ session, text: prompt });
-    onSent(draftId, session.sessionId);
+    const createdSessionId = await session.getSessionId();
+    setSessionId(createdSessionId);
+    await sendPrompt.mutateAsync({
+      session,
+      sessionId: createdSessionId,
+      text: prompt,
+    });
+    onSent(draftId, createdSessionId);
   }
 
   return (

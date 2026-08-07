@@ -10,7 +10,7 @@ import type {
   SessionMessage,
   SessionSummary,
   SessionTranscript,
-} from "../renderer/api/SystemApi.js";
+} from "../shared/rpc.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
@@ -23,10 +23,6 @@ export class CreateAgentSessionError extends errore.createTaggedError({
   message: "Failed to create agent session",
 }) {}
 
-export type CreateAgentSessionOptions = {
-  sessionId?: string;
-};
-
 /**
  * Stateless Pi SDK proxy: SessionManager for durable list/read, createAgentSession
  * for live AgentSession. Callers own subscribe / prompt / dispose.
@@ -34,16 +30,25 @@ export type CreateAgentSessionOptions = {
 export class PiService {
   constructor(private readonly workspace: WorkspaceService) {}
 
-  async createAgentSession(options: CreateAgentSessionOptions = {}) {
+  async newAgentSession() {
     const layout = this.workspace.getLayout();
     if (layout instanceof Error) return layout;
+    const manager = SessionManager.create(layout.root, layout.sessionDir);
+    return this.createAgentSession(layout, manager);
+  }
 
-    const manager =
-      options.sessionId === undefined
-        ? SessionManager.create(layout.root, layout.sessionDir)
-        : await this.openSessionManager(layout, options.sessionId);
+  async openAgentSession(sessionId: string) {
+    const layout = this.workspace.getLayout();
+    if (layout instanceof Error) return layout;
+    const manager = await this.openSessionManager(layout, sessionId);
     if (manager instanceof Error) return manager;
+    return this.createAgentSession(layout, manager);
+  }
 
+  private async createAgentSession(
+    layout: WorkspaceLayout,
+    manager: SessionManager,
+  ) {
     const created = await createAgentSession({
       cwd: layout.root,
       agentDir: layout.agentDir,

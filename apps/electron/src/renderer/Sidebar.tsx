@@ -10,8 +10,8 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
+import type { SessionState, SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
-import type { SessionState, SessionSummary } from "./api/SystemApi.ts";
 import { HaloLogo } from "./HaloLogo.tsx";
 
 type SidebarProps = {
