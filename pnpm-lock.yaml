@@ -5,7 +5,6 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@effect/platform-bun': 4.0.0-beta.103
   '@effect/platform-node': 4.0.0-beta.103
   '@effect/platform-node-shared': 4.0.0-beta.103
   effect: 4.0.0-beta.103
@@ -123,9 +122,6 @@ importers:
 
   infra:
     dependencies:
-      '@effect/platform-bun':
-        specifier: 4.0.0-beta.103
-        version: 4.0.0-beta.103(effect@4.0.0-beta.103)
       '@effect/platform-node':
         specifier: 4.0.0-beta.103
         version: 4.0.0-beta.103(effect@4.0.0-beta.103)(ioredis@5.11.1(supports-color@8.1.1))
@@ -551,7 +547,7 @@ packages:
     resolution: {integrity: sha512-kubDEVDpkbXxNY56TnoXQGaAc0az2IA7SQsBkhgCnN538Vn9LGXTOJ1534AzFhKtfmrVxzj0rtcd5cPKBNTn4A==}
     peerDependencies:
       '@distilled.cloud/cloudflare': ^0.30.3
-      '@effect/platform-bun': 4.0.0-beta.103
+      '@effect/platform-bun': '>=4.0.0-beta.102 || >=4.0.0'
       '@effect/platform-node': 4.0.0-beta.103
       effect: 4.0.0-beta.103
     peerDependenciesMeta:
@@ -565,7 +561,7 @@ packages:
     peerDependencies:
       '@distilled.cloud/cloudflare': ^0.30.3
       '@distilled.cloud/cloudflare-runtime': 0.16.1
-      '@effect/platform-bun': 4.0.0-beta.103
+      '@effect/platform-bun': '>=4.0.0-beta.102 || >=4.0.0'
       '@effect/platform-node': 4.0.0-beta.103
       effect: 4.0.0-beta.103
       vite: ^7.0.0 || ^8.0.0
@@ -3275,7 +3271,7 @@ packages:
     hasBin: true
     peerDependencies:
       '@aws/durable-execution-sdk-js': ^2.1.0
-      '@effect/platform-bun': 4.0.0-beta.103
+      '@effect/platform-bun': '>=4.0.0-beta.102 || >=4.0.0'
       '@effect/platform-node': 4.0.0-beta.103
       '@effect/sql-mysql2': '>=4.0.0-beta.102 || >=4.0.0'
       '@effect/sql-pg': '>=4.0.0-beta.102 || >=4.0.0'

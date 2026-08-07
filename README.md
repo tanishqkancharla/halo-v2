@@ -67,7 +67,7 @@ Pass `--stdin` for longer scripts. Output uses TOON by default; pass `--json` fo
 
 ## Cloudflare infrastructure
 
-Cloudflare is the cloud target. Alchemy owns the stack under `infra/`. Alchemy CLI commands need [Bun](https://bun.sh).
+Cloudflare is the cloud target. Alchemy owns the stack under `infra/`.
 
 | Need | Cloudflare product | Alchemy resource |
 | --- | --- | --- |

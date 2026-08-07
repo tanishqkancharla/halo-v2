@@ -53,7 +53,7 @@ Review every prose output against these rules before delivering.
 
 The one service is the Halo Electron app. Start it from the repo root with `pnpm --filter @halo/desktop dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo-web` (see the halo-web skill). After edits, run `pnpm run check-affected` (see Commands).
 
-Cloudflare infrastructure lives in `infra/` (Alchemy). Use `pnpm infra:login`, `pnpm infra:plan`, and `pnpm infra:deploy`. Those commands need Bun on `PATH` (the environment install script installs it).
+Cloudflare infrastructure lives in `infra/` (Alchemy). Use `pnpm infra:login`, `pnpm infra:plan`, and `pnpm infra:deploy`.
 
 Headless hosts (Xvfb/VNC) need `HALO_USE_SWIFTSHADER=1`, which the `halo-dev` terminal exports. Without it the renderer cannot start WebGL.
 
