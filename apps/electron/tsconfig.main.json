@@ -10,6 +10,7 @@
   },
   "include": [
     "src/main/**/*.ts",
+    "src/shared/**/*.ts",
     "forge.config.ts",
     "vite.main.config.ts",
     "vite.preload.config.ts",

@@ -32,6 +32,9 @@ importers:
       '@types/three':
         specifier: ^0.185.1
         version: 0.185.1
+      capnweb:
+        specifier: ^0.10.0
+        version: 0.10.0
       electron-squirrel-startup:
         specifier: ^1.0.1
         version: 1.0.1(supports-color@8.1.1)
@@ -2537,6 +2540,9 @@ packages:
 
   caniuse-lite@1.0.30001806:
     resolution: {integrity: sha512-72Cuvd95zbSYPKq6Fhg8eDJRlzgWDf7/mtoZv6Qe/DYNCEBdNxoA3+rZAU2ZhGCpZlns3EssFavaZomckT5Uuw==}
+
+  capnweb@0.10.0:
+    resolution: {integrity: sha512-lQ2nlzaifkqBeNfs8RLErn7NZ8FNf3vn1W7J3nSH73edWG+0B5nHZGR51S2S9HMZEuZcEypOO469dZRY/BluFA==}
 
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
@@ -8101,6 +8107,8 @@ snapshots:
       responselike: 2.0.1
 
   caniuse-lite@1.0.30001806: {}
+
+  capnweb@0.10.0: {}
 
   ccount@2.0.1: {}
 
