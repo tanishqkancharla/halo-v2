@@ -1,9 +1,6 @@
-import { join } from "node:path";
 import {
-  AuthStorage,
   createAgentSession,
   createCodingTools,
-  ModelRegistry,
   SessionManager,
   type SessionInfo,
   type SessionMessageEntry,
@@ -30,17 +27,12 @@ export type CreateAgentSessionOptions = {
   sessionId?: string;
 };
 
-type AgentSessionFactory = typeof createAgentSession;
-
 /**
  * Stateless Pi SDK proxy: SessionManager for durable list/read, createAgentSession
  * for live AgentSession. Callers own subscribe / prompt / dispose.
  */
 export class PiService {
-  constructor(
-    private readonly workspace: WorkspaceService,
-    private readonly createSession: AgentSessionFactory = createAgentSession,
-  ) {}
+  constructor(private readonly workspace: WorkspaceService) {}
 
   async createAgentSession(options: CreateAgentSessionOptions = {}) {
     const layout = this.workspace.getLayout();
@@ -52,16 +44,9 @@ export class PiService {
         : await this.openSessionManager(layout, options.sessionId);
     if (manager instanceof Error) return manager;
 
-    const authStorage = AuthStorage.create(join(layout.agentDir, "auth.json"));
-    const modelRegistry = new ModelRegistry(
-      authStorage,
-      join(layout.agentDir, "models.json"),
-    );
-    const created = await this.createSession({
+    const created = await createAgentSession({
       cwd: layout.root,
       agentDir: layout.agentDir,
-      authStorage,
-      modelRegistry,
       sessionManager: manager,
       tools: createCodingTools(layout.root),
     }).catch((e) => new CreateAgentSessionError({ cause: e }));

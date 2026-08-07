@@ -75,7 +75,6 @@ Expose `newAgentSession()` and `openAgentSession(sessionId)` from `HaloRpc`. Eac
 ## Important files, docs, and websites
 
 - [`apps/electron/src/main/pi-service.ts`](../apps/electron/src/main/pi-service.ts) — Delegate SDK-owned services to Pi and create/open per-chat managers.
-- [`apps/electron/src/main/pi-service.test.ts`](../apps/electron/src/main/pi-service.test.ts) — Prove factory options, manager ownership, durable reopen, and caller-owned disposal.
 - [`apps/electron/src/main/rpc.ts`](../apps/electron/src/main/rpc.ts) — Return `AgentSessionRpc` directly and keep the one required Pi-to-Cap'n-Web adapter.
 - [`apps/electron/src/renderer/api/SystemApi.ts`](../apps/electron/src/renderer/api/SystemApi.ts) — Remove `AgentSessionHandle`, `CreateAgentSessionResult`, and the duplicate RPC interface.
 - [`apps/electron/src/renderer/api/HaloRpcClient.ts`](../apps/electron/src/renderer/api/HaloRpcClient.ts) — Return the root `RpcStub<HaloRpc>` without wrapping its methods.
@@ -170,10 +169,10 @@ The options passed to Pi omit `authStorage`, `modelRegistry`, `settingsManager`,
 ```
 
 - [ ] Remove explicit `AuthStorage` and `ModelRegistry` construction and imports from `apps/electron/src/main/pi-service.ts`; do not add explicit settings or resource-loader objects.
-- [ ] Pass only `cwd`, `agentDir`, `sessionManager`, and `createCodingTools(layout.root)` to Pi's `createAgentSession()`.
+- [ ] Delete the injected `AgentSessionFactory` seam and call Pi's `createAgentSession()` directly with only `cwd`, `agentDir`, `sessionManager`, and `createCodingTools(layout.root)`.
 - [ ] Keep `SessionManager.create/open` local to each live-session request and keep `listSessions()` / `readTranscript()` as separate durable catalog operations.
-- [ ] Update `apps/electron/src/main/pi-service.test.ts` to assert the exact factory options, distinct managers for distinct live chats, durable reopen, repeated-prompt reuse, and caller-owned disposal.
-- [ ] Keep Pi factory rejection wrapped as `CreateAgentSessionError`; run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/desktop typecheck`, then commit this phase.
+- [ ] Delete `apps/electron/src/main/pi-service.test.ts`; prove the supported behavior through the live Cap'n Web/UI path instead of a second fake Pi implementation.
+- [ ] Keep Pi factory rejection wrapped as `CreateAgentSessionError`; run `pnpm run check-affected` and verify the draft first-send and saved-chat reopen flows with `pnpm halo-web`, then commit this phase.
 
 ### Phase 2: Return direct Cap'n Web session stubs
 
