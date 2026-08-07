@@ -9,11 +9,11 @@ import "./styles.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ApiProvider createApi={createElectronApi}>
-      <MauiProvider>
+    <MauiProvider>
+      <ApiProvider createApi={createElectronApi}>
         <App />
         {import.meta.env.DEV && <Agentation />}
-      </MauiProvider>
-    </ApiProvider>
+      </ApiProvider>
+    </MauiProvider>
   </StrictMode>,
 );
