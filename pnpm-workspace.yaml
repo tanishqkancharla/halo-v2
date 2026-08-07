@@ -1,5 +1,6 @@
 packages:
   - "apps/*"
+  - "infra"
   - "packages/*"
 nodeLinker: hoisted
 blockExoticSubdeps: false
@@ -15,4 +16,18 @@ allowBuilds:
   macos-alias: true
   maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/8fb6ba3a4d58ed2da1a783f088995d041a57f458: false
   maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/cb99be2b6872afff0d865f9aba48cffa93ac6f98: true
+  msgpackr-extract: false
   protobufjs: false
+  sharp: false
+  workerd: true
+# alchemy@2.0.0-beta.70 still uses Schema.TaggedErrorClass (removed in effect beta.104+)
+overrides:
+  "@effect/platform-bun": "4.0.0-beta.103"
+  "@effect/platform-node": "4.0.0-beta.103"
+  "@effect/platform-node-shared": "4.0.0-beta.103"
+  effect: "4.0.0-beta.103"
+minimumReleaseAgeExclude:
+  - '@effect/platform-bun@4.0.0-beta.103'
+  - '@effect/platform-node-shared@4.0.0-beta.103'
+  - '@effect/platform-node@4.0.0-beta.103'
+  - effect@4.0.0-beta.103

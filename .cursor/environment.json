@@ -1,6 +1,6 @@
 {
   "name": "halo-v2",
-  "install": "pnpm install && node node_modules/electron/install.js",
+  "install": "curl -fsSL https://bun.sh/install | bash && export BUN_INSTALL=\"$HOME/.bun\" && export PATH=\"$BUN_INSTALL/bin:$PATH\" && pnpm install && node node_modules/electron/install.js",
   "terminals": [
     {
       "name": "halo-dev",
