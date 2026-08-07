@@ -23,13 +23,13 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    W[Selected workspace] --> S[Workspace-scoped Pi services]
-    S --> A[AuthStorage]
-    S --> M[ModelRegistry]
-    S --> G[SettingsManager]
-    S --> R[ResourceLoader]
-    S --> T[Coding tools]
-    S --> F[AgentSession factory]
+    W[Selected workspace] --> F[Pi createAgentSession]
+    W --> T[Workspace-bound coding tools]
+    T --> F
+    F --> A[Default AuthStorage]
+    F --> M[Default ModelRegistry]
+    F --> G[Default SettingsManager]
+    F --> R[Default ResourceLoader]
     N[New chat first send] --> C[SessionManager.create]
     O[Open saved chat] --> P[SessionManager.open]
     C --> F
@@ -44,17 +44,18 @@ flowchart TD
 
 The current branch keeps the right live-session lifetime but adds wrappers on both sides of Cap'n Web. `HaloRpc.createAgentSession()` returns an object containing a stub, then `systemApiFromHaloRpc()` wraps that stub in `AgentSessionHandle`. The UI also uses one factory name for two different actions: creating a new chat and opening a saved chat.
 
-`PiService` creates `AuthStorage` and `ModelRegistry` for every live chat. Pi 0.60's TUI instead creates workspace/process-scoped services once, opens or creates one `SessionManager`, and gives that manager to one `AgentSession` for the full interactive run. `SessionManager.list()` remains a separate catalog read.
+`PiService` creates `AuthStorage` and `ModelRegistry` explicitly even though Halo does not configure or use either object. Pi's `createAgentSession()` already creates those objects from `agentDir`, creates settings from `cwd` and `agentDir`, and loads resources. The TUI keeps them for its one process-long session, but that is not a reusable ownership contract for Halo.
 
 ## Solution overview
 
-Keep `PiService` free of live-session maps, but cache the Pi services that belong to the selected workspace. Create one `SessionManager` for each live `AgentSession`; keep both alive until the renderer leaves that chat and disposes the Cap'n Web stub.
+Keep `PiService` free of live-session maps and let each Pi `AgentSession` own its SDK-default auth, model, settings, and resource services. Halo supplies only the selected `cwd`, `agentDir`, one durable `SessionManager`, and `createCodingTools(cwd)`. The explicit tools remain necessary because Pi 0.60's default tools bind to `process.cwd()` rather than Halo's selected workspace.
 
 Expose `newAgentSession()` and `openAgentSession(sessionId)` from `HaloRpc`. Each method returns `AgentSessionRpc` directly. Let Cap'n Web turn that `RpcTarget` into an `RpcStub`, and use the stub directly in renderer hooks. Keep only the adapter that Pi requires: `AgentSessionRpc` maps Pi events to the retained renderer callback and disposes the real `AgentSession`.
 
 ## Goals
 
-- Hold workspace-scoped Pi services once after workspace selection instead of rebuilding them for every chat.
+- Rely on Pi's defaults for auth storage, model registry, settings, and resources.
+- Keep Halo's explicit `cwd`, `agentDir`, durable manager, and workspace-bound tools.
 - Create or open exactly one `SessionManager` for each live chat runtime.
 - Keep one live Pi `AgentSession` across all prompts for the selected chat.
 - Use `newAgentSession` for a draft's first send and `openAgentSession` for a saved chat.
@@ -73,49 +74,45 @@ Expose `newAgentSession()` and `openAgentSession(sessionId)` from `HaloRpc`. Eac
 
 ## Important files, docs, and websites
 
-- [`apps/electron/src/main/pi-service.ts`](../apps/electron/src/main/pi-service.ts) — Own workspace-scoped Pi services and create/open per-chat managers.
-- [`apps/electron/src/main/pi-service.test.ts`](../apps/electron/src/main/pi-service.test.ts) — Prove service reuse, manager ownership, durable reopen, and caller-owned disposal.
+- [`apps/electron/src/main/pi-service.ts`](../apps/electron/src/main/pi-service.ts) — Delegate SDK-owned services to Pi and create/open per-chat managers.
+- [`apps/electron/src/main/pi-service.test.ts`](../apps/electron/src/main/pi-service.test.ts) — Prove factory options, manager ownership, durable reopen, and caller-owned disposal.
 - [`apps/electron/src/main/rpc.ts`](../apps/electron/src/main/rpc.ts) — Return `AgentSessionRpc` directly and keep the one required Pi-to-Cap'n-Web adapter.
 - [`apps/electron/src/renderer/api/SystemApi.ts`](../apps/electron/src/renderer/api/SystemApi.ts) — Remove `AgentSessionHandle`, `CreateAgentSessionResult`, and the duplicate RPC interface.
 - [`apps/electron/src/renderer/api/HaloRpcClient.ts`](../apps/electron/src/renderer/api/HaloRpcClient.ts) — Return the root `RpcStub<HaloRpc>` without wrapping its methods.
 - [`apps/electron/src/renderer/api/electron.ts`](../apps/electron/src/renderer/api/electron.ts) — Cache the root Cap'n Web stub.
 - [`apps/electron/src/renderer/api/ApiProvider.tsx`](../apps/electron/src/renderer/api/ApiProvider.tsx) — Own direct session stubs for draft and saved-chat lifetimes.
 - [`apps/electron/src/renderer/MainPane.tsx`](../apps/electron/src/renderer/MainPane.tsx) — Send prompts through the direct session stub.
-- [Pi 0.60 `main.ts`](https://github.com/badlogic/pi-mono/blob/v0.60.0/packages/coding-agent/src/main.ts) — Shows TUI ownership: shared services, one manager, and one session for the interactive run.
+- [Pi 0.60 `main.ts`](https://github.com/badlogic/pi-mono/blob/v0.60.0/packages/coding-agent/src/main.ts) — Shows the TUI's one process-long session lifetime.
+- [Pi 0.60 SDK implementation](https://github.com/badlogic/pi-mono/blob/v0.60.0/packages/coding-agent/src/core/sdk.ts) — Defines the default auth, model, settings, resource, cwd, and agent-dir behavior.
 - [Pi 0.60 SDK documentation](https://github.com/badlogic/pi-mono/blob/v0.60.0/packages/coding-agent/docs/sdk.md) — Defines `createAgentSession`, `SessionManager`, subscriptions, and disposal.
 - [Cap'n Web README](https://github.com/cloudflare/capnweb/blob/main/README.md) — Defines `RpcTarget`, direct `RpcStub` returns, promise pipelining, callback duplication, and disposal.
 
 ## Implementation
 
-### Phase 1: Reuse workspace-scoped Pi services
+### Phase 1: Delegate session services to Pi defaults
 
-Make `PiService` a session factory without session state. Lazily initialize and retain the services tied to the selected workspace, while creating or opening one `SessionManager` per requested live chat. Keep the current public factory method during this phase so the repository remains working.
+Make `PiService` pass only the values Halo owns: workspace paths, a per-chat manager, and cwd-bound coding tools. Let `createAgentSession()` construct auth, model, settings, and resource services from those paths. Keep the current public factory method during this phase so the repository remains working.
 
 #### Important types
 
 ```ts
-// apps/electron/src/main/pi-service.ts
-type PiWorkspaceServices = {
-  layout: WorkspaceLayout;
-  authStorage: AuthStorage;
-  modelRegistry: ModelRegistry;
-  settingsManager: SettingsManager;
-  resourceLoader: DefaultResourceLoader;
+// @mariozechner/pi-coding-agent createAgentSession input from Halo
+type CreateLiveAgentSessionOptions = {
+  cwd: string;
+  agentDir: string;
+  sessionManager: SessionManager;
   tools: Tool[];
 };
 
-type AgentSessionFactory = typeof createAgentSession;
-
+// apps/electron/src/main/pi-service.ts
 class PiService {
-  private services: Promise<PiWorkspaceServices | InitializePiError> | null;
-
   createAgentSession(
     options?: { sessionId?: string },
   ): Promise<AgentSession | Error>;
 }
 ```
 
-The cached object contains only workspace-scoped dependencies. It must not contain `SessionManager` or `AgentSession`. `DefaultResourceLoader.reload()` is an external async boundary and returns a tagged `InitializePiError` through `.catch()`.
+The options passed to Pi omit `authStorage`, `modelRegistry`, `settingsManager`, and `resourceLoader`. Because `agentDir` is present, Pi resolves auth from `<agentDir>/auth.json` and models from `<agentDir>/models.json`; it also creates settings and reloads resources for the selected workspace. `createCodingTools(layout.root)` stays explicit because Pi 0.60's default tool instances use the Electron process working directory.
 
 #### Call stack diff
 
@@ -125,21 +122,20 @@ The cached object contains only workspace-scoped dependencies. It must not conta
      ├── WorkspaceService.getLayout()
 -    ├── AuthStorage.create()
 -    ├── new ModelRegistry()
--    ├── createCodingTools()
-+    ├── PiService.getServices()
-+    │   ├── AuthStorage.create()
-+    │   ├── new ModelRegistry()
-+    │   ├── SettingsManager.create()
-+    │   ├── new DefaultResourceLoader()
-+    │   ├── DefaultResourceLoader.reload()
-+    │   └── createCodingTools()
+     ├── createCodingTools(layout.root)
      ├── options.sessionId absent
      │   └── SessionManager.create()
      ├── options.sessionId set
      │   ├── SessionManager.list()
      │   └── SessionManager.open()
-     └── createAgentSession({ services, sessionManager })
-         └── live AgentSession returned to caller
+     └── Pi createAgentSession({ cwd, agentDir, sessionManager, tools })
+-        ├── Halo-provided AuthStorage
+-        └── Halo-provided ModelRegistry
++        ├── Pi default AuthStorage
++        ├── Pi default ModelRegistry
++        ├── Pi default SettingsManager
++        ├── Pi default ResourceLoader
++        └── live AgentSession returned to caller
 ```
 
 #### Code diff preview
@@ -147,15 +143,9 @@ The cached object contains only workspace-scoped dependencies. It must not conta
 ```diff
  // apps/electron/src/main/pi-service.ts
  export class PiService {
-+  private services: Promise<PiWorkspaceServices | InitializePiError> | null =
-+    null;
-+
    async createAgentSession(options: CreateAgentSessionOptions = {}) {
      const layout = this.workspace.getLayout();
      if (layout instanceof Error) return layout;
-+
-+    const services = await this.getServices(layout);
-+    if (services instanceof Error) return services;
  
      const manager =
        options.sessionId === undefined
@@ -170,13 +160,8 @@ The cached object contains only workspace-scoped dependencies. It must not conta
        agentDir: layout.agentDir,
 -      authStorage,
 -      modelRegistry,
-+      authStorage: services.authStorage,
-+      modelRegistry: services.modelRegistry,
-+      settingsManager: services.settingsManager,
-+      resourceLoader: services.resourceLoader,
        sessionManager: manager,
--      tools: createCodingTools(layout.root),
-+      tools: services.tools,
+       tools: createCodingTools(layout.root),
      }).catch((e) => new CreateAgentSessionError({ cause: e }));
      if (created instanceof Error) return created;
      return created.session;
@@ -184,11 +169,11 @@ The cached object contains only workspace-scoped dependencies. It must not conta
  }
 ```
 
-- [ ] Add `PiWorkspaceServices`, `InitializePiError`, and lazy `PiService.getServices()` in `apps/electron/src/main/pi-service.ts`; initialize `AuthStorage`, `ModelRegistry`, `SettingsManager`, `DefaultResourceLoader`, and coding tools once for the selected workspace.
-- [ ] Keep `SessionManager.create/open` local to each `createAgentSession()` call and keep `listSessions()` / `readTranscript()` outside the cached services.
-- [ ] Update `apps/electron/src/main/pi-service.test.ts` to assert that two live chats receive distinct managers but the same workspace-scoped service instances, and that repeated prompts still use one `AgentSession`.
-- [ ] Cover `DefaultResourceLoader.reload()` and Pi factory rejection with tagged errors at their external boundaries.
-- [ ] Run `pnpm --filter @halo/desktop test`, `pnpm --filter @halo/desktop typecheck`, then commit this phase.
+- [ ] Remove explicit `AuthStorage` and `ModelRegistry` construction and imports from `apps/electron/src/main/pi-service.ts`; do not add explicit settings or resource-loader objects.
+- [ ] Pass only `cwd`, `agentDir`, `sessionManager`, and `createCodingTools(layout.root)` to Pi's `createAgentSession()`.
+- [ ] Keep `SessionManager.create/open` local to each live-session request and keep `listSessions()` / `readTranscript()` as separate durable catalog operations.
+- [ ] Update `apps/electron/src/main/pi-service.test.ts` to assert the exact factory options, distinct managers for distinct live chats, durable reopen, repeated-prompt reuse, and caller-owned disposal.
+- [ ] Keep Pi factory rejection wrapped as `CreateAgentSessionError`; run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/desktop typecheck`, then commit this phase.
 
 ### Phase 2: Return direct Cap'n Web session stubs
 
@@ -306,7 +291,7 @@ type LiveAgentSession = RpcStub<AgentSessionRpc>;
 ## Final check
 
 - [ ] Confirm the diagrams appear only at the top and match the implemented ownership and RPC paths.
-- [ ] Confirm `PiService` caches no `SessionManager`, `AgentSession`, draft, running, or busy state.
+- [ ] Confirm `PiService` caches no SDK services, `SessionManager`, `AgentSession`, draft, running, or busy state.
 - [ ] Confirm each live chat owns one manager, one Pi session, and one direct Cap'n Web session stub until the renderer leaves.
 - [ ] Confirm no `AgentSessionHandle`, result wrapper, `systemApiFromHaloRpc`, or option-shaped renderer call remains.
 - [ ] Confirm `pnpm run check-affected` passes and the Halo UI proves draft first-send, follow-up reuse, saved-chat open, and disposal on leave.
