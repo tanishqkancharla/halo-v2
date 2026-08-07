@@ -198,7 +198,7 @@ export function useOpenAgentSession(
           if (current === undefined) return;
           queryClient.setQueryData(key, applyPromptStreamEvent(current, event));
         });
-        setSession(created);
+        setSession(() => created);
       })
       .catch((e) => {
         console.warn("Failed to open agent session:", e);
