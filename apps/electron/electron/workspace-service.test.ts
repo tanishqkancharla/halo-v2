@@ -9,7 +9,12 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { WorkspaceService } from "./workspace-service.js";
+import {
+  WorkspaceAlreadySelectedError,
+  WorkspaceIoError,
+  WorkspaceNotDirectoryError,
+  WorkspaceService,
+} from "./workspace-service.js";
 
 async function testDirectory(name: string) {
   return mkdtemp(join(tmpdir(), `halo-${name}-`));
@@ -39,7 +44,8 @@ describe("WorkspaceService", () => {
     const resolvedRoot = await realpath(root);
     const service = new WorkspaceService(appDataDir);
 
-    await service.select(root);
+    const selected = await service.select(root);
+    expect(selected).not.toBeInstanceOf(Error);
 
     expect(
       JSON.parse(await readFile(join(appDataDir, "workspace.json"), "utf8")),
@@ -50,7 +56,8 @@ describe("WorkspaceService", () => {
     const root = await testDirectory("workspace");
     const appDataDir = await testDirectory("app-data");
     const resolvedRoot = await realpath(root);
-    await new WorkspaceService(appDataDir).select(root);
+    const selected = await new WorkspaceService(appDataDir).select(root);
+    expect(selected).not.toBeInstanceOf(Error);
 
     const restored = await new WorkspaceService(appDataDir).restore();
 
@@ -71,7 +78,8 @@ describe("WorkspaceService", () => {
   test("restore clears a missing saved workspace", async () => {
     const root = await testDirectory("workspace");
     const appDataDir = await testDirectory("app-data");
-    await new WorkspaceService(appDataDir).select(root);
+    const selected = await new WorkspaceService(appDataDir).select(root);
+    expect(selected).not.toBeInstanceOf(Error);
     await rm(root, { recursive: true, force: true });
 
     await expect(
@@ -88,18 +96,18 @@ describe("WorkspaceService", () => {
     const file = join(root, "workspace.txt");
     await writeFile(file, "not a directory");
 
-    await expect(new WorkspaceService(appDataDir).select(file)).rejects.toThrow(
-      "must be a directory",
-    );
+    const selected = await new WorkspaceService(appDataDir).select(file);
+    expect(selected).toBeInstanceOf(WorkspaceNotDirectoryError);
   });
 
   test("rejects a missing path", async () => {
     const root = await testDirectory("missing");
     const appDataDir = await testDirectory("app-data");
 
-    await expect(
-      new WorkspaceService(appDataDir).select(join(root, "missing")),
-    ).rejects.toThrow();
+    const selected = await new WorkspaceService(appDataDir).select(
+      join(root, "missing"),
+    );
+    expect(selected).toBeInstanceOf(WorkspaceIoError);
   });
 
   test("resolves a selected symlink", async () => {
@@ -110,7 +118,8 @@ describe("WorkspaceService", () => {
     await symlink(root, link);
 
     const selected = await new WorkspaceService(appDataDir).select(link);
-
+    expect(selected).not.toBeInstanceOf(Error);
+    if (selected instanceof Error) return;
     expect(selected.workspaceRoot).toBe(await realpath(root));
   });
 
@@ -119,13 +128,13 @@ describe("WorkspaceService", () => {
     const second = await testDirectory("second");
     const appDataDir = await testDirectory("app-data");
     const service = new WorkspaceService(appDataDir);
-    await service.select(first);
+    const initial = await service.select(first);
+    expect(initial).not.toBeInstanceOf(Error);
 
     await expect(service.select(first)).resolves.toMatchObject({
       workspaceRoot: await realpath(first),
     });
-    await expect(service.select(second)).rejects.toThrow(
-      "already been selected",
-    );
+    const rejected = await service.select(second);
+    expect(rejected).toBeInstanceOf(WorkspaceAlreadySelectedError);
   });
 });

@@ -22,6 +22,7 @@
     "@tanstack/react-query": "^5.101.4",
     "@types/three": "^0.185.1",
     "electron-squirrel-startup": "^1.0.1",
+    "errore": "^0.14.1",
     "maui": "github:tanishqkancharla/maui#cb99be2b6872afff0d865f9aba48cffa93ac6f98",
     "purse-styles": "^0.2.1",
     "react": "^19.2.8",

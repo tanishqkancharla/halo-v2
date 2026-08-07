@@ -3,8 +3,14 @@ import {
   LocalBrowserProvider,
   type BrowserToolkit,
 } from "libretto-browser-tools";
+import * as errore from "errore";
 
 const debuggerVersionUrl = "http://127.0.0.1:4445/json/version";
+
+export class BrowserToolsError extends errore.createTaggedError({
+  name: "BrowserToolsError",
+  message: "Browser tools failed: $reason",
+}) {}
 
 type DebuggerVersion = {
   webSocketDebuggerUrl: string;
@@ -30,9 +36,25 @@ export type SnapshotResult = {
   tree: string;
 };
 
-async function connect(): Promise<ConnectedTools> {
-  const response = await fetch(debuggerVersionUrl);
-  const version = (await response.json()) as DebuggerVersion;
+async function connect() {
+  const response = await fetch(debuggerVersionUrl).catch(
+    (e) =>
+      new BrowserToolsError({
+        reason: "Debugger unreachable",
+        cause: e,
+      }),
+  );
+  if (response instanceof Error) return response;
+
+  const version = await (response.json() as Promise<DebuggerVersion>).catch(
+    (e) =>
+      new BrowserToolsError({
+        reason: "Invalid debugger version response",
+        cause: e,
+      }),
+  );
+  if (version instanceof Error) return version;
+
   const toolkit = createBrowserTools(new LocalBrowserProvider());
   const connection = await toolkit.tools.browser_connect.execute({
     cdpUrl: version.webSocketDebuggerUrl,
@@ -40,63 +62,58 @@ async function connect(): Promise<ConnectedTools> {
 
   if (!connection.ok) {
     await toolkit.dispose();
-    throw new Error(connection.error);
+    return new BrowserToolsError({ reason: connection.error });
   }
 
   return { sessionId: connection.sessionId, toolkit };
 }
 
 async function useConnectedTools<T>(
-  run: (connection: ConnectedTools) => Promise<T>,
-): Promise<T> {
+  run: (connection: ConnectedTools) => Promise<BrowserToolsError | T>,
+) {
   const connection = await connect();
-  try {
-    return await run(connection);
-  } finally {
-    await connection.toolkit.dispose();
-  }
+  if (connection instanceof Error) return connection;
+
+  await using cleanup = new errore.AsyncDisposableStack();
+  cleanup.defer(() => connection.toolkit.dispose());
+  return await run(connection);
 }
 
-export async function getStatus(): Promise<{
-  message: string;
-  ready: boolean;
-}> {
+export async function getStatus() {
   return await useConnectedTools(async ({ sessionId, toolkit }) => {
     const status = await toolkit.tools.browser_status.execute({ sessionId });
-    if (!status.ok) {
-      throw new Error(status.error);
-    }
+    if (!status.ok) return new BrowserToolsError({ reason: status.error });
     return { message: "ready", ready: true };
   });
 }
 
-export async function execute(source: string): Promise<ExecutionResult> {
+export async function execute(source: string) {
   return await useConnectedTools(async ({ sessionId, toolkit }) => {
     const execution = await toolkit.tools.browser_exec.execute({
       code: source,
       sessionId,
     });
-    if (!execution.ok) {
-      throw new Error(execution.error);
-    }
+    if (!execution.ok)
+      return new BrowserToolsError({ reason: execution.error });
     return {
       result: execution.result,
       snapshotDiff: execution.snapshotDiff,
       stderr: execution.stderr,
       stdout: execution.stdout,
-    };
+    } satisfies ExecutionResult;
   });
 }
 
-export async function snapshot(screenshot: boolean): Promise<SnapshotResult> {
+export async function snapshot(screenshot: boolean) {
   return await useConnectedTools(async ({ sessionId, toolkit }) => {
     const result = await toolkit.tools.browser_snapshot.execute({
       screenshot,
       sessionId,
     });
-    if (!result.ok) {
-      throw new Error(result.error);
-    }
-    return { screenshot: result.screenshot, tree: result.tree };
+    if (!result.ok) return new BrowserToolsError({ reason: result.error });
+    return {
+      screenshot: result.screenshot,
+      tree: result.tree,
+    } satisfies SnapshotResult;
   });
 }

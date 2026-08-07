@@ -1,3 +1,4 @@
+import * as errore from "errore";
 import { useEffect, useRef } from "react";
 import { style, useStyles } from "purse-styles";
 import {
@@ -19,6 +20,11 @@ import haloModel from "./assets/halo-donut-3d.obj?url";
 
 const logoSize = 20;
 
+class WebGlUnavailableError extends errore.createTaggedError({
+  name: "WebGlUnavailableError",
+  message: "WebGL renderer unavailable",
+}) {}
+
 type HaloLogoProps = {
   className: string;
 };
@@ -30,14 +36,17 @@ export function HaloLogo({ className }: HaloLogoProps) {
   useEffect(() => {
     // Chromium blocks WebGL on some software GL stacks (Xvfb/llvmpipe) unless
     // SwiftShader is forced. Keep the chrome UI up when the logo cannot draw.
-    let renderer: WebGLRenderer;
-    try {
-      renderer = new WebGLRenderer({
-        canvas: canvasRef.current!,
-        alpha: true,
-        antialias: true,
-      });
-    } catch {
+    const renderer = errore.try({
+      try: () =>
+        new WebGLRenderer({
+          canvas: canvasRef.current!,
+          alpha: true,
+          antialias: true,
+        }),
+      catch: (e) => new WebGlUnavailableError({ cause: e }),
+    });
+    if (renderer instanceof Error) {
+      console.warn("Halo logo skipped:", renderer.message);
       return;
     }
     const scene = new Scene();

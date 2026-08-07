@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "errore": "^0.14.1",
     "incur": "^0.4.20",
     "libretto-browser-tools": "^0.1.2"
   },

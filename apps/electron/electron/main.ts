@@ -114,34 +114,45 @@ function registerIpcHandlers(): void {
       properties: ["openDirectory"],
     });
     if (selection.canceled) return null;
-    return workspaceService.select(selection.filePaths[0]!);
+    return throwIfError(await workspaceService.select(selection.filePaths[0]!));
   });
-  ipcMain.handle(IPC.listSessions, (event) => {
+  ipcMain.handle(IPC.listSessions, async (event) => {
     assertTrustedSender(event);
-    return piService.listSessions();
+    return throwIfError(await piService.listSessions());
   });
-  ipcMain.handle(IPC.readSessionTranscript, (event, sessionId: string) => {
+  ipcMain.handle(
+    IPC.readSessionTranscript,
+    async (event, sessionId: string) => {
+      assertTrustedSender(event);
+      return throwIfError(await piService.readTranscript(sessionId));
+    },
+  );
+  ipcMain.handle(IPC.createSession, async (event) => {
     assertTrustedSender(event);
-    return piService.readTranscript(sessionId);
-  });
-  ipcMain.handle(IPC.createSession, (event) => {
-    assertTrustedSender(event);
-    return piService.createNewSession();
+    return throwIfError(await piService.createNewSession());
   });
   ipcMain.handle(
     IPC.sendPrompt,
     async (event, requestId: string, sessionId: string, prompt: string) => {
       assertTrustedSender(event);
-      await piService.sendPrompt(sessionId, prompt, (promptEvent) => {
-        if (!event.sender.isDestroyed()) {
-          event.sender.send(IPC.promptEvent, {
-            requestId,
-            event: promptEvent,
-          });
-        }
-      });
+      return throwIfError(
+        await piService.sendPrompt(sessionId, prompt, (promptEvent) => {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send(IPC.promptEvent, {
+              requestId,
+              event: promptEvent,
+            });
+          }
+        }),
+      );
     },
   );
+}
+
+// Electron IPC transports failures as rejections.
+function throwIfError<T>(result: T): Exclude<T, Error> {
+  if (result instanceof Error) throw result;
+  return result as Exclude<T, Error>;
 }
 
 function assertTrustedSender(event: IpcMainInvokeEvent): BrowserWindow {
