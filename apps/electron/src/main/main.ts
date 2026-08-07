@@ -54,18 +54,9 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on("before-quit", (event) => {
-  if (piServiceIsStopped) return;
-  event.preventDefault();
-  piServiceIsStopped = true;
-  void piService.shutdown().then(() => app.quit());
-});
-
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
-
-let piServiceIsStopped = false;
 
 function openMainWindow(): void {
   const window = createWindow();

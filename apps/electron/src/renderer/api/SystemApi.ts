@@ -36,31 +36,43 @@ export type PromptStreamEvent = {
 
 export type PromptEventHandler = (event: PromptStreamEvent) => void;
 
-/**
- * Temporary renderer-facing API. Adapts Cap'n Web HaloRpcApi until the UI
- * talks to createAgentSession stubs directly.
- */
+export type CreateAgentSessionOptions = {
+  sessionId?: string;
+};
+
+/** Live Pi AgentSession handle held by the renderer across prompts. */
+export type AgentSessionHandle = {
+  sessionId: string;
+  subscribe(callback: PromptEventHandler): (() => void) | Promise<() => void>;
+  prompt(text: string): Promise<void>;
+  send(text: string): Promise<void>;
+  [Symbol.dispose](): void;
+};
+
 export type SystemApi = {
   getWorkspace: () => Promise<WorkspaceInfo | null>;
   chooseWorkspace: () => Promise<WorkspaceInfo | null>;
   listSessions: () => Promise<SessionSummary[]>;
   readSessionTranscript: (sessionId: string) => Promise<SessionTranscript>;
-  createSession: () => Promise<SessionSummary>;
-  sendPrompt: (
-    sessionId: string,
-    prompt: string,
-    onEvent: PromptEventHandler,
-  ) => Promise<void>;
+  createAgentSession: (
+    options?: CreateAgentSessionOptions,
+  ) => Promise<AgentSessionHandle>;
 };
 
-/** Cap'n Web main API shape (object-capability; grows toward Pi). */
+/** Cap'n Web main API shape (object-capability; mirrors Pi). */
 export type HaloRpcApi = {
   getWorkspace(): Promise<WorkspaceInfo | null>;
   chooseWorkspace(): Promise<WorkspaceInfo | null | Error>;
   listSessions(): Promise<SessionSummary[] | Error>;
   readSessionTranscript(sessionId: string): Promise<SessionTranscript | Error>;
-  createSession(): Promise<SessionSummary | Error>;
-  createAgentSession(sessionId: string): AgentSessionApi;
+  createAgentSession(
+    options?: CreateAgentSessionOptions,
+  ): Promise<CreateAgentSessionResult | Error>;
+};
+
+export type CreateAgentSessionResult = {
+  sessionId: string;
+  session: AgentSessionApi;
 };
 
 export type AgentSessionApi = {

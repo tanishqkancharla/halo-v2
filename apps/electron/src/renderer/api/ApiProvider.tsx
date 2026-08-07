@@ -8,9 +8,17 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import * as errore from "errore";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Onboarding } from "../Onboarding.tsx";
 import type {
+  AgentSessionHandle,
   PromptStreamEvent,
   SystemApi,
   WorkspaceInfo,
@@ -35,7 +43,7 @@ const systemApiQueryKey = ["system-api"] as const;
 const workspaceQueryKey = ["workspace"] as const;
 const sendPromptMutationKey = ["send-prompt"] as const;
 
-type SendPromptInput = { sessionId: string; text: string };
+type SendPromptInput = { session: AgentSessionHandle; text: string };
 
 export type LivePrompt = {
   sessionId: string;
@@ -151,38 +159,112 @@ export function useLivePrompt(sessionId: string | null) {
   }).data;
 }
 
+/**
+ * Opens a durable Pi AgentSession for a saved chat and keeps it alive until
+ * the selection changes. Disposes on leave.
+ */
+export function useOpenAgentSession(sessionId: string | null) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const [session, setSession] = useState<AgentSessionHandle | null>(null);
+
+  useEffect(() => {
+    if (sessionId === null) {
+      setSession(null);
+      return;
+    }
+
+    let cancelled = false;
+    let handle: AgentSessionHandle | undefined;
+    void api
+      .createAgentSession({ sessionId })
+      .then((created) => {
+        if (cancelled) {
+          created[Symbol.dispose]();
+          return;
+        }
+        handle = created;
+        void created.subscribe((event) => {
+          const key = livePromptKey(sessionId);
+          const current = queryClient.getQueryData<LivePrompt>(key);
+          if (current === undefined) return;
+          queryClient.setQueryData(key, applyPromptStreamEvent(current, event));
+        });
+        setSession(created);
+      })
+      .catch((e) => {
+        console.warn("Failed to open agent session:", e);
+      });
+
+    return () => {
+      cancelled = true;
+      handle?.[Symbol.dispose]();
+      setSession(null);
+    };
+  }, [api, queryClient, sessionId]);
+
+  return session;
+}
+
+/** Lazy AgentSession for a draft: created on first send, disposed on leave. */
+export function useDraftAgentSession() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const sessionRef = useRef<AgentSessionHandle | null>(null);
+
+  useEffect(() => {
+    return () => {
+      sessionRef.current?.[Symbol.dispose]();
+      sessionRef.current = null;
+    };
+  }, []);
+
+  async function ensureSession() {
+    if (sessionRef.current !== null) return sessionRef.current;
+    const created = await api.createAgentSession();
+    sessionRef.current = created;
+    await created.subscribe((event) => {
+      const key = livePromptKey(created.sessionId);
+      const current = queryClient.getQueryData<LivePrompt>(key);
+      if (current === undefined) return;
+      queryClient.setQueryData(key, applyPromptStreamEvent(current, event));
+    });
+    return created;
+  }
+
+  return { ensureSession };
+}
+
 export function useSendPromptMutation() {
   const { api, queryClient } = useContext(ApiContext);
   return useMutation({
     mutationKey: sendPromptMutationKey,
-    mutationFn: ({ sessionId, text }: SendPromptInput) =>
-      api.sendPrompt(sessionId, text, (event) => {
-        const key = livePromptKey(sessionId);
-        const current = queryClient.getQueryData<LivePrompt>(key)!;
-        queryClient.setQueryData(key, applyPromptStreamEvent(current, event));
-      }),
-    onMutate: ({ sessionId, text }) => {
-      queryClient.setQueryData<LivePrompt>(livePromptKey(sessionId), {
-        sessionId,
+    mutationFn: ({ session, text }: SendPromptInput) => session.prompt(text),
+    onMutate: ({ session, text }) => {
+      queryClient.setQueryData<LivePrompt>(livePromptKey(session.sessionId), {
+        sessionId: session.sessionId,
         userText: text,
         assistantText: "",
         status: "sending",
       });
     },
-    onSuccess: async (_, { sessionId }) => {
-      const transcript = await api.readSessionTranscript(sessionId);
-      queryClient.setQueryData(sessionTranscriptKey(sessionId), transcript);
+    onSuccess: async (_, { session }) => {
+      const transcript = await api.readSessionTranscript(session.sessionId);
+      queryClient.setQueryData(
+        sessionTranscriptKey(session.sessionId),
+        transcript,
+      );
       await queryClient.invalidateQueries({
         queryKey: ["sessions"],
         refetchType: "all",
       });
       queryClient.removeQueries({
-        queryKey: livePromptKey(sessionId),
+        queryKey: livePromptKey(session.sessionId),
         exact: true,
       });
     },
-    onError: (error, { sessionId }) => {
-      const key = livePromptKey(sessionId);
+    onError: (error, { session }) => {
+      const key = livePromptKey(session.sessionId);
       const current = queryClient.getQueryData<LivePrompt>(key)!;
       queryClient.setQueryData(key, {
         ...current,
@@ -193,16 +275,12 @@ export function useSendPromptMutation() {
   });
 }
 
-export function useCreateSessionMutation() {
-  const api = useApi();
-  return useMutation({ mutationFn: api.createSession });
-}
-
 export function useIsSendingPrompt(sessionId: string | null) {
   const count = useIsMutating({
     mutationKey: sendPromptMutationKey,
     predicate: (mutation) =>
-      (mutation.state.variables as SendPromptInput).sessionId === sessionId,
+      (mutation.state.variables as SendPromptInput | undefined)?.session
+        .sessionId === sessionId,
   });
   return count > 0;
 }

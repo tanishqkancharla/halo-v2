@@ -8,9 +8,9 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { describe, expect, test, vi } from "vitest";
 import {
+  CreateAgentSessionError,
   PiService,
-  PromptFailedError,
-  SessionBusyError,
+  SessionNotFoundError,
 } from "./pi-service.js";
 import { WorkspaceService } from "./workspace-service.js";
 
@@ -44,8 +44,12 @@ function successfulFactory() {
   const dispose = vi.fn();
   const abort = vi.fn().mockResolvedValue(undefined);
   const factory = vi.fn(async (options: AgentSessionOptions) => {
-    let listener: SessionListener;
+    let listener: SessionListener | undefined;
+    const sessionId = options!.sessionManager!.getSessionId();
     const session = {
+      get sessionId() {
+        return sessionId;
+      },
       abort,
       dispose,
       subscribe(nextListener: SessionListener) {
@@ -55,7 +59,7 @@ function successfulFactory() {
       async prompt(prompt: string) {
         options!.sessionManager!.appendMessage(message("user", prompt));
         for (const delta of ["Hello", " there"]) {
-          listener({
+          listener?.({
             type: "message_update",
             assistantMessageEvent: { type: "text_delta", delta },
           } as Parameters<SessionListener>[0]);
@@ -71,26 +75,29 @@ function successfulFactory() {
 }
 
 describe("PiService", () => {
-  test("streams and persists a new session", async () => {
+  test("createAgentSession streams and persists; list/read use SessionManager", async () => {
     const workspace = await workspaceService();
     const fake = successfulFactory();
     const service = new PiService(workspace, fake.factory);
-    const session = await service.createNewSession();
+
+    const session = await service.createAgentSession();
     expect(session).not.toBeInstanceOf(Error);
     if (session instanceof Error) return;
-    const deltas: string[] = [];
 
-    const sent = await service.sendPrompt(
-      session.sessionId,
-      "Say hello",
-      (event) => {
-        deltas.push(event.text);
-      },
-    );
-    expect(sent).toBeUndefined();
+    const deltas: string[] = [];
+    const unsubscribe = session.subscribe((event) => {
+      if (
+        event.type === "message_update" &&
+        event.assistantMessageEvent.type === "text_delta"
+      ) {
+        deltas.push(event.assistantMessageEvent.delta);
+      }
+    });
+    await session.prompt("Say hello");
+    unsubscribe();
+    session.dispose();
 
     expect(deltas).toEqual(["Hello", " there"]);
-    expect(fake.unsubscribe).toHaveBeenCalledOnce();
     expect(fake.dispose).toHaveBeenCalledOnce();
 
     const restarted = new PiService(workspace, fake.factory);
@@ -109,77 +116,68 @@ describe("PiService", () => {
     });
   });
 
-  test("cleans up after a prompt error and allows a retry", async () => {
+  test("createAgentSession({ sessionId }) reopens a durable session", async () => {
     const workspace = await workspaceService();
-    const succeeding = successfulFactory();
-    const failedDispose = vi.fn();
-    const failingSession = {
-      abort: vi.fn().mockResolvedValue(undefined),
-      dispose: failedDispose,
-      subscribe: vi.fn(() => vi.fn()),
-      prompt: vi.fn().mockRejectedValue(new Error("provider failed")),
-    } as unknown as AgentSession;
+    const fake = successfulFactory();
+    const service = new PiService(workspace, fake.factory);
+    const created = await service.createAgentSession();
+    expect(created).not.toBeInstanceOf(Error);
+    if (created instanceof Error) return;
+    await created.prompt("First");
+    created.dispose();
+
+    const reopened = await service.createAgentSession({
+      sessionId: created.sessionId,
+    });
+    expect(reopened).not.toBeInstanceOf(Error);
+    if (reopened instanceof Error) return;
+    expect(reopened.sessionId).toBe(created.sessionId);
+    await reopened.prompt("Second");
+    reopened.dispose();
+
+    await expect(service.readTranscript(created.sessionId)).resolves.toEqual({
+      messages: [
+        expect.objectContaining({ role: "user", text: "First" }),
+        expect.objectContaining({ role: "assistant", text: "Hello there" }),
+        expect.objectContaining({ role: "user", text: "Second" }),
+        expect.objectContaining({ role: "assistant", text: "Hello there" }),
+      ],
+    });
+  });
+
+  test("create failure returns CreateAgentSessionError; missing id is SessionNotFoundError", async () => {
+    const workspace = await workspaceService();
     const factory = vi
       .fn()
-      .mockResolvedValueOnce({ session: failingSession })
-      .mockImplementation(succeeding.factory) as AgentSessionFactory;
+      .mockRejectedValue(new Error("no credentials")) as AgentSessionFactory;
     const service = new PiService(workspace, factory);
-    const session = await service.createNewSession();
+
+    const failed = await service.createAgentSession();
+    expect(failed).toBeInstanceOf(CreateAgentSessionError);
+
+    const missing = await new PiService(
+      workspace,
+      successfulFactory().factory,
+    ).createAgentSession({ sessionId: "does-not-exist" });
+    expect(missing).toBeInstanceOf(SessionNotFoundError);
+  });
+
+  test("caller keeps AgentSession across prompts; dispose is caller-owned", async () => {
+    const workspace = await workspaceService();
+    const fake = successfulFactory();
+    const service = new PiService(workspace, fake.factory);
+    const session = await service.createAgentSession();
     expect(session).not.toBeInstanceOf(Error);
     if (session instanceof Error) return;
 
-    const failed = await service.sendPrompt(
-      session.sessionId,
-      "First",
-      vi.fn(),
-    );
-    expect(failed).toBeInstanceOf(PromptFailedError);
-    expect(failedDispose).toHaveBeenCalledOnce();
-    const retried = await service.sendPrompt(
-      session.sessionId,
-      "Retry",
-      vi.fn(),
-    );
-    expect(retried).toBeUndefined();
-  });
+    await session.prompt("One");
+    await session.prompt("Two");
+    expect(fake.factory).toHaveBeenCalledOnce();
+    expect(fake.dispose).not.toHaveBeenCalled();
 
-  test("rejects concurrent prompts and aborts on shutdown", async () => {
-    const workspace = await workspaceService();
-    let finishPrompt: (() => void) | undefined;
-    const promptDone = new Promise<void>((resolve) => {
-      finishPrompt = resolve;
-    });
-    const abort = vi.fn(() => {
-      finishPrompt!();
-      return Promise.resolve();
-    });
-    const dispose = vi.fn();
-    const session = {
-      abort,
-      dispose,
-      subscribe: vi.fn(() => vi.fn()),
-      prompt: vi.fn(() => promptDone),
-    } as unknown as AgentSession;
-    const factory = vi
-      .fn()
-      .mockResolvedValue({ session }) as AgentSessionFactory;
-    const service = new PiService(workspace, factory);
-    const created = await service.createNewSession();
-    expect(created).not.toBeInstanceOf(Error);
-    if (created instanceof Error) return;
-    const running = service.sendPrompt(created.sessionId, "Wait", vi.fn());
-    await vi.waitFor(() => expect(session.prompt).toHaveBeenCalledOnce());
-
-    const concurrent = await service.sendPrompt(
-      created.sessionId,
-      "Again",
-      vi.fn(),
-    );
-    expect(concurrent).toBeInstanceOf(SessionBusyError);
-    await service.shutdown();
-    await running;
-
-    expect(abort).toHaveBeenCalledOnce();
-    expect(dispose).toHaveBeenCalled();
+    await session.abort();
+    session.dispose();
+    expect(fake.abort).toHaveBeenCalledOnce();
+    expect(fake.dispose).toHaveBeenCalledOnce();
   });
 });

@@ -1,16 +1,14 @@
+import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { RpcTarget } from "capnweb";
 import { dialog, type BrowserWindow } from "electron";
 import type {
   PromptEventHandler,
   WorkspaceInfo,
 } from "../renderer/api/SystemApi.js";
-import type { PiService } from "./pi-service.js";
+import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
+import type { CreateAgentSessionOptions, PiService } from "./pi-service.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
-/**
- * Main-side Cap'n Web API. Shape can grow toward Pi's createAgentSession →
- * session.subscribe / session.prompt without redesigning PiService yet.
- */
 export class HaloRpc extends RpcTarget {
   constructor(
     private readonly workspace: WorkspaceService,
@@ -42,12 +40,13 @@ export class HaloRpc extends RpcTarget {
     return this.pi.readTranscript(sessionId);
   }
 
-  createSession() {
-    return this.pi.createNewSession();
-  }
-
-  createAgentSession(sessionId: string) {
-    return new AgentSessionRpc(sessionId, this.pi);
+  async createAgentSession(options: CreateAgentSessionOptions = {}) {
+    const session = await this.pi.createAgentSession(options);
+    if (session instanceof Error) return session;
+    return {
+      sessionId: session.sessionId,
+      session: new AgentSessionRpc(session),
+    };
   }
 }
 
@@ -55,18 +54,33 @@ type PromptListener = PromptEventHandler & {
   dup?: () => PromptEventHandler & Disposable;
 } & Partial<Disposable>;
 
-/**
- * Session stub: subscribe(callback) + prompt/send(text).
- * Temporary stand-in until PiService is flattened to this shape.
- */
+/** Cap'n Web stub wrapping a live Pi AgentSession. */
 export class AgentSessionRpc extends RpcTarget {
-  private listeners = new Set<PromptEventHandler>();
+  private listeners = new Set<PromptListener>();
+  private pendingDeliveries: Promise<unknown>[] | null = null;
+  private readonly unsubscribePi: () => void;
 
-  constructor(
-    private readonly sessionId: string,
-    private readonly pi: PiService,
-  ) {
+  constructor(private readonly session: AgentSession) {
     super();
+    this.unsubscribePi = session.subscribe((event) => {
+      if (
+        event.type !== "message_update" ||
+        event.assistantMessageEvent.type !== "text_delta"
+      ) {
+        return;
+      }
+      const streamEvent = {
+        type: "delta" as const,
+        sessionId: this.session.sessionId,
+        text: event.assistantMessageEvent.delta,
+      };
+      for (const listener of this.listeners) {
+        const delivery = Promise.resolve(listener(streamEvent));
+        if (this.pendingDeliveries !== null) {
+          this.pendingDeliveries.push(delivery);
+        }
+      }
+    });
   }
 
   subscribe(callback: PromptListener) {
@@ -82,17 +96,28 @@ export class AgentSessionRpc extends RpcTarget {
   }
 
   async prompt(text: string) {
-    const pending: Promise<unknown>[] = [];
-    const result = await this.pi.sendPrompt(this.sessionId, text, (event) => {
-      for (const listener of this.listeners) {
-        pending.push(Promise.resolve(listener(event)));
-      }
-    });
-    await Promise.all(pending);
-    return result;
+    if (text.trim().length === 0) return new EmptyPromptError();
+    this.pendingDeliveries = [];
+    const prompted = await this.session
+      .prompt(text)
+      .catch((e) => new PromptFailedError({ cause: e }));
+    await Promise.all(this.pendingDeliveries);
+    this.pendingDeliveries = null;
+    return prompted;
   }
 
   send(text: string) {
     return this.prompt(text);
+  }
+
+  [Symbol.dispose]() {
+    this.unsubscribePi();
+    for (const listener of this.listeners) {
+      const dispose = listener[Symbol.dispose];
+      if (typeof dispose === "function") dispose.call(listener);
+    }
+    this.listeners.clear();
+    void this.session.abort();
+    this.session.dispose();
   }
 }

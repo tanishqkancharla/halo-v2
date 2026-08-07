@@ -1,7 +1,7 @@
 import { newMessagePortRpcSession, type RpcStub } from "capnweb";
-import * as errore from "errore";
 import { RPC_CHANNELS } from "../../shared/channels.js";
 import type {
+  AgentSessionHandle,
   HaloRpcApi,
   SessionSummary,
   SessionTranscript,
@@ -9,10 +9,7 @@ import type {
   WorkspaceInfo,
 } from "./SystemApi.js";
 
-/**
- * Temporary adapter: Cap'n Web HaloRpcApi → existing SystemApi for the UI.
- * Remove once the renderer uses createAgentSession stubs directly.
- */
+/** Cap'n Web HaloRpcApi → SystemApi (throws at the legacy UI boundary). */
 export function systemApiFromHaloRpc(halo: RpcStub<HaloRpcApi>): SystemApi {
   return {
     async getWorkspace() {
@@ -33,20 +30,29 @@ export function systemApiFromHaloRpc(halo: RpcStub<HaloRpcApi>): SystemApi {
       if (value instanceof Error) throw value;
       return value as SessionTranscript;
     },
-    async createSession() {
-      const value = await halo.createSession();
+    async createAgentSession(options = {}) {
+      const value = await halo.createAgentSession(options);
       if (value instanceof Error) throw value;
-      return value as SessionSummary;
-    },
-    async sendPrompt(sessionId, prompt, onEvent) {
-      await using cleanup = new errore.AsyncDisposableStack();
-      const session = halo.createAgentSession(sessionId);
-      cleanup.defer(() => {
-        session[Symbol.dispose]();
-      });
-      await session.subscribe(onEvent);
-      const value = await session.prompt(prompt);
-      if (value instanceof Error) throw value;
+      const sessionId = await value.sessionId;
+      const session = value.session;
+      const handle: AgentSessionHandle = {
+        sessionId,
+        subscribe(callback) {
+          return session.subscribe(callback);
+        },
+        async prompt(text) {
+          const result = await session.prompt(text);
+          if (result instanceof Error) throw result;
+        },
+        async send(text) {
+          const result = await session.send(text);
+          if (result instanceof Error) throw result;
+        },
+        [Symbol.dispose]() {
+          value[Symbol.dispose]();
+        },
+      };
+      return handle;
     },
   };
 }
