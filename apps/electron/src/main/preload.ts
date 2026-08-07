@@ -1,55 +1,19 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
-import * as errore from "errore";
-import type {
-  PromptEventHandler,
-  SystemApi,
-} from "../renderer/api/SystemApi.js";
-import { IPC, type PromptEventEnvelope } from "./ipc.js";
+import { ipcRenderer } from "electron";
+import { IPC } from "./ipc.js";
 
-const haloApi: SystemApi = {
-  getWorkspace() {
-    return ipcRenderer.invoke(IPC.getWorkspace);
-  },
+const windowLoaded = new Promise<void>((resolve) => {
+  window.addEventListener("load", () => resolve());
+});
 
-  chooseWorkspace() {
-    return ipcRenderer.invoke(IPC.chooseWorkspace);
-  },
+// Renderer requests a Cap'n Web MessagePort; we forward it into the main world.
+window.addEventListener("message", (event) => {
+  if (event.source !== window) return;
+  if (event.data !== IPC.requestRpc) return;
+  ipcRenderer.postMessage(IPC.requestRpc, null);
+});
 
-  listSessions() {
-    return ipcRenderer.invoke(IPC.listSessions);
-  },
-
-  readSessionTranscript(sessionId) {
-    return ipcRenderer.invoke(IPC.readSessionTranscript, sessionId);
-  },
-
-  createSession() {
-    return ipcRenderer.invoke(IPC.createSession);
-  },
-
-  sendPrompt(sessionId, prompt, onEvent) {
-    return invokePrompt(sessionId, prompt, onEvent);
-  },
-};
-
-async function invokePrompt(
-  sessionId: string,
-  prompt: string,
-  onEvent: PromptEventHandler,
-): Promise<void> {
-  await using cleanup = new errore.AsyncDisposableStack();
-  const requestId = crypto.randomUUID();
-  const listener = (
-    _event: IpcRendererEvent,
-    envelope: PromptEventEnvelope,
-  ) => {
-    if (envelope.requestId === requestId) onEvent(envelope.event);
-  };
-  ipcRenderer.on(IPC.promptEvent, listener);
-  cleanup.defer(() => {
-    ipcRenderer.off(IPC.promptEvent, listener);
+ipcRenderer.on(IPC.provideRpc, (event) => {
+  void windowLoaded.then(() => {
+    window.postMessage(IPC.provideRpc, "*", event.ports);
   });
-  await ipcRenderer.invoke(IPC.sendPrompt, requestId, sessionId, prompt);
-}
-
-contextBridge.exposeInMainWorld("halo", haloApi);
+});

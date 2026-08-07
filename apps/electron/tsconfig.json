@@ -2,6 +2,7 @@
   "extends": "@repo/typescript-config/react-library.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "ESNext.Disposable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
@@ -10,5 +11,5 @@
     },
     "types": ["vite/client"]
   },
-  "include": ["src/renderer", "vite.renderer.config.ts"]
+  "include": ["src/renderer", "src/shared", "vite.renderer.config.ts"]
 }
