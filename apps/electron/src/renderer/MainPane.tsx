@@ -18,9 +18,6 @@ import {
   spacing,
   text,
 } from "maui";
-import { AssistantMessage } from "maui/src/patterns/AssistantMessage.tsx";
-import { Editor } from "maui/src/patterns/Editor.tsx";
-import { Loader } from "maui/src/patterns/Loader.tsx";
 import { style, useStyles } from "purse-styles";
 import {
   useDraftAgentSession,
@@ -31,6 +28,9 @@ import {
   useSessionTranscriptQuery,
   type LivePrompt,
 } from "./api/ApiProvider.tsx";
+import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
+import { Editor } from "./patterns/Editor.tsx";
+import { Loader } from "./patterns/Loader.tsx";
 import { type SessionSummary, type SessionTranscript } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 
