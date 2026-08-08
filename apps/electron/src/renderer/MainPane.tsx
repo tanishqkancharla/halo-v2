@@ -11,9 +11,7 @@ import {
   flex,
   flexItem,
   icon,
-  prose,
   radius,
-  shadow,
   shadowVars,
   spacing,
   text,
@@ -311,15 +309,17 @@ function Message({
   text: string;
   isAnimating?: boolean;
 }) {
-  const userRow = useStyles(styles.userRow);
-  const userBubble = useStyles(styles.userBubble);
-  const assistantRow = useStyles(styles.assistantRow);
+  const messageClass = useStyles(
+    role === "user" ? styles.userMessage : styles.assistantRow,
+  );
+  const body = useStyles(styles.messageBody);
   const assistantMessage = useStyles(styles.assistantMessage);
   const thinking = useStyles(styles.thinking);
+  const roleLabel = role === "user" ? "You" : "Assistant";
 
   if (role === "assistant") {
     return (
-      <div className={assistantRow} aria-label="Assistant message">
+      <div className={messageClass} aria-label={`${roleLabel} message`}>
         {messageText ? (
           <AssistantMessage
             size="sm"
@@ -340,9 +340,9 @@ function Message({
   }
 
   return (
-    <div className={userRow} aria-label="You message">
-      <div className={userBubble}>{messageText}</div>
-    </div>
+    <article className={messageClass} aria-label={`${roleLabel} message`}>
+      <div className={body}>{messageText}</div>
+    </article>
   );
 }
 
@@ -423,21 +423,13 @@ const styles = {
       overflowWrap: "anywhere",
     },
   ),
-  userRow: style(flex({ justify: "end" }), {
+  userMessage: style(radius.lg, spacing.padding({ x: 4, y: 2 }), {
+    alignSelf: "flex-end",
+    width: "fit-content",
+    maxWidth: "80%",
     minWidth: 0,
-    alignSelf: "stretch",
+    backgroundColor: colors.gray[3],
   }),
-  userBubble: style(
-    prose("sm").paragraph,
-    radius.md,
-    shadow.subtle,
-    spacing.padding({ x: 4, y: 2 }),
-    {
-      backgroundColor: backgroundColor.element,
-      whiteSpace: "pre-wrap",
-      maxWidth: "80%",
-    },
-  ),
   assistantRow: style(flex({ direction: "column", gap: 3 }), {
     minWidth: 0,
     width: "100%",
@@ -451,6 +443,11 @@ const styles = {
     text("xs", 400, "lowContrast"),
     flex({ align: "center", gap: 4 }),
   ),
+  messageBody: style(text("md", 400, "highContrast"), {
+    minWidth: 0,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+  }),
   promptEditor: style(flex({ direction: "column", gap: 2 }), {
     width: "100%",
     minWidth: 0,
