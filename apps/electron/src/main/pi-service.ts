@@ -1,68 +1,62 @@
-import { join } from "node:path";
 import {
-  AuthStorage,
-  type AgentSession,
   createAgentSession,
   createCodingTools,
-  ModelRegistry,
   SessionManager,
   type SessionInfo,
   type SessionMessageEntry,
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
 import type {
-  PromptEventHandler,
   SessionMessage,
   SessionSummary,
   SessionTranscript,
-} from "../renderer/api/SystemApi.js";
+} from "../shared/rpc.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
-
-export class EmptyPromptError extends errore.createTaggedError({
-  name: "EmptyPromptError",
-  message: "Enter a prompt first.",
-}) {}
-
-export class SessionBusyError extends errore.createTaggedError({
-  name: "SessionBusyError",
-  message: "This session is already running.",
-}) {}
 
 export class SessionNotFoundError extends errore.createTaggedError({
   name: "SessionNotFoundError",
   message: "Session '$sessionId' does not exist.",
 }) {}
 
-export class PromptFailedError extends errore.createTaggedError({
-  name: "PromptFailedError",
-  message: "Prompt failed",
+export class CreateAgentSessionError extends errore.createTaggedError({
+  name: "CreateAgentSessionError",
+  message: "Failed to create agent session",
 }) {}
 
-type AgentSessionFactory = typeof createAgentSession;
-
+/**
+ * Stateless Pi SDK proxy: SessionManager for durable list/read, createAgentSession
+ * for live AgentSession. Callers own subscribe / prompt / dispose.
+ */
 export class PiService {
-  private readonly runningSessions = new Map<string, AgentSession>();
-  private readonly draftSessions = new Map<string, SessionManager>();
+  constructor(private readonly workspace: WorkspaceService) {}
 
-  constructor(
-    private readonly workspace: WorkspaceService,
-    private readonly createSession: AgentSessionFactory = createAgentSession,
-  ) {}
-
-  async createNewSession() {
+  async newAgentSession() {
     const layout = this.workspace.getLayout();
     if (layout instanceof Error) return layout;
     const manager = SessionManager.create(layout.root, layout.sessionDir);
-    const header = manager.getHeader()!;
-    this.draftSessions.set(manager.getSessionId(), manager);
-    return {
-      sessionId: manager.getSessionId(),
-      agent: "pi",
+    return this.createAgentSession(layout, manager);
+  }
+
+  async openAgentSession(sessionId: string) {
+    const layout = this.workspace.getLayout();
+    if (layout instanceof Error) return layout;
+    const manager = await this.openSessionManager(layout, sessionId);
+    if (manager instanceof Error) return manager;
+    return this.createAgentSession(layout, manager);
+  }
+
+  private async createAgentSession(
+    layout: WorkspaceLayout,
+    manager: SessionManager,
+  ) {
+    const created = await createAgentSession({
       cwd: layout.root,
-      state: "idle",
-      createdAt: header.timestamp,
-      updatedAt: header.timestamp,
-    } satisfies SessionSummary;
+      agentDir: layout.agentDir,
+      sessionManager: manager,
+      tools: createCodingTools(layout.root),
+    }).catch((e) => new CreateAgentSessionError({ cause: e }));
+    if (created instanceof Error) return created;
+    return created.session;
   }
 
   async listSessions() {
@@ -70,14 +64,14 @@ export class PiService {
     if (layout instanceof Error) return layout;
     const sessions = await SessionManager.list(layout.root, layout.sessionDir);
     return sessions
-      .map((session) => this.sessionSummary(session))
+      .map((session) => sessionSummary(session))
       .toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
   async readTranscript(sessionId: string) {
     const layout = this.workspace.getLayout();
     if (layout instanceof Error) return layout;
-    const manager = await this.getSessionManager(layout, sessionId);
+    const manager = await this.openSessionManager(layout, sessionId);
     if (manager instanceof Error) return manager;
     const messages = manager
       .getBranch()
@@ -86,102 +80,25 @@ export class PiService {
     return { messages } satisfies SessionTranscript;
   }
 
-  async sendPrompt(
-    sessionId: string,
-    prompt: string,
-    onEvent: PromptEventHandler,
-  ) {
-    if (prompt.trim().length === 0) return new EmptyPromptError();
-    if (this.runningSessions.has(sessionId)) return new SessionBusyError();
-
-    const layout = this.workspace.getLayout();
-    if (layout instanceof Error) return layout;
-    const manager = await this.getSessionManager(layout, sessionId);
-    if (manager instanceof Error) return manager;
-
-    const authStorage = AuthStorage.create(join(layout.agentDir, "auth.json"));
-    const modelRegistry = new ModelRegistry(
-      authStorage,
-      join(layout.agentDir, "models.json"),
-    );
-    const created = await this.createSession({
-      cwd: layout.root,
-      agentDir: layout.agentDir,
-      authStorage,
-      modelRegistry,
-      sessionManager: manager,
-      tools: createCodingTools(layout.root),
-    }).catch((e) => new PromptFailedError({ cause: e }));
-    if (created instanceof Error) return created;
-
-    const { session } = created;
-    await using cleanup = new errore.AsyncDisposableStack();
-    this.runningSessions.set(sessionId, session);
-    const unsubscribe = session.subscribe((event) => {
-      if (
-        event.type === "message_update" &&
-        event.assistantMessageEvent.type === "text_delta"
-      ) {
-        onEvent({
-          type: "delta",
-          sessionId,
-          text: event.assistantMessageEvent.delta,
-        });
-      }
-    });
-    cleanup.defer(() => {
-      unsubscribe();
-      this.runningSessions.delete(sessionId);
-      session.dispose();
-    });
-
-    const prompted = await session
-      .prompt(prompt)
-      .catch((e) => new PromptFailedError({ cause: e }));
-    if (prompted instanceof Error) return prompted;
-    this.draftSessions.delete(sessionId);
-  }
-
-  async shutdown(): Promise<void> {
-    const sessions = [...this.runningSessions.values()];
-    for (const session of sessions) {
-      await session.abort();
-      session.dispose();
-    }
-    this.runningSessions.clear();
-  }
-
-  private async findSession(layout: WorkspaceLayout, sessionId: string) {
+  private async openSessionManager(layout: WorkspaceLayout, sessionId: string) {
     const sessions = await SessionManager.list(layout.root, layout.sessionDir);
     const session = sessions.find((candidate) => candidate.id === sessionId);
     if (session === undefined) return new SessionNotFoundError({ sessionId });
-    return session;
+    return SessionManager.open(session.path, layout.sessionDir);
   }
+}
 
-  private async getSessionManager(
-    layout: WorkspaceLayout,
-    sessionId: string,
-  ): Promise<SessionManager | SessionNotFoundError> {
-    const draft = this.draftSessions.get(sessionId);
-    if (draft !== undefined) return draft;
-    const info = await this.findSession(layout, sessionId);
-    if (info instanceof Error) return info;
-    return SessionManager.open(info.path, layout.sessionDir);
-  }
-
-  private sessionSummary(session: SessionInfo): SessionSummary {
-    const title =
-      session.name === undefined ? session.firstMessage : session.name;
-    return {
-      sessionId: session.id,
-      agent: "pi",
-      cwd: session.cwd,
-      state: this.runningSessions.has(session.id) ? "running" : "idle",
-      title: title.trim().length === 0 ? undefined : title,
-      createdAt: session.created.toISOString(),
-      updatedAt: session.modified.toISOString(),
-    };
-  }
+function sessionSummary(session: SessionInfo): SessionSummary {
+  const title =
+    session.name === undefined ? session.firstMessage : session.name;
+  return {
+    sessionId: session.id,
+    agent: "pi",
+    cwd: session.cwd,
+    title: title.trim().length === 0 ? undefined : title,
+    createdAt: session.created.toISOString(),
+    updatedAt: session.modified.toISOString(),
+  };
 }
 
 function sessionMessage(entry: SessionMessageEntry): SessionMessage[] {

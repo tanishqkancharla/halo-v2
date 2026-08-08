@@ -19,17 +19,15 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import {
-  useCreateSessionMutation,
+  useDraftAgentSession,
   useIsSendingPrompt,
   useLivePrompt,
+  useOpenAgentSession,
   useSendPromptMutation,
   useSessionTranscriptQuery,
   type LivePrompt,
 } from "./api/ApiProvider.tsx";
-import {
-  type SessionSummary,
-  type SessionTranscript,
-} from "./api/SystemApi.ts";
+import { type SessionSummary, type SessionTranscript } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
@@ -47,15 +45,6 @@ export function MainPane({
   onDraftSent: (draftId: string, sessionId: string) => void;
 }) {
   const pane = useStyles(styles.pane);
-  const content = useStyles(styles.content);
-  const header = useStyles(styles.header);
-  const editorArea = useStyles(styles.editorArea);
-  const status = useStyles(styles.status);
-  const sessionId = selection?.kind === "saved" ? selection.sessionId : null;
-  const transcript = useSessionTranscriptQuery(sessionId);
-  const livePrompt = useLivePrompt(sessionId);
-  const sendPrompt = useSendPromptMutation();
-  const isSending = useIsSendingPrompt(sessionId);
   if (!selection) {
     return (
       <main className={pane} aria-label="Session">
@@ -68,10 +57,31 @@ export function MainPane({
     return <DraftPane draftId={selection.draftId} onSent={onDraftSent} />;
   }
 
+  return <SavedPane sessionId={selection.sessionId} sessions={sessions} />;
+}
+
+function SavedPane({
+  sessionId,
+  sessions,
+}: {
+  sessionId: string;
+  sessions: SessionSummary[];
+}) {
+  const content = useStyles(styles.content);
+  const header = useStyles(styles.header);
+  const editorArea = useStyles(styles.editorArea);
+  const status = useStyles(styles.status);
+  const pane = useStyles(styles.pane);
+  const transcript = useSessionTranscriptQuery(sessionId);
+  const livePrompt = useLivePrompt(sessionId);
+  const agentSession = useOpenAgentSession(sessionId);
+  const sendPrompt = useSendPromptMutation();
+  const isSending = useIsSendingPrompt(sessionId);
   const session = sessions.find(
-    ({ sessionId: candidate }) => candidate === selection.sessionId,
+    ({ sessionId: candidate }) => candidate === sessionId,
   );
-  const title = session?.title ? session.title : selection.sessionId;
+  const title = session?.title ? session.title : sessionId;
+
   return (
     <main className={pane} aria-label={title}>
       <div className={content}>
@@ -94,14 +104,20 @@ export function MainPane({
         )}
         <div className={editorArea}>
           <PromptEditor
-            key={selection.sessionId}
-            isSending={isSending}
-            onSubmit={(prompt) =>
-              sendPrompt.mutateAsync({
-                sessionId: selection.sessionId,
+            key={sessionId}
+            isSending={isSending ? true : agentSession === null}
+            onSubmit={async (prompt) => {
+              if (agentSession === null) {
+                return new PromptSubmitError({
+                  reason: "Session is not ready.",
+                });
+              }
+              return sendPrompt.mutateAsync({
+                session: agentSession,
+                sessionId,
                 text: prompt,
-              })
-            }
+              });
+            }}
           />
         </div>
       </div>
@@ -116,26 +132,25 @@ function DraftPane({
   draftId: string;
   onSent: (draftId: string, sessionId: string) => void;
 }) {
-  const [durableSessionId, setDurableSessionId] = useState<string>();
-  const createSession = useCreateSessionMutation();
+  const { ensureSession } = useDraftAgentSession();
   const sendPrompt = useSendPromptMutation();
-  const livePrompt = useLivePrompt(
-    durableSessionId === undefined ? null : durableSessionId,
-  );
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const livePrompt = useLivePrompt(sessionId);
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);
   const header = useStyles(styles.header);
   const editorArea = useStyles(styles.editorArea);
 
   async function submit(prompt: string) {
-    let sessionId = durableSessionId;
-    if (sessionId === undefined) {
-      const session = await createSession.mutateAsync();
-      sessionId = session.sessionId;
-      setDurableSessionId(sessionId);
-    }
-    await sendPrompt.mutateAsync({ sessionId, text: prompt });
-    onSent(draftId, sessionId);
+    const session = await ensureSession();
+    const createdSessionId = await session.getSessionId();
+    setSessionId(createdSessionId);
+    await sendPrompt.mutateAsync({
+      session,
+      sessionId: createdSessionId,
+      text: prompt,
+    });
+    onSent(draftId, createdSessionId);
   }
 
   return (
@@ -151,7 +166,7 @@ function DraftPane({
         <div className={editorArea}>
           <PromptEditor
             key={draftId}
-            isSending={createSession.isPending ? true : sendPrompt.isPending}
+            isSending={sendPrompt.isPending}
             onSubmit={submit}
           />
         </div>

@@ -7,14 +7,23 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import type { RpcStub } from "capnweb";
 import * as errore from "errore";
-import { createContext, useContext, useState, type ReactNode } from "react";
-import { Onboarding } from "../Onboarding.tsx";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type {
+  AgentSessionApi,
   PromptStreamEvent,
-  SystemApi,
   WorkspaceInfo,
-} from "./SystemApi.js";
+} from "../../shared/rpc.js";
+import { Onboarding } from "../Onboarding.tsx";
+import type { HaloApiStub } from "./HaloRpcClient.js";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
   name: "WorkspaceRestoreError",
@@ -26,16 +35,21 @@ export type WorkspaceState =
   | { status: "ready"; workspace: WorkspaceInfo };
 
 type ApiContextValue = {
-  api: SystemApi;
+  api: HaloApiStub;
   queryClient: QueryClient;
 };
 
 const ApiContext = createContext<ApiContextValue>(undefined!);
-const systemApiQueryKey = ["system-api"] as const;
+const haloApiQueryKey = ["halo-api"] as const;
 const workspaceQueryKey = ["workspace"] as const;
 const sendPromptMutationKey = ["send-prompt"] as const;
 
-type SendPromptInput = { sessionId: string; text: string };
+export type AgentSessionStub = RpcStub<AgentSessionApi>;
+type SendPromptInput = {
+  session: AgentSessionStub;
+  sessionId: string;
+  text: string;
+};
 
 export type LivePrompt = {
   sessionId: string;
@@ -49,7 +63,7 @@ export function ApiProvider({
   createApi,
   children,
 }: {
-  createApi: () => Promise<SystemApi>;
+  createApi: () => Promise<HaloApiStub>;
   children: ReactNode;
 }) {
   const [queryClient] = useState(
@@ -78,12 +92,12 @@ function ResolveApi({
   createApi,
   children,
 }: {
-  createApi: () => Promise<SystemApi>;
+  createApi: () => Promise<HaloApiStub>;
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
   const apiQuery = useQuery({
-    queryKey: systemApiQueryKey,
+    queryKey: haloApiQueryKey,
     queryFn: createApi,
   });
 
@@ -97,7 +111,7 @@ function ResolveApi({
   );
 }
 
-export function useApi() {
+export function useApi(): HaloApiStub {
   return useContext(ApiContext).api;
 }
 
@@ -112,7 +126,7 @@ export function useWorkspaceQuery() {
 export function useChooseWorkspaceMutation() {
   const { api, queryClient } = useContext(ApiContext);
   return useMutation({
-    mutationFn: api.chooseWorkspace,
+    mutationFn: () => api.chooseWorkspace(),
     onSuccess: (workspace) => {
       if (workspace !== null) {
         queryClient.setQueryData(workspaceQueryKey, readyWorkspace(workspace));
@@ -128,7 +142,7 @@ export function useSessionsQuery(workspace: WorkspaceState | undefined) {
 
   return useQuery({
     queryKey: ["sessions", workspaceRoot],
-    queryFn: api.listSessions,
+    queryFn: () => api.listSessions(),
     enabled: workspaceRoot !== null,
   });
 }
@@ -151,16 +165,91 @@ export function useLivePrompt(sessionId: string | null) {
   }).data;
 }
 
+/**
+ * Opens a durable Pi AgentSession for a saved chat and keeps it alive until
+ * the selection changes. Disposes on leave.
+ */
+export function useOpenAgentSession(
+  sessionId: string | null,
+): AgentSessionStub | null {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const [session, setSession] = useState<AgentSessionStub | null>(null);
+
+  useEffect(() => {
+    if (sessionId === null) {
+      setSession(null);
+      return;
+    }
+
+    let cancelled = false;
+    let stub: AgentSessionStub | undefined;
+    void api
+      .openAgentSession(sessionId)
+      .then((created) => {
+        if (cancelled) {
+          created[Symbol.dispose]();
+          return;
+        }
+        stub = created;
+        void created.subscribe((event) => {
+          const key = livePromptKey(event.sessionId);
+          const current = queryClient.getQueryData<LivePrompt>(key);
+          if (current === undefined) return;
+          queryClient.setQueryData(key, applyPromptStreamEvent(current, event));
+        });
+        setSession(() => created);
+      })
+      .catch((e) => {
+        console.warn("Failed to open agent session:", e);
+      });
+
+    return () => {
+      cancelled = true;
+      stub?.[Symbol.dispose]();
+      setSession(null);
+    };
+  }, [api, queryClient, sessionId]);
+
+  return session;
+}
+
+/** Lazy AgentSession for a draft: created on first send, disposed on leave. */
+export function useDraftAgentSession(): {
+  ensureSession(): Promise<AgentSessionStub>;
+} {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const sessionRef = useRef<AgentSessionStub | null>(null);
+
+  useEffect(() => {
+    return () => {
+      sessionRef.current?.[Symbol.dispose]();
+      sessionRef.current = null;
+    };
+  }, []);
+
+  async function ensureSession() {
+    if (sessionRef.current !== null) return sessionRef.current;
+    const created = await api.newAgentSession();
+    sessionRef.current = created;
+    await created.subscribe((event) => {
+      const key = livePromptKey(event.sessionId);
+      const current = queryClient.getQueryData<LivePrompt>(key);
+      if (current === undefined) return;
+      queryClient.setQueryData(key, applyPromptStreamEvent(current, event));
+    });
+    return created;
+  }
+
+  return { ensureSession };
+}
+
 export function useSendPromptMutation() {
   const { api, queryClient } = useContext(ApiContext);
   return useMutation({
     mutationKey: sendPromptMutationKey,
-    mutationFn: ({ sessionId, text }: SendPromptInput) =>
-      api.sendPrompt(sessionId, text, (event) => {
-        const key = livePromptKey(sessionId);
-        const current = queryClient.getQueryData<LivePrompt>(key)!;
-        queryClient.setQueryData(key, applyPromptStreamEvent(current, event));
-      }),
+    mutationFn: ({ session, text }: SendPromptInput) => session.prompt(text),
     onMutate: ({ sessionId, text }) => {
       queryClient.setQueryData<LivePrompt>(livePromptKey(sessionId), {
         sessionId,
@@ -193,16 +282,12 @@ export function useSendPromptMutation() {
   });
 }
 
-export function useCreateSessionMutation() {
-  const api = useApi();
-  return useMutation({ mutationFn: api.createSession });
-}
-
 export function useIsSendingPrompt(sessionId: string | null) {
   const count = useIsMutating({
     mutationKey: sendPromptMutationKey,
     predicate: (mutation) =>
-      (mutation.state.variables as SendPromptInput).sessionId === sessionId,
+      (mutation.state.variables as SendPromptInput | undefined)?.sessionId ===
+      sessionId,
   });
   return count > 0;
 }
@@ -225,7 +310,7 @@ function sessionTranscriptKey(sessionId: string | null) {
   return ["session-transcript", sessionId] as const;
 }
 
-async function restoreWorkspace(api: SystemApi): Promise<WorkspaceState> {
+async function restoreWorkspace(api: HaloApiStub): Promise<WorkspaceState> {
   const active = await api
     .getWorkspace()
     .catch((e) => new WorkspaceRestoreError({ cause: e }));
