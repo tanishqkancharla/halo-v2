@@ -15,7 +15,6 @@ import {
   shadow,
   shadowVars,
   spacing,
-  text,
   type ProseSize,
 } from "maui";
 import { style, useStyles } from "purse-styles";
