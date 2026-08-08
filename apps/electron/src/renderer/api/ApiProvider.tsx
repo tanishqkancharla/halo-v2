@@ -40,7 +40,7 @@ type ApiContextValue = {
 };
 
 const ApiContext = createContext<ApiContextValue>(undefined!);
-const systemApiQueryKey = ["system-api"] as const;
+const haloApiQueryKey = ["halo-api"] as const;
 const workspaceQueryKey = ["workspace"] as const;
 const sendPromptMutationKey = ["send-prompt"] as const;
 
@@ -97,7 +97,7 @@ function ResolveApi({
 }) {
   const queryClient = useQueryClient();
   const apiQuery = useQuery({
-    queryKey: systemApiQueryKey,
+    queryKey: haloApiQueryKey,
     queryFn: createApi,
   });
 

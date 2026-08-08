@@ -10,7 +10,7 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import type { SessionState, SessionSummary } from "../shared/rpc.ts";
+import type { SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 import { HaloLogo } from "./HaloLogo.tsx";
 
@@ -38,7 +38,6 @@ export function Sidebar({
   const sectionLabel = useStyles(styles.sectionLabel);
   const sessionList = useStyles(styles.sessionList);
   const sessionTitle = useStyles(styles.sessionTitle);
-  const sessionState = useStyles(styles.sessionState);
 
   return (
     <nav className={sidebar} aria-label="Sessions">
@@ -66,7 +65,6 @@ export function Sidebar({
             const active =
               selection?.kind === "saved" &&
               selection.sessionId === session.sessionId;
-            const state = stateLabel(session.state);
 
             return (
               <li key={session.sessionId}>
@@ -84,7 +82,6 @@ export function Sidebar({
                   <span className={sessionTitle}>
                     {session.title ? session.title : session.sessionId}
                   </span>
-                  {state ? <span className={sessionState}>{state}</span> : null}
                 </button>
               </li>
             );
@@ -93,15 +90,6 @@ export function Sidebar({
       </section>
     </nav>
   );
-}
-
-function stateLabel(state: SessionState) {
-  switch (state) {
-    case "idle":
-      return undefined;
-    case "running":
-      return "Running";
-  }
 }
 
 const styles = {
@@ -179,9 +167,5 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
-  }),
-  sessionState: style(text("xs", 400, "lowContrast"), {
-    marginLeft: "auto",
-    flexShrink: 0,
   }),
 };

@@ -95,7 +95,6 @@ function sessionSummary(session: SessionInfo): SessionSummary {
     sessionId: session.id,
     agent: "pi",
     cwd: session.cwd,
-    state: "idle",
     title: title.trim().length === 0 ? undefined : title,
     createdAt: session.created.toISOString(),
     updatedAt: session.modified.toISOString(),

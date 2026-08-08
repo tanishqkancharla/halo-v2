@@ -168,11 +168,11 @@ The options passed to Pi omit `authStorage`, `modelRegistry`, `settingsManager`,
  }
 ```
 
-- [ ] Remove explicit `AuthStorage` and `ModelRegistry` construction and imports from `apps/electron/src/main/pi-service.ts`; do not add explicit settings or resource-loader objects.
-- [ ] Delete the injected `AgentSessionFactory` seam and call Pi's `createAgentSession()` directly with only `cwd`, `agentDir`, `sessionManager`, and `createCodingTools(layout.root)`.
-- [ ] Keep `SessionManager.create/open` local to each live-session request and keep `listSessions()` / `readTranscript()` as separate durable catalog operations.
-- [ ] Delete `apps/electron/src/main/pi-service.test.ts`; prove the supported behavior through the live Cap'n Web/UI path instead of a second fake Pi implementation.
-- [ ] Keep Pi factory rejection wrapped as `CreateAgentSessionError`; run `pnpm run check-affected` and verify the draft first-send and saved-chat reopen flows with `pnpm halo-web`, then commit this phase.
+- [x] Remove explicit `AuthStorage` and `ModelRegistry` construction and imports from `apps/electron/src/main/pi-service.ts`; do not add explicit settings or resource-loader objects.
+- [x] Delete the injected `AgentSessionFactory` seam and call Pi's `createAgentSession()` directly with only `cwd`, `agentDir`, `sessionManager`, and `createCodingTools(layout.root)`.
+- [x] Keep `SessionManager.create/open` local to each live-session request and keep `listSessions()` / `readTranscript()` as separate durable catalog operations.
+- [x] Delete `apps/electron/src/main/pi-service.test.ts`; prove the supported behavior through the live Cap'n Web/UI path instead of a second fake Pi implementation.
+- [x] Keep Pi factory rejection wrapped as `CreateAgentSessionError`; run `pnpm run check-affected` and verify the draft first-send and saved-chat reopen flows with `pnpm halo-web`, then commit this phase.
 
 ### Phase 2: Return direct Cap'n Web session stubs
 
@@ -288,16 +288,17 @@ type LiveAgentSession = RpcStub<AgentSessionApi>;
  }
 ```
 
-- [ ] Replace `HaloRpc.createAgentSession()` with `newAgentSession()` and `openAgentSession(sessionId)`, return `AgentSessionRpc` directly, and throw returned service errors only at this RPC boundary.
-- [ ] Simplify `AgentSessionRpc` to one duplicated callback, one ordered delivery chain, and one disposer; remove the listener set, result wrapper, and `send()` alias.
-- [ ] Delete `AgentSessionHandle`, `CreateAgentSessionResult`, `HaloRpcApi`, `SystemApi`, and `systemApiFromHaloRpc()`; make `createElectronApi()` and `ApiProvider` use `RpcStub<HaloApi>` and `RpcStub<AgentSessionApi>` directly.
-- [ ] Update `useDraftAgentSession`, `useOpenAgentSession`, `useSendPromptMutation`, and `MainPane` so drafts call `newAgentSession()` only on first send, saved chats call `openAgentSession()`, later prompts reuse the same stub, and cleanup disposes it.
-- [ ] Add focused RPC lifecycle tests where practical, run `pnpm run check-affected`, verify first-send/reuse/open/dispose with `pnpm halo-web`, then commit and push this phase.
+- [x] Replace `HaloRpc.createAgentSession()` with `newAgentSession()` and `openAgentSession(sessionId)`, return `AgentSessionRpc` directly, and throw returned service errors only at this RPC boundary.
+- [x] Simplify `AgentSessionRpc` to one duplicated callback, one ordered delivery chain, and one disposer; remove the listener set, result wrapper, and `send()` alias.
+- [x] Delete `AgentSessionHandle`, `CreateAgentSessionResult`, `HaloRpcApi`, `SystemApi`, and `systemApiFromHaloRpc()`; make `createElectronApi()` and `ApiProvider` use `RpcStub<HaloApi>` and `RpcStub<AgentSessionApi>` directly.
+- [x] Update `useDraftAgentSession`, `useOpenAgentSession`, `useSendPromptMutation`, and `MainPane` so drafts call `newAgentSession()` only on first send, saved chats call `openAgentSession()`, later prompts reuse the same stub, and cleanup disposes it.
+- [x] Add focused RPC lifecycle tests where practical, run `pnpm run check-affected`, verify first-send/reuse/open/dispose with `pnpm halo-web`, then commit and push this phase.
 
 ## Final check
 
-- [ ] Confirm the diagrams appear only at the top and match the implemented ownership and RPC paths.
-- [ ] Confirm `PiService` caches no SDK services, `SessionManager`, `AgentSession`, draft, running, or busy state.
-- [ ] Confirm each live chat owns one manager, one Pi session, and one direct Cap'n Web session stub until the renderer leaves.
-- [ ] Confirm no `AgentSessionHandle`, result wrapper, `systemApiFromHaloRpc`, or option-shaped renderer call remains.
-- [ ] Confirm `pnpm run check-affected` passes and the Halo UI proves draft first-send, follow-up reuse, saved-chat open, and disposal on leave.
+- [x] Confirm the diagrams appear only at the top and match the implemented ownership and RPC paths.
+- [x] Confirm `PiService` caches no SDK services, `SessionManager`, `AgentSession`, draft, running, or busy state.
+- [x] Confirm each live chat owns one manager, one Pi session, and one direct Cap'n Web session stub until the renderer leaves.
+- [x] Confirm no `AgentSessionHandle`, result wrapper, `systemApiFromHaloRpc`, or option-shaped renderer call remains.
+- [x] Confirm `pnpm run check-affected` passes and the Halo UI proves draft first-send, follow-up reuse, saved-chat open, and disposal on leave.
+- [x] Drop leftover live `SessionState` / `running` from durable session summaries and the sidebar; rename the renderer Cap'n Web query key off the old `SystemApi` name.

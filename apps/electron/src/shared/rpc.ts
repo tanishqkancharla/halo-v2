@@ -5,13 +5,10 @@ export type WorkspaceInfo = {
   workspaceRoot: string;
 };
 
-export type SessionState = "idle" | "running";
-
 export type SessionSummary = {
   sessionId: string;
   agent: "pi";
   cwd: string;
-  state: SessionState;
   title?: string;
   createdAt: string;
   updatedAt: string;
