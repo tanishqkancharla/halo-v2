@@ -4,6 +4,7 @@ import {
   backgroundColor,
   colors,
   flex,
+  icon,
   radius,
   shadow,
   spacing,
@@ -33,6 +34,7 @@ export function Sidebar({
   const header = useStyles(styles.header);
   const logo = useStyles(styles.logo);
   const newButton = useStyles(styles.newButton);
+  const newIcon = useStyles(icon("sm"));
   const sessionLink = useStyles(styles.sessionLink);
   const section = useStyles(styles.section);
   const sectionLabel = useStyles(styles.sectionLabel);
@@ -53,7 +55,7 @@ export function Sidebar({
           onSelectionChange({ kind: "draft", draftId: crypto.randomUUID() })
         }
       >
-        <Icons.Plus aria-hidden="true" />
+        <Icons.Plus className={newIcon} aria-hidden="true" />
         New session
       </Button>
       <section className={section} aria-labelledby="sessions-label">
@@ -123,7 +125,6 @@ const styles = {
     alignSelf: "stretch",
     width: `calc(100% - ${spacing.value(4)} - ${spacing.value(4)})`,
     marginInline: spacing.value(4),
-    "& svg": { width: "16px", height: "16px" },
   }),
   sessionLink: style(
     spacing.padding({ x: 4, y: 2 }),
@@ -138,7 +139,6 @@ const styles = {
       cursor: "default",
       background: "transparent",
       textAlign: "left",
-      "& svg": { width: "16px", height: "16px", flexShrink: 0 },
       "&:hover": { background: backgroundColor.elementHover },
       "&[aria-current='page']": {
         color: colors.accent[9],

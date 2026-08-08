@@ -6,9 +6,6 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
-    "paths": {
-      "maui": ["./src/renderer/maui.d.ts"]
-    },
     "types": ["vite/client"]
   },
   "include": ["src/renderer", "src/shared", "vite.renderer.config.ts"]

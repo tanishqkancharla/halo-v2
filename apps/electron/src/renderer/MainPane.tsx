@@ -1,17 +1,16 @@
 import * as errore from "errore";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
-  AssistantMessage,
   Button,
-  Editor,
   H1,
   H3,
-  Loader,
+  Icons,
   P,
   backgroundColor,
   colors,
   flex,
   flexItem,
+  icon,
   radius,
   shadowVars,
   spacing,
@@ -27,6 +26,9 @@ import {
   useSessionTranscriptQuery,
   type LivePrompt,
 } from "./api/ApiProvider.tsx";
+import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
+import { Editor } from "./patterns/Editor.tsx";
+import { Loader } from "./patterns/Loader.tsx";
 import { type SessionSummary, type SessionTranscript } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 
@@ -69,7 +71,7 @@ function SavedPane({
 }) {
   const content = useStyles(styles.content);
   const header = useStyles(styles.header);
-  const editorArea = useStyles(styles.editorArea);
+  const composer = useStyles(styles.composer);
   const status = useStyles(styles.status);
   const pane = useStyles(styles.pane);
   const transcript = useSessionTranscriptQuery(sessionId);
@@ -102,7 +104,7 @@ function SavedPane({
         ) : (
           <MessageFeed transcript={transcript.data} livePrompt={livePrompt} />
         )}
-        <div className={editorArea}>
+        <div className={composer}>
           <PromptEditor
             key={sessionId}
             isSending={isSending ? true : agentSession === null}
@@ -139,7 +141,7 @@ function DraftPane({
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);
   const header = useStyles(styles.header);
-  const editorArea = useStyles(styles.editorArea);
+  const composer = useStyles(styles.composer);
 
   async function submit(prompt: string) {
     const session = await ensureSession();
@@ -163,7 +165,7 @@ function DraftPane({
         {livePrompt === undefined ? null : (
           <MessageFeed transcript={emptyTranscript} livePrompt={livePrompt} />
         )}
-        <div className={editorArea}>
+        <div className={composer}>
           <PromptEditor
             key={draftId}
             isSending={sendPrompt.isPending}
@@ -188,6 +190,8 @@ function PromptEditor({
   const errorId = useId();
   const editor = useStyles(styles.promptEditor);
   const editorSurface = useStyles(styles.editorSurface);
+  const sendButton = useStyles(styles.sendButton);
+  const sendIcon = useStyles(icon("sm"));
   const error = useStyles(styles.promptError);
   const trimmedText = draft.text.trim();
   const sendDisabled = isSending ? true : trimmedText.length === 0;
@@ -229,8 +233,13 @@ function PromptEditor({
         size="sm"
         className={editorSurface}
         actions={
-          <Button onClick={submit} disabled={sendDisabled}>
-            {isSending ? "Sending…" : "Send"}
+          <Button
+            aria-label={isSending ? "Sending" : "Send"}
+            className={sendButton}
+            disabled={sendDisabled}
+            onClick={submit}
+          >
+            <Icons.ArrowUp className={sendIcon} />
           </Button>
         }
       />
@@ -273,13 +282,11 @@ function MessageFeed({
       {livePrompt === undefined ? null : (
         <>
           <Message role="user" text={livePrompt.userText} />
-          {livePrompt.assistantText.length === 0 ? null : (
-            <Message
-              role="assistant"
-              text={livePrompt.assistantText}
-              isAnimating={livePrompt.status === "sending"}
-            />
-          )}
+          <Message
+            role="assistant"
+            text={livePrompt.assistantText}
+            isAnimating={livePrompt.status === "sending"}
+          />
           {livePrompt.status === "failed" ? (
             <div className={liveStatus} role="alert">
               {livePrompt.error === undefined
@@ -303,26 +310,32 @@ function Message({
   isAnimating?: boolean;
 }) {
   const messageClass = useStyles(
-    role === "user" ? styles.userMessage : styles.assistantMessage,
+    role === "user" ? styles.userMessage : styles.assistantRow,
   );
   const body = useStyles(styles.messageBody);
+  const assistantMessage = useStyles(styles.assistantMessage);
   const thinking = useStyles(styles.thinking);
   const roleLabel = role === "user" ? "You" : "Assistant";
 
   if (role === "assistant") {
     return (
-      <article className={messageClass} aria-label={`${roleLabel} message`}>
+      <div className={messageClass} aria-label={`${roleLabel} message`}>
         {messageText ? (
-          <AssistantMessage size="sm" isAnimating={isAnimating}>
+          <AssistantMessage
+            size="sm"
+            className={assistantMessage}
+            isAnimating={isAnimating}
+          >
             {messageText}
           </AssistantMessage>
-        ) : isAnimating ? (
+        ) : null}
+        {isAnimating ? (
           <span className={thinking}>
-            <Loader size="0.75em" variant="muted" aria-label="Generating" />
-            Thinking…
+            <Loader size="0.75em" variant="muted" aria-label="Thinking" />
+            Thinking
           </span>
         ) : null}
-      </article>
+      </div>
     );
   }
 
@@ -380,7 +393,7 @@ const styles = {
       "&::-webkit-scrollbar": { display: "none" },
     },
   ),
-  editorArea: style(flexItem({ size: "hug" }), {
+  composer: style(flexItem({ size: "hug" }), {
     width: "100%",
     minWidth: 0,
     position: "relative",
@@ -417,13 +430,18 @@ const styles = {
     minWidth: 0,
     backgroundColor: colors.gray[3],
   }),
-  assistantMessage: style(flexItem({ size: "hug" }), {
-    width: "100%",
+  assistantRow: style(flex({ direction: "column", gap: 3 }), {
     minWidth: 0,
+    width: "100%",
+    alignSelf: "stretch",
+  }),
+  assistantMessage: style({
+    maxWidth: "none",
+    width: "100%",
   }),
   thinking: style(
     text("xs", 400, "lowContrast"),
-    flex({ align: "center", gap: 2 }),
+    flex({ align: "center", gap: 4 }),
   ),
   messageBody: style(text("md", 400, "highContrast"), {
     minWidth: 0,
@@ -435,8 +453,26 @@ const styles = {
     minWidth: 0,
   }),
   editorSurface: style({
-    "&&": { boxShadow: shadowVars.medium },
-    backgroundColor: `light-dark(transparent, ${colors.gray[2]})`,
+    maxWidth: "none",
+    width: "100%",
+    // Keep the editor's subtle elevation on focus; drop the blue focus ring.
+    "&:focus-within": {
+      outline: "none",
+      boxShadow: shadowVars.subtle,
+      zIndex: "auto",
+    },
+  }),
+  sendButton: style(radius.circle, {
+    boxShadow: "none",
+    // Editor shell is also `background.app` white; a light wash keeps the circle
+    // readable once the default Button shadow is removed.
+    backgroundColor: colors.gray[3],
+    "&:hover": {
+      backgroundColor: colors.gray[4],
+    },
+    "&:active": {
+      backgroundColor: colors.gray[5],
+    },
   }),
   promptError: style(
     text("xs", 500, "highContrast"),
