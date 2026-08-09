@@ -1,31 +1,19 @@
-import type { LogLevel, LoggerApi, LoggerData } from "@repo/logger";
+import { Logger, type LoggerEntry, type LoggerSinkApi } from "@repo/logger";
 import { LOG_CHANNELS } from "../shared/channels.js";
 
-function send(level: LogLevel, data: LoggerData) {
-  window.postMessage(
-    {
-      channel: LOG_CHANNELS.log,
-      payload: { level, data },
-    },
-    "*",
-  );
+class MainProcessLoggerSink implements LoggerSinkApi {
+  log(entry: LoggerEntry) {
+    window.postMessage(
+      {
+        channel: LOG_CHANNELS.log,
+        payload: { level: entry.level, data: entry.data },
+      },
+      "*",
+    );
+  }
 }
 
 /** Forwards renderer logs to the main-process `logger.scope("renderer")`. */
-export const logger: LoggerApi = {
-  debug(data) {
-    send("debug", data);
-  },
-  info(data) {
-    send("info", data);
-  },
-  warn(data) {
-    send("warn", data);
-  },
-  log(data) {
-    send("log", data);
-  },
-  error(data) {
-    send("error", data);
-  },
-};
+export const logger = new Logger({
+  sinks: [new MainProcessLoggerSink()],
+});

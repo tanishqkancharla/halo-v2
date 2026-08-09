@@ -9,11 +9,16 @@ import {
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { LogLevel, LoggerData } from "@repo/logger";
+import {
+  ConsoleLoggerSink,
+  JsonlLoggerSink,
+  Logger,
+  type LogLevel,
+  type LoggerData,
+} from "@repo/logger";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
-import { getApplicationConfig } from "./ApplicationConfig.js";
-import { createApplicationLogger } from "./createApplicationLogger.js";
+import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { newMessagePortMainRpcSession } from "./MessagePortMainTransport.js";
 import { PiService } from "./pi-service.js";
 import { HaloRpc } from "./rpc.js";
@@ -30,11 +35,13 @@ if (started) app.quit();
 loadDevelopmentEnvironment();
 configureUserDataPath();
 
-const applicationConfig = getApplicationConfig({
-  isDevelopment,
-  dataDir: app.getPath("userData"),
+const applicationConfig = getApplicationConfig({ isDevelopment });
+const logger = new Logger({
+  sinks: [
+    new ConsoleLoggerSink(),
+    new JsonlLoggerSink({ filePath: getLogFilePath(applicationConfig) }),
+  ],
 });
-const logger = createApplicationLogger(applicationConfig);
 const rendererLogger = logger.scope("renderer");
 
 if (isDevelopment) {

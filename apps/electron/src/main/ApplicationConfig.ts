@@ -1,3 +1,4 @@
+import { app } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -7,21 +8,17 @@ export type ApplicationConfig = {
   logsDir: string;
 };
 
-export type ApplicationConfigEnv = {
+export function getApplicationConfig(env: {
   isDevelopment: boolean;
-  dataDir: string;
-};
-
-export function getApplicationConfig(
-  env: ApplicationConfigEnv,
-): ApplicationConfig {
-  const config: ApplicationConfig = {
+}): ApplicationConfig {
+  const dataDir = app.getPath("userData");
+  const logsDir = join(dataDir, "logs");
+  mkdirSync(logsDir, { recursive: true });
+  return {
     isDevelopment: env.isDevelopment,
-    dataDir: env.dataDir,
-    logsDir: join(env.dataDir, "logs"),
+    dataDir,
+    logsDir,
   };
-  mkdirSync(config.logsDir, { recursive: true });
-  return config;
 }
 
 export function getLogFilePath(
@@ -29,11 +26,7 @@ export function getLogFilePath(
   now = new Date(),
 ): string {
   if (config.isDevelopment) {
-    return join(config.logsDir, `${utcDay(now)}.jsonl`);
+    return join(config.logsDir, `${now.toISOString().slice(0, 10)}.jsonl`);
   }
   return join(config.logsDir, "halo.jsonl");
-}
-
-function utcDay(now: Date): string {
-  return now.toISOString().slice(0, 10);
 }
