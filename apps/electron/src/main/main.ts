@@ -11,11 +11,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ConsoleLoggerSink,
-  JsonlLoggerSink,
   Logger,
   type LogLevel,
   type LoggerData,
 } from "@repo/logger";
+import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";

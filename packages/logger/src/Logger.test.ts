@@ -2,12 +2,8 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import {
-  JsonlLoggerSink,
-  Logger,
-  type LoggerEntry,
-  type LoggerSinkApi,
-} from "./Logger.js";
+import { JsonlLoggerSink } from "./JsonlLoggerSink.js";
+import { Logger, type LoggerEntry, type LoggerSinkApi } from "./Logger.js";
 
 class CollectingSink implements LoggerSinkApi {
   readonly entries: LoggerEntry[] = [];
