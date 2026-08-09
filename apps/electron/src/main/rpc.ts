@@ -1,11 +1,16 @@
-import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import type {
+  AgentSession,
+  AgentSessionEvent,
+} from "@mariozechner/pi-coding-agent";
 import { dialog, type BrowserWindow } from "electron";
 import {
   AgentSessionApi,
   HaloApi,
   type PromptEventHandler,
+  type PromptStreamEvent,
   type WorkspaceInfo,
 } from "../shared/rpc.js";
+import { toolCallFromPi } from "../shared/ToolCall.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
 import type { PiService } from "./pi-service.js";
 import type { WorkspaceService } from "./workspace-service.js";
@@ -73,17 +78,8 @@ export class AgentSessionRpc extends AgentSessionApi {
   constructor(private readonly session: AgentSession) {
     super();
     this.unsubscribePi = session.subscribe((event) => {
-      if (
-        event.type !== "message_update" ||
-        event.assistantMessageEvent.type !== "text_delta"
-      ) {
-        return;
-      }
-      const streamEvent = {
-        type: "delta" as const,
-        sessionId: this.session.sessionId,
-        text: event.assistantMessageEvent.delta,
-      };
+      const streamEvent = promptStreamEvent(this.session.sessionId, event);
+      if (streamEvent === null) return;
       const listener = this.listener;
       if (listener === null) return;
       this.deliveries = this.deliveries.then(() => listener(streamEvent));
@@ -122,4 +118,30 @@ export class AgentSessionRpc extends AgentSessionApi {
     });
     this.session.dispose();
   }
+}
+
+function promptStreamEvent(
+  sessionId: string,
+  event: AgentSessionEvent,
+): PromptStreamEvent | null {
+  if (
+    event.type === "message_update" &&
+    event.assistantMessageEvent.type === "text_delta"
+  ) {
+    return {
+      type: "delta",
+      sessionId,
+      text: event.assistantMessageEvent.delta,
+    };
+  }
+  if (event.type === "tool_execution_start") {
+    const toolCall = toolCallFromPi(
+      event.toolCallId,
+      event.toolName,
+      event.args,
+    );
+    if (toolCall === null) return null;
+    return { type: "toolCall", sessionId, toolCall };
+  }
+  return null;
 }

@@ -11,6 +11,8 @@ import {
   flex,
   flexItem,
   icon,
+  monospace,
+  prose,
   radius,
   shadowVars,
   spacing,
@@ -29,7 +31,11 @@ import {
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
-import { type SessionSummary, type SessionTranscript } from "../shared/rpc.ts";
+import {
+  type SessionSummary,
+  type SessionTranscript,
+  type ToolCall,
+} from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
@@ -277,14 +283,20 @@ function MessageFeed({
       ref={feedRef}
     >
       {transcript.messages.map((message) => (
-        <Message key={message.id} role={message.role} text={message.text} />
+        <Message
+          key={message.id}
+          role={message.role}
+          text={message.text}
+          toolCalls={message.toolCalls}
+        />
       ))}
       {livePrompt === undefined ? null : (
         <>
-          <Message role="user" text={livePrompt.userText} />
+          <Message role="user" text={livePrompt.userText} toolCalls={[]} />
           <Message
             role="assistant"
             text={livePrompt.assistantText}
+            toolCalls={livePrompt.toolCalls}
             isAnimating={livePrompt.status === "sending"}
           />
           {livePrompt.status === "failed" ? (
@@ -303,10 +315,12 @@ function MessageFeed({
 function Message({
   role,
   text: messageText,
+  toolCalls,
   isAnimating = false,
 }: {
   role: "user" | "assistant";
   text: string;
+  toolCalls: ToolCall[];
   isAnimating?: boolean;
 }) {
   const messageClass = useStyles(
@@ -320,6 +334,7 @@ function Message({
   if (role === "assistant") {
     return (
       <div className={messageClass} aria-label={`${roleLabel} message`}>
+        <ToolCallList toolCalls={toolCalls} />
         {messageText ? (
           <AssistantMessage
             size="sm"
@@ -343,6 +358,33 @@ function Message({
     <article className={messageClass} aria-label={`${roleLabel} message`}>
       <div className={body}>{messageText}</div>
     </article>
+  );
+}
+
+function ToolCallList({ toolCalls }: { toolCalls: ToolCall[] }) {
+  const toolCallsClassName = useStyles(styles.toolCalls);
+  const toolCallClassName = useStyles(styles.toolCall);
+  const toolShellClassName = useStyles(styles.toolShell);
+
+  if (toolCalls.length === 0) return null;
+
+  return (
+    <div className={toolCallsClassName} aria-label="Tool calls">
+      {toolCalls.map((call) => (
+        <div key={call.id} className={toolCallClassName}>
+          {call.kind === "read" ? (
+            <>Read {call.path}</>
+          ) : call.kind === "wrote" ? (
+            <>Wrote {call.path}</>
+          ) : (
+            <>
+              {"$ "}
+              <span className={toolShellClassName}>{call.command}</span>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -439,6 +481,17 @@ const styles = {
     maxWidth: "none",
     width: "100%",
   }),
+  toolCalls: style(flex({ direction: "column", gap: 2 }), {
+    minWidth: 0,
+  }),
+  toolCall: style(prose("sm").paragraph, {
+    color: colors.gray[11],
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  }),
+  toolShell: style(monospace),
   thinking: style(
     text("xs", 400, "lowContrast"),
     flex({ align: "center", gap: 4 }),

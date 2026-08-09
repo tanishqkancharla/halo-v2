@@ -11,6 +11,7 @@ import type {
   SessionSummary,
   SessionTranscript,
 } from "../shared/rpc.js";
+import { collectToolCalls } from "../shared/ToolCall.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
@@ -105,12 +106,15 @@ function sessionMessage(entry: SessionMessageEntry): SessionMessage[] {
   const message = entry.message;
   if (message.role !== "user" && message.role !== "assistant") return [];
   const text = collectText(message.content);
-  if (text.length === 0) return [];
+  const toolCalls =
+    message.role === "assistant" ? collectToolCalls(message.content) : [];
+  if (text.length === 0 && toolCalls.length === 0) return [];
   return [
     {
       id: entry.id,
       role: message.role,
       text,
+      toolCalls,
       timestamp: entry.timestamp,
     },
   ];

@@ -20,6 +20,7 @@ import {
 import type {
   AgentSessionApi,
   PromptStreamEvent,
+  ToolCall,
   WorkspaceInfo,
 } from "../../shared/rpc.js";
 import { Onboarding } from "../Onboarding.tsx";
@@ -55,6 +56,7 @@ export type LivePrompt = {
   sessionId: string;
   userText: string;
   assistantText: string;
+  toolCalls: ToolCall[];
   status: "sending" | "failed";
   error?: string;
 };
@@ -255,6 +257,7 @@ export function useSendPromptMutation() {
         sessionId,
         userText: text,
         assistantText: "",
+        toolCalls: [],
         status: "sending",
       });
     },
@@ -296,9 +299,15 @@ export function applyPromptStreamEvent(
   current: LivePrompt,
   event: PromptStreamEvent,
 ): LivePrompt {
+  if (event.type === "delta") {
+    return {
+      ...current,
+      assistantText: current.assistantText + event.text,
+    };
+  }
   return {
     ...current,
-    assistantText: current.assistantText + event.text,
+    toolCalls: [...current.toolCalls, event.toolCall],
   };
 }
 

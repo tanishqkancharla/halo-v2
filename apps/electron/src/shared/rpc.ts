@@ -1,4 +1,7 @@
 import { RpcTarget } from "capnweb";
+import type { ToolCall } from "./ToolCall.js";
+
+export type { ToolCall } from "./ToolCall.js";
 
 export type WorkspaceInfo = {
   name: string;
@@ -20,6 +23,7 @@ export type SessionMessage = {
   id: string;
   role: MessageRole;
   text: string;
+  toolCalls: ToolCall[];
   timestamp: string;
 };
 
@@ -27,11 +31,9 @@ export type SessionTranscript = {
   messages: SessionMessage[];
 };
 
-export type PromptStreamEvent = {
-  type: "delta";
-  sessionId: string;
-  text: string;
-};
+export type PromptStreamEvent =
+  | { type: "delta"; sessionId: string; text: string }
+  | { type: "toolCall"; sessionId: string; toolCall: ToolCall };
 
 export type PromptEventHandler = (event: PromptStreamEvent) => void;
 
