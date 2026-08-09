@@ -27,7 +27,7 @@ jobs:
       github.repository == 'tanishqkancharla/halo-v2' &&
       github.actor == 'tanishqkancharla' &&
       (inputs.platforms == 'all' || inputs.platforms == matrix.platform)
-    environment: release
+    environment: Release
     strategy:
       fail-fast: false
       matrix:

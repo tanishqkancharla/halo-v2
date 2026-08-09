@@ -81,7 +81,7 @@ pnpm infra:deploy
 pnpm infra:dev
 ```
 
-First login stores Cloudflare credentials in `~/.alchemy/profiles.json`. CI uses `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN` instead. Electron publish to R2 uses the `release` GitHub Environment (see [Publishing](#publishing)).
+First login stores Cloudflare credentials in `~/.alchemy/profiles.json`. CI uses `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN` instead. Electron publish to R2 uses the `Release` GitHub Environment (see [Publishing](#publishing)).
 
 ## Packaging
 
@@ -102,7 +102,7 @@ The deployed bucket name is `halo-releases-dev-ubuntu-auuzjrvkmjn3x2oy` (ENAM, S
 
 1. Confirm infra is deployed (`pnpm infra:deploy` if needed).
 2. In the Cloudflare dashboard, create an [R2 API token](https://developers.cloudflare.com/r2/api/tokens/) with Object Read & Write on that bucket.
-3. Create a GitHub Environment named `release` on this repo.
+3. Create a GitHub Environment named `Release` on this repo (name is case-sensitive).
 4. Add environment **variables**:
    - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account id
    - `HALO_RELEASES_BUCKET` — `halo-releases-dev-ubuntu-auuzjrvkmjn3x2oy`
