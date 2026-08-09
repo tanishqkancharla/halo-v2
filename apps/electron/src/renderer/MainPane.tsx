@@ -85,7 +85,7 @@ function SavedPane({
   const content = useStyles(styles.content);
   const composer = useStyles(styles.composer);
   const pane = useStyles(styles.pane);
-  const { session, state, isWorking, prompt } = useAgentSession(sessionId);
+  const { state, isWorking, prompt } = useAgentSession(sessionId);
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
   );
@@ -99,7 +99,6 @@ function SavedPane({
         <div className={composer}>
           <PromptEditor
             key={sessionId}
-            isSending={isWorking ? true : session === null}
             onSubmit={async (promptText) => {
               const result = await prompt(promptText);
               if (result instanceof Error) {
@@ -138,7 +137,6 @@ function DraftPane({
         <div className={composer}>
           <PromptEditor
             key={draftId}
-            isSending={isWorking}
             onSubmit={async (promptText) => {
               const result = await prompt(promptText);
               if (result instanceof Error) {
@@ -155,10 +153,8 @@ function DraftPane({
 type PromptDraft = { text: string; error?: string };
 
 function PromptEditor({
-  isSending,
   onSubmit,
 }: {
-  isSending: boolean;
   onSubmit: (prompt: string) => Promise<unknown>;
 }) {
   const [draft, setDraft] = useState<PromptDraft>({ text: "" });
@@ -169,13 +165,12 @@ function PromptEditor({
   const sendIcon = useStyles(icon("sm"));
   const error = useStyles(styles.promptError);
   const trimmedText = draft.text.trim();
-  const sendDisabled = isSending ? true : trimmedText.length === 0;
+  const sendDisabled = trimmedText.length === 0;
 
   async function submit() {
-    if (isSending) return;
     if (!trimmedText) return;
 
-    setDraft({ text: draft.text });
+    setDraft({ text: "" });
     const result = await onSubmit(trimmedText).catch(
       (e) =>
         new PromptSubmitError({
@@ -188,11 +183,7 @@ function PromptEditor({
         text: current.text,
         error: result.message,
       }));
-      return;
     }
-    setDraft((current) =>
-      current.text === draft.text ? { text: "" } : current,
-    );
   }
 
   return (
@@ -201,14 +192,13 @@ function PromptEditor({
         content={draft.text}
         onChange={(markdown) => setDraft({ text: markdown })}
         onSubmit={submit}
-        editable={!isSending}
         placeholder="Message Halo"
         aria-label="Message"
         size="sm"
         className={editorSurface}
         actions={
           <Button
-            aria-label={isSending ? "Sending" : "Send"}
+            aria-label="Send"
             className={sendButton}
             disabled={sendDisabled}
             onClick={submit}
