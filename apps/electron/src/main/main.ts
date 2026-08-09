@@ -9,8 +9,17 @@ import {
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  Logger,
+  type LogLevel,
+  type LoggerData,
+  type LoggerScope,
+} from "@repo/logger";
+import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
+import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
-import { RPC_CHANNELS } from "../shared/channels.js";
+import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
+import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { newMessagePortMainRpcSession } from "./MessagePortMainTransport.js";
 import { PiService } from "./pi-service.js";
 import { HaloRpc } from "./rpc.js";
@@ -26,6 +35,17 @@ if (started) app.quit();
 
 loadDevelopmentEnvironment();
 configureUserDataPath();
+
+const applicationConfig = getApplicationConfig({ isDevelopment });
+const logger = new Logger({
+  sinks: [
+    new PrettyConsoleLoggerSink(),
+    new JsonlLoggerSink({ filePath: getLogFilePath(applicationConfig) }),
+  ],
+});
+const rendererLogger = logger.scope("renderer");
+const rpcLogger = logger.scope("rpc");
+
 if (isDevelopment) {
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", "4445");
@@ -39,15 +59,17 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
   app.commandLine.appendSwitch("disable-gpu-sandbox");
 }
 
-const workspaceService = new WorkspaceService(app.getPath("userData"));
+const workspaceService = new WorkspaceService(applicationConfig.dataDir);
 const piService = new PiService(workspaceService);
 let mainWindow: BrowserWindow | null = null;
 
 app.whenReady().then(async () => {
   await workspaceService.restore();
+  registerLogBridge();
   registerRpcBridge();
   installMenu();
   openMainWindow();
+  logger.info({ event: "app-ready" });
 
   app.on("activate", () => {
     if (mainWindow === null) openMainWindow();
@@ -56,6 +78,10 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("will-quit", () => {
+  logger.destroy();
 });
 
 function openMainWindow(): void {
@@ -94,6 +120,29 @@ function createWindow(): BrowserWindow {
   return window;
 }
 
+function registerLogBridge(): void {
+  ipcMain.on(
+    LOG_CHANNELS.log,
+    (
+      event,
+      payload: {
+        level: LogLevel;
+        scopes: readonly LoggerScope[];
+        data: LoggerData;
+      },
+    ) => {
+      assertTrustedSender(event);
+      let log = rendererLogger;
+      for (const scope of payload.scopes) {
+        for (const [name, scopeData] of Object.entries(scope)) {
+          log = log.scope(name, scopeData);
+        }
+      }
+      log[payload.level](payload.data);
+    },
+  );
+}
+
 function registerRpcBridge(): void {
   ipcMain.on(RPC_CHANNELS.requestRpc, (event) => {
     assertTrustedSender(event);
@@ -104,12 +153,17 @@ function registerRpcBridge(): void {
     const { port1, port2 } = new MessageChannelMain();
     newMessagePortMainRpcSession(
       port1,
-      new HaloRpc(workspaceService, piService, () => {
-        if (mainWindow === null) {
-          throw new Error("Halo main window is not open.");
-        }
-        return mainWindow;
-      }),
+      new HaloRpc(
+        workspaceService,
+        piService,
+        () => {
+          if (mainWindow === null) {
+            throw new Error("Halo main window is not open.");
+          }
+          return mainWindow;
+        },
+        rpcLogger,
+      ),
     );
     frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);
   });

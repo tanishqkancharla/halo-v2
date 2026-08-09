@@ -8,7 +8,7 @@ import {
 import * as errore from "errore";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { WorkspaceInfo } from "../../shared/rpc.js";
-import { Onboarding } from "../Onboarding.tsx";
+import { LoadingPage } from "../LoadingPage.tsx";
 import type { HaloApiStub } from "./HaloRpcClient.js";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
@@ -71,7 +71,7 @@ function ResolveApi({
     queryFn: createApi,
   });
 
-  if (apiQuery.isPending) return <Onboarding status="loading" />;
+  if (apiQuery.isPending) return <LoadingPage />;
   if (apiQuery.isError) throw apiQuery.error;
 
   return (
