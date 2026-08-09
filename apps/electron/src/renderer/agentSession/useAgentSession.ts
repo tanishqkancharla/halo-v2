@@ -2,14 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import type { RpcStub } from "capnweb";
 import * as errore from "errore";
 import { useQueryClient } from "@tanstack/react-query";
-import type { AgentSessionApi } from "../../shared/rpc.js";
-import { useApi } from "../api/ApiProvider.tsx";
+import type { AgentSessionApi, AgentSessionState } from "../../shared/rpc.js";
 import {
-  agentSessionStateFromMessages,
   applyAgentSessionEvent,
   emptyAgentSessionState,
-  type AgentSessionState,
-} from "./AgentSessionState.ts";
+} from "../../shared/AgentSessionState.js";
+import { useApi } from "../api/ApiProvider.tsx";
 
 export type AgentSessionStub = RpcStub<AgentSessionApi>;
 
@@ -45,13 +43,13 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
     setSession(null);
 
     void api
-      .readSessionTranscript(sessionId)
-      .then((transcript) => {
+      .readSession(sessionId)
+      .then((loaded) => {
         if (cancelled) return;
-        setState(agentSessionStateFromMessages(transcript.messages));
+        setState(loaded);
       })
       .catch((e) => {
-        console.warn("Failed to load session transcript:", e);
+        console.warn("Failed to load session:", e);
       });
 
     void api
@@ -97,8 +95,8 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       setState((current) => ({ ...current, error: result.message }));
       return result;
     }
-    const transcript = await api.readSessionTranscript(sessionId);
-    setState(agentSessionStateFromMessages(transcript.messages));
+    const loaded = await api.readSession(sessionId);
+    setState(loaded);
     await queryClient.invalidateQueries({
       queryKey: ["sessions"],
       refetchType: "all",
@@ -169,8 +167,8 @@ export function useDraftAgentSession(onCreated: (sessionId: string) => void): {
       return result;
     }
     const sessionId = await session.getSessionId();
-    const transcript = await api.readSessionTranscript(sessionId);
-    setState(agentSessionStateFromMessages(transcript.messages));
+    const loaded = await api.readSession(sessionId);
+    setState(loaded);
     await queryClient.invalidateQueries({
       queryKey: ["sessions"],
       refetchType: "all",

@@ -6,7 +6,8 @@ import {
   type SessionMessageEntry,
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
-import type { SessionSummary, SessionTranscript } from "../shared/rpc.js";
+import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
+import type { SessionSummary } from "../shared/rpc.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
@@ -64,7 +65,7 @@ export class PiService {
       .toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
-  async readTranscript(sessionId: string) {
+  async readSession(sessionId: string) {
     const layout = this.workspace.getLayout();
     if (layout instanceof Error) return layout;
     const manager = await this.openSessionManager(layout, sessionId);
@@ -73,7 +74,7 @@ export class PiService {
       .getBranch()
       .filter((entry): entry is SessionMessageEntry => entry.type === "message")
       .map((entry) => entry.message);
-    return { messages } satisfies SessionTranscript;
+    return agentSessionStateFromSession({ messages });
   }
 
   private async openSessionManager(layout: WorkspaceLayout, sessionId: string) {

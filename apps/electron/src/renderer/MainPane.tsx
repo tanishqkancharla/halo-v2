@@ -25,10 +25,10 @@ import {
 } from "./agentSession/useAgentSession.ts";
 import {
   sessionFeedItems,
-  toolExecutionLabel,
+  toolPartLabel,
   type SessionFeedItem,
 } from "./agentSession/sessionFeed.ts";
-import type { AgentSessionState } from "./agentSession/AgentSessionState.ts";
+import type { AgentSessionState } from "../shared/AgentSessionState.ts";
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
@@ -288,10 +288,10 @@ function FeedItemView({ item }: { item: SessionFeedItem }) {
     <div className={assistantRow} aria-label="Assistant message">
       {item.parts.map((part) => {
         if (part.kind === "tool") {
-          const label = toolExecutionLabel(part.tool);
+          const label = toolPartLabel(part);
           return (
             <div
-              key={part.tool.toolCallId}
+              key={part.id}
               className={toolCallsClassName}
               aria-label="Tool calls"
             >

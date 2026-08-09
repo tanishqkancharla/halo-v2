@@ -1,6 +1,5 @@
 import type { AgentMessage } from "../../shared/rpc.js";
-import { toolCallFromPi } from "../../shared/ToolCall.js";
-import type { AgentSessionState, ToolExecution } from "./AgentSessionState.ts";
+import type { AgentSessionState } from "../../shared/AgentSessionState.js";
 
 export type SessionFeedItem =
   | { kind: "user"; id: string; text: string }
@@ -12,11 +11,17 @@ export type SessionFeedItem =
 
 export type SessionFeedPart =
   | { kind: "text"; id: string; text: string; streaming: boolean }
-  | { kind: "tool"; tool: ToolExecution };
+  | {
+      kind: "tool";
+      id: string;
+      toolName: string;
+      args: unknown;
+    };
 
 /**
  * Project AgentSessionState into feed rows: one user bubble per user message,
- * one assistant column per stretch of assistant/tool activity (Pi TUI shape).
+ * one assistant column per stretch of assistant activity (Pi TUI shape).
+ * Tool lines come from assistant message toolCall content blocks.
  */
 export function sessionFeedItems(state: AgentSessionState): SessionFeedItem[] {
   const items: SessionFeedItem[] = [];
@@ -34,38 +39,31 @@ export function sessionFeedItems(state: AgentSessionState): SessionFeedItem[] {
     assistantParts = [];
   }
 
-  function pushTool(tool: ToolExecution) {
-    if (emittedTools.has(tool.toolCallId)) return;
-    emittedTools.add(tool.toolCallId);
-    assistantParts.push({ kind: "tool", tool });
-  }
-
   function pushAssistantMessage(message: AgentMessage, streaming: boolean) {
     if (message.role !== "assistant") return;
     assistantId = `assistant-${message.timestamp}`;
-    const text = assistantText(message);
-    if (text.length > 0) {
-      assistantParts.push({
-        kind: "text",
-        id: `text-${message.timestamp}`,
-        text,
-        streaming,
-      });
-    }
+    let textIndex = 0;
     for (const part of message.content) {
-      if (part.type !== "toolCall") continue;
-      const tool = state.tools[part.id];
-      if (tool === undefined) {
-        pushTool({
-          toolCallId: part.id,
-          toolName: part.name,
-          args: part.arguments,
-          isError: false,
-          isPartial: streaming,
+      if (part.type === "text") {
+        if (part.text.length === 0) continue;
+        assistantParts.push({
+          kind: "text",
+          id: `text-${message.timestamp}-${textIndex}`,
+          text: part.text,
+          streaming,
         });
+        textIndex += 1;
         continue;
       }
-      pushTool(tool);
+      if (part.type !== "toolCall") continue;
+      if (emittedTools.has(part.id)) continue;
+      emittedTools.add(part.id);
+      assistantParts.push({
+        kind: "tool",
+        id: part.id,
+        toolName: part.name,
+        args: part.arguments,
+      });
     }
   }
 
@@ -81,49 +79,54 @@ export function sessionFeedItems(state: AgentSessionState): SessionFeedItem[] {
     }
     if (message.role === "assistant") {
       pushAssistantMessage(message, false);
-      continue;
     }
-    // toolResult rows are folded into tool parts via state.tools
   }
 
   if (state.streamingMessage !== null) {
     pushAssistantMessage(state.streamingMessage, true);
   }
 
-  for (const tool of Object.values(state.tools)) {
-    pushTool(tool);
-  }
-
   flushAssistant();
   return items;
 }
 
-export function toolExecutionLabel(tool: ToolExecution): {
+/** Maui AiChat labels for Pi coding tools. */
+export function toolPartLabel(part: { toolName: string; args: unknown }): {
   kind: "read" | "wrote" | "shell" | "other";
   text: string;
 } {
-  const mapped = toolCallFromPi(tool.toolCallId, tool.toolName, tool.args);
-  if (mapped === null) {
-    return { kind: "other", text: tool.toolName };
+  const args = part.args;
+  if (typeof args !== "object" || args === null) {
+    return { kind: "other", text: part.toolName };
   }
-  if (mapped.kind === "read") return { kind: "read", text: mapped.path };
-  if (mapped.kind === "wrote") return { kind: "wrote", text: mapped.path };
-  return { kind: "shell", text: mapped.command };
+
+  if (part.toolName === "read") {
+    if (!("path" in args) || typeof args.path !== "string") {
+      return { kind: "other", text: part.toolName };
+    }
+    return { kind: "read", text: args.path };
+  }
+
+  if (part.toolName === "write" || part.toolName === "edit") {
+    if (!("path" in args) || typeof args.path !== "string") {
+      return { kind: "other", text: part.toolName };
+    }
+    return { kind: "wrote", text: args.path };
+  }
+
+  if (part.toolName === "bash") {
+    if (!("command" in args) || typeof args.command !== "string") {
+      return { kind: "other", text: part.toolName };
+    }
+    return { kind: "shell", text: args.command };
+  }
+
+  return { kind: "other", text: part.toolName };
 }
 
 function userText(message: AgentMessage): string {
   if (message.role !== "user") return "";
   if (typeof message.content === "string") return message.content;
-  return message.content
-    .flatMap((part) => {
-      if (part.type !== "text") return [];
-      return [part.text];
-    })
-    .join("");
-}
-
-function assistantText(message: AgentMessage): string {
-  if (message.role !== "assistant") return "";
   return message.content
     .flatMap((part) => {
       if (part.type !== "text") return [];

@@ -1,9 +1,15 @@
 import { RpcTarget } from "capnweb";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
+import type { AgentSessionState } from "./AgentSessionState.js";
 
-export type { AgentSessionEvent };
+export type { AgentSessionEvent, AgentSessionState };
+export {
+  agentSessionStateFromSession,
+  applyAgentSessionEvent,
+  emptyAgentSessionState,
+} from "./AgentSessionState.js";
 
-/** Pi agent message carried on session events and durable transcripts. */
+/** Pi agent message carried on session events and durable sessions. */
 export type AgentMessage = Extract<
   AgentSessionEvent,
   { type: "message_end" }
@@ -23,10 +29,6 @@ export type SessionSummary = {
   updatedAt: string;
 };
 
-export type SessionTranscript = {
-  messages: AgentMessage[];
-};
-
 export type AgentSessionEventHandler = (event: AgentSessionEvent) => void;
 
 export abstract class AgentSessionApi extends RpcTarget {
@@ -39,7 +41,7 @@ export abstract class HaloApi extends RpcTarget {
   abstract getWorkspace(): WorkspaceInfo | null;
   abstract chooseWorkspace(): Promise<WorkspaceInfo | null>;
   abstract listSessions(): Promise<SessionSummary[]>;
-  abstract readSessionTranscript(sessionId: string): Promise<SessionTranscript>;
+  abstract readSession(sessionId: string): Promise<AgentSessionState>;
   abstract newAgentSession(): Promise<AgentSessionApi>;
   abstract openAgentSession(sessionId: string): Promise<AgentSessionApi>;
 }

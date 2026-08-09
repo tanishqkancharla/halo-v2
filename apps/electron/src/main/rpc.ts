@@ -44,10 +44,10 @@ export class HaloRpc extends HaloApi {
     return sessions;
   }
 
-  async readSessionTranscript(sessionId: string) {
-    const transcript = await this.pi.readTranscript(sessionId);
-    if (transcript instanceof Error) throw transcript;
-    return transcript;
+  async readSession(sessionId: string) {
+    const session = await this.pi.readSession(sessionId);
+    if (session instanceof Error) throw session;
+    return session;
   }
 
   async newAgentSession() {
