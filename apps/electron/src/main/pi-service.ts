@@ -74,10 +74,14 @@ export class PiService {
     if (layout instanceof Error) return layout;
     const manager = await this.openSessionManager(layout, sessionId);
     if (manager instanceof Error) return manager;
-    const messages = manager
-      .getBranch()
-      .filter((entry): entry is SessionMessageEntry => entry.type === "message")
-      .flatMap(sessionMessage);
+    const messages = coalesceAssistantMessages(
+      manager
+        .getBranch()
+        .filter(
+          (entry): entry is SessionMessageEntry => entry.type === "message",
+        )
+        .flatMap(sessionMessage),
+    );
     return { messages } satisfies SessionTranscript;
   }
 
@@ -118,6 +122,41 @@ function sessionMessage(entry: SessionMessageEntry): SessionMessage[] {
       timestamp: entry.timestamp,
     },
   ];
+}
+
+/**
+ * Pi stores each tool round as its own assistant message. Live prompts keep one
+ * assistant row, so merge adjacent assistant messages for the same feed spacing.
+ */
+export function coalesceAssistantMessages(
+  messages: SessionMessage[],
+): SessionMessage[] {
+  const coalesced: SessionMessage[] = [];
+  for (const message of messages) {
+    const previous = coalesced[coalesced.length - 1];
+    if (
+      previous !== undefined &&
+      previous.role === "assistant" &&
+      message.role === "assistant"
+    ) {
+      coalesced[coalesced.length - 1] = {
+        id: previous.id,
+        role: "assistant",
+        text: joinAssistantText(previous.text, message.text),
+        toolCalls: [...previous.toolCalls, ...message.toolCalls],
+        timestamp: previous.timestamp,
+      };
+      continue;
+    }
+    coalesced.push(message);
+  }
+  return coalesced;
+}
+
+function joinAssistantText(left: string, right: string): string {
+  if (left.length === 0) return right;
+  if (right.length === 0) return left;
+  return `${left}\n\n${right}`;
 }
 
 function collectText(content: unknown): string {
