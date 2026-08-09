@@ -8,9 +8,15 @@ export class BashRunError extends errore.createTaggedError({
 
 export async function runBash(
   cwd: string,
-  command: string,
-  options?: { timeoutMs?: number },
-  signal?: AbortSignal,
+  {
+    command,
+    timeoutMs,
+    signal,
+  }: {
+    command: string;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+  },
 ) {
   if (signal?.aborted) {
     return new BashRunError({ cause: signal.reason });
@@ -48,18 +54,16 @@ export async function runBash(
     signal?.addEventListener("abort", onAbort, { once: true });
 
     const timer =
-      options?.timeoutMs === undefined
+      timeoutMs === undefined
         ? undefined
         : setTimeout(() => {
             child.kill("SIGTERM");
             finish(
               new BashRunError({
-                cause: new Error(
-                  `Command timed out after ${options.timeoutMs}ms`,
-                ),
+                cause: new Error(`Command timed out after ${timeoutMs}ms`),
               }),
             );
-          }, options.timeoutMs);
+          }, timeoutMs);
 
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf8");

@@ -7,7 +7,10 @@ export class FilesDeleteError extends errore.createTaggedError({
   message: "Failed to delete $path",
 }) {}
 
-export async function deleteFile(cwd: string, filePath: string) {
+export async function deleteFile(
+  cwd: string,
+  { path: filePath }: { path: string },
+) {
   const absolutePath = path.resolve(cwd, filePath);
   const removed = await fs
     .unlink(absolutePath)

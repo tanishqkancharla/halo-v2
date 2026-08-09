@@ -9,8 +9,7 @@ export class FilesWriteError extends errore.createTaggedError({
 
 export async function writeFile(
   cwd: string,
-  filePath: string,
-  content: string,
+  { path: filePath, content }: { path: string; content: string },
 ) {
   const absolutePath = path.resolve(cwd, filePath);
   const written = await fs

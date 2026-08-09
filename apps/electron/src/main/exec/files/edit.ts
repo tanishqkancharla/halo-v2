@@ -31,10 +31,17 @@ function restoreLineEndings(text: string, ending: "\r\n" | "\n") {
 
 export async function editFile(
   cwd: string,
-  filePath: string,
-  oldText: string,
-  newText: string,
-  options?: { replaceAll?: boolean },
+  {
+    path: filePath,
+    oldText,
+    newText,
+    replaceAll = false,
+  }: {
+    path: string;
+    oldText: string;
+    newText: string;
+    replaceAll?: boolean;
+  },
 ) {
   if (oldText === newText) {
     return new FilesEditError({
@@ -60,7 +67,6 @@ export async function editFile(
   const normalizedContent = normalizeToLF(noBomContent);
   const normalizedOldText = normalizeToLF(oldText);
   const normalizedNewText = normalizeToLF(newText);
-  const replaceAll = options?.replaceAll === true;
   const occurrences = normalizedContent.split(normalizedOldText).length - 1;
 
   if (occurrences === 0) {

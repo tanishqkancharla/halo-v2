@@ -35,15 +35,26 @@ export function createAgentTools(
 ): AgentTools {
   return {
     files: {
-      read: (filePath, options) => readFile(cwd, filePath, options),
-      edit: (filePath, oldText, newText, options) =>
-        editFile(cwd, filePath, oldText, newText, options),
-      patch: (patchText) => patchFiles(cwd, patchText),
-      write: (filePath, content) => writeFile(cwd, filePath, content),
-      delete: (filePath) => deleteFile(cwd, filePath),
+      read: (path, options) =>
+        readFile(cwd, { path, offset: options?.offset, limit: options?.limit }),
+      edit: (path, oldText, newText, options) =>
+        editFile(cwd, {
+          path,
+          oldText,
+          newText,
+          replaceAll: options?.replaceAll,
+        }),
+      patch: (patchText) => patchFiles(cwd, { patchText }),
+      write: (path, content) => writeFile(cwd, { path, content }),
+      delete: (path) => deleteFile(cwd, { path }),
     },
     bash: {
-      run: (command, options) => runBash(cwd, command, options, signal),
+      run: (command, options) =>
+        runBash(cwd, {
+          command,
+          timeoutMs: options?.timeoutMs,
+          signal,
+        }),
     },
   };
 }

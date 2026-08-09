@@ -6,7 +6,10 @@ export class FilesPatchError extends errore.createTaggedError({
   message: "Failed to apply patch",
 }) {}
 
-export async function patchFiles(cwd: string, patchText: string) {
+export async function patchFiles(
+  cwd: string,
+  { patchText }: { patchText: string },
+) {
   const preview = errore.try({
     try: () => applyPatch(patchText, cwd),
     catch: (e) => new FilesPatchError({ cause: e }),
