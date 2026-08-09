@@ -28,16 +28,16 @@ function selectLogger(
 
 export class PrettyConsoleLoggerSink implements LoggerSinkApi {
   log(entry: LoggerEntry) {
-    const scopeLabel = Object.keys(entry.scopes)
+    const scopeLabel = entry.scopes
+      .flatMap((scope) => Object.keys(scope))
       .map((name) => `${colors.cyan}[${name}]${colors.reset}`)
       .join("");
     const event = typeof entry.data.event === "string" ? entry.data.event : "";
     const data: Record<string, unknown> = {};
-    for (const value of Object.values(entry.scopes)) {
-      if (typeof value !== "object" || value === null || Array.isArray(value)) {
-        continue;
+    for (const scope of entry.scopes) {
+      for (const value of Object.values(scope)) {
+        Object.assign(data, value);
       }
-      Object.assign(data, value);
     }
     for (const [key, value] of Object.entries(entry.data)) {
       if (key === "event") continue;

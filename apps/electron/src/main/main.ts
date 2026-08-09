@@ -9,7 +9,12 @@ import {
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Logger, type LogLevel, type LoggerData } from "@repo/logger";
+import {
+  Logger,
+  type LogLevel,
+  type LoggerData,
+  type LoggerScope,
+} from "@repo/logger";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
@@ -120,12 +125,18 @@ function registerLogBridge(): void {
     LOG_CHANNELS.log,
     (
       event,
-      payload: { level: LogLevel; scopes: LoggerData; data: LoggerData },
+      payload: {
+        level: LogLevel;
+        scopes: readonly LoggerScope[];
+        data: LoggerData;
+      },
     ) => {
       assertTrustedSender(event);
       let log = rendererLogger;
-      for (const [name, scopeData] of Object.entries(payload.scopes)) {
-        log = log.scope(name, scopeData as LoggerData);
+      for (const scope of payload.scopes) {
+        for (const [name, scopeData] of Object.entries(scope)) {
+          log = log.scope(name, scopeData);
+        }
       }
       log[payload.level](payload.data);
     },

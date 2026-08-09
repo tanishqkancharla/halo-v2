@@ -2,10 +2,12 @@ export type LogLevel = "debug" | "info" | "warn" | "log" | "error";
 
 export type LoggerData = Record<string, unknown>;
 
+export type LoggerScope = Record<string, LoggerData>;
+
 export type LoggerEntry = {
   timestamp: string;
   level: LogLevel;
-  scopes: LoggerData;
+  scopes: readonly LoggerScope[];
   data: LoggerData;
 };
 
@@ -24,12 +26,12 @@ export type LoggerApi = {
 
 type LoggerArgs = {
   sinks?: readonly LoggerSinkApi[];
-  scopes?: LoggerData;
+  scopes?: readonly LoggerScope[];
 };
 
 function createLogEntry(
   level: LogLevel,
-  scopes: LoggerData,
+  scopes: readonly LoggerScope[],
   data: LoggerData,
 ): LoggerEntry {
   return {
@@ -42,9 +44,9 @@ function createLogEntry(
 
 export class Logger implements LoggerApi {
   private readonly sinks: readonly LoggerSinkApi[];
-  private readonly scopes: LoggerData;
+  private readonly scopes: readonly LoggerScope[];
 
-  constructor({ sinks = [], scopes = {} }: LoggerArgs = {}) {
+  constructor({ sinks = [], scopes = [] }: LoggerArgs = {}) {
     this.sinks = sinks;
     this.scopes = scopes;
   }
@@ -72,10 +74,7 @@ export class Logger implements LoggerApi {
   scope(name: string, data: LoggerData = {}): Logger {
     return new Logger({
       sinks: this.sinks,
-      scopes: {
-        ...this.scopes,
-        [name]: data,
-      },
+      scopes: [...this.scopes, { [name]: data }],
     });
   }
 

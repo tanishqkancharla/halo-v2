@@ -1,4 +1,4 @@
-import type { LogLevel, LoggerData } from "@repo/logger";
+import type { LogLevel, LoggerData, LoggerScope } from "@repo/logger";
 import { ipcRenderer } from "electron";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 
@@ -27,7 +27,7 @@ type LogMessage = {
   channel: typeof LOG_CHANNELS.log;
   payload: {
     level: LogLevel;
-    scopes: LoggerData;
+    scopes: readonly LoggerScope[];
     data: LoggerData;
   };
 };

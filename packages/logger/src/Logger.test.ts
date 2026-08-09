@@ -23,12 +23,12 @@ describe("Logger", () => {
     expect(sink.entries).toHaveLength(1);
     const entry = sink.entries[0]!;
     expect(entry.level).toBe("info");
-    expect(entry.scopes).toEqual({});
+    expect(entry.scopes).toEqual([]);
     expect(entry.data).toEqual({ message: "hello", count: 1 });
     expect(Number.isNaN(Date.parse(entry.timestamp))).toBe(false);
   });
 
-  test("keeps scope data under the scope name", () => {
+  test("appends each scope as its own object in order", () => {
     const sink = new CollectingSink();
     const logger = new Logger({ sinks: [sink] })
       .scope("renderer")
@@ -36,10 +36,10 @@ describe("Logger", () => {
 
     logger.warn({ message: "slow render" });
 
-    expect(sink.entries[0]!.scopes).toEqual({
-      renderer: {},
-      ui: { route: "chat" },
-    });
+    expect(sink.entries[0]!.scopes).toEqual([
+      { renderer: {} },
+      { ui: { route: "chat" } },
+    ]);
     expect(sink.entries[0]!.data).toEqual({
       message: "slow render",
     });
@@ -52,9 +52,9 @@ describe("Logger", () => {
 
     logger.log({ event: "ready" });
 
-    expect(first.entries[0]!.scopes).toEqual({ main: {} });
+    expect(first.entries[0]!.scopes).toEqual([{ main: {} }]);
     expect(first.entries[0]!.data).toEqual({ event: "ready" });
-    expect(second.entries[0]!.scopes).toEqual({ main: {} });
+    expect(second.entries[0]!.scopes).toEqual([{ main: {} }]);
     expect(second.entries[0]!.data).toEqual({ event: "ready" });
   });
 
@@ -88,7 +88,7 @@ describe("JsonlLoggerSink", () => {
     expect(lines).toHaveLength(1);
     const parsed = JSON.parse(lines[0]!) as LoggerEntry;
     expect(parsed.level).toBe("error");
-    expect(parsed.scopes).toEqual({ main: {} });
+    expect(parsed.scopes).toEqual([{ main: {} }]);
     expect(parsed.data).toEqual({
       message: "failed",
       error: {
