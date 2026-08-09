@@ -22,6 +22,11 @@ Halo is an open-source self-modifiable desktop app built with Electron and Pi. I
 - Use `vitest` for tests: `describe`, `test`, `expect`. Don't use `beforeAll` or `afterAll`; use Vitest fixtures instead.
 - Generally, you should avoid adding comments and instead aim to make code readable. The only exception is when there is external context that is not easily traced back (e.g. external dependency behavior, or explicit business logic decisions).
 
+## Working Style
+
+- When working on issues that seem like they would be common (e.g. issues hooking up popular libraries to each other), do research into the Github issues of those repos or research code of projects that use the same libraries. Here's some reference projects you can look at:
+  - Craft Agents: https://github.com/craft-ai-agents/craft-agents-oss. Uses Electron, Pi (`@mariozechner/pi-coding-agent`), Vite, and esbuild.
+
 ## Error handling (errore.org)
 
 This codebase uses the [errore.org](https://errore.org) convention. Always read the `errore` skill (`.agents/skills/errore/SKILL.md`) before editing TypeScript that handles failures. Always `import * as errore from 'errore'`.

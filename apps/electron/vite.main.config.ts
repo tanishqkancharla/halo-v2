@@ -1,16 +1,5 @@
-import { builtinModules, createRequire } from "node:module";
+import { builtinModules } from "node:module";
 import { defineConfig } from "vite";
-
-const require = createRequire(import.meta.url);
-const packageJson = require("./package.json") as {
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-};
-
-const dependencyNames = [
-  ...Object.keys(packageJson.dependencies ?? {}),
-  ...Object.keys(packageJson.devDependencies ?? {}),
-];
 
 const nodeBuiltins = [
   ...builtinModules,
@@ -19,24 +8,24 @@ const nodeBuiltins = [
 
 export default defineConfig({
   build: {
+    // Forge Vite only packs `/.vite`. Bundle npm packages into main.
+    minify: false,
+    // Without platform:node, Rolldown replaces import.meta with {} for CJS
+    // (EMPTY_IMPORT_META) and Pi/Halo crash on fileURLToPath({}.url).
+    rolldownOptions: {
+      platform: "node",
+      output: {
+        codeSplitting: false,
+      },
+    },
     lib: {
       entry: "src/main/main.ts",
-      fileName: () => "main.js",
-      formats: ["es"],
+      // .cjs required: package.json has "type":"module", so .js is treated as ESM.
+      fileName: () => "main.cjs",
+      formats: ["cjs"],
     },
     rollupOptions: {
-      // Rolldown's watch binding rejects function externals. Leave packages and
-      // Node builtins external so CJS deps are not rewritten to `__require`.
-      external: [
-        "electron",
-        ...nodeBuiltins,
-        ...dependencyNames,
-        ...dependencyNames.map((name) => new RegExp(`^${escapeRegExp(name)}/`)),
-      ],
+      external: ["electron", "electron/main", ...nodeBuiltins],
     },
   },
 });
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}

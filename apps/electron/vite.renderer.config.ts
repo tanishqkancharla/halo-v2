@@ -3,6 +3,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    minify: false,
+  },
   resolve: {
     dedupe: ["react", "react-dom", "purse-styles"],
     preserveSymlinks: false,

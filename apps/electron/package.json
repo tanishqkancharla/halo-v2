@@ -5,7 +5,7 @@
   "description": "Halo desktop app",
   "author": "Saffron Health",
   "type": "module",
-  "main": ".vite/build/main.js",
+  "main": ".vite/build/main.cjs",
   "scripts": {
     "build": "electron-forge package",
     "dev": "electron-forge start",
@@ -57,7 +57,7 @@
     "agentation": "^3.0.2",
     "electron": "^43.2.0",
     "typescript": "7.0.2",
-    "vite": "^7.3.1",
+    "vite": "^8.2.1",
     "vitest": "^4.1.10"
   },
   "productName": "Halo"
