@@ -8,13 +8,13 @@ describe("toolCallFromPi", () => {
       kind: "read",
       path: "a.ts",
     });
-    expect(toolCallFromPi("2", "write", { path: "b.ts", content: "x" })).toEqual(
-      {
-        id: "2",
-        kind: "wrote",
-        path: "b.ts",
-      },
-    );
+    expect(
+      toolCallFromPi("2", "write", { path: "b.ts", content: "x" }),
+    ).toEqual({
+      id: "2",
+      kind: "wrote",
+      path: "b.ts",
+    });
     expect(
       toolCallFromPi("3", "edit", {
         path: "c.ts",
