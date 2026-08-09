@@ -31,6 +31,9 @@ importers:
       '@mariozechner/pi-coding-agent':
         specifier: 0.60.0
         version: 0.60.0(supports-color@8.1.1)(ws@8.21.1)(zod@4.4.3)
+      '@repo/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@streamdown/code':
         specifier: ^1.1.1
         version: 1.1.1(react@19.2.8)
@@ -189,6 +192,21 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^4.0.18
+        version: 4.1.10(@types/node@22.15.3)(vite@8.2.1(@types/node@22.15.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
+  packages/logger:
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.10
         version: 4.1.10(@types/node@22.15.3)(vite@8.2.1(@types/node@22.15.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/typescript-config: {}

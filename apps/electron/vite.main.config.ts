@@ -10,7 +10,7 @@ const packageJson = require("./package.json") as {
 const dependencyNames = [
   ...Object.keys(packageJson.dependencies ?? {}),
   ...Object.keys(packageJson.devDependencies ?? {}),
-];
+].filter((name) => name !== "@repo/logger");
 
 const nodeBuiltins = [
   ...builtinModules,
@@ -27,6 +27,7 @@ export default defineConfig({
     rollupOptions: {
       // Rolldown's watch binding rejects function externals. Leave packages and
       // Node builtins external so CJS deps are not rewritten to `__require`.
+      // Bundle @repo/logger so main can import its TypeScript source.
       external: [
         "electron",
         ...nodeBuiltins,

@@ -9,8 +9,11 @@ import {
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { LogLevel, LoggerData } from "@repo/logger";
 import started from "electron-squirrel-startup";
-import { RPC_CHANNELS } from "../shared/channels.js";
+import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
+import { getApplicationConfig } from "./ApplicationConfig.js";
+import { createApplicationLogger } from "./createApplicationLogger.js";
 import { newMessagePortMainRpcSession } from "./MessagePortMainTransport.js";
 import { PiService } from "./pi-service.js";
 import { HaloRpc } from "./rpc.js";
@@ -26,6 +29,14 @@ if (started) app.quit();
 
 loadDevelopmentEnvironment();
 configureUserDataPath();
+
+const applicationConfig = getApplicationConfig({
+  isDevelopment,
+  dataDir: app.getPath("userData"),
+});
+const logger = createApplicationLogger(applicationConfig);
+const rendererLogger = logger.scope("renderer");
+
 if (isDevelopment) {
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", "4445");
@@ -39,15 +50,17 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
   app.commandLine.appendSwitch("disable-gpu-sandbox");
 }
 
-const workspaceService = new WorkspaceService(app.getPath("userData"));
+const workspaceService = new WorkspaceService(applicationConfig.dataDir);
 const piService = new PiService(workspaceService);
 let mainWindow: BrowserWindow | null = null;
 
 app.whenReady().then(async () => {
   await workspaceService.restore();
+  registerLogBridge();
   registerRpcBridge();
   installMenu();
   openMainWindow();
+  logger.info({ event: "app-ready" });
 
   app.on("activate", () => {
     if (mainWindow === null) openMainWindow();
@@ -56,6 +69,10 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("will-quit", () => {
+  logger.destroy();
 });
 
 function openMainWindow(): void {
@@ -92,6 +109,16 @@ function createWindow(): BrowserWindow {
     );
   }
   return window;
+}
+
+function registerLogBridge(): void {
+  ipcMain.on(
+    LOG_CHANNELS.log,
+    (event, payload: { level: LogLevel; data: LoggerData }) => {
+      assertTrustedSender(event);
+      rendererLogger[payload.level](payload.data);
+    },
+  );
 }
 
 function registerRpcBridge(): void {
