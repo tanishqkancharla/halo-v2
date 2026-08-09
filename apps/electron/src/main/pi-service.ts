@@ -6,12 +6,7 @@ import {
   type SessionMessageEntry,
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
-import type {
-  SessionMessage,
-  SessionSummary,
-  SessionTranscript,
-} from "../shared/rpc.js";
-import { collectToolCalls } from "../shared/ToolCall.js";
+import type { SessionSummary, SessionTranscript } from "../shared/rpc.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
@@ -77,7 +72,7 @@ export class PiService {
     const messages = manager
       .getBranch()
       .filter((entry): entry is SessionMessageEntry => entry.type === "message")
-      .flatMap(sessionMessage);
+      .map((entry) => entry.message);
     return { messages } satisfies SessionTranscript;
   }
 
@@ -100,35 +95,4 @@ function sessionSummary(session: SessionInfo): SessionSummary {
     createdAt: session.created.toISOString(),
     updatedAt: session.modified.toISOString(),
   };
-}
-
-function sessionMessage(entry: SessionMessageEntry): SessionMessage[] {
-  const message = entry.message;
-  if (message.role !== "user" && message.role !== "assistant") return [];
-  const text = collectText(message.content);
-  const toolCalls =
-    message.role === "assistant" ? collectToolCalls(message.content) : [];
-  if (text.length === 0 && toolCalls.length === 0) return [];
-  return [
-    {
-      id: entry.id,
-      role: message.role,
-      text,
-      toolCalls,
-      timestamp: entry.timestamp,
-    },
-  ];
-}
-
-function collectText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .flatMap((part) => {
-      if (typeof part !== "object" || part === null) return [];
-      if (!("type" in part) || part.type !== "text") return [];
-      if (!("text" in part) || typeof part.text !== "string") return [];
-      return [part.text];
-    })
-    .join("");
 }

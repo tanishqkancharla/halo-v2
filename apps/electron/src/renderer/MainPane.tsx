@@ -20,23 +20,19 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import {
+  useAgentSession,
   useDraftAgentSession,
-  useIsSendingPrompt,
-  useLivePrompt,
-  useOpenAgentSession,
-  useSendPromptMutation,
-  useSessionTranscriptQuery,
-  type LivePrompt,
-} from "./api/ApiProvider.tsx";
+} from "./agentSession/useAgentSession.ts";
+import {
+  sessionFeedItems,
+  toolExecutionLabel,
+  type SessionFeedItem,
+} from "./agentSession/sessionFeed.ts";
+import type { AgentSessionState } from "./agentSession/AgentSessionState.ts";
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
-import {
-  type SessionSummary,
-  type SessionTranscript,
-  type ToolCall,
-} from "../shared/rpc.ts";
-import { coalesceAssistantMessages } from "../shared/coalesceAssistantMessages.ts";
+import { type SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
@@ -79,17 +75,12 @@ function SavedPane({
   const content = useStyles(styles.content);
   const header = useStyles(styles.header);
   const composer = useStyles(styles.composer);
-  const status = useStyles(styles.status);
   const pane = useStyles(styles.pane);
-  const transcript = useSessionTranscriptQuery(sessionId);
-  const livePrompt = useLivePrompt(sessionId);
-  const agentSession = useOpenAgentSession(sessionId);
-  const sendPrompt = useSendPromptMutation();
-  const isSending = useIsSendingPrompt(sessionId);
-  const session = sessions.find(
+  const { session, state, isWorking, prompt } = useAgentSession(sessionId);
+  const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
   );
-  const title = session?.title ? session.title : sessionId;
+  const title = sessionMeta?.title ? sessionMeta.title : sessionId;
 
   return (
     <main className={pane} aria-label={title}>
@@ -97,35 +88,16 @@ function SavedPane({
         <header className={header}>
           <H3>{title}</H3>
         </header>
-        {transcript.isPending ? (
-          <div className={status} aria-live="polite">
-            Loading transcript…
-          </div>
-        ) : transcript.isError ? (
-          <div className={status} role="alert">
-            Could not load transcript: {String(transcript.error)}
-          </div>
-        ) : transcript.data.messages.length === 0 &&
-          livePrompt === undefined ? (
-          <div className={status}>No messages yet.</div>
-        ) : (
-          <MessageFeed transcript={transcript.data} livePrompt={livePrompt} />
-        )}
+        <SessionFeed state={state} isWorking={isWorking} />
         <div className={composer}>
           <PromptEditor
             key={sessionId}
-            isSending={isSending ? true : agentSession === null}
-            onSubmit={async (prompt) => {
-              if (agentSession === null) {
-                return new PromptSubmitError({
-                  reason: "Session is not ready.",
-                });
+            isSending={isWorking ? true : session === null}
+            onSubmit={async (promptText) => {
+              const result = await prompt(promptText);
+              if (result instanceof Error) {
+                return new PromptSubmitError({ reason: result.message });
               }
-              return sendPrompt.mutateAsync({
-                session: agentSession,
-                sessionId,
-                text: prompt,
-              });
             }}
           />
         </div>
@@ -141,26 +113,14 @@ function DraftPane({
   draftId: string;
   onSent: (draftId: string, sessionId: string) => void;
 }) {
-  const { ensureSession } = useDraftAgentSession();
-  const sendPrompt = useSendPromptMutation();
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const livePrompt = useLivePrompt(sessionId);
+  const { state, isWorking, prompt } = useDraftAgentSession((sessionId) => {
+    onSent(draftId, sessionId);
+  });
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);
   const header = useStyles(styles.header);
   const composer = useStyles(styles.composer);
-
-  async function submit(prompt: string) {
-    const session = await ensureSession();
-    const createdSessionId = await session.getSessionId();
-    setSessionId(createdSessionId);
-    await sendPrompt.mutateAsync({
-      session,
-      sessionId: createdSessionId,
-      text: prompt,
-    });
-    onSent(draftId, createdSessionId);
-  }
+  const hasMessages = sessionFeedItems(state).length > 0;
 
   return (
     <main className={pane} aria-label="New session" data-draft-id={draftId}>
@@ -169,14 +129,19 @@ function DraftPane({
           <H1>New session</H1>
           <P>Send a message to start this session.</P>
         </header>
-        {livePrompt === undefined ? null : (
-          <MessageFeed transcript={emptyTranscript} livePrompt={livePrompt} />
-        )}
+        {hasMessages ? (
+          <SessionFeed state={state} isWorking={isWorking} />
+        ) : null}
         <div className={composer}>
           <PromptEditor
             key={draftId}
-            isSending={sendPrompt.isPending}
-            onSubmit={submit}
+            isSending={isWorking}
+            onSubmit={async (promptText) => {
+              const result = await prompt(promptText);
+              if (result instanceof Error) {
+                return new PromptSubmitError({ reason: result.message });
+              }
+            }}
           />
         </div>
       </div>
@@ -207,9 +172,8 @@ function PromptEditor({
     if (isSending) return;
     if (!trimmedText) return;
 
-    const submittedText = trimmedText;
     setDraft({ text: draft.text });
-    const result = await onSubmit(submittedText).catch(
+    const result = await onSubmit(trimmedText).catch(
       (e) =>
         new PromptSubmitError({
           reason: e instanceof Error ? e.message : String(e),
@@ -259,21 +223,23 @@ function PromptEditor({
   );
 }
 
-function MessageFeed({
-  transcript,
-  livePrompt,
+function SessionFeed({
+  state,
+  isWorking,
 }: {
-  transcript: SessionTranscript;
-  livePrompt: LivePrompt | undefined;
+  state: AgentSessionState;
+  isWorking: boolean;
 }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const feed = useStyles(styles.feed);
   const liveStatus = useStyles(styles.liveStatus);
+  const thinking = useStyles(styles.thinking);
+  const items = sessionFeedItems(state);
 
   useLayoutEffect(() => {
     const element = feedRef.current;
     if (element) element.scrollTop = element.scrollHeight;
-  }, [transcript, livePrompt]);
+  }, [state, isWorking]);
 
   return (
     <div
@@ -283,115 +249,83 @@ function MessageFeed({
       aria-relevant="additions"
       ref={feedRef}
     >
-      {coalesceAssistantMessages(transcript.messages).map((message) => (
-        <Message
-          key={message.id}
-          role={message.role}
-          text={message.text}
-          toolCalls={message.toolCalls}
-        />
+      {items.map((item) => (
+        <FeedItemView key={item.id} item={item} />
       ))}
-      {livePrompt === undefined ? null : (
-        <>
-          <Message role="user" text={livePrompt.userText} toolCalls={[]} />
-          <Message
-            role="assistant"
-            text={livePrompt.assistantText}
-            toolCalls={livePrompt.toolCalls}
-            isAnimating={livePrompt.status === "sending"}
-          />
-          {livePrompt.status === "failed" ? (
-            <div className={liveStatus} role="alert">
-              {livePrompt.error === undefined
-                ? "The response stopped before it finished."
-                : livePrompt.error}
-            </div>
-          ) : null}
-        </>
-      )}
+      {isWorking ? (
+        <span className={thinking}>
+          <Loader size="0.75em" variant="muted" aria-label="Thinking" />
+          Thinking
+        </span>
+      ) : null}
+      {state.error !== null ? (
+        <div className={liveStatus} role="alert">
+          {state.error}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function Message({
-  role,
-  text: messageText,
-  toolCalls,
-  isAnimating = false,
-}: {
-  role: "user" | "assistant";
-  text: string;
-  toolCalls: ToolCall[];
-  isAnimating?: boolean;
-}) {
-  const messageClass = useStyles(
-    role === "user" ? styles.userMessage : styles.assistantRow,
-  );
+function FeedItemView({ item }: { item: SessionFeedItem }) {
+  const userMessage = useStyles(styles.userMessage);
   const body = useStyles(styles.messageBody);
+  const assistantRow = useStyles(styles.assistantRow);
   const assistantMessage = useStyles(styles.assistantMessage);
-  const thinking = useStyles(styles.thinking);
-  const roleLabel = role === "user" ? "You" : "Assistant";
-
-  if (role === "assistant") {
-    return (
-      <div className={messageClass} aria-label={`${roleLabel} message`}>
-        <ToolCallList toolCalls={toolCalls} />
-        {messageText ? (
-          <AssistantMessage
-            size="sm"
-            className={assistantMessage}
-            isAnimating={isAnimating}
-          >
-            {messageText}
-          </AssistantMessage>
-        ) : null}
-        {isAnimating ? (
-          <span className={thinking}>
-            <Loader size="0.75em" variant="muted" aria-label="Thinking" />
-            Thinking
-          </span>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <article className={messageClass} aria-label={`${roleLabel} message`}>
-      <div className={body}>{messageText}</div>
-    </article>
-  );
-}
-
-function ToolCallList({ toolCalls }: { toolCalls: ToolCall[] }) {
   const toolCallsClassName = useStyles(styles.toolCalls);
   const toolCallClassName = useStyles(styles.toolCall);
   const toolShellClassName = useStyles(styles.toolShell);
 
-  if (toolCalls.length === 0) return null;
+  if (item.kind === "user") {
+    return (
+      <article className={userMessage} aria-label="You message">
+        <div className={body}>{item.text}</div>
+      </article>
+    );
+  }
 
   return (
-    <div className={toolCallsClassName} aria-label="Tool calls">
-      {toolCalls.map((call) => (
-        <div key={call.id} className={toolCallClassName}>
-          {call.kind === "read" ? (
-            <>Read {call.path}</>
-          ) : call.kind === "wrote" ? (
-            <>Wrote {call.path}</>
-          ) : (
-            <>
-              {"$ "}
-              <span className={toolShellClassName}>{call.command}</span>
-            </>
-          )}
-        </div>
-      ))}
+    <div className={assistantRow} aria-label="Assistant message">
+      {item.parts.map((part) => {
+        if (part.kind === "tool") {
+          const label = toolExecutionLabel(part.tool);
+          return (
+            <div
+              key={part.tool.toolCallId}
+              className={toolCallsClassName}
+              aria-label="Tool calls"
+            >
+              <div className={toolCallClassName}>
+                {label.kind === "read" ? (
+                  <>Read {label.text}</>
+                ) : label.kind === "wrote" ? (
+                  <>Wrote {label.text}</>
+                ) : label.kind === "shell" ? (
+                  <>
+                    {"$ "}
+                    <span className={toolShellClassName}>{label.text}</span>
+                  </>
+                ) : (
+                  <>{label.text}</>
+                )}
+              </div>
+            </div>
+          );
+        }
+        return (
+          <AssistantMessage
+            key={part.id}
+            size="sm"
+            className={assistantMessage}
+            isAnimating={part.streaming}
+          >
+            {part.text}
+          </AssistantMessage>
+        );
+      })}
     </div>
   );
 }
-
-const emptyTranscript: SessionTranscript = {
-  messages: [],
-};
 
 const styles = {
   pane: style(
@@ -417,9 +351,6 @@ const styles = {
   header: style(flexItem({ size: "hug" }), {
     minWidth: 0,
     marginBottom: spacing.value(6),
-  }),
-  status: style(text("sm", 400, "lowContrast"), {
-    margin: 0,
   }),
   feed: style(
     flex({ direction: "column", gap: 6 }),
@@ -509,7 +440,6 @@ const styles = {
   editorSurface: style({
     maxWidth: "none",
     width: "100%",
-    // Keep the editor's subtle elevation on focus; drop the blue focus ring.
     "&:focus-within": {
       outline: "none",
       boxShadow: shadowVars.subtle,
@@ -518,8 +448,6 @@ const styles = {
   }),
   sendButton: style(radius.circle, {
     boxShadow: "none",
-    // Editor shell is also `background.app` white; a light wash keeps the circle
-    // readable once the default Button shadow is removed.
     backgroundColor: colors.gray[3],
     "&:hover": {
       backgroundColor: colors.gray[4],

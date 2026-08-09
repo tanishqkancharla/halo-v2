@@ -1,7 +1,13 @@
 import { RpcTarget } from "capnweb";
-import type { ToolCall } from "./ToolCall.js";
+import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
-export type { ToolCall } from "./ToolCall.js";
+export type { AgentSessionEvent };
+
+/** Pi agent message carried on session events and durable transcripts. */
+export type AgentMessage = Extract<
+  AgentSessionEvent,
+  { type: "message_end" }
+>["message"];
 
 export type WorkspaceInfo = {
   name: string;
@@ -17,29 +23,15 @@ export type SessionSummary = {
   updatedAt: string;
 };
 
-export type MessageRole = "user" | "assistant";
-
-export type SessionMessage = {
-  id: string;
-  role: MessageRole;
-  text: string;
-  toolCalls: ToolCall[];
-  timestamp: string;
-};
-
 export type SessionTranscript = {
-  messages: SessionMessage[];
+  messages: AgentMessage[];
 };
 
-export type PromptStreamEvent =
-  | { type: "delta"; sessionId: string; text: string }
-  | { type: "toolCall"; sessionId: string; toolCall: ToolCall };
-
-export type PromptEventHandler = (event: PromptStreamEvent) => void;
+export type AgentSessionEventHandler = (event: AgentSessionEvent) => void;
 
 export abstract class AgentSessionApi extends RpcTarget {
   abstract getSessionId(): string;
-  abstract subscribe(callback: PromptEventHandler): void;
+  abstract subscribe(callback: AgentSessionEventHandler): void;
   abstract prompt(text: string): Promise<void>;
 }
 

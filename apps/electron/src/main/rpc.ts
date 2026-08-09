@@ -6,11 +6,9 @@ import { dialog, type BrowserWindow } from "electron";
 import {
   AgentSessionApi,
   HaloApi,
-  type PromptEventHandler,
-  type PromptStreamEvent,
+  type AgentSessionEventHandler,
   type WorkspaceInfo,
 } from "../shared/rpc.js";
-import { toolCallFromPi } from "../shared/ToolCall.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
 import type { PiService } from "./pi-service.js";
 import type { WorkspaceService } from "./workspace-service.js";
@@ -65,24 +63,22 @@ export class HaloRpc extends HaloApi {
   }
 }
 
-type PromptListener = PromptEventHandler & {
-  dup?: () => PromptEventHandler & Disposable;
+type SessionListener = AgentSessionEventHandler & {
+  dup?: () => AgentSessionEventHandler & Disposable;
 } & Partial<Disposable>;
 
-/** Cap'n Web stub wrapping a live Pi AgentSession. */
+/** Cap'n Web stub wrapping a live Pi AgentSession. Forwards raw Pi events. */
 export class AgentSessionRpc extends AgentSessionApi {
-  private listener: PromptListener | null = null;
+  private listener: SessionListener | null = null;
   private deliveries = Promise.resolve();
   private readonly unsubscribePi: () => void;
 
   constructor(private readonly session: AgentSession) {
     super();
-    this.unsubscribePi = session.subscribe((event) => {
-      const streamEvent = promptStreamEvent(this.session.sessionId, event);
-      if (streamEvent === null) return;
+    this.unsubscribePi = session.subscribe((event: AgentSessionEvent) => {
       const listener = this.listener;
       if (listener === null) return;
-      this.deliveries = this.deliveries.then(() => listener(streamEvent));
+      this.deliveries = this.deliveries.then(() => listener(event));
     });
   }
 
@@ -90,7 +86,7 @@ export class AgentSessionRpc extends AgentSessionApi {
     return this.session.sessionId;
   }
 
-  subscribe(callback: PromptListener) {
+  subscribe(callback: SessionListener) {
     // Cap'n Web releases arg stubs when the call returns unless we dup().
     this.listener =
       typeof callback.dup === "function" ? callback.dup() : callback;
@@ -118,30 +114,4 @@ export class AgentSessionRpc extends AgentSessionApi {
     });
     this.session.dispose();
   }
-}
-
-function promptStreamEvent(
-  sessionId: string,
-  event: AgentSessionEvent,
-): PromptStreamEvent | null {
-  if (
-    event.type === "message_update" &&
-    event.assistantMessageEvent.type === "text_delta"
-  ) {
-    return {
-      type: "delta",
-      sessionId,
-      text: event.assistantMessageEvent.delta,
-    };
-  }
-  if (event.type === "tool_execution_start") {
-    const toolCall = toolCallFromPi(
-      event.toolCallId,
-      event.toolName,
-      event.args,
-    );
-    if (toolCall === null) return null;
-    return { type: "toolCall", sessionId, toolCall };
-  }
-  return null;
 }
