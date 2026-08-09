@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { coalesceAssistantMessages } from "./pi-service.js";
+import { coalesceAssistantMessages } from "../shared/coalesceAssistantMessages.js";
 
 describe("coalesceAssistantMessages", () => {
   test("merges adjacent assistant tool rounds into one feed row", () => {

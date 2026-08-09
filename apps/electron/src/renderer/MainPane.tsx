@@ -36,6 +36,7 @@ import {
   type SessionTranscript,
   type ToolCall,
 } from "../shared/rpc.ts";
+import { coalesceAssistantMessages } from "../shared/coalesceAssistantMessages.ts";
 import type { SessionSelection } from "./App.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
@@ -282,7 +283,7 @@ function MessageFeed({
       aria-relevant="additions"
       ref={feedRef}
     >
-      {transcript.messages.map((message) => (
+      {coalesceAssistantMessages(transcript.messages).map((message) => (
         <Message
           key={message.id}
           role={message.role}
