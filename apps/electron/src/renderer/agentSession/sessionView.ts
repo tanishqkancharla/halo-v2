@@ -1,15 +1,15 @@
 import type { AgentMessage } from "../../shared/rpc.js";
 import type { AgentSessionState } from "../../shared/AgentSessionState.js";
 
-export type SessionFeedItem =
+export type SessionViewItem =
   | { kind: "user"; id: string; text: string }
   | {
       kind: "assistantTurn";
       id: string;
-      parts: SessionFeedPart[];
+      parts: SessionViewPart[];
     };
 
-export type SessionFeedPart =
+export type SessionViewPart =
   | { kind: "text"; id: string; text: string; streaming: boolean }
   | {
       kind: "tool";
@@ -19,13 +19,13 @@ export type SessionFeedPart =
     };
 
 /**
- * Project AgentSessionState into feed rows: one user bubble per user message,
+ * Project AgentSessionState into view rows: one user bubble per user message,
  * one assistant column per stretch of assistant activity (Pi TUI shape).
  * Tool lines come from assistant message toolCall content blocks.
  */
-export function sessionFeedItems(state: AgentSessionState): SessionFeedItem[] {
-  const items: SessionFeedItem[] = [];
-  let assistantParts: SessionFeedPart[] = [];
+export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
+  const items: SessionViewItem[] = [];
+  let assistantParts: SessionViewPart[] = [];
   let assistantId = "assistant";
   const emittedTools = new Set<string>();
 

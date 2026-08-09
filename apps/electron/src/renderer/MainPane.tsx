@@ -24,10 +24,10 @@ import {
   useDraftAgentSession,
 } from "./agentSession/useAgentSession.ts";
 import {
-  sessionFeedItems,
+  sessionViewItems,
   toolPartLabel,
-  type SessionFeedItem,
-} from "./agentSession/sessionFeed.ts";
+  type SessionViewItem,
+} from "./agentSession/sessionView.ts";
 import type { AgentSessionState } from "../shared/AgentSessionState.ts";
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
@@ -88,7 +88,7 @@ function SavedPane({
         <header className={header}>
           <H3>{title}</H3>
         </header>
-        <SessionFeed state={state} isWorking={isWorking} />
+        <SessionView state={state} isWorking={isWorking} />
         <div className={composer}>
           <PromptEditor
             key={sessionId}
@@ -120,7 +120,7 @@ function DraftPane({
   const content = useStyles(styles.content);
   const header = useStyles(styles.header);
   const composer = useStyles(styles.composer);
-  const hasMessages = sessionFeedItems(state).length > 0;
+  const hasMessages = sessionViewItems(state).length > 0;
 
   return (
     <main className={pane} aria-label="New session" data-draft-id={draftId}>
@@ -130,7 +130,7 @@ function DraftPane({
           <P>Send a message to start this session.</P>
         </header>
         {hasMessages ? (
-          <SessionFeed state={state} isWorking={isWorking} />
+          <SessionView state={state} isWorking={isWorking} />
         ) : null}
         <div className={composer}>
           <PromptEditor
@@ -223,34 +223,34 @@ function PromptEditor({
   );
 }
 
-function SessionFeed({
+function SessionView({
   state,
   isWorking,
 }: {
   state: AgentSessionState;
   isWorking: boolean;
 }) {
-  const feedRef = useRef<HTMLDivElement>(null);
-  const feed = useStyles(styles.feed);
+  const viewRef = useRef<HTMLDivElement>(null);
+  const view = useStyles(styles.view);
   const liveStatus = useStyles(styles.liveStatus);
   const thinking = useStyles(styles.thinking);
-  const items = sessionFeedItems(state);
+  const items = sessionViewItems(state);
 
   useLayoutEffect(() => {
-    const element = feedRef.current;
+    const element = viewRef.current;
     if (element) element.scrollTop = element.scrollHeight;
   }, [state, isWorking]);
 
   return (
     <div
-      className={feed}
+      className={view}
       role="log"
       aria-label="Session transcript"
       aria-relevant="additions"
-      ref={feedRef}
+      ref={viewRef}
     >
       {items.map((item) => (
-        <FeedItemView key={item.id} item={item} />
+        <SessionViewRow key={item.id} item={item} />
       ))}
       {isWorking ? (
         <span className={thinking}>
@@ -267,7 +267,7 @@ function SessionFeed({
   );
 }
 
-function FeedItemView({ item }: { item: SessionFeedItem }) {
+function SessionViewRow({ item }: { item: SessionViewItem }) {
   const userMessage = useStyles(styles.userMessage);
   const body = useStyles(styles.messageBody);
   const assistantRow = useStyles(styles.assistantRow);
@@ -352,7 +352,7 @@ const styles = {
     minWidth: 0,
     marginBottom: spacing.value(6),
   }),
-  feed: style(
+  view: style(
     flex({ direction: "column", gap: 6 }),
     flexItem({
       size: "auto",
