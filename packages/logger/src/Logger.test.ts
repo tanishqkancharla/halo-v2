@@ -14,7 +14,7 @@ class CollectingSink implements LoggerSinkApi {
 }
 
 describe("Logger", () => {
-  test("writes level, timestamp, and data to sinks", () => {
+  test("writes level, timestamp, scopes, and data to sinks", () => {
     const sink = new CollectingSink();
     const logger = new Logger({ sinks: [sink] });
 
@@ -23,11 +23,12 @@ describe("Logger", () => {
     expect(sink.entries).toHaveLength(1);
     const entry = sink.entries[0]!;
     expect(entry.level).toBe("info");
+    expect(entry.scopes).toEqual({});
     expect(entry.data).toEqual({ message: "hello", count: 1 });
     expect(Number.isNaN(Date.parse(entry.timestamp))).toBe(false);
   });
 
-  test("merges scope data under the scope name", () => {
+  test("keeps scope data under the scope name", () => {
     const sink = new CollectingSink();
     const logger = new Logger({ sinks: [sink] })
       .scope("renderer")
@@ -35,9 +36,11 @@ describe("Logger", () => {
 
     logger.warn({ message: "slow render" });
 
-    expect(sink.entries[0]!.data).toEqual({
+    expect(sink.entries[0]!.scopes).toEqual({
       renderer: {},
       ui: { route: "chat" },
+    });
+    expect(sink.entries[0]!.data).toEqual({
       message: "slow render",
     });
   });
@@ -49,8 +52,10 @@ describe("Logger", () => {
 
     logger.log({ event: "ready" });
 
-    expect(first.entries[0]!.data).toEqual({ main: {}, event: "ready" });
-    expect(second.entries[0]!.data).toEqual({ main: {}, event: "ready" });
+    expect(first.entries[0]!.scopes).toEqual({ main: {} });
+    expect(first.entries[0]!.data).toEqual({ event: "ready" });
+    expect(second.entries[0]!.scopes).toEqual({ main: {} });
+    expect(second.entries[0]!.data).toEqual({ event: "ready" });
   });
 
   test("destroy calls each unique sink once", () => {
@@ -74,7 +79,7 @@ describe("JsonlLoggerSink", () => {
     const directory = await mkdtemp(join(tmpdir(), "halo-logger-"));
     const filePath = join(directory, "test.jsonl");
     const sink = new JsonlLoggerSink({ filePath });
-    const logger = new Logger({ sinks: [sink] });
+    const logger = new Logger({ sinks: [sink] }).scope("main");
     const error = new Error("boom");
 
     logger.error({ message: "failed", error });
@@ -83,6 +88,7 @@ describe("JsonlLoggerSink", () => {
     expect(lines).toHaveLength(1);
     const parsed = JSON.parse(lines[0]!) as LoggerEntry;
     expect(parsed.level).toBe("error");
+    expect(parsed.scopes).toEqual({ main: {} });
     expect(parsed.data).toEqual({
       message: "failed",
       error: {

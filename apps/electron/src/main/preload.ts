@@ -27,6 +27,7 @@ type LogMessage = {
   channel: typeof LOG_CHANNELS.log;
   payload: {
     level: LogLevel;
+    scopes: LoggerData;
     data: LoggerData;
   };
 };
@@ -36,6 +37,12 @@ function isLogMessage(data: unknown): data is LogMessage {
   if (!("channel" in data) || data.channel !== LOG_CHANNELS.log) return false;
   if (!("payload" in data) || typeof data.payload !== "object") return false;
   if (data.payload === null) return false;
-  if (!("level" in data.payload) || !("data" in data.payload)) return false;
+  if (
+    !("level" in data.payload) ||
+    !("scopes" in data.payload) ||
+    !("data" in data.payload)
+  ) {
+    return false;
+  }
   return true;
 }

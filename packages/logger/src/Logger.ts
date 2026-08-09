@@ -5,6 +5,7 @@ export type LoggerData = Record<string, unknown>;
 export type LoggerEntry = {
   timestamp: string;
   level: LogLevel;
+  scopes: LoggerData;
   data: LoggerData;
 };
 
@@ -34,10 +35,8 @@ function createLogEntry(
   return {
     timestamp: new Date().toISOString(),
     level,
-    data: {
-      ...scopes,
-      ...data,
-    },
+    scopes,
+    data,
   };
 }
 
@@ -98,11 +97,5 @@ export class Logger implements LoggerApi {
     for (const sink of this.sinks) {
       sink.log(entry);
     }
-  }
-}
-
-export class ConsoleLoggerSink implements LoggerSinkApi {
-  log(entry: LoggerEntry) {
-    console[entry.level](entry);
   }
 }

@@ -9,13 +9,9 @@ import {
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  ConsoleLoggerSink,
-  Logger,
-  type LogLevel,
-  type LoggerData,
-} from "@repo/logger";
+import { Logger, type LogLevel, type LoggerData } from "@repo/logger";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
+import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
@@ -38,11 +34,12 @@ configureUserDataPath();
 const applicationConfig = getApplicationConfig({ isDevelopment });
 const logger = new Logger({
   sinks: [
-    new ConsoleLoggerSink(),
+    new PrettyConsoleLoggerSink(),
     new JsonlLoggerSink({ filePath: getLogFilePath(applicationConfig) }),
   ],
 });
 const rendererLogger = logger.scope("renderer");
+const rpcLogger = logger.scope("rpc");
 
 if (isDevelopment) {
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
@@ -121,9 +118,16 @@ function createWindow(): BrowserWindow {
 function registerLogBridge(): void {
   ipcMain.on(
     LOG_CHANNELS.log,
-    (event, payload: { level: LogLevel; data: LoggerData }) => {
+    (
+      event,
+      payload: { level: LogLevel; scopes: LoggerData; data: LoggerData },
+    ) => {
       assertTrustedSender(event);
-      rendererLogger[payload.level](payload.data);
+      let log = rendererLogger;
+      for (const [name, scopeData] of Object.entries(payload.scopes)) {
+        log = log.scope(name, scopeData as LoggerData);
+      }
+      log[payload.level](payload.data);
     },
   );
 }
@@ -138,12 +142,17 @@ function registerRpcBridge(): void {
     const { port1, port2 } = new MessageChannelMain();
     newMessagePortMainRpcSession(
       port1,
-      new HaloRpc(workspaceService, piService, () => {
-        if (mainWindow === null) {
-          throw new Error("Halo main window is not open.");
-        }
-        return mainWindow;
-      }),
+      new HaloRpc(
+        workspaceService,
+        piService,
+        () => {
+          if (mainWindow === null) {
+            throw new Error("Halo main window is not open.");
+          }
+          return mainWindow;
+        },
+        rpcLogger,
+      ),
     );
     frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);
   });

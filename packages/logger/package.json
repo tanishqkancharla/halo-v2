@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/Logger.ts",
-    "./JsonlLoggerSink": "./src/JsonlLoggerSink.ts"
+    "./JsonlLoggerSink": "./src/JsonlLoggerSink.ts",
+    "./PrettyConsoleLoggerSink": "./src/PrettyConsoleLoggerSink.ts"
   },
   "scripts": {
     "lint": "oxlint --deny-warnings .",
