@@ -2,8 +2,6 @@ import * as errore from "errore";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import {
   Button,
-  H1,
-  H3,
   Icons,
   P,
   backgroundColor,
@@ -65,6 +63,18 @@ export function MainPane({
   return <SavedPane sessionId={selection.sessionId} sessions={sessions} />;
 }
 
+function SessionTitleSlot({ title }: { title?: string }) {
+  const header = useStyles(styles.header);
+  const titleClassName = useStyles(styles.title);
+  return (
+    <header className={header} aria-label={title}>
+      {title === undefined ? null : (
+        <div className={titleClassName}>{title}</div>
+      )}
+    </header>
+  );
+}
+
 function SavedPane({
   sessionId,
   sessions,
@@ -73,7 +83,6 @@ function SavedPane({
   sessions: SessionSummary[];
 }) {
   const content = useStyles(styles.content);
-  const header = useStyles(styles.header);
   const composer = useStyles(styles.composer);
   const pane = useStyles(styles.pane);
   const { session, state, isWorking, prompt } = useAgentSession(sessionId);
@@ -85,9 +94,7 @@ function SavedPane({
   return (
     <main className={pane} aria-label={title}>
       <div className={content}>
-        <header className={header}>
-          <H3>{title}</H3>
-        </header>
+        <SessionTitleSlot title={title} />
         <SessionView state={state} isWorking={isWorking} />
         <div className={composer}>
           <PromptEditor
@@ -118,17 +125,13 @@ function DraftPane({
   });
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);
-  const header = useStyles(styles.header);
   const composer = useStyles(styles.composer);
   const hasMessages = sessionViewItems(state).length > 0;
 
   return (
     <main className={pane} aria-label="New session" data-draft-id={draftId}>
       <div className={content}>
-        <header className={header}>
-          <H1>New session</H1>
-          <P>Send a message to start this session.</P>
-        </header>
+        <SessionTitleSlot />
         {hasMessages ? (
           <SessionView state={state} isWorking={isWorking} />
         ) : null}
@@ -348,9 +351,15 @@ const styles = {
     minHeight: 0,
     marginInline: "auto",
   }),
-  header: style(flexItem({ size: "hug" }), {
+  header: style(flexItem({ size: "hug" }), text("md", 600, "highContrast"), {
     minWidth: 0,
-    marginBottom: spacing.value(6),
+    height: "1lh",
+    overflow: "hidden",
+  }),
+  title: style({
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   }),
   view: style(
     flex({ direction: "column", gap: 6 }),
