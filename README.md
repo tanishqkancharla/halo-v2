@@ -81,7 +81,7 @@ pnpm infra:deploy
 pnpm infra:dev
 ```
 
-First login stores Cloudflare credentials in `~/.alchemy/profiles.json`. CI uses `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN` instead.
+First login stores Cloudflare credentials in `~/.alchemy/profiles.json`. CI uses `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN` instead. Electron publish to R2 uses the `release` GitHub Environment (see [Publishing](#publishing)).
 
 ## Packaging
 
@@ -91,6 +91,36 @@ pnpm --filter @halo/desktop make
 ```
 
 Electron Forge writes packaged apps to `apps/electron/out`.
+
+## Publishing
+
+`Publish Electron` (`.github/workflows/publish-electron.yml`) builds installers and uploads them to the Alchemy `Releases` R2 bucket (`halo-releases`). Only `tanishqkancharla` can run it on `tanishqkancharla/halo-v2`.
+
+### One-time GitHub setup
+
+1. Deploy infra so the bucket exists: `pnpm infra:deploy`.
+2. In the Cloudflare dashboard, create an [R2 API token](https://developers.cloudflare.com/r2/api/tokens/) with Object Read & Write on `halo-releases`.
+3. Create a GitHub Environment named `release` on this repo.
+4. Add environment **variables**:
+   - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account id
+   - `HALO_RELEASES_BUCKET` — `halo-releases`
+5. Add environment **secrets**:
+   - `R2_ACCESS_KEY_ID` — R2 access key id
+   - `R2_SECRET_ACCESS_KEY` — R2 secret access key
+
+### Run a publish
+
+Use **Actions → Publish Electron → Run workflow**. Artifacts land at:
+
+```text
+s3://halo-releases/<version>/<platform>/<arch>/<file>
+```
+
+Local publish (same env vars as above, with R2 keys mapped to `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`):
+
+```sh
+pnpm --filter @halo/desktop publish
+```
 
 ## Checks
 
