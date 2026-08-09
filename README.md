@@ -8,7 +8,7 @@ Halo is an Electron desktop app with a React renderer and Pi in the main process
 - `apps/electron/src/main`: Electron main process, preload bridge, workspace service, and Pi service.
 - `infra`: Cloudflare infrastructure via [Alchemy](https://alchemy.run/) (`alchemy.run.ts`).
 - `packages/halo-web-cli`: Debug UI control through Libretto Browser Tools.
-- `packages/ui`: Shared React components.
+- `packages/logger`: Shared structured logger.
 - `packages/typescript-config`: Shared TypeScript settings.
 
 ## Local development

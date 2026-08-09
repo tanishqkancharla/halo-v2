@@ -1,27 +1,25 @@
 {
-  "name": "@repo/ui",
+  "name": "@repo/logger",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "exports": {
-    "./*": "./src/*.tsx"
+    ".": "./src/Logger.ts",
+    "./JsonlLoggerSink": "./src/JsonlLoggerSink.ts",
+    "./PrettyConsoleLoggerSink": "./src/PrettyConsoleLoggerSink.ts"
   },
   "scripts": {
     "lint": "oxlint --deny-warnings .",
     "lint:fix": "oxlint --fix .",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "generate:component": "turbo gen react-component",
+    "test": "vitest run src",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
-    "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
   }
 }

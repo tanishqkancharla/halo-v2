@@ -1,4 +1,5 @@
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import type { Logger } from "@repo/logger";
 import { dialog, type BrowserWindow } from "electron";
 import {
   AgentSessionApi,
@@ -15,15 +16,18 @@ export class HaloRpc extends HaloApi {
     private readonly workspace: WorkspaceService,
     private readonly pi: PiService,
     private readonly getWindow: () => BrowserWindow,
+    private readonly logger: Logger,
   ) {
     super();
   }
 
   getWorkspace(): WorkspaceInfo | null {
+    this.logger.info({ event: "getWorkspace" });
     return this.workspace.getWorkspace();
   }
 
   async chooseWorkspace() {
+    this.logger.info({ event: "chooseWorkspace" });
     const selection = await dialog.showOpenDialog(this.getWindow(), {
       title: "Choose a Halo workspace",
       buttonLabel: "Choose workspace",
@@ -36,27 +40,37 @@ export class HaloRpc extends HaloApi {
   }
 
   async listSessions() {
+    this.logger.info({ event: "listSessions" });
     const sessions = await this.pi.listSessions();
     if (sessions instanceof Error) throw sessions;
     return sessions;
   }
 
   async readSessionTranscript(sessionId: string) {
+    this.logger.info({ event: "readSessionTranscript", sessionId });
     const transcript = await this.pi.readTranscript(sessionId);
     if (transcript instanceof Error) throw transcript;
     return transcript;
   }
 
   async newAgentSession() {
+    this.logger.info({ event: "newAgentSession" });
     const session = await this.pi.newAgentSession();
     if (session instanceof Error) throw session;
-    return new AgentSessionRpc(session);
+    return new AgentSessionRpc(
+      session,
+      this.logger.scope("agentSession", { sessionId: session.sessionId }),
+    );
   }
 
   async openAgentSession(sessionId: string) {
+    this.logger.info({ event: "openAgentSession", sessionId });
     const session = await this.pi.openAgentSession(sessionId);
     if (session instanceof Error) throw session;
-    return new AgentSessionRpc(session);
+    return new AgentSessionRpc(
+      session,
+      this.logger.scope("agentSession", { sessionId: session.sessionId }),
+    );
   }
 }
 
@@ -70,7 +84,10 @@ export class AgentSessionRpc extends AgentSessionApi {
   private deliveries = Promise.resolve();
   private readonly unsubscribePi: () => void;
 
-  constructor(private readonly session: AgentSession) {
+  constructor(
+    private readonly session: AgentSession,
+    private readonly logger: Logger,
+  ) {
     super();
     this.unsubscribePi = session.subscribe((event) => {
       if (
@@ -91,16 +108,19 @@ export class AgentSessionRpc extends AgentSessionApi {
   }
 
   getSessionId() {
+    this.logger.info({ event: "getSessionId" });
     return this.session.sessionId;
   }
 
   subscribe(callback: PromptListener) {
+    this.logger.info({ event: "subscribe" });
     // Cap'n Web releases arg stubs when the call returns unless we dup().
     this.listener =
       typeof callback.dup === "function" ? callback.dup() : callback;
   }
 
   async prompt(text: string) {
+    this.logger.info({ event: "prompt", textLength: text.length });
     if (text.trim().length === 0) throw new EmptyPromptError();
     const prompted = await this.session
       .prompt(text)
@@ -110,6 +130,7 @@ export class AgentSessionRpc extends AgentSessionApi {
   }
 
   [Symbol.dispose]() {
+    this.logger.info({ event: "dispose" });
     this.unsubscribePi();
     const listener = this.listener;
     if (listener !== null) {
@@ -118,7 +139,7 @@ export class AgentSessionRpc extends AgentSessionApi {
     }
     this.listener = null;
     void this.session.abort().catch((error) => {
-      console.warn("Failed to abort disposed agent session:", error);
+      this.logger.warn({ event: "abort-failed", error });
     });
     this.session.dispose();
   }
