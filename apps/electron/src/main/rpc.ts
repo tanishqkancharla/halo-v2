@@ -3,10 +3,12 @@ import type {
   AgentSessionEvent,
 } from "@mariozechner/pi-coding-agent";
 import { dialog, type BrowserWindow } from "electron";
+import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import {
   AgentSessionApi,
   HaloApi,
   type AgentSessionEventHandler,
+  type OpenedAgentSession,
   type WorkspaceInfo,
 } from "../shared/rpc.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
@@ -44,22 +46,19 @@ export class HaloRpc extends HaloApi {
     return sessions;
   }
 
-  async readSession(sessionId: string) {
-    const session = await this.pi.readSession(sessionId);
-    if (session instanceof Error) throw session;
-    return session;
-  }
-
   async newAgentSession() {
     const session = await this.pi.newAgentSession();
     if (session instanceof Error) throw session;
     return new AgentSessionRpc(session);
   }
 
-  async openAgentSession(sessionId: string) {
+  async openAgentSession(sessionId: string): Promise<OpenedAgentSession> {
     const session = await this.pi.openAgentSession(sessionId);
     if (session instanceof Error) throw session;
-    return new AgentSessionRpc(session);
+    return {
+      state: agentSessionStateFromSession({ messages: session.messages }),
+      session: new AgentSessionRpc(session),
+    };
   }
 }
 

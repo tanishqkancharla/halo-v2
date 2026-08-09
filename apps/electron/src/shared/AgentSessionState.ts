@@ -18,7 +18,7 @@ export function emptyAgentSessionState(): AgentSessionState {
   };
 }
 
-/** Build state from a durable session snapshot (readSession). */
+/** Build feed state from a live Pi session's loaded messages. */
 export function agentSessionStateFromSession(session: {
   messages: AgentMessage[];
 }): AgentSessionState {

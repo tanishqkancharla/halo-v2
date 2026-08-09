@@ -37,11 +37,16 @@ export abstract class AgentSessionApi extends RpcTarget {
   abstract prompt(text: string): Promise<void>;
 }
 
+/** Live session stub plus the durable messages already loaded into it. */
+export type OpenedAgentSession = {
+  session: AgentSessionApi;
+  state: AgentSessionState;
+};
+
 export abstract class HaloApi extends RpcTarget {
   abstract getWorkspace(): WorkspaceInfo | null;
   abstract chooseWorkspace(): Promise<WorkspaceInfo | null>;
   abstract listSessions(): Promise<SessionSummary[]>;
-  abstract readSession(sessionId: string): Promise<AgentSessionState>;
   abstract newAgentSession(): Promise<AgentSessionApi>;
-  abstract openAgentSession(sessionId: string): Promise<AgentSessionApi>;
+  abstract openAgentSession(sessionId: string): Promise<OpenedAgentSession>;
 }

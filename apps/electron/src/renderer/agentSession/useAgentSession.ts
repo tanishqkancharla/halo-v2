@@ -42,30 +42,23 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
     setIsWorking(false);
     setSession(null);
 
-    void api
-      .readSession(sessionId)
-      .then((loaded) => {
-        if (cancelled) return;
-        setState(loaded);
-      })
-      .catch((e) => {
-        console.warn("Failed to load session:", e);
-      });
-
+    // If cleanup runs before this resolves, `stub` is still unset — dispose the
+    // late result here. Effect cleanup only covers stubs already assigned.
     void api
       .openAgentSession(sessionId)
-      .then((created) => {
+      .then((opened) => {
         if (cancelled) {
-          created[Symbol.dispose]();
+          opened.session[Symbol.dispose]();
           return;
         }
-        stub = created;
-        void created.subscribe((event) => {
+        stub = opened.session;
+        setState(opened.state);
+        void opened.session.subscribe((event) => {
           if (event.type === "agent_start") setIsWorking(true);
           if (event.type === "agent_end") setIsWorking(false);
           setState((current) => applyAgentSessionEvent(current, event));
         });
-        setSession(() => created);
+        setSession(() => opened.session);
       })
       .catch((e) => {
         console.warn("Failed to open agent session:", e);
@@ -95,8 +88,6 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       setState((current) => ({ ...current, error: result.message }));
       return result;
     }
-    const loaded = await api.readSession(sessionId);
-    setState(loaded);
     await queryClient.invalidateQueries({
       queryKey: ["sessions"],
       refetchType: "all",
@@ -167,8 +158,6 @@ export function useDraftAgentSession(onCreated: (sessionId: string) => void): {
       return result;
     }
     const sessionId = await session.getSessionId();
-    const loaded = await api.readSession(sessionId);
-    setState(loaded);
     await queryClient.invalidateQueries({
       queryKey: ["sessions"],
       refetchType: "all",

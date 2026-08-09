@@ -3,10 +3,8 @@ import {
   createCodingTools,
   SessionManager,
   type SessionInfo,
-  type SessionMessageEntry,
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
-import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import type { SessionSummary } from "../shared/rpc.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
 
@@ -21,7 +19,7 @@ export class CreateAgentSessionError extends errore.createTaggedError({
 }) {}
 
 /**
- * Stateless Pi SDK proxy: SessionManager for durable list/read, createAgentSession
+ * Stateless Pi SDK proxy: SessionManager for durable list, createAgentSession
  * for live AgentSession. Callers own subscribe / prompt / dispose.
  */
 export class PiService {
@@ -63,18 +61,6 @@ export class PiService {
     return sessions
       .map((session) => sessionSummary(session))
       .toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-  }
-
-  async readSession(sessionId: string) {
-    const layout = this.workspace.getLayout();
-    if (layout instanceof Error) return layout;
-    const manager = await this.openSessionManager(layout, sessionId);
-    if (manager instanceof Error) return manager;
-    const messages = manager
-      .getBranch()
-      .filter((entry): entry is SessionMessageEntry => entry.type === "message")
-      .map((entry) => entry.message);
-    return agentSessionStateFromSession({ messages });
   }
 
   private async openSessionManager(layout: WorkspaceLayout, sessionId: string) {
