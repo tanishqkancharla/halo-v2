@@ -1,10 +1,15 @@
-import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import type {
+  AgentSession,
+  AgentSessionEvent,
+} from "@mariozechner/pi-coding-agent";
 import type { Logger } from "@repo/logger";
 import { dialog, type BrowserWindow } from "electron";
+import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import {
   AgentSessionApi,
   HaloApi,
-  type PromptEventHandler,
+  type AgentSessionEventHandler,
+  type OpenedAgentSession,
   type WorkspaceInfo,
 } from "../shared/rpc.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
@@ -46,13 +51,6 @@ export class HaloRpc extends HaloApi {
     return sessions;
   }
 
-  async readSessionTranscript(sessionId: string) {
-    this.logger.info({ event: "readSessionTranscript", sessionId });
-    const transcript = await this.pi.readTranscript(sessionId);
-    if (transcript instanceof Error) throw transcript;
-    return transcript;
-  }
-
   async newAgentSession() {
     this.logger.info({ event: "newAgentSession" });
     const session = await this.pi.newAgentSession();
@@ -63,24 +61,27 @@ export class HaloRpc extends HaloApi {
     );
   }
 
-  async openAgentSession(sessionId: string) {
+  async openAgentSession(sessionId: string): Promise<OpenedAgentSession> {
     this.logger.info({ event: "openAgentSession", sessionId });
     const session = await this.pi.openAgentSession(sessionId);
     if (session instanceof Error) throw session;
-    return new AgentSessionRpc(
-      session,
-      this.logger.scope("agentSession", { sessionId: session.sessionId }),
-    );
+    return {
+      state: agentSessionStateFromSession({ messages: session.messages }),
+      session: new AgentSessionRpc(
+        session,
+        this.logger.scope("agentSession", { sessionId: session.sessionId }),
+      ),
+    };
   }
 }
 
-type PromptListener = PromptEventHandler & {
-  dup?: () => PromptEventHandler & Disposable;
+type SessionListener = AgentSessionEventHandler & {
+  dup?: () => AgentSessionEventHandler & Disposable;
 } & Partial<Disposable>;
 
-/** Cap'n Web stub wrapping a live Pi AgentSession. */
+/** Cap'n Web stub wrapping a live Pi AgentSession. Forwards raw Pi events. */
 export class AgentSessionRpc extends AgentSessionApi {
-  private listener: PromptListener | null = null;
+  private listener: SessionListener | null = null;
   private deliveries = Promise.resolve();
   private readonly unsubscribePi: () => void;
 
@@ -89,21 +90,10 @@ export class AgentSessionRpc extends AgentSessionApi {
     private readonly logger: Logger,
   ) {
     super();
-    this.unsubscribePi = session.subscribe((event) => {
-      if (
-        event.type !== "message_update" ||
-        event.assistantMessageEvent.type !== "text_delta"
-      ) {
-        return;
-      }
-      const streamEvent = {
-        type: "delta" as const,
-        sessionId: this.session.sessionId,
-        text: event.assistantMessageEvent.delta,
-      };
+    this.unsubscribePi = session.subscribe((event: AgentSessionEvent) => {
       const listener = this.listener;
       if (listener === null) return;
-      this.deliveries = this.deliveries.then(() => listener(streamEvent));
+      this.deliveries = this.deliveries.then(() => listener(event));
     });
   }
 
@@ -112,7 +102,7 @@ export class AgentSessionRpc extends AgentSessionApi {
     return this.session.sessionId;
   }
 
-  subscribe(callback: PromptListener) {
+  subscribe(callback: SessionListener) {
     this.logger.info({ event: "subscribe" });
     // Cap'n Web releases arg stubs when the call returns unless we dup().
     this.listener =

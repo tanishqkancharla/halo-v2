@@ -1,4 +1,19 @@
 import { RpcTarget } from "capnweb";
+import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
+import type { AgentSessionState } from "./AgentSessionState.js";
+
+export type { AgentSessionEvent, AgentSessionState };
+export {
+  agentSessionStateFromSession,
+  applyAgentSessionEvent,
+  emptyAgentSessionState,
+} from "./AgentSessionState.js";
+
+/** Pi agent message carried on session events and durable sessions. */
+export type AgentMessage = Extract<
+  AgentSessionEvent,
+  { type: "message_end" }
+>["message"];
 
 export type WorkspaceInfo = {
   name: string;
@@ -14,38 +29,24 @@ export type SessionSummary = {
   updatedAt: string;
 };
 
-export type MessageRole = "user" | "assistant";
-
-export type SessionMessage = {
-  id: string;
-  role: MessageRole;
-  text: string;
-  timestamp: string;
-};
-
-export type SessionTranscript = {
-  messages: SessionMessage[];
-};
-
-export type PromptStreamEvent = {
-  type: "delta";
-  sessionId: string;
-  text: string;
-};
-
-export type PromptEventHandler = (event: PromptStreamEvent) => void;
+export type AgentSessionEventHandler = (event: AgentSessionEvent) => void;
 
 export abstract class AgentSessionApi extends RpcTarget {
   abstract getSessionId(): string;
-  abstract subscribe(callback: PromptEventHandler): void;
+  abstract subscribe(callback: AgentSessionEventHandler): void;
   abstract prompt(text: string): Promise<void>;
 }
+
+/** Live session stub plus the durable messages already loaded into it. */
+export type OpenedAgentSession = {
+  session: AgentSessionApi;
+  state: AgentSessionState;
+};
 
 export abstract class HaloApi extends RpcTarget {
   abstract getWorkspace(): WorkspaceInfo | null;
   abstract chooseWorkspace(): Promise<WorkspaceInfo | null>;
   abstract listSessions(): Promise<SessionSummary[]>;
-  abstract readSessionTranscript(sessionId: string): Promise<SessionTranscript>;
   abstract newAgentSession(): Promise<AgentSessionApi>;
-  abstract openAgentSession(sessionId: string): Promise<AgentSessionApi>;
+  abstract openAgentSession(sessionId: string): Promise<OpenedAgentSession>;
 }

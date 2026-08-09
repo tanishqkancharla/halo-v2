@@ -3,14 +3,9 @@ import {
   createCodingTools,
   SessionManager,
   type SessionInfo,
-  type SessionMessageEntry,
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
-import type {
-  SessionMessage,
-  SessionSummary,
-  SessionTranscript,
-} from "../shared/rpc.js";
+import type { SessionSummary } from "../shared/rpc.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
@@ -24,7 +19,7 @@ export class CreateAgentSessionError extends errore.createTaggedError({
 }) {}
 
 /**
- * Stateless Pi SDK proxy: SessionManager for durable list/read, createAgentSession
+ * Stateless Pi SDK proxy: SessionManager for durable list, createAgentSession
  * for live AgentSession. Callers own subscribe / prompt / dispose.
  */
 export class PiService {
@@ -68,18 +63,6 @@ export class PiService {
       .toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
-  async readTranscript(sessionId: string) {
-    const layout = this.workspace.getLayout();
-    if (layout instanceof Error) return layout;
-    const manager = await this.openSessionManager(layout, sessionId);
-    if (manager instanceof Error) return manager;
-    const messages = manager
-      .getBranch()
-      .filter((entry): entry is SessionMessageEntry => entry.type === "message")
-      .flatMap(sessionMessage);
-    return { messages } satisfies SessionTranscript;
-  }
-
   private async openSessionManager(layout: WorkspaceLayout, sessionId: string) {
     const sessions = await SessionManager.list(layout.root, layout.sessionDir);
     const session = sessions.find((candidate) => candidate.id === sessionId);
@@ -99,32 +82,4 @@ function sessionSummary(session: SessionInfo): SessionSummary {
     createdAt: session.created.toISOString(),
     updatedAt: session.modified.toISOString(),
   };
-}
-
-function sessionMessage(entry: SessionMessageEntry): SessionMessage[] {
-  const message = entry.message;
-  if (message.role !== "user" && message.role !== "assistant") return [];
-  const text = collectText(message.content);
-  if (text.length === 0) return [];
-  return [
-    {
-      id: entry.id,
-      role: message.role,
-      text,
-      timestamp: entry.timestamp,
-    },
-  ];
-}
-
-function collectText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .flatMap((part) => {
-      if (typeof part !== "object" || part === null) return [];
-      if (!("type" in part) || part.type !== "text") return [];
-      if (!("text" in part) || typeof part.text !== "string") return [];
-      return [part.text];
-    })
-    .join("");
 }
