@@ -12,30 +12,16 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 
-type OnboardingProps =
-  | { status: "loading" }
-  | {
-      status: "choose";
-      message?: string;
-      isChoosing: boolean;
-      onChoose: () => void;
-    };
+type OnboardingProps = {
+  message?: string;
+  isChoosing: boolean;
+  onChoose: () => void;
+};
 
 export function Onboarding(props: OnboardingProps) {
   const shell = useStyles(styles.shell);
   const card = useStyles(styles.card);
   const error = useStyles(styles.error);
-
-  if (props.status === "loading") {
-    return (
-      <main className={shell}>
-        <section className={card} aria-live="polite">
-          <H1>Opening workspace</H1>
-          <P>Waiting for a workspace folder…</P>
-        </section>
-      </main>
-    );
-  }
 
   return (
     <main className={shell}>

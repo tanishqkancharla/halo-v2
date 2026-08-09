@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { colors, spacing, text, useTheme } from "maui";
 import { style, useStyles } from "purse-styles";
+import { LoadingPage } from "./LoadingPage.tsx";
 import { MainPane } from "./MainPane.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { Sidebar } from "./Sidebar.tsx";
@@ -41,18 +42,13 @@ export function App() {
   const shell = useStyles(styles.shell);
   const errorClassName = useStyles(styles.error);
 
-  if (workspaceQuery.isPending) {
-    return <Onboarding status="loading" />;
-  }
-
-  if (!workspace) {
-    return <Onboarding status="loading" />;
+  if (workspaceQuery.isPending || !workspace) {
+    return <LoadingPage />;
   }
 
   if (workspace.status !== "ready") {
     return (
       <Onboarding
-        status="choose"
         message={
           chooseWorkspace.error
             ? String(chooseWorkspace.error)

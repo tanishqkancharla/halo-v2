@@ -1,0 +1,91 @@
+name: Publish Electron
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: Platforms to publish
+        type: choice
+        options:
+          - all
+          - linux
+          - macos
+          - windows
+        default: all
+
+concurrency:
+  group: publish-electron-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  select:
+    name: Select platforms
+    if: >
+      github.repository == 'tanishqkancharla/halo-v2' &&
+      github.actor == 'tanishqkancharla'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - name: Build matrix
+        id: set
+        run: |
+          case "${{ inputs.platforms }}" in
+            all)
+              matrix='[{"platform":"linux","os":"ubuntu-latest"},{"platform":"macos","os":"macos-latest"},{"platform":"windows","os":"windows-latest"}]'
+              ;;
+            linux)
+              matrix='[{"platform":"linux","os":"ubuntu-latest"}]'
+              ;;
+            macos)
+              matrix='[{"platform":"macos","os":"macos-latest"}]'
+              ;;
+            windows)
+              matrix='[{"platform":"windows","os":"windows-latest"}]'
+              ;;
+          esac
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish ${{ matrix.platform }}
+    needs: select
+    environment: Release
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Linux packaging tools
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot dpkg rpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish to Cloudflare R2
+        working-directory: apps/electron
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          HALO_RELEASES_BUCKET: ${{ vars.HALO_RELEASES_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_REGION: auto
+        run: pnpm run publish

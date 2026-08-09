@@ -1,5 +1,9 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
 
+const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+const releasesBucket = process.env.HALO_RELEASES_BUCKET;
+const releaseFolder = process.env.npm_package_version;
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
@@ -37,6 +41,22 @@ const config: ForgeConfig = {
       name: "@electron-forge/maker-rpm",
       platforms: ["linux"],
       config: {},
+    },
+  ],
+  publishers: [
+    {
+      name: "@electron-forge/publisher-s3",
+      config: {
+        bucket: releasesBucket,
+        endpoint:
+          cloudflareAccountId === undefined
+            ? undefined
+            : `https://${cloudflareAccountId}.r2.cloudflarestorage.com`,
+        region: "auto",
+        // R2 rejects S3 object ACLs.
+        omitAcl: true,
+        folder: releaseFolder,
+      },
     },
   ],
   plugins: [
