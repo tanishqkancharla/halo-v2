@@ -9,8 +9,6 @@ import {
   flex,
   flexItem,
   icon,
-  monospace,
-  prose,
   radius,
   shadowVars,
   spacing,
@@ -23,13 +21,13 @@ import {
 } from "./agentSession/useAgentSession.ts";
 import {
   sessionViewItems,
-  toolPartLabel,
   type SessionViewItem,
 } from "./agentSession/sessionView.ts";
 import type { AgentSessionState } from "../shared/AgentSessionState.ts";
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
+import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 
@@ -266,8 +264,6 @@ function SessionViewRow({ item }: { item: SessionViewItem }) {
   const assistantRow = useStyles(styles.assistantRow);
   const assistantMessage = useStyles(styles.assistantMessage);
   const toolCallsClassName = useStyles(styles.toolCalls);
-  const toolCallClassName = useStyles(styles.toolCall);
-  const toolShellClassName = useStyles(styles.toolShell);
 
   if (item.kind === "user") {
     return (
@@ -281,27 +277,13 @@ function SessionViewRow({ item }: { item: SessionViewItem }) {
     <div className={assistantRow} aria-label="Assistant message">
       {item.parts.map((part) => {
         if (part.kind === "tool") {
-          const label = toolPartLabel(part);
           return (
             <div
               key={part.id}
               className={toolCallsClassName}
               aria-label="Tool calls"
             >
-              <div className={toolCallClassName}>
-                {label.kind === "read" ? (
-                  <>Read {label.text}</>
-                ) : label.kind === "wrote" ? (
-                  <>Wrote {label.text}</>
-                ) : label.kind === "shell" ? (
-                  <>
-                    {"$ "}
-                    <span className={toolShellClassName}>{label.text}</span>
-                  </>
-                ) : (
-                  <>{label.text}</>
-                )}
-              </div>
+              <ToolCall part={part} />
             </div>
           );
         }
@@ -415,14 +397,6 @@ const styles = {
   toolCalls: style(flex({ direction: "column", gap: 2 }), {
     minWidth: 0,
   }),
-  toolCall: style(prose("sm").paragraph, {
-    color: colors.gray[11],
-    minWidth: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  }),
-  toolShell: style(monospace),
   thinking: style(
     text("xs", 400, "lowContrast"),
     flex({ align: "center", gap: 4 }),
