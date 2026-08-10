@@ -7,7 +7,6 @@ import {
   prose,
   radius,
   spacing,
-  text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import {
@@ -29,7 +28,6 @@ export function ToolCall({ part }: { part: ToolPart }) {
   const summaryClassName = useStyles(styles.summary);
   const shellClassName = useStyles(styles.shell);
   const bodyClassName = useStyles(styles.body);
-  const outputClassName = useStyles(styles.output);
   const js = label.kind === "exec" ? execJsSource(part.args) : undefined;
   const expandable = label.kind === "exec" && js !== undefined;
 
@@ -66,7 +64,7 @@ export function ToolCall({ part }: { part: ToolPart }) {
         <div className={bodyClassName}>
           <CodeBlock lang="javascript">{js}</CodeBlock>
           {part.resultText !== undefined ? (
-            <pre className={outputClassName}>{part.resultText}</pre>
+            <CodeBlock lang="text">{part.resultText}</CodeBlock>
           ) : null}
         </div>
       ) : null}
@@ -103,12 +101,5 @@ const styles = {
   shell: style(monospace),
   body: style(flex({ direction: "column", gap: 3 }), {
     minWidth: 0,
-  }),
-  output: style(text("xs", 400, "highContrast"), monospace, {
-    margin: 0,
-    padding: 0,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-    color: colors.gray[11],
   }),
 };
