@@ -16,6 +16,7 @@ export type SessionViewPart =
       id: string;
       toolName: string;
       args: unknown;
+      resultText?: string;
     };
 
 /**
@@ -28,6 +29,7 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
   let assistantParts: SessionViewPart[] = [];
   let assistantId = "assistant";
   const emittedTools = new Set<string>();
+  const toolResults = toolResultsByCallId(state);
 
   function flushAssistant() {
     if (assistantParts.length === 0) return;
@@ -58,11 +60,13 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
       if (part.type !== "toolCall") continue;
       if (emittedTools.has(part.id)) continue;
       emittedTools.add(part.id);
+      const resultText = toolResults.get(part.id);
       assistantParts.push({
         kind: "tool",
         id: part.id,
         toolName: part.name,
         args: part.arguments,
+        ...(resultText === undefined ? {} : { resultText }),
       });
     }
   }
@@ -92,12 +96,16 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
 
 /** Maui AiChat labels for Pi coding tools. */
 export function toolPartLabel(part: { toolName: string; args: unknown }): {
-  kind: "read" | "wrote" | "shell" | "other";
+  kind: "read" | "wrote" | "shell" | "exec" | "other";
   text: string;
 } {
   const args = part.args;
   if (typeof args !== "object" || args === null) {
     return { kind: "other", text: part.toolName };
+  }
+
+  if (part.toolName === "exec") {
+    return { kind: "exec", text: "Exec" };
   }
 
   if (part.toolName === "read") {
@@ -122,6 +130,31 @@ export function toolPartLabel(part: { toolName: string; args: unknown }): {
   }
 
   return { kind: "other", text: part.toolName };
+}
+
+export function execJsSource(args: unknown): string | undefined {
+  if (typeof args !== "object" || args === null) return undefined;
+  if (!("js" in args) || typeof args.js !== "string") return undefined;
+  return args.js;
+}
+
+function toolResultsByCallId(state: AgentSessionState): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const message of state.messages) {
+    if (message.role !== "toolResult") continue;
+    map.set(message.toolCallId, toolResultText(message));
+  }
+  return map;
+}
+
+function toolResultText(message: AgentMessage): string {
+  if (message.role !== "toolResult") return "";
+  return message.content
+    .flatMap((part) => {
+      if (part.type !== "text") return [];
+      return [part.text];
+    })
+    .join("");
 }
 
 function userText(message: AgentMessage): string {
