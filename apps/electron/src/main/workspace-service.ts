@@ -31,11 +31,6 @@ export class WorkspaceNotDirectoryError extends errore.createTaggedError({
   message: "The selected workspace must be a directory.",
 }) {}
 
-export class WorkspaceAlreadySelectedError extends errore.createTaggedError({
-  name: "WorkspaceAlreadySelectedError",
-  message: "A workspace has already been selected.",
-}) {}
-
 export class WorkspaceIoError extends errore.createTaggedError({
   name: "WorkspaceIoError",
   message: "Workspace I/O failed",
@@ -100,10 +95,10 @@ export class WorkspaceService {
     if (!metadata.isDirectory()) return new WorkspaceNotDirectoryError();
 
     const layout = workspaceLayout(root);
-    if (this.state.status === "ready") {
-      if (this.state.layout.root !== layout.root) {
-        return new WorkspaceAlreadySelectedError();
-      }
+    if (
+      this.state.status === "ready" &&
+      this.state.layout.root === layout.root
+    ) {
       return workspaceInfo(this.state.layout);
     }
 

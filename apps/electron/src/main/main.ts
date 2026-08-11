@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Menu,
   MessageChannelMain,
@@ -184,6 +185,22 @@ function installMenu(): void {
     label: "Check for Updates…",
     click: () => checkForUpdates(),
   };
+  const switchWorkspaceItem = {
+    label: "Switch Workspace…",
+    click: () => {
+      void switchWorkspace();
+    },
+  };
+  const fileMenu = {
+    label: "File",
+    submenu: [
+      switchWorkspaceItem,
+      { type: "separator" as const },
+      process.platform === "darwin"
+        ? { role: "close" as const }
+        : { role: "quit" as const },
+    ],
+  };
   const viewSubmenu = [
     {
       label: "Reload",
@@ -212,7 +229,7 @@ function installMenu(): void {
             { role: "quit" },
           ],
         },
-        { role: "fileMenu" },
+        fileMenu,
         { role: "editMenu" },
         { label: "View", submenu: viewSubmenu },
         { role: "windowMenu" },
@@ -223,13 +240,43 @@ function installMenu(): void {
 
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      { role: "fileMenu" },
+      fileMenu,
       { role: "editMenu" },
       { label: "View", submenu: viewSubmenu },
       { role: "windowMenu" },
       { label: "Help", submenu: [checkForUpdatesItem] },
     ]),
   );
+}
+
+async function switchWorkspace(): Promise<void> {
+  if (mainWindow === null) return;
+
+  const selection = await dialog.showOpenDialog(mainWindow, {
+    title: "Switch workspace",
+    buttonLabel: "Switch workspace",
+    properties: ["openDirectory"],
+  });
+  if (selection.canceled) return;
+  const directory = selection.filePaths[0];
+  if (directory === undefined) return;
+
+  const previous = workspaceService.getWorkspace();
+  const workspace = await workspaceService.select(directory);
+  if (workspace instanceof Error) {
+    void dialog.showMessageBox(mainWindow, {
+      type: "error",
+      title: "Switch Workspace",
+      message: "Could not switch workspace",
+      detail: workspace.message,
+    });
+    return;
+  }
+  if (previous !== null && previous.workspaceRoot === workspace.workspaceRoot) {
+    return;
+  }
+
+  mainWindow.reload();
 }
 
 function configureUserDataPath(): void {
