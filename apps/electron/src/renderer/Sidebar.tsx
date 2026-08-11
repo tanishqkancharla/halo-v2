@@ -115,7 +115,7 @@ function formatUpdateStatus(update: AppInfo["update"]): string {
     case "checking":
       return "Checking for updates…";
     case "available":
-      return `Update ${update.version} available`;
+      return "Update available — downloading…";
     case "downloaded":
       return `Update ${update.version} ready — restart to apply`;
     case "error":

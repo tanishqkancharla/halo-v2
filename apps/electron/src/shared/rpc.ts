@@ -47,7 +47,7 @@ export type AppUpdateStatus =
   | { state: "disabled"; reason: string }
   | { state: "idle" }
   | { state: "checking" }
-  | { state: "available"; version: string }
+  | { state: "available" }
   | { state: "downloaded"; version: string }
   | { state: "error"; message: string };
 
