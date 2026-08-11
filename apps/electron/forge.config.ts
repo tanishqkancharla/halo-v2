@@ -15,6 +15,7 @@ const config: ForgeConfig = {
     appCategoryType: "public.app-category.medical",
     icon: "icons/icon",
     name: "Halo",
+    executableName: "Halo",
     osxSign: {},
     ...(shouldNotarize
       ? {
@@ -67,6 +68,8 @@ const config: ForgeConfig = {
         },
         prerelease: false,
         draft: false,
+        // Tag must equal package.json version (no "v" prefix).
+        tagPrefix: "",
       },
     },
   ],

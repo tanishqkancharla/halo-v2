@@ -90,6 +90,10 @@ jobs:
         run: |
           KEY_PATH="${RUNNER_TEMP}/AuthKey.p8"
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
+            echo "APPLE_API_KEY_BASE64 did not decode to a .p8 private key"
+            exit 1
+          fi
           echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Install dependencies
