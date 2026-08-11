@@ -24,6 +24,7 @@ import {
   inlineCodeAnimateTag,
   rehypeInlineCodeAnimate,
 } from "./rehypeInlineCodeAnimate.ts";
+import { proseInlineCode } from "./proseInlineCode.ts";
 import "streamdown/styles.css";
 
 type AssistantMessageProps = {
@@ -147,6 +148,7 @@ export function AssistantMessage({
   const rootClassName = useStyles(assistantMessageClass);
   const streamdownClassName = useStyles(
     proseHtml(size),
+    proseInlineCode,
     streamdownRootClass,
     isAnimating ? proseStreamingMarkers : undefined,
   );

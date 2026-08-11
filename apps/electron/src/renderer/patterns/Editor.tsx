@@ -18,6 +18,7 @@ import {
   type ProseSize,
 } from "maui";
 import { style, useStyles } from "purse-styles";
+import { proseInlineCode } from "./proseInlineCode.ts";
 import { useRefCurrent } from "./useRefCurrent.ts";
 
 type EditorProps = {
@@ -52,7 +53,7 @@ export function Editor({
 }: EditorProps) {
   const shellClassName = useStyles(editorShellClass);
   const actionsClassName = useStyles(editorActionsClass);
-  const proseClassName = useStyles(proseHtml(size));
+  const proseClassName = useStyles(proseHtml(size), proseInlineCode);
   const onChangeRef = useRefCurrent(onChange);
   const onSubmitRef = useRefCurrent(onSubmit);
 
