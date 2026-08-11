@@ -189,8 +189,7 @@ const styles = {
   sessionList: style(flex({ direction: "column" }), {
     listStyleType: "none",
     padding: 0,
-    margin: 0,
-    marginInline: `calc(-1 * ${spacing.value(2)})`,
+    margin: `0 calc(-1 * ${spacing.value(2)})`,
     width: `calc(100% + ${spacing.value(2)} + ${spacing.value(2)})`,
     gap: "1px",
   }),
