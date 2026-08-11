@@ -66,6 +66,7 @@ const config: ForgeConfig = {
           name: "halo",
           bin: "Halo",
           productName: "Halo",
+          license: "MIT",
         },
       },
     },

@@ -1,9 +1,10 @@
 {
   "name": "@halo/desktop",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Halo desktop app",
   "author": "Saffron Health",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/tanishqkancharla/halo-v2.git"
