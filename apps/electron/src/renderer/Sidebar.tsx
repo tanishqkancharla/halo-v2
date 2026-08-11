@@ -201,7 +201,7 @@ const styles = {
   }),
   footer: style(
     flex({ direction: "column", gap: 1 }),
-    spacing.padding({ x: 4, top: 4, bottom: 4 }),
+    spacing.padding({ x: 4, top: 4, bottom: 8 }),
     {
       marginTop: "auto",
       minWidth: 0,
