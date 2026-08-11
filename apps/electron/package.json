@@ -20,7 +20,7 @@
     "format:check": "oxfmt --check src index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
     "lint": "oxlint --deny-warnings src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
     "lint:fix": "oxlint --fix src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "test": "vitest run src/main",
+    "test": "vitest run src/main src/shared",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.main.json"
   },
   "dependencies": {
