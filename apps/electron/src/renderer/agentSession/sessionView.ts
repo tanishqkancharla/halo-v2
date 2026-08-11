@@ -96,16 +96,12 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
 
 /** Maui AiChat labels for Pi coding tools. */
 export function toolPartLabel(part: { toolName: string; args: unknown }): {
-  kind: "read" | "wrote" | "shell" | "exec" | "other";
+  kind: "read" | "wrote" | "shell" | "other";
   text: string;
 } {
   const args = part.args;
   if (typeof args !== "object" || args === null) {
     return { kind: "other", text: part.toolName };
-  }
-
-  if (part.toolName === "exec") {
-    return { kind: "exec", text: "Exec" };
   }
 
   if (part.toolName === "read") {
@@ -130,12 +126,6 @@ export function toolPartLabel(part: { toolName: string; args: unknown }): {
   }
 
   return { kind: "other", text: part.toolName };
-}
-
-export function execJsSource(args: unknown): string | undefined {
-  if (typeof args !== "object" || args === null) return undefined;
-  if (!("js" in args) || typeof args.js !== "string") return undefined;
-  return args.js;
 }
 
 function toolResultsByCallId(state: AgentSessionState): Map<string, string> {
