@@ -16,6 +16,10 @@ const config: ForgeConfig = {
     icon: "icons/icon",
     name: "Halo",
     executableName: "Halo",
+    extendInfo: {
+      CFBundleName: "Halo",
+      CFBundleDisplayName: "Halo",
+    },
     osxSign: {},
     ...(shouldNotarize
       ? {

@@ -20,7 +20,7 @@ import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
-import { startAppUpdates } from "./AppUpdate.js";
+import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
 import { newMessagePortMainRpcSession } from "./MessagePortMainTransport.js";
 import { PiService } from "./pi-service.js";
 import { HaloRpc } from "./rpc.js";
@@ -33,6 +33,11 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const isDevelopment = Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL);
 
 if (started) app.quit();
+
+app.setName("Halo");
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.saffronhealth.halo");
+}
 
 loadDevelopmentEnvironment();
 configureUserDataPath();
@@ -180,25 +185,56 @@ function assertTrustedSender(event: IpcMainEvent): BrowserWindow {
 }
 
 function installMenu(): void {
-  if (process.platform !== "darwin") return;
-  const menu = Menu.buildFromTemplate([
-    { role: "appMenu" },
-    { role: "fileMenu" },
-    { role: "editMenu" },
+  const checkForUpdatesItem = {
+    label: "Check for Updates…",
+    click: () => checkForUpdates(),
+  };
+  const viewSubmenu = [
     {
-      label: "View",
-      submenu: [
-        {
-          label: "Reload",
-          accelerator: "CmdOrCtrl+R",
-          click: () => mainWindow?.reload(),
-        },
-        { role: "toggleDevTools" },
-      ],
+      label: "Reload",
+      accelerator: "CmdOrCtrl+R",
+      click: () => mainWindow?.reload(),
     },
-    { role: "windowMenu" },
-  ]);
-  Menu.setApplicationMenu(menu);
+    { role: "toggleDevTools" as const },
+  ];
+
+  if (process.platform === "darwin") {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        {
+          label: app.name,
+          submenu: [
+            { role: "about" },
+            { type: "separator" },
+            checkForUpdatesItem,
+            { type: "separator" },
+            { role: "services" },
+            { type: "separator" },
+            { role: "hide" },
+            { role: "hideOthers" },
+            { role: "unhide" },
+            { type: "separator" },
+            { role: "quit" },
+          ],
+        },
+        { role: "fileMenu" },
+        { role: "editMenu" },
+        { label: "View", submenu: viewSubmenu },
+        { role: "windowMenu" },
+      ]),
+    );
+    return;
+  }
+
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      { role: "fileMenu" },
+      { role: "editMenu" },
+      { label: "View", submenu: viewSubmenu },
+      { role: "windowMenu" },
+      { label: "Help", submenu: [checkForUpdatesItem] },
+    ]),
+  );
 }
 
 function configureUserDataPath(): void {
