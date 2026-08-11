@@ -5,7 +5,6 @@ import {
   colors,
   flex,
   icon,
-  radius,
   shadow,
   spacing,
   text,
@@ -157,9 +156,8 @@ const styles = {
     marginInline: spacing.value(4),
   }),
   sessionLink: style(
-    spacing.padding({ x: 4, y: 2 }),
+    spacing.padding({ y: 2 }),
     text("sm", 400, "highContrast"),
-    radius.sm,
     flex({ align: "center", gap: 3 }),
     {
       width: "100%",
@@ -169,6 +167,7 @@ const styles = {
       cursor: "default",
       background: "transparent",
       textAlign: "left",
+      paddingInline: `calc(${spacing.value(2)} + ${spacing.value(4)})`,
       "&:hover": { background: backgroundColor.elementHover },
       "&[aria-current='page']": {
         color: colors.accent[9],
@@ -178,6 +177,7 @@ const styles = {
   ),
   section: style(flex({ direction: "column", gap: 4 }), {
     minWidth: 0,
+    marginTop: spacing.value(4),
   }),
   sectionLabel: style(
     text("xs", 500, "lowContrast"),
@@ -189,7 +189,8 @@ const styles = {
   sessionList: style(flex({ direction: "column" }), {
     listStyleType: "none",
     padding: 0,
-    margin: 0,
+    margin: `0 calc(-1 * ${spacing.value(2)})`,
+    width: `calc(100% + ${spacing.value(2)} + ${spacing.value(2)})`,
     gap: "1px",
   }),
   sessionTitle: style({
@@ -200,7 +201,7 @@ const styles = {
   }),
   footer: style(
     flex({ direction: "column", gap: 1 }),
-    spacing.padding({ x: 4, top: 4 }),
+    spacing.padding({ x: 4, top: 4, bottom: 8 }),
     {
       marginTop: "auto",
       minWidth: 0,
