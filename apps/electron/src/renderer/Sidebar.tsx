@@ -11,7 +11,7 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import type { SessionSummary } from "../shared/rpc.ts";
+import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 import { HaloLogo } from "./HaloLogo.tsx";
 
@@ -21,6 +21,7 @@ type SidebarProps = {
   onSelectionChange: (selection: SessionSelection) => void;
   onToggleTheme: () => void;
   themeLabel: string;
+  appInfo?: AppInfo;
 };
 
 export function Sidebar({
@@ -29,6 +30,7 @@ export function Sidebar({
   onSelectionChange,
   onToggleTheme,
   themeLabel,
+  appInfo,
 }: SidebarProps) {
   const sidebar = useStyles(styles.sidebar);
   const header = useStyles(styles.header);
@@ -40,6 +42,9 @@ export function Sidebar({
   const sectionLabel = useStyles(styles.sectionLabel);
   const sessionList = useStyles(styles.sessionList);
   const sessionTitle = useStyles(styles.sessionTitle);
+  const footer = useStyles(styles.footer);
+  const versionLabel = useStyles(styles.versionLabel);
+  const updateLabel = useStyles(styles.updateLabel);
 
   return (
     <nav className={sidebar} aria-label="Sessions">
@@ -90,8 +95,33 @@ export function Sidebar({
           })}
         </ul>
       </section>
+      {appInfo !== undefined && (
+        <div className={footer} data-testid="app-update-status">
+          <div className={versionLabel}>Halo {appInfo.version}</div>
+          <div className={updateLabel}>
+            {formatUpdateStatus(appInfo.update)}
+          </div>
+        </div>
+      )}
     </nav>
   );
+}
+
+function formatUpdateStatus(update: AppInfo["update"]): string {
+  switch (update.state) {
+    case "disabled":
+      return update.reason;
+    case "idle":
+      return "Up to date · GitHub Releases";
+    case "checking":
+      return "Checking for updates…";
+    case "available":
+      return `Update ${update.version} available`;
+    case "downloaded":
+      return `Update ${update.version} ready — restart to apply`;
+    case "error":
+      return `Update error: ${update.message}`;
+  }
 }
 
 const styles = {
@@ -163,6 +193,23 @@ const styles = {
     gap: "1px",
   }),
   sessionTitle: style({
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  }),
+  footer: style(
+    flex({ direction: "column", gap: 1 }),
+    spacing.padding({ x: 4, top: 4 }),
+    {
+      marginTop: "auto",
+      minWidth: 0,
+    },
+  ),
+  versionLabel: style(text("xs", 500, "highContrast"), {
+    minWidth: 0,
+  }),
+  updateLabel: style(text("xs", 400, "lowContrast"), {
     minWidth: 0,
     overflow: "hidden",
     textOverflow: "ellipsis",

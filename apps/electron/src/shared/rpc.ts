@@ -43,7 +43,21 @@ export type OpenedAgentSession = {
   state: AgentSessionState;
 };
 
+export type AppUpdateStatus =
+  | { state: "disabled"; reason: string }
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "available"; version: string }
+  | { state: "downloaded"; version: string }
+  | { state: "error"; message: string };
+
+export type AppInfo = {
+  version: string;
+  update: AppUpdateStatus;
+};
+
 export abstract class HaloApi extends RpcTarget {
+  abstract getAppInfo(): AppInfo;
   abstract getWorkspace(): WorkspaceInfo | null;
   abstract chooseWorkspace(): Promise<WorkspaceInfo | null>;
   abstract listSessions(): Promise<SessionSummary[]>;

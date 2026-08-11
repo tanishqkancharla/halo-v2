@@ -117,6 +117,15 @@ export function useSessionsQuery(workspace: WorkspaceState | undefined) {
   });
 }
 
+export function useAppInfoQuery() {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["app-info"],
+    queryFn: () => api.getAppInfo(),
+    refetchInterval: 5_000,
+  });
+}
+
 async function restoreWorkspace(api: HaloApiStub): Promise<WorkspaceState> {
   const active = await api
     .getWorkspace()

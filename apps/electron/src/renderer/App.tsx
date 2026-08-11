@@ -9,6 +9,7 @@ import {
   useSessionsQuery,
   useChooseWorkspaceMutation,
   useWorkspaceQuery,
+  useAppInfoQuery,
 } from "./api/ApiProvider.tsx";
 
 export type SessionSelection =
@@ -25,6 +26,7 @@ export function App() {
   const workspace = workspaceQuery.data;
   const chooseWorkspace = useChooseWorkspaceMutation();
   const sessionsQuery = useSessionsQuery(workspace);
+  const appInfoQuery = useAppInfoQuery();
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
   let activeSelection = selection;
   if (activeSelection === undefined && sessions[0]) {
@@ -80,6 +82,7 @@ export function App() {
             setPreference(resolvedTheme === "dark" ? "light" : "dark")
           }
           themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
+          appInfo={appInfoQuery.data}
         />
         <MainPane
           selection={activeSelection}

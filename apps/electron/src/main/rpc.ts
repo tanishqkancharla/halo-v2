@@ -9,10 +9,12 @@ import {
   AgentSessionApi,
   HaloApi,
   type AgentSessionEventHandler,
+  type AppInfo,
   type OpenedAgentSession,
   type WorkspaceInfo,
 } from "../shared/rpc.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
+import { getAppInfo } from "./AppUpdate.js";
 import type { PiService } from "./pi-service.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
@@ -24,6 +26,10 @@ export class HaloRpc extends HaloApi {
     private readonly logger: Logger,
   ) {
     super();
+  }
+
+  getAppInfo(): AppInfo {
+    return getAppInfo();
   }
 
   getWorkspace(): WorkspaceInfo | null {
