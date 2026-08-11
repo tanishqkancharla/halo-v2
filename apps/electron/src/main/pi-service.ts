@@ -1,12 +1,12 @@
 import {
   createAgentSession,
+  createCodingTools,
   SessionManager,
   type SessionInfo,
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
 import type { SessionSummary } from "../shared/rpc.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
-import { createExecTool } from "./exec/execTool.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
   name: "SessionNotFoundError",
@@ -48,8 +48,7 @@ export class PiService {
       cwd: layout.root,
       agentDir: layout.agentDir,
       sessionManager: manager,
-      tools: [],
-      customTools: [createExecTool(layout.root)],
+      tools: createCodingTools(layout.root),
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;
     return created.session;
