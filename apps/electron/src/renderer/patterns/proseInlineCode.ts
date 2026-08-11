@@ -1,12 +1,11 @@
-import { colors } from "maui";
+import { colors, radius, spacing } from "maui";
 import { style } from "purse-styles";
 
-/** Chip treatment for inline `code` inside Maui `proseHtml` trees. */
-export const proseInlineCode = style({
-  "& :not(pre):not(.maui-code-block) > code": {
+/** Chip treatment for inline `code` marks. */
+export const proseInlineCode = style(
+  radius.md,
+  spacing.padding({ x: 2, y: 1 }),
+  {
     backgroundColor: colors.gray[4],
-    borderRadius: "6px",
-    color: colors.accent[11],
-    padding: "0.15em 0.45em",
   },
-});
+);

@@ -115,19 +115,25 @@ const streamdownComponents: Components = {
   ),
   em: ({ node: _node, className: _className, ...props }) => <em {...props} />,
   hr: ({ node: _node, className: _className, ...props }) => <hr {...props} />,
-  inlineCode: ({ node: _node, className: _className, children, ...props }) => (
-    <code {...props}>{children}</code>
-  ),
+  inlineCode: InlineCode,
   // Retagged inline code while streaming (see rehypeInlineCodeAnimate).
-  [inlineCodeAnimateTag]: ({
-    node: _node,
-    className: _className,
-    ...props
-  }: React.ComponentPropsWithoutRef<"code"> & { node?: unknown }) => (
-    <code {...props} />
-  ),
+  [inlineCodeAnimateTag]: InlineCode,
   code: MauiFencedCode,
 };
+
+function InlineCode({
+  node: _node,
+  className: _className,
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<"code"> & { node?: unknown }) {
+  const chipClassName = useStyles(proseInlineCode);
+  return (
+    <code className={chipClassName} {...props}>
+      {children}
+    </code>
+  );
+}
 
 /** Defaults + inline-code retag so animate can stagger inline code with prose. */
 const streamingRehypePlugins = [
@@ -148,7 +154,6 @@ export function AssistantMessage({
   const rootClassName = useStyles(assistantMessageClass);
   const streamdownClassName = useStyles(
     proseHtml(size),
-    proseInlineCode,
     streamdownRootClass,
     isAnimating ? proseStreamingMarkers : undefined,
   );

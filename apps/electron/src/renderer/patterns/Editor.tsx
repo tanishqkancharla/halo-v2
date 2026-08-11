@@ -53,7 +53,8 @@ export function Editor({
 }: EditorProps) {
   const shellClassName = useStyles(editorShellClass);
   const actionsClassName = useStyles(editorActionsClass);
-  const proseClassName = useStyles(proseHtml(size), proseInlineCode);
+  const proseClassName = useStyles(proseHtml(size));
+  const inlineCodeClassName = useStyles(proseInlineCode);
   const onChangeRef = useRefCurrent(onChange);
   const onSubmitRef = useRefCurrent(onSubmit);
 
@@ -63,6 +64,11 @@ export function Editor({
         heading: { levels: [1, 2, 3, 4] },
         link: {
           openOnClick: false,
+        },
+        code: {
+          HTMLAttributes: {
+            class: inlineCodeClassName,
+          },
         },
       }),
       Markdown,
