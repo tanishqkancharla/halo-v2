@@ -198,12 +198,7 @@ describe("agentSessionStateFromSession", () => {
       timestamp: 40,
     });
     const state = agentSessionStateFromSession({
-      messages: [
-        userMessage("one", 10),
-        failed,
-        userMessage("two", 30),
-        ok,
-      ],
+      messages: [userMessage("one", 10), failed, userMessage("two", 30), ok],
     });
 
     expect(state.error).toBeNull();

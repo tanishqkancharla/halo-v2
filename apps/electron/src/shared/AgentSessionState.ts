@@ -107,8 +107,7 @@ function assistantTurnError(message: AgentMessage): string | null {
   if (message.role !== "assistant") return null;
 
   const errorMessage = message.errorMessage;
-  const hasErrorMessage =
-    errorMessage !== undefined && errorMessage.length > 0;
+  const hasErrorMessage = errorMessage !== undefined && errorMessage.length > 0;
   if (message.stopReason !== "error" && !hasErrorMessage) return null;
   if (!hasErrorMessage) return null;
 
