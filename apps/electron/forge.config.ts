@@ -1,8 +1,12 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
 
-const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-const releasesBucket = process.env.HALO_RELEASES_BUCKET;
-const releaseFolder = process.env.npm_package_version;
+const appleApiKey = process.env.APPLE_API_KEY;
+const appleApiKeyId = process.env.APPLE_API_KEY_ID;
+const appleApiIssuer = process.env.APPLE_API_ISSUER;
+const shouldNotarize =
+  appleApiKey !== undefined &&
+  appleApiKeyId !== undefined &&
+  appleApiIssuer !== undefined;
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -11,6 +15,16 @@ const config: ForgeConfig = {
     appCategoryType: "public.app-category.medical",
     icon: "icons/icon",
     name: "Halo",
+    osxSign: {},
+    ...(shouldNotarize
+      ? {
+          osxNotarize: {
+            appleApiKey,
+            appleApiKeyId,
+            appleApiIssuer,
+          },
+        }
+      : {}),
   },
   makers: [
     {
@@ -45,17 +59,14 @@ const config: ForgeConfig = {
   ],
   publishers: [
     {
-      name: "@electron-forge/publisher-s3",
+      name: "@electron-forge/publisher-github",
       config: {
-        bucket: releasesBucket,
-        endpoint:
-          cloudflareAccountId === undefined
-            ? undefined
-            : `https://${cloudflareAccountId}.r2.cloudflarestorage.com`,
-        region: "auto",
-        // R2 rejects S3 object ACLs.
-        omitAcl: true,
-        folder: releaseFolder,
+        repository: {
+          owner: "tanishqkancharla",
+          name: "halo-v2",
+        },
+        prerelease: false,
+        draft: false,
       },
     },
   ],

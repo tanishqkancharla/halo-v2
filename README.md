@@ -72,7 +72,7 @@ Cloudflare is the cloud target. Alchemy owns the stack under `infra/`.
 | Need | Cloudflare product | Alchemy resource |
 | --- | --- | --- |
 | Secrets manager | [Secrets Store](https://developers.cloudflare.com/secrets-store/) | `Cloudflare.SecretsStore.Store` |
-| App release artifacts | [R2](https://developers.cloudflare.com/r2/) object storage | `Cloudflare.R2.Bucket` (`Releases`) |
+| App release artifacts (unused by publish CI; kept for later) | [R2](https://developers.cloudflare.com/r2/) object storage | `Cloudflare.R2.Bucket` (`Releases`) |
 
 ```sh
 pnpm infra:login
@@ -81,7 +81,7 @@ pnpm infra:deploy
 pnpm infra:dev
 ```
 
-First login stores Cloudflare credentials in `~/.alchemy/profiles.json`. CI uses `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN` instead. Electron publish to R2 uses the `Release` GitHub Environment (see [Publishing](#publishing)).
+First login stores Cloudflare credentials in `~/.alchemy/profiles.json`. CI uses `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN` instead. Electron releases publish to GitHub Releases (see [Publishing](#publishing)).
 
 ## Packaging
 
@@ -94,35 +94,38 @@ Electron Forge writes packaged apps to `apps/electron/out`.
 
 ## Publishing
 
-`Publish Electron` (`.github/workflows/publish-electron.yml`) builds installers and uploads them to the Alchemy `Releases` R2 bucket. Only `tanishqkancharla` can run it on `tanishqkancharla/halo-v2`.
+`Publish Electron` (`.github/workflows/publish-electron.yml`) builds installers on a version tag and uploads them to a GitHub Release. The tag name must equal `apps/electron/package.json` `version` (for example version `0.1.1` → tag `0.1.1`).
 
-The deployed bucket name is `halo-releases-dev-ubuntu-auuzjrvkmjn3x2oy` (ENAM, Standard).
+Packaged macOS and Windows builds check for updates through [update.electronjs.org](https://update.electronjs.org), which reads those GitHub Releases. macOS builds are signed and notarized in CI.
 
 ### One-time GitHub setup
 
-1. Confirm infra is deployed (`pnpm infra:deploy` if needed).
-2. In the Cloudflare dashboard, create an [R2 API token](https://developers.cloudflare.com/r2/api/tokens/) with Object Read & Write on that bucket.
-3. Create a GitHub Environment named `Release` on this repo (name is case-sensitive).
-4. Add environment **variables**:
-   - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account id
-   - `HALO_RELEASES_BUCKET` — `halo-releases-dev-ubuntu-auuzjrvkmjn3x2oy`
-5. Add environment **secrets**:
-   - `R2_ACCESS_KEY_ID` — R2 access key id
-   - `R2_SECRET_ACCESS_KEY` — R2 secret access key
+Create a GitHub Environment named `Release` (name is case-sensitive) and add:
+
+**Variables**
+
+- `APPLE_TEAM_ID` — Apple Team ID (for example `S2ZR72G4R4`)
+
+**Secrets**
+
+- `APPLE_CERTIFICATE_BASE64` — base64-encoded Developer ID Application `.p12`
+- `APPLE_CERTIFICATE_PASSWORD` — password for that `.p12`
+- `APPLE_API_KEY_BASE64` — base64-encoded App Store Connect API `.p8` key
+- `APPLE_API_KEY_ID` — App Store Connect API key id
+- `APPLE_API_ISSUER` — App Store Connect issuer UUID
 
 ### Run a publish
 
-Use **Actions → Publish Electron → Run workflow**. Artifacts land at:
-
-```text
-s3://halo-releases-dev-ubuntu-auuzjrvkmjn3x2oy/<version>/<platform>/<arch>/<file>
-```
-
-Local publish (same env vars as above, with R2 keys mapped to `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`):
+1. Set `version` in `apps/electron/package.json`.
+2. Commit that change on `main`.
+3. Create and push a matching tag:
 
 ```sh
-pnpm --filter @halo/desktop publish
+git tag 0.1.1
+git push origin 0.1.1
 ```
+
+Artifacts appear on the GitHub Release for that tag.
 
 ## Checks
 

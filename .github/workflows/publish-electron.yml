@@ -1,62 +1,61 @@
 name: Publish Electron
 
 on:
-  workflow_dispatch:
-    inputs:
-      platforms:
-        description: Platforms to publish
-        type: choice
-        options:
-          - all
-          - linux
-          - macos
-          - windows
-        default: all
+  push:
+    tags:
+      - "*"
 
 concurrency:
   group: publish-electron-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  select:
-    name: Select platforms
-    if: >
-      github.repository == 'tanishqkancharla/halo-v2' &&
-      github.actor == 'tanishqkancharla'
+  prepare:
+    name: Prepare release
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set.outputs.matrix }}
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Build matrix
-        id: set
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check tag matches package.json
+        id: version
         run: |
-          case "${{ inputs.platforms }}" in
-            all)
-              matrix='[{"platform":"linux","os":"ubuntu-latest"},{"platform":"macos","os":"macos-latest"},{"platform":"windows","os":"windows-latest"}]'
-              ;;
-            linux)
-              matrix='[{"platform":"linux","os":"ubuntu-latest"}]'
-              ;;
-            macos)
-              matrix='[{"platform":"macos","os":"macos-latest"}]'
-              ;;
-            windows)
-              matrix='[{"platform":"windows","os":"windows-latest"}]'
-              ;;
-          esac
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          VERSION="$(node -p "require('./apps/electron/package.json').version")"
+          TAG="${GITHUB_REF_NAME}"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Tag '$TAG' must equal apps/electron package.json version '$VERSION'"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            --title "${{ steps.version.outputs.version }}" \
+            --generate-notes \
+            --latest
 
   publish:
     name: Publish ${{ matrix.platform }}
-    needs: select
+    needs: prepare
     environment: Release
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.select.outputs.matrix) }}
+        include:
+          - platform: linux
+            os: ubuntu-latest
+          - platform: macos
+            os: macos-latest
+          - platform: windows
+            os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -77,15 +76,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fakeroot dpkg rpm
 
+      - name: Import Apple signing certificate
+        if: matrix.platform == 'macos'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Write Apple notarization key
+        if: matrix.platform == 'macos'
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          KEY_PATH="${RUNNER_TEMP}/AuthKey.p8"
+          echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Publish to Cloudflare R2
+      - name: Publish to GitHub Releases
         working-directory: apps/electron
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          HALO_RELEASES_BUCKET: ${{ vars.HALO_RELEASES_BUCKET }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_REGION: auto
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
         run: pnpm run publish

@@ -1,9 +1,13 @@
 {
   "name": "@halo/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Halo desktop app",
   "author": "Saffron Health",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tanishqkancharla/halo-v2.git"
+  },
   "type": "module",
   "main": ".vite/build/main.cjs",
   "scripts": {
@@ -36,7 +40,8 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "streamdown": "^2.5.0",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "update-electron-app": "^3.3.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
@@ -47,7 +52,7 @@
     "@electron-forge/maker-zip": "^7.11.2",
     "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
     "@electron-forge/plugin-vite": "^7.11.2",
-    "@electron-forge/publisher-s3": "^7.11.2",
+    "@electron-forge/publisher-github": "^7.11.2",
     "@electron-forge/shared-types": "^7.11.2",
     "@repo/typescript-config": "workspace:*",
     "@types/hast": "^3.0.5",

@@ -18,6 +18,7 @@ import {
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
+import { updateElectronApp } from "update-electron-app";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { newMessagePortMainRpcSession } from "./MessagePortMainTransport.js";
@@ -69,6 +70,9 @@ app.whenReady().then(async () => {
   registerRpcBridge();
   installMenu();
   openMainWindow();
+  if (!isDevelopment) {
+    updateElectronApp();
+  }
   logger.info({ event: "app-ready" });
 
   app.on("activate", () => {

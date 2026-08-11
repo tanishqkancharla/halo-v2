@@ -6,6 +6,10 @@ Halo is an open-source self-modifiable desktop app built with Electron and Pi. I
 
 - `pnpm run check-affected` - Lint, typecheck, format-check, and test affected packages. Run this after edits before you treat the work as done.
 
+## Releasing
+
+Bump `apps/electron/package.json` `version`, commit, then create and push a git tag with that exact same version string (no `v` prefix). Example: version `0.1.1` → tag `0.1.1`. That tag push runs `Publish Electron`, which builds installers and uploads them to a non-draft GitHub Release. Packaged apps check for updates via `update.electronjs.org`.
+
 ## Code Style
 
 - Prefer explicit, straightforward code. Don't use fallbacks. Avoid patterns like `||` and `??`.
