@@ -34,11 +34,6 @@ const isDevelopment = Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL);
 
 if (started) app.quit();
 
-app.setName("Halo");
-if (process.platform === "win32") {
-  app.setAppUserModelId("com.saffronhealth.halo");
-}
-
 loadDevelopmentEnvironment();
 configureUserDataPath();
 
