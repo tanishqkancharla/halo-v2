@@ -125,6 +125,24 @@ export function toolPartLabel(part: { toolName: string; args: unknown }): {
     return { kind: "shell", text: args.command };
   }
 
+  if (part.toolName === "web_search") {
+    if (!("objective" in args) || typeof args.objective !== "string") {
+      return { kind: "other", text: part.toolName };
+    }
+    return { kind: "other", text: `Search ${args.objective}` };
+  }
+
+  if (part.toolName === "web_fetch") {
+    if (!("urls" in args) || !Array.isArray(args.urls)) {
+      return { kind: "other", text: part.toolName };
+    }
+    const url = args.urls[0];
+    if (typeof url !== "string") {
+      return { kind: "other", text: part.toolName };
+    }
+    return { kind: "other", text: `Fetch ${url}` };
+  }
+
   return { kind: "other", text: part.toolName };
 }
 
