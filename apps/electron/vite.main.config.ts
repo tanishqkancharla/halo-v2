@@ -1,5 +1,6 @@
 import { builtinModules } from "node:module";
 import { defineConfig } from "vite";
+import { viteMainExternals } from "./mainExternals.js";
 
 const nodeBuiltins = [
   ...builtinModules,
@@ -14,12 +15,10 @@ export default defineConfig({
     // (EMPTY_IMPORT_META) and Pi/Halo crash on fileURLToPath({}.url).
     rolldownOptions: {
       platform: "node",
-      // Native modules cannot be bundled into main.cjs.
       external: [
         "electron",
         "electron/main",
-        "@parcel/watcher",
-        /^@parcel\/watcher-/,
+        ...viteMainExternals(),
         ...nodeBuiltins,
       ],
       output: {

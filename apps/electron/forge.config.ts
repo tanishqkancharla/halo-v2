@@ -1,4 +1,5 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
+import { copyMainProcessExternals } from "./copyMainProcessExternals.js";
 
 const appleApiKey = process.env.APPLE_API_KEY;
 const appleApiKeyId = process.env.APPLE_API_KEY_ID;
@@ -26,6 +27,11 @@ const config: ForgeConfig = {
           },
         }
       : {}),
+  },
+  hooks: {
+    packageAfterCopy: async (_forgeConfig, buildPath) => {
+      await copyMainProcessExternals(buildPath);
+    },
   },
   makers: [
     {
