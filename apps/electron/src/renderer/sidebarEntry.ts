@@ -68,13 +68,18 @@ export const sidebarEntryTreeCss = `
     font-weight: 500;
   }
 
-  [data-item-selected="true"][data-item-focused="true"]:before {
-    outline: none;
+  [data-item-focused="true"]:not(:focus-visible):before {
+    display: none;
   }
 
   [data-icon-name="file-tree-icon-chevron"] {
     width: 10px;
     height: 10px;
+  }
+
+  [data-icon-name="file-tree-icon-file"] {
+    fill: none;
+    stroke: currentColor;
   }
 
   [data-item-section="icon"] {

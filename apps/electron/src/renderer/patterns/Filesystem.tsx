@@ -24,6 +24,55 @@ export const mockWorkspacePaths = [
   "tsconfig.json",
 ] as const;
 
+const fileIconSpriteSheet = `<svg data-icon-sprite aria-hidden="true" width="0" height="0">
+  <symbol id="halo-file-icon" viewBox="0 0 24 24" fill="none">
+    <path
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="1.5"
+      d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+    />
+    <path
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="1.5"
+      d="M14 2v4a2 2 0 0 0 2 2h4"
+    />
+    <path
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-width="1.5"
+      d="M10 9H8"
+    />
+    <path
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-width="1.5"
+      d="M16 13H8"
+    />
+    <path
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-width="1.5"
+      d="M16 17H8"
+    />
+  </symbol>
+</svg>`;
+
+const fileTreeIcons = {
+  set: "minimal" as const,
+  colored: false,
+  spriteSheet: fileIconSpriteSheet,
+  remap: {
+    "file-tree-icon-file": {
+      name: "halo-file-icon",
+      viewBox: "0 0 24 24",
+    },
+  },
+};
+
 type FilesystemProps = {
   paths: readonly string[];
   header?: ReactNode;
@@ -48,7 +97,7 @@ export function Filesystem({
   const { model } = useFileTree({
     paths,
     density: "compact",
-    icons: { set: "minimal", colored: false },
+    icons: fileTreeIcons,
     initialExpansion: "open",
     initialSelectedPaths:
       initialSelectedPath === undefined ? undefined : [initialSelectedPath],

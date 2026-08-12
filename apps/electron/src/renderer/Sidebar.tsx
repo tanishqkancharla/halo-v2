@@ -66,6 +66,14 @@ export function Sidebar({
         <Icons.Plus className={newIcon} aria-hidden="true" />
         New session
       </Button>
+      <section className={filesSection} aria-labelledby="files-label">
+        <div className={sectionLabel} id="files-label">
+          Files
+        </div>
+        <div className={filesTree}>
+          <WorkspaceFilesystem />
+        </div>
+      </section>
       <section className={section} aria-labelledby="sessions-label">
         <div className={sectionLabel} id="sessions-label">
           Sessions
@@ -97,14 +105,6 @@ export function Sidebar({
             );
           })}
         </ul>
-      </section>
-      <section className={filesSection} aria-labelledby="files-label">
-        <div className={sectionLabel} id="files-label">
-          Files
-        </div>
-        <div className={filesTree}>
-          <WorkspaceFilesystem />
-        </div>
       </section>
       <section className={section} aria-labelledby="uikit-label">
         <div className={sectionLabel} id="uikit-label">
