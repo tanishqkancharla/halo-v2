@@ -12,18 +12,7 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import { Filesystem } from "./patterns/Filesystem.tsx";
-
-const mockPaths = [
-  "src/renderer/App.tsx",
-  "src/renderer/Sidebar.tsx",
-  "src/renderer/MainPane.tsx",
-  "src/main/index.ts",
-  "src/shared/rpc.ts",
-  "package.json",
-  "README.md",
-  "tsconfig.json",
-] as const;
+import { Filesystem, mockWorkspacePaths } from "./patterns/Filesystem.tsx";
 
 export function UiKitPage() {
   const pane = useStyles(styles.pane);
@@ -42,14 +31,15 @@ export function UiKitPage() {
           <H2>Filesystem</H2>
           <P>
             Lowkey workspace tree styled like sidebar session rows. Mock paths
-            for now; later this lands in the sidebar Files section.
+            for now; the same tree is mounted in the sidebar Files section.
           </P>
           <H3>Example</H3>
           <div className={preview}>
             <Filesystem
               header="Files"
-              paths={mockPaths}
+              paths={mockWorkspacePaths}
               initialSelectedPath="src/renderer/App.tsx"
+              showSelectionLabel
             />
           </div>
         </Prose>

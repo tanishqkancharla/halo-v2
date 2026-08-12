@@ -4,6 +4,7 @@ import {
   backgroundColor,
   colors,
   flex,
+  flexItem,
   icon,
   shadow,
   spacing,
@@ -13,6 +14,7 @@ import { style, useStyles } from "purse-styles";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 import { HaloLogo } from "./HaloLogo.tsx";
+import { Filesystem, mockWorkspacePaths } from "./patterns/Filesystem.tsx";
 
 type SidebarProps = {
   sessions: SessionSummary[];
@@ -38,6 +40,8 @@ export function Sidebar({
   const newIcon = useStyles(icon("sm"));
   const sessionLink = useStyles(styles.sessionLink);
   const section = useStyles(styles.section);
+  const filesSection = useStyles(styles.filesSection);
+  const filesTree = useStyles(styles.filesTree);
   const sectionLabel = useStyles(styles.sectionLabel);
   const sessionList = useStyles(styles.sessionList);
   const sessionTitle = useStyles(styles.sessionTitle);
@@ -93,6 +97,17 @@ export function Sidebar({
             );
           })}
         </ul>
+      </section>
+      <section className={filesSection} aria-labelledby="files-label">
+        <div className={sectionLabel} id="files-label">
+          Files
+        </div>
+        <div className={filesTree}>
+          <Filesystem
+            paths={mockWorkspacePaths}
+            initialSelectedPath="src/renderer/App.tsx"
+          />
+        </div>
       </section>
       <section className={section} aria-labelledby="uikit-label">
         <div className={sectionLabel} id="uikit-label">
@@ -196,6 +211,22 @@ const styles = {
     minWidth: 0,
     marginTop: spacing.value(4),
   }),
+  filesSection: style(
+    flex({ direction: "column", gap: 4 }),
+    flexItem({ size: "auto" }),
+    {
+      minWidth: 0,
+      minHeight: "200px",
+      marginTop: spacing.value(4),
+    },
+  ),
+  filesTree: style(flexItem({ size: "auto" }), {
+    minWidth: 0,
+    minHeight: 0,
+    height: "0",
+    marginInline: `calc(-1 * ${spacing.value(2)})`,
+    width: `calc(100% + ${spacing.value(2)} + ${spacing.value(2)})`,
+  }),
   sectionLabel: style(
     text("xs", 500, "lowContrast"),
     spacing.padding({ x: 4 }),
@@ -219,6 +250,7 @@ const styles = {
   footer: style(
     flex({ direction: "column", gap: 1 }),
     spacing.padding({ x: 4, top: 4, bottom: 8 }),
+    flexItem({ size: "hug" }),
     {
       marginTop: "auto",
       minWidth: 0,

@@ -14,11 +14,23 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 
+export const mockWorkspacePaths = [
+  "src/renderer/App.tsx",
+  "src/renderer/Sidebar.tsx",
+  "src/renderer/MainPane.tsx",
+  "src/main/index.ts",
+  "src/shared/rpc.ts",
+  "package.json",
+  "README.md",
+  "tsconfig.json",
+] as const;
+
 type FilesystemProps = {
   paths: readonly string[];
   header?: ReactNode;
   initialSelectedPath?: string;
   onSelectionChange?: (path: string | null) => void;
+  showSelectionLabel?: boolean;
 };
 
 const mauiTreeStyles = {
@@ -32,14 +44,14 @@ const mauiTreeStyles = {
   "--trees-fg-override": colors.gray[12],
   "--trees-fg-muted-override": colors.gray[11],
   "--trees-bg-muted-override": backgroundColor.elementHover,
-  "--trees-selected-bg-override": "transparent",
+  "--trees-selected-bg-override": `color-mix(in oklch, ${colors.accent[9]} 14%, transparent)`,
   "--trees-selected-fg-override": colors.accent[9],
   "--trees-accent-override": colors.accent[9],
   "--trees-focus-ring-color-override": colors.accent[8],
   "--trees-border-color-override": "transparent",
   "--trees-border-radius-override": "0px",
-  "--trees-padding-inline-override": spacing.value(4),
-  "--trees-item-padding-x-override": spacing.value(2),
+  "--trees-padding-inline-override": "0px",
+  "--trees-item-padding-x-override": spacing.value(4),
   "--trees-item-margin-x-override": "0px",
   "--trees-indent-guide-bg-override": colors.gray[6],
   "--trees-scrollbar-thumb-override": colors.gray[7],
@@ -59,6 +71,11 @@ const mauiTreeCss = `
     outline: none;
   }
 
+  [data-icon-name="file-tree-icon-chevron"] {
+    width: 10px;
+    height: 10px;
+  }
+
   [data-item-section="icon"] {
     color: ${colors.gray[11]};
   }
@@ -73,6 +90,7 @@ export function Filesystem({
   header,
   initialSelectedPath,
   onSelectionChange,
+  showSelectionLabel = false,
 }: FilesystemProps) {
   const shell = useStyles(styles.shell);
   const treeWrap = useStyles(styles.treeWrap);
@@ -110,9 +128,11 @@ export function Filesystem({
           style={mauiTreeStyles}
         />
       </div>
-      <p className={selection}>
-        Selected: {selectedPath === undefined ? "none" : selectedPath}
-      </p>
+      {showSelectionLabel ? (
+        <p className={selection}>
+          Selected: {selectedPath === undefined ? "none" : selectedPath}
+        </p>
+      ) : null}
     </div>
   );
 }
