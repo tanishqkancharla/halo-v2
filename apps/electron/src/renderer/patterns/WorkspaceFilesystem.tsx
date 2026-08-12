@@ -8,7 +8,11 @@ import {
 } from "../api/ApiProvider.tsx";
 import { Filesystem } from "./Filesystem.tsx";
 
-export function WorkspaceFilesystem() {
+type WorkspaceFilesystemProps = {
+  maxHeight?: number;
+};
+
+export function WorkspaceFilesystem({ maxHeight }: WorkspaceFilesystemProps) {
   const workspaceQuery = useWorkspaceQuery();
   const workspace = workspaceQuery.data;
   const pathsQuery = useWorkspacePathsQuery(workspace);
@@ -37,6 +41,7 @@ export function WorkspaceFilesystem() {
     <Filesystem
       key={workspaceRoot}
       paths={pathsQuery.data}
+      maxHeight={maxHeight}
       onModel={(model) => {
         modelRef.current = model;
       }}

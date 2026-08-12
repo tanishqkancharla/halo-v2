@@ -74,7 +74,7 @@ export function Sidebar({
           Files
         </div>
         <div className={filesTree}>
-          <WorkspaceFilesystem />
+          <WorkspaceFilesystem maxHeight={filesTreeMaxHeightPx} />
         </div>
       </section>
       <section className={section} aria-labelledby="sessions-label">
@@ -155,6 +155,13 @@ function formatUpdateStatus(update: AppInfo["update"]): string {
   }
 }
 
+const filesSectionMaxHeightPx = 240;
+const filesLabelLineHeightPx = 18;
+const filesTreeMaxHeightPx =
+  filesSectionMaxHeightPx -
+  filesLabelLineHeightPx -
+  Number.parseInt(spacing.value(4), 10);
+
 const styles = {
   sidebar: style(
     shadow.medium,
@@ -191,31 +198,34 @@ const styles = {
     minWidth: 0,
     marginTop: spacing.value(4),
   }),
-  filesSection: style(flex({ direction: "column", gap: 4 }), {
-    minWidth: 0,
-    minHeight: 0,
-    height: "240px",
-    maxHeight: "240px",
-    overflow: "hidden",
-    marginTop: spacing.value(4),
-    position: "relative",
-    "&::before, &::after": {
-      content: "''",
-      position: "absolute",
-      right: 0,
-      left: 0,
-      height: "1px",
-      backgroundColor: borderColor.outline,
-      opacity: 0,
-      pointerEvents: "none",
-      zIndex: 3,
-      transition: `opacity ${motionDurationMs}ms ${motionEasing}`,
+  filesSection: style(
+    flex({ direction: "column", gap: 4 }),
+    flexItem({ size: "hug" }),
+    {
+      minWidth: 0,
+      minHeight: 0,
+      maxHeight: `${filesSectionMaxHeightPx}px`,
+      overflow: "hidden",
+      marginTop: spacing.value(8),
+      position: "relative",
+      "&::before, &::after": {
+        content: "''",
+        position: "absolute",
+        right: 0,
+        left: 0,
+        height: "1px",
+        backgroundColor: borderColor.outline,
+        opacity: 0,
+        pointerEvents: "none",
+        zIndex: 3,
+        transition: `opacity ${motionDurationMs}ms ${motionEasing}`,
+      },
+      "&::before": { top: 0 },
+      "&::after": { bottom: 0 },
+      "&:hover::before, &:hover::after": { opacity: 1 },
     },
-    "&::before": { top: 0 },
-    "&::after": { bottom: 0 },
-    "&:hover::before, &:hover::after": { opacity: 1 },
-  }),
-  filesTree: style(flexItem({ size: "fill" }), {
+  ),
+  filesTree: style(flexItem({ size: "hug" }), {
     minWidth: 0,
     minHeight: 0,
     overflow: "hidden",

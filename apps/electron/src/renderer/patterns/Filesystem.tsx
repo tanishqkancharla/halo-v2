@@ -76,6 +76,8 @@ const fileTreeIcons = {
     "file-tree-icon-file": {
       name: "halo-file-icon",
       viewBox: "0 0 24 24",
+      width: 14,
+      height: 14,
     },
   },
 };
@@ -87,6 +89,7 @@ type FilesystemProps = {
   onSelectionChange?: (path: string | null) => void;
   onModel?: (model: FileTreeModel) => void;
   showSelectionLabel?: boolean;
+  maxHeight?: number;
 };
 
 export function Filesystem({
@@ -96,9 +99,14 @@ export function Filesystem({
   onSelectionChange,
   onModel,
   showSelectionLabel = false,
+  maxHeight,
 }: FilesystemProps) {
-  const shell = useStyles(styles.shell);
-  const treeWrap = useStyles(styles.treeWrap);
+  const hug = maxHeight !== undefined;
+  const shell = useStyles(styles.shell, hug ? styles.shellHug : undefined);
+  const treeWrap = useStyles(
+    styles.treeWrap,
+    hug ? styles.treeWrapHug : undefined,
+  );
   const selection = useStyles(styles.selection);
   const headerClassName = useStyles(styles.header);
   const { model } = useFileTree({
@@ -120,6 +128,7 @@ export function Filesystem({
   const selectedPaths = useFileTreeSelection(model);
   const selectedPath = selectedPaths[0];
   const overflow = useFileTreeOverflow(model);
+  const contentHeight = useFileTreeContentHeight(model);
 
   useEffect(() => {
     model.resetPaths([...paths]);
@@ -146,7 +155,10 @@ export function Filesystem({
           }
           style={
             {
-              height: "100%",
+              height:
+                maxHeight === undefined
+                  ? "100%"
+                  : `${Math.min(contentHeight, maxHeight)}px`,
               minHeight: 0,
               ...sidebarEntryTreeStyles,
             } as CSSProperties
@@ -160,6 +172,23 @@ export function Filesystem({
       ) : null}
     </div>
   );
+}
+
+function useFileTreeContentHeight(model: FileTreeModel) {
+  const [height, setHeight] = useState(
+    () => model.getVisibleCount() * model.getItemHeight(),
+  );
+
+  useEffect(() => {
+    const read = () => {
+      setHeight(model.getVisibleCount() * model.getItemHeight());
+    };
+    const unsubscribe = model.subscribe(read);
+    read();
+    return unsubscribe;
+  }, [model]);
+
+  return height;
 }
 
 function useFileTreeOverflow(model: FileTreeModel) {
@@ -239,6 +268,9 @@ const styles = {
     minWidth: 0,
     minHeight: 0,
   }),
+  shellHug: style({
+    height: "auto",
+  }),
   treeWrap: style(flexItem({ size: "auto" }), {
     minWidth: 0,
     minHeight: 0,
@@ -265,6 +297,7 @@ const styles = {
     "&[data-overflow-top='true']::before": { opacity: 1 },
     "&[data-overflow-bottom='true']::after": { opacity: 1 },
   }),
+  treeWrapHug: style(flexItem({ size: "hug" })),
   header: style(
     text("xs", 500, "lowContrast"),
     spacing.padding({ x: 4, y: 2 }),

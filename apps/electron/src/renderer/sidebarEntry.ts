@@ -56,6 +56,7 @@ export const sidebarEntryTreeStyles = {
   "--trees-item-margin-x-override": "0px",
   "--trees-indent-guide-bg-override": colors.gray[6],
   "--trees-scrollbar-thumb-override": colors.gray[7],
+  "--trees-icon-width-override": "14px",
   "--trees-file-icon-color": sidebarEntryMutedFg,
 } as CSSProperties;
 
@@ -80,6 +81,8 @@ export const sidebarEntryTreeCss = `
   [data-icon-name="file-tree-icon-file"] {
     fill: none;
     stroke: currentColor;
+    width: 14px;
+    height: 14px;
   }
 
   [data-item-section="icon"] {
