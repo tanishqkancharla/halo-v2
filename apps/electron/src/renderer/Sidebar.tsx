@@ -1,7 +1,6 @@
 import {
   Button,
   Icons,
-  backgroundColor,
   colors,
   flex,
   flexItem,
@@ -15,6 +14,7 @@ import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 import { HaloLogo } from "./HaloLogo.tsx";
 import { Filesystem, mockWorkspacePaths } from "./patterns/Filesystem.tsx";
+import { sidebarEntry, sidebarEntryLabel } from "./sidebarEntry.ts";
 
 type SidebarProps = {
   sessions: SessionSummary[];
@@ -38,13 +38,13 @@ export function Sidebar({
   const logo = useStyles(styles.logo);
   const newButton = useStyles(styles.newButton);
   const newIcon = useStyles(icon("sm"));
-  const sessionLink = useStyles(styles.sessionLink);
+  const entry = useStyles(sidebarEntry);
+  const entryLabel = useStyles(sidebarEntryLabel);
   const section = useStyles(styles.section);
   const filesSection = useStyles(styles.filesSection);
   const filesTree = useStyles(styles.filesTree);
   const sectionLabel = useStyles(styles.sectionLabel);
   const sessionList = useStyles(styles.sessionList);
-  const sessionTitle = useStyles(styles.sessionTitle);
   const footer = useStyles(styles.footer);
   const versionLabel = useStyles(styles.versionLabel);
   const updateLabel = useStyles(styles.updateLabel);
@@ -79,7 +79,7 @@ export function Sidebar({
             return (
               <li key={session.sessionId}>
                 <button
-                  className={sessionLink}
+                  className={entry}
                   type="button"
                   aria-current={active ? "page" : undefined}
                   onClick={() =>
@@ -89,7 +89,7 @@ export function Sidebar({
                     })
                   }
                 >
-                  <span className={sessionTitle}>
+                  <span className={entryLabel}>
                     {session.title ? session.title : session.sessionId}
                   </span>
                 </button>
@@ -116,12 +116,12 @@ export function Sidebar({
         <ul className={sessionList}>
           <li>
             <button
-              className={sessionLink}
+              className={entry}
               type="button"
               aria-current={selection?.kind === "uikit" ? "page" : undefined}
               onClick={() => onSelectionChange({ kind: "uikit" })}
             >
-              <span className={sessionTitle}>UI kit</span>
+              <span className={entryLabel}>UI kit</span>
             </button>
           </li>
         </ul>
@@ -187,26 +187,6 @@ const styles = {
     width: `calc(100% - ${spacing.value(4)} - ${spacing.value(4)})`,
     marginInline: spacing.value(4),
   }),
-  sessionLink: style(
-    spacing.padding({ y: 2 }),
-    text("sm", 400, "highContrast"),
-    flex({ align: "center", gap: 3 }),
-    {
-      width: "100%",
-      minWidth: 0,
-      border: 0,
-      outline: "none",
-      cursor: "default",
-      background: "transparent",
-      textAlign: "left",
-      paddingInline: `calc(${spacing.value(2)} + ${spacing.value(4)})`,
-      "&:hover": { background: backgroundColor.elementHover },
-      "&[aria-current='page']": {
-        color: colors.accent[9],
-        fontWeight: 500,
-      },
-    },
-  ),
   section: style(flex({ direction: "column", gap: 4 }), {
     minWidth: 0,
     marginTop: spacing.value(4),
@@ -240,12 +220,6 @@ const styles = {
     margin: `0 calc(-1 * ${spacing.value(2)})`,
     width: `calc(100% + ${spacing.value(2)} + ${spacing.value(2)})`,
     gap: "1px",
-  }),
-  sessionTitle: style({
-    minWidth: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
   }),
   footer: style(
     flex({ direction: "column", gap: 1 }),
