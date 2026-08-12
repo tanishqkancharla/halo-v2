@@ -188,19 +188,18 @@ const styles = {
     minWidth: 0,
     marginTop: spacing.value(4),
   }),
-  filesSection: style(
-    flex({ direction: "column", gap: 4 }),
-    flexItem({ size: "auto" }),
-    {
-      minWidth: 0,
-      minHeight: "200px",
-      marginTop: spacing.value(4),
-    },
-  ),
-  filesTree: style(flexItem({ size: "auto" }), {
+  filesSection: style(flex({ direction: "column", gap: 4 }), {
     minWidth: 0,
     minHeight: 0,
-    height: "0",
+    height: "300px",
+    maxHeight: "300px",
+    overflow: "hidden",
+    marginTop: spacing.value(4),
+  }),
+  filesTree: style(flexItem({ size: "fill" }), {
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
     marginInline: `calc(-1 * ${spacing.value(2)})`,
     width: `calc(100% + ${spacing.value(2)} + ${spacing.value(2)})`,
   }),
