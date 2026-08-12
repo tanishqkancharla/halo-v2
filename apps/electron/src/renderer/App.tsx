@@ -14,7 +14,8 @@ import {
 
 export type SessionSelection =
   | { kind: "draft"; draftId: string }
-  | { kind: "saved"; sessionId: string };
+  | { kind: "saved"; sessionId: string }
+  | { kind: "uikit" };
 
 export function App() {
   const [selection, setSelection] = useState<SessionSelection>();

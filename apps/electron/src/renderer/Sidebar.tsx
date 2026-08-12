@@ -94,6 +94,23 @@ export function Sidebar({
           })}
         </ul>
       </section>
+      <section className={section} aria-labelledby="uikit-label">
+        <div className={sectionLabel} id="uikit-label">
+          Develop
+        </div>
+        <ul className={sessionList}>
+          <li>
+            <button
+              className={sessionLink}
+              type="button"
+              aria-current={selection?.kind === "uikit" ? "page" : undefined}
+              onClick={() => onSelectionChange({ kind: "uikit" })}
+            >
+              <span className={sessionTitle}>UI kit</span>
+            </button>
+          </li>
+        </ul>
+      </section>
       {appInfo !== undefined && (
         <div className={footer} data-testid="app-update-status">
           <div className={versionLabel}>Halo {appInfo.version}</div>
