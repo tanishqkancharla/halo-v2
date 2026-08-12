@@ -55,6 +55,10 @@ const mauiTreeCss = `
     font-weight: 500;
   }
 
+  [data-item-selected="true"][data-item-focused="true"]:before {
+    outline: none;
+  }
+
   [data-item-section="icon"] {
     color: ${colors.gray[11]};
   }
