@@ -56,11 +56,19 @@ export type AppInfo = {
   update: AppUpdateStatus;
 };
 
+export type WorkspaceTreeEvent =
+  | { type: "create"; path: string }
+  | { type: "delete"; path: string };
+
+export type WorkspaceTreeEventHandler = (events: WorkspaceTreeEvent[]) => void;
+
 export abstract class HaloApi extends RpcTarget {
   abstract getAppInfo(): AppInfo;
   abstract getWorkspace(): WorkspaceInfo | null;
   abstract chooseWorkspace(): Promise<WorkspaceInfo | null>;
   abstract listSessions(): Promise<SessionSummary[]>;
+  abstract listWorkspacePaths(): Promise<string[]>;
+  abstract subscribeWorkspaceTree(callback: WorkspaceTreeEventHandler): void;
   abstract newAgentSession(): Promise<AgentSessionApi>;
   abstract openAgentSession(sessionId: string): Promise<OpenedAgentSession>;
 }

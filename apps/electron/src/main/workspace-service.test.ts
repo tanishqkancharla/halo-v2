@@ -1,4 +1,5 @@
 import {
+  mkdir,
   mkdtemp,
   readFile,
   realpath,
@@ -12,7 +13,13 @@ import { describe, expect, test } from "vitest";
 import {
   WorkspaceIoError,
   WorkspaceNotDirectoryError,
+  WorkspaceNotReadyError,
   WorkspaceService,
+  directoryPathsFromList,
+  isSkippedRelativePath,
+  mapParcelEventsToTreeEvents,
+  shouldSkipEntryName,
+  toPosixRelative,
 } from "./workspace-service.js";
 
 async function testDirectory(name: string) {
@@ -144,5 +151,86 @@ describe("WorkspaceService", () => {
     expect(
       JSON.parse(await readFile(join(appDataDir, "workspace.json"), "utf8")),
     ).toEqual({ workspaceRoot: await realpath(second) });
+  });
+
+  test("listPaths returns relative POSIX paths and skips hidden entries", async () => {
+    const root = await testDirectory("list-paths");
+    const appDataDir = await testDirectory("app-data");
+    await mkdir(join(root, "src", "renderer"), { recursive: true });
+    await mkdir(join(root, "empty-dir"), { recursive: true });
+    await mkdir(join(root, ".hidden"), { recursive: true });
+    await mkdir(join(root, "node_modules", "pkg"), { recursive: true });
+    await writeFile(join(root, "src", "renderer", "App.tsx"), "export {};\n");
+    await writeFile(join(root, "package.json"), "{}\n");
+    await writeFile(join(root, ".hidden", "secret.txt"), "nope\n");
+    await writeFile(join(root, "node_modules", "pkg", "index.js"), "ok\n");
+    await writeFile(join(root, ".env"), "SECRET=1\n");
+
+    const outside = await testDirectory("outside");
+    await symlink(outside, join(root, "outside-link"));
+
+    const service = new WorkspaceService(appDataDir);
+    const selected = await service.select(root);
+    expect(selected).not.toBeInstanceOf(Error);
+
+    const paths = await service.listPaths();
+    expect(paths).not.toBeInstanceOf(Error);
+    if (paths instanceof Error) return;
+
+    expect(paths.toSorted()).toEqual(
+      ["empty-dir/", "package.json", "src/renderer/App.tsx"].toSorted(),
+    );
+  });
+
+  test("listPaths returns WorkspaceNotReadyError before select", async () => {
+    const appDataDir = await testDirectory("app-data");
+    const paths = await new WorkspaceService(appDataDir).listPaths();
+    expect(paths).toBeInstanceOf(WorkspaceNotReadyError);
+  });
+});
+
+describe("workspace path helpers", () => {
+  test("shouldSkipEntryName hides dotfiles and node_modules", () => {
+    expect(shouldSkipEntryName(".git")).toBe(true);
+    expect(shouldSkipEntryName(".env")).toBe(true);
+    expect(shouldSkipEntryName("node_modules")).toBe(true);
+    expect(shouldSkipEntryName("src")).toBe(false);
+  });
+
+  test("isSkippedRelativePath checks every segment", () => {
+    expect(isSkippedRelativePath(".hidden/file.txt")).toBe(true);
+    expect(isSkippedRelativePath("src/.cache/x")).toBe(true);
+    expect(isSkippedRelativePath("src/App.tsx")).toBe(false);
+  });
+
+  test("toPosixRelative rejects paths outside the root", async () => {
+    const root = await testDirectory("rel-root");
+    const outside = await testDirectory("rel-outside");
+    expect(toPosixRelative(root, join(root, "a", "b.txt"))).toBe("a/b.txt");
+    expect(toPosixRelative(root, outside)).toBeNull();
+  });
+
+  test("mapParcelEventsToTreeEvents drops updates and maps create/delete", async () => {
+    const root = await testDirectory("watch-map");
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "src", "a.ts"), "a\n");
+    const directories = directoryPathsFromList(["src/"]);
+
+    await writeFile(join(root, "src", "b.ts"), "b\n");
+    const mapped = await mapParcelEventsToTreeEvents(
+      root,
+      [
+        { type: "update", path: join(root, "src", "a.ts") },
+        { type: "create", path: join(root, "src", "b.ts") },
+        { type: "delete", path: join(root, "src", "a.ts") },
+        { type: "create", path: join(root, ".env") },
+      ],
+      directories,
+    );
+
+    expect(mapped).toEqual([
+      { type: "create", path: "src/b.ts" },
+      { type: "delete", path: "src/a.ts" },
+    ]);
   });
 });

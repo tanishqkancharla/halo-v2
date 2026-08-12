@@ -30,6 +30,7 @@ import { Loader } from "./patterns/Loader.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
+import { UiKitPage } from "./UiKitPage.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
   name: "PromptSubmitError",
@@ -52,6 +53,10 @@ export function MainPane({
         <P>Loading sessions…</P>
       </main>
     );
+  }
+
+  if (selection.kind === "uikit") {
+    return <UiKitPage />;
   }
 
   if (selection.kind === "draft") {

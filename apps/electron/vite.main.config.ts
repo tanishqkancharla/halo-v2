@@ -14,6 +14,14 @@ export default defineConfig({
     // (EMPTY_IMPORT_META) and Pi/Halo crash on fileURLToPath({}.url).
     rolldownOptions: {
       platform: "node",
+      // Native modules cannot be bundled into main.cjs.
+      external: [
+        "electron",
+        "electron/main",
+        "@parcel/watcher",
+        /^@parcel\/watcher-/,
+        ...nodeBuiltins,
+      ],
       output: {
         codeSplitting: false,
       },
@@ -23,9 +31,6 @@ export default defineConfig({
       // .cjs required: package.json has "type":"module", so .js is treated as ESM.
       fileName: () => "main.cjs",
       formats: ["cjs"],
-    },
-    rollupOptions: {
-      external: ["electron", "electron/main", ...nodeBuiltins],
     },
   },
 });
