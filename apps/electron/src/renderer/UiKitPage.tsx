@@ -12,10 +12,7 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import {
-  Filesystem,
-  type FilesystemNode,
-} from "./patterns/Filesystem.tsx";
+import { Filesystem, type FilesystemNode } from "./patterns/Filesystem.tsx";
 
 const mockWorkspace: FilesystemNode[] = [
   {
@@ -45,9 +42,7 @@ const mockWorkspace: FilesystemNode[] = [
         id: "src/main",
         name: "main",
         kind: "directory",
-        children: [
-          { id: "src/main/index.ts", name: "index.ts", kind: "file" },
-        ],
+        children: [{ id: "src/main/index.ts", name: "index.ts", kind: "file" }],
       },
       { id: "src/shared", name: "shared", kind: "directory", children: [] },
     ],

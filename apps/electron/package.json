@@ -39,6 +39,7 @@
     "maui": "npm:@tanishqkancharla/maui@0.0.2",
     "purse-styles": "^0.2.1",
     "react": "^19.2.8",
+    "react-aria-components": "^1.19.0",
     "react-dom": "^19.2.8",
     "streamdown": "^2.5.0",
     "three": "^0.185.1",

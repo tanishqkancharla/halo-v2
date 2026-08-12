@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { colors, monospace, text } from "maui";
-import { Tree, type TreeNode } from "maui/src/patterns/Tree";
+import { Tree, type TreeNode } from "./Tree.tsx";
 import { style, useStyles } from "purse-styles";
 
 export type FilesystemNode = {
