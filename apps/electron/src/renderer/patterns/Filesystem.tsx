@@ -1,6 +1,9 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useState } from "react";
-import type { FileTree as FileTreeModel } from "@pierre/trees";
+import type {
+  FileTree as FileTreeModel,
+  FileTreeIconConfig,
+} from "@pierre/trees";
 import {
   FileTree,
   useFileTree,
@@ -68,8 +71,8 @@ const fileIconSpriteSheet = `<svg data-icon-sprite aria-hidden="true" width="0" 
   </symbol>
 </svg>`;
 
-const fileTreeIcons = {
-  set: "minimal" as const,
+const fileTreeIcons: FileTreeIconConfig = {
+  set: "minimal",
   colored: false,
   spriteSheet: fileIconSpriteSheet,
   remap: {
