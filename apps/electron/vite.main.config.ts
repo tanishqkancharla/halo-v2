@@ -25,7 +25,14 @@ export default defineConfig({
       formats: ["cjs"],
     },
     rollupOptions: {
-      external: ["electron", "electron/main", ...nodeBuiltins],
+      // Native modules cannot be bundled into main.cjs.
+      external: [
+        "electron",
+        "electron/main",
+        "@parcel/watcher",
+        /^@parcel\/watcher-/,
+        ...nodeBuiltins,
+      ],
     },
   },
 });

@@ -1,4 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
+import { useEffect } from "react";
+import type { FileTree as FileTreeModel } from "@pierre/trees";
 import {
   FileTree,
   useFileTree,
@@ -27,6 +29,7 @@ type FilesystemProps = {
   header?: ReactNode;
   initialSelectedPath?: string;
   onSelectionChange?: (path: string | null) => void;
+  onModel?: (model: FileTreeModel) => void;
   showSelectionLabel?: boolean;
 };
 
@@ -35,6 +38,7 @@ export function Filesystem({
   header,
   initialSelectedPath,
   onSelectionChange,
+  onModel,
   showSelectionLabel = false,
 }: FilesystemProps) {
   const shell = useStyles(styles.shell);
@@ -59,6 +63,15 @@ export function Filesystem({
   });
   const selectedPaths = useFileTreeSelection(model);
   const selectedPath = selectedPaths[0];
+
+  useEffect(() => {
+    model.resetPaths([...paths]);
+  }, [model, paths]);
+
+  useEffect(() => {
+    if (onModel === undefined) return;
+    onModel(model);
+  }, [model, onModel]);
 
   return (
     <div className={shell}>

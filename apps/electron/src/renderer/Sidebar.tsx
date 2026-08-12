@@ -13,7 +13,7 @@ import { style, useStyles } from "purse-styles";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 import { HaloLogo } from "./HaloLogo.tsx";
-import { Filesystem, mockWorkspacePaths } from "./patterns/Filesystem.tsx";
+import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
 import { sidebarEntry, sidebarEntryLabel } from "./sidebarEntry.ts";
 
 type SidebarProps = {
@@ -103,10 +103,7 @@ export function Sidebar({
           Files
         </div>
         <div className={filesTree}>
-          <Filesystem
-            paths={mockWorkspacePaths}
-            initialSelectedPath="src/renderer/App.tsx"
-          />
+          <WorkspaceFilesystem />
         </div>
       </section>
       <section className={section} aria-labelledby="uikit-label">

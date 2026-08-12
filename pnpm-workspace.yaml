@@ -6,6 +6,7 @@ nodeLinker: hoisted
 blockExoticSubdeps: false
 allowBuilds:
   "@google/genai": false
+  '@parcel/watcher': true
   edgedriver: false
   electron: true
   electron-winstaller: true

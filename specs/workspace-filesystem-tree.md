@@ -52,7 +52,7 @@ Main walks the ready workspace once for the initial path list, then watches that
 
 The renderer loads the full list with React Query, mounts Pierre once, then applies live patches with `model.add` / `model.remove` / `model.batch` so expansion state survives. Do not call `resetPaths` on every watcher batch.
 
-Assumption: ignore `node_modules` and `.git` for both the walk and Parcel’s `ignore` option (no `.gitignore` parsing). Empty directories use a trailing `/`. Do not follow directory symlinks on the walk. Paths use `/` with no leading slash.
+Assumption: skip Finder-hidden names (any path segment starting with `.`) and `node_modules` for both the walk and Parcel’s `ignore` option (no `.gitignore` parsing). Empty directories use a trailing `/`. Do not follow directory symlinks on the walk. Paths use `/` with no leading slash.
 
 ## Goals
 

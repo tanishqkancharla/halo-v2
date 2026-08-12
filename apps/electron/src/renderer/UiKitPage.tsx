@@ -30,8 +30,9 @@ export function UiKitPage() {
         <Prose>
           <H2>Filesystem</H2>
           <P>
-            Lowkey workspace tree styled like sidebar session rows. Mock paths
-            for now; the same tree is mounted in the sidebar Files section.
+            Workspace tree styled like sidebar session rows. The gallery uses
+            mock paths; the sidebar Files section loads the real workspace and
+            stays live via the main-process watcher.
           </P>
           <H3>Example</H3>
           <div className={preview}>

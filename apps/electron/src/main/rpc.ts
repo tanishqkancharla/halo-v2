@@ -12,13 +12,20 @@ import {
   type AppInfo,
   type OpenedAgentSession,
   type WorkspaceInfo,
+  type WorkspaceTreeEventHandler,
 } from "../shared/rpc.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
 import { getAppInfo } from "./AppUpdate.js";
 import type { PiService } from "./pi-service.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
+type TreeListener = WorkspaceTreeEventHandler & {
+  dup?: () => WorkspaceTreeEventHandler & Disposable;
+} & Partial<Disposable>;
+
 export class HaloRpc extends HaloApi {
+  private treeListener: TreeListener | null = null;
+
   constructor(
     private readonly workspace: WorkspaceService,
     private readonly pi: PiService,
@@ -55,6 +62,29 @@ export class HaloRpc extends HaloApi {
     const sessions = await this.pi.listSessions();
     if (sessions instanceof Error) throw sessions;
     return sessions;
+  }
+
+  async listWorkspacePaths() {
+    this.logger.info({ event: "listWorkspacePaths" });
+    const paths = await this.workspace.listPaths();
+    if (paths instanceof Error) throw paths;
+    return paths;
+  }
+
+  subscribeWorkspaceTree(callback: TreeListener) {
+    this.logger.info({ event: "subscribeWorkspaceTree" });
+    const previous = this.treeListener;
+    this.treeListener =
+      typeof callback.dup === "function" ? callback.dup() : callback;
+    if (previous !== null) {
+      const dispose = previous[Symbol.dispose];
+      if (typeof dispose === "function") dispose.call(previous);
+    }
+    this.workspace.setTreeListener((events) => {
+      const listener = this.treeListener;
+      if (listener === null) return;
+      listener(events);
+    });
   }
 
   async newAgentSession() {

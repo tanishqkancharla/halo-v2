@@ -2,13 +2,16 @@ import { existsSync } from "node:fs";
 import {
   mkdir,
   readFile,
+  readdir,
   realpath,
   rm,
   stat,
   writeFile,
 } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, relative, sep } from "node:path";
+import * as watcher from "@parcel/watcher";
 import * as errore from "errore";
+import type { WorkspaceTreeEvent } from "../shared/rpc.js";
 
 export type WorkspaceLayout = {
   root: string;
@@ -44,10 +47,117 @@ type WorkspacePreference = {
   workspaceRoot: string;
 };
 
+type TreeListener = (events: WorkspaceTreeEvent[]) => void;
+
 const preferenceFileName = "workspace.json";
+
+/** Finder-hidden names (leading `.`) plus `node_modules` for walk cost. */
+export function shouldSkipEntryName(name: string): boolean {
+  if (name.startsWith(".")) return true;
+  return name === "node_modules";
+}
+
+export function isSkippedRelativePath(relativePath: string): boolean {
+  for (const segment of relativePath.split("/")) {
+    if (segment.length === 0) continue;
+    if (shouldSkipEntryName(segment)) return true;
+  }
+  return false;
+}
+
+export function toPosixRelative(
+  workspaceRoot: string,
+  absolutePath: string,
+): string | null {
+  const rel = relative(workspaceRoot, absolutePath);
+  if (rel.length === 0) return null;
+  if (rel === "..") return null;
+  if (rel.startsWith(`..${sep}`)) return null;
+  return rel.split(sep).join("/");
+}
+
+export const parcelWatcherIgnore = [
+  "**/node_modules/**",
+  "**/.*",
+  "**/.*/**",
+] as const;
+
+export type ParcelWatchEvent = {
+  type: "create" | "update" | "delete";
+  path: string;
+};
+
+export async function mapParcelEventsToTreeEvents(
+  workspaceRoot: string,
+  events: readonly ParcelWatchEvent[],
+  directoryPaths: Set<string>,
+): Promise<WorkspaceTreeEvent[]> {
+  const mapped: WorkspaceTreeEvent[] = [];
+
+  for (const event of events) {
+    if (event.type === "update") continue;
+
+    const relativePath = toPosixRelative(workspaceRoot, event.path);
+    if (relativePath === null) continue;
+    if (isSkippedRelativePath(relativePath)) continue;
+
+    if (event.type === "delete") {
+      const directoryPath = relativePath.endsWith("/")
+        ? relativePath
+        : `${relativePath}/`;
+      if (directoryPaths.has(directoryPath)) {
+        mapped.push({ type: "delete", path: directoryPath });
+        removeDirectoryAndDescendants(directoryPaths, directoryPath);
+        continue;
+      }
+      mapped.push({ type: "delete", path: relativePath });
+      continue;
+    }
+
+    const metadata = await stat(event.path).catch(
+      (e) => new WorkspaceIoError({ cause: e }),
+    );
+    if (metadata instanceof Error) continue;
+    if (metadata.isDirectory()) {
+      const directoryPath = relativePath.endsWith("/")
+        ? relativePath
+        : `${relativePath}/`;
+      directoryPaths.add(directoryPath);
+      mapped.push({ type: "create", path: directoryPath });
+      continue;
+    }
+    if (metadata.isFile()) {
+      mapped.push({ type: "create", path: relativePath });
+    }
+  }
+
+  return mapped;
+}
+
+export function directoryPathsFromList(paths: readonly string[]): Set<string> {
+  const directories = new Set<string>();
+  for (const path of paths) {
+    if (path.endsWith("/")) directories.add(path);
+  }
+  return directories;
+}
+
+function removeDirectoryAndDescendants(
+  directoryPaths: Set<string>,
+  directoryPath: string,
+) {
+  for (const known of Array.from(directoryPaths)) {
+    if (known === directoryPath || known.startsWith(directoryPath)) {
+      directoryPaths.delete(known);
+    }
+  }
+}
 
 export class WorkspaceService {
   private state: WorkspaceState = { status: "notStarted" };
+  private treeListener: TreeListener | null = null;
+  private watchSubscription: watcher.AsyncSubscription | null = null;
+  private directoryPaths = new Set<string>();
 
   constructor(private readonly appDataDir: string) {}
 
@@ -59,6 +169,19 @@ export class WorkspaceService {
   getLayout() {
     if (this.state.status === "notStarted") return new WorkspaceNotReadyError();
     return this.state.layout;
+  }
+
+  async listPaths() {
+    const layout = this.getLayout();
+    if (layout instanceof Error) return layout;
+    const paths = await listRelativeWorkspacePaths(layout.root);
+    if (paths instanceof Error) return paths;
+    this.directoryPaths = directoryPathsFromList(paths);
+    return paths;
+  }
+
+  setTreeListener(listener: TreeListener | null) {
+    this.treeListener = listener;
   }
 
   async restore() {
@@ -111,8 +234,104 @@ export class WorkspaceService {
     const preference = await writeWorkspacePreference(this.appDataDir, root);
     if (preference instanceof Error) return preference;
 
+    await this.stopWatch();
     this.state = { status: "ready", layout };
+    this.directoryPaths = new Set();
+    await this.startWatch(layout.root);
     return workspaceInfo(layout);
+  }
+
+  private async startWatch(root: string) {
+    const subscription = await watcher
+      .subscribe(
+        root,
+        (err, events) => {
+          if (err !== null) {
+            console.warn("Workspace watch error:", err.message);
+            return;
+          }
+          void this.handleWatchEvents(root, events);
+        },
+        { ignore: [...parcelWatcherIgnore] },
+      )
+      .catch((e) => new WorkspaceIoError({ cause: e }));
+    if (subscription instanceof Error) {
+      console.warn("Workspace watch failed to start:", subscription.message);
+      return;
+    }
+    this.watchSubscription = subscription;
+  }
+
+  private async stopWatch() {
+    const subscription = this.watchSubscription;
+    this.watchSubscription = null;
+    if (subscription === null) return;
+    const stopped = await subscription
+      .unsubscribe()
+      .catch((e) => new WorkspaceIoError({ cause: e }));
+    if (stopped instanceof Error) {
+      console.warn("Workspace watch stop failed:", stopped.message);
+    }
+  }
+
+  private async handleWatchEvents(
+    root: string,
+    events: readonly watcher.Event[],
+  ) {
+    const mapped = await mapParcelEventsToTreeEvents(
+      root,
+      events,
+      this.directoryPaths,
+    );
+    if (mapped.length === 0) return;
+    const listener = this.treeListener;
+    if (listener === null) return;
+    listener(mapped);
+  }
+}
+
+async function listRelativeWorkspacePaths(workspaceRoot: string) {
+  const paths: string[] = [];
+  const walked = await walkDirectory(workspaceRoot, "", paths);
+  if (walked instanceof Error) return walked;
+  return paths;
+}
+
+async function walkDirectory(
+  absoluteDir: string,
+  relativeDir: string,
+  paths: string[],
+): Promise<void | WorkspaceIoError> {
+  const entries = await readdir(absoluteDir, { withFileTypes: true }).catch(
+    (e) => new WorkspaceIoError({ cause: e }),
+  );
+  if (entries instanceof Error) return entries;
+
+  const included = entries.filter((entry) => {
+    if (shouldSkipEntryName(entry.name)) return false;
+    if (entry.isSymbolicLink()) return false;
+    return entry.isFile() || entry.isDirectory();
+  });
+
+  if (relativeDir.length > 0 && included.length === 0) {
+    paths.push(`${relativeDir}/`);
+    return;
+  }
+
+  for (const entry of included) {
+    const childAbsolute = join(absoluteDir, entry.name);
+    const childRelative =
+      relativeDir.length === 0 ? entry.name : `${relativeDir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      const walked: void | WorkspaceIoError = await walkDirectory(
+        childAbsolute,
+        childRelative,
+        paths,
+      );
+      if (walked instanceof Error) return walked;
+      continue;
+    }
+    paths.push(childRelative);
   }
 }
 

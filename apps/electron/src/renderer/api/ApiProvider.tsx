@@ -117,6 +117,18 @@ export function useSessionsQuery(workspace: WorkspaceState | undefined) {
   });
 }
 
+export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
+  const api = useApi();
+  const workspaceRoot =
+    workspace?.status === "ready" ? workspace.workspace.workspaceRoot : null;
+
+  return useQuery({
+    queryKey: ["workspace-paths", workspaceRoot],
+    queryFn: () => api.listWorkspacePaths(),
+    enabled: workspaceRoot !== null,
+  });
+}
+
 export function useAppInfoQuery() {
   const api = useApi();
   return useQuery({
