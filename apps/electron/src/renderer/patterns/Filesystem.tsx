@@ -73,14 +73,11 @@ const fileIconSpriteSheet = `<svg data-icon-sprite aria-hidden="true" width="0" 
 
 const fileTreeIcons: FileTreeIconConfig = {
   set: "minimal",
-  colored: false,
   spriteSheet: fileIconSpriteSheet,
   remap: {
     "file-tree-icon-file": {
       name: "halo-file-icon",
       viewBox: "0 0 24 24",
-      width: 14,
-      height: 14,
     },
   },
 };
