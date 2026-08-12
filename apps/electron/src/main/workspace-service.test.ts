@@ -10,7 +10,6 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
-  WorkspaceAlreadySelectedError,
   WorkspaceIoError,
   WorkspaceNotDirectoryError,
   WorkspaceService,
@@ -123,7 +122,7 @@ describe("WorkspaceService", () => {
     expect(selected.workspaceRoot).toBe(await realpath(root));
   });
 
-  test("allows the same directory and rejects a different one", async () => {
+  test("allows selecting the same directory again and switching to another", async () => {
     const first = await testDirectory("first");
     const second = await testDirectory("second");
     const appDataDir = await testDirectory("app-data");
@@ -134,7 +133,16 @@ describe("WorkspaceService", () => {
     await expect(service.select(first)).resolves.toMatchObject({
       workspaceRoot: await realpath(first),
     });
-    const rejected = await service.select(second);
-    expect(rejected).toBeInstanceOf(WorkspaceAlreadySelectedError);
+
+    const switched = await service.select(second);
+    expect(switched).not.toBeInstanceOf(Error);
+    if (switched instanceof Error) return;
+    expect(switched.workspaceRoot).toBe(await realpath(second));
+    expect(service.getLayout()).toMatchObject({
+      root: await realpath(second),
+    });
+    expect(
+      JSON.parse(await readFile(join(appDataDir, "workspace.json"), "utf8")),
+    ).toEqual({ workspaceRoot: await realpath(second) });
   });
 });
