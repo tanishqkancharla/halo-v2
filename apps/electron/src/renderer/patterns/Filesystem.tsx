@@ -1,12 +1,19 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { FileTree as FileTreeModel } from "@pierre/trees";
 import {
   FileTree,
   useFileTree,
   useFileTreeSelection,
 } from "@pierre/trees/react";
-import { flexItem, spacing, text } from "maui";
+import {
+  colors,
+  flexItem,
+  motionDurationMs,
+  motionEasing,
+  spacing,
+  text,
+} from "maui";
 import { style, useStyles } from "purse-styles";
 import {
   sidebarEntryTreeCss,
@@ -112,6 +119,7 @@ export function Filesystem({
   });
   const selectedPaths = useFileTreeSelection(model);
   const selectedPath = selectedPaths[0];
+  const overflow = useFileTreeOverflow(model);
 
   useEffect(() => {
     model.resetPaths([...paths]);
@@ -124,7 +132,11 @@ export function Filesystem({
 
   return (
     <div className={shell}>
-      <div className={treeWrap}>
+      <div
+        className={treeWrap}
+        data-overflow-top={overflow.top ? "true" : "false"}
+        data-overflow-bottom={overflow.bottom ? "true" : "false"}
+      >
         <FileTree
           model={model}
           header={
@@ -150,6 +162,73 @@ export function Filesystem({
   );
 }
 
+function useFileTreeOverflow(model: FileTreeModel) {
+  const [overflow, setOverflow] = useState({ top: false, bottom: false });
+
+  useEffect(() => {
+    let scroll: HTMLElement | null = null;
+    let cancelled = false;
+    const resize = new ResizeObserver(() => {
+      read();
+    });
+
+    const getScroll = () => {
+      const host = model.getFileTreeContainer();
+      if (host === undefined) return null;
+      const element = host.shadowRoot?.querySelector(
+        "[data-file-tree-virtualized-scroll='true']",
+      );
+      if (element instanceof HTMLElement) return element;
+      return null;
+    };
+
+    const attach = () => {
+      const next = getScroll();
+      if (next === null) return null;
+      if (next === scroll) return scroll;
+      if (scroll !== null) {
+        scroll.removeEventListener("scroll", read);
+        resize.disconnect();
+      }
+      scroll = next;
+      scroll.addEventListener("scroll", read, { passive: true });
+      resize.observe(scroll);
+      return scroll;
+    };
+
+    const read = () => {
+      if (cancelled) return;
+      const element = attach();
+      if (element === null) return;
+      const top = element.scrollTop > 0;
+      const bottom =
+        element.scrollTop + element.clientHeight < element.scrollHeight - 1;
+      setOverflow((current) => {
+        if (current.top === top && current.bottom === bottom) return current;
+        return { top, bottom };
+      });
+    };
+
+    const unsubscribe = model.subscribe(read);
+    read();
+    // Pierre FileTree assigns its host in a ref callback, then renders the
+    // scroller in a later layout effect.
+    const retry = window.setTimeout(read, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(retry);
+      unsubscribe();
+      resize.disconnect();
+      if (scroll !== null) scroll.removeEventListener("scroll", read);
+    };
+  }, [model]);
+
+  return overflow;
+}
+
+const sidebarSurface = `light-dark(${colors.gray[1]}, ${colors.gray[2]})`;
+
 const styles = {
   shell: style({
     display: "flex",
@@ -163,6 +242,28 @@ const styles = {
   treeWrap: style(flexItem({ size: "auto" }), {
     minWidth: 0,
     minHeight: 0,
+    position: "relative",
+    "&::before, &::after": {
+      content: "''",
+      position: "absolute",
+      right: 0,
+      left: 0,
+      height: spacing.value(6),
+      pointerEvents: "none",
+      zIndex: 2,
+      opacity: 0,
+      transition: `opacity ${motionDurationMs}ms ${motionEasing}`,
+    },
+    "&::before": {
+      top: 0,
+      background: `linear-gradient(to bottom, ${sidebarSurface}, transparent)`,
+    },
+    "&::after": {
+      bottom: 0,
+      background: `linear-gradient(to top, ${sidebarSurface}, transparent)`,
+    },
+    "&[data-overflow-top='true']::before": { opacity: 1 },
+    "&[data-overflow-bottom='true']::after": { opacity: 1 },
   }),
   header: style(
     text("xs", 500, "lowContrast"),
