@@ -191,8 +191,8 @@ const styles = {
   filesSection: style(flex({ direction: "column", gap: 4 }), {
     minWidth: 0,
     minHeight: 0,
-    height: "300px",
-    maxHeight: "300px",
+    height: "240px",
+    maxHeight: "240px",
     overflow: "hidden",
     marginTop: spacing.value(4),
   }),
