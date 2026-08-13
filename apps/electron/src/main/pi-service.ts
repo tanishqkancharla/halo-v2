@@ -6,6 +6,8 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
 import type { SessionSummary } from "../shared/rpc.js";
+import { createParallelSearchTools } from "./ParallelSearchTools.js";
+import type { UserService } from "./UserService.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
@@ -23,7 +25,10 @@ export class CreateAgentSessionError extends errore.createTaggedError({
  * for live AgentSession. Callers own subscribe / prompt / dispose.
  */
 export class PiService {
-  constructor(private readonly workspace: WorkspaceService) {}
+  constructor(
+    private readonly workspace: WorkspaceService,
+    private readonly user: UserService,
+  ) {}
 
   async newAgentSession() {
     const layout = this.workspace.getLayout();
@@ -44,11 +49,15 @@ export class PiService {
     layout: WorkspaceLayout,
     manager: SessionManager,
   ) {
+    const user = await this.user.getUser();
+    if (user instanceof Error) return user;
+
     const created = await createAgentSession({
       cwd: layout.root,
       agentDir: layout.agentDir,
       sessionManager: manager,
       tools: createCodingTools(layout.root),
+      customTools: createParallelSearchTools(user.id),
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;
     return created.session;
