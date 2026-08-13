@@ -72,7 +72,7 @@ class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
     const signaled = errore.try({
       try: () => {
         // MessagePortMain.postMessage has no targetOrigin (unlike window.postMessage).
-        // oxlint-disable-next-line unicorn/require-post-message-target-origin
+        // oxlint-disable-next-line unicorn/require-post-message-target-origin, unicorn/no-null
         this.port.postMessage(null);
       },
       catch: (e) =>

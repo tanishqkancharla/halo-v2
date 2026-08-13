@@ -86,7 +86,7 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
     }
   }
 
-  if (state.streamingMessage !== null) {
+  if (state.streamingMessage !== undefined) {
     pushAssistantMessage(state.streamingMessage, true);
   }
 

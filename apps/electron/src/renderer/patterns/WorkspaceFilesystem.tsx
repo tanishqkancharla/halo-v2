@@ -17,12 +17,14 @@ export function WorkspaceFilesystem({ maxHeight }: WorkspaceFilesystemProps) {
   const workspace = workspaceQuery.data;
   const pathsQuery = useWorkspacePathsQuery(workspace);
   const api = useApi();
-  const modelRef = useRef<FileTreeModel | null>(null);
+  const modelRef = useRef<FileTreeModel | undefined>(undefined);
   const workspaceRoot =
-    workspace?.status === "ready" ? workspace.workspace.workspaceRoot : null;
+    workspace?.status === "ready"
+      ? workspace.workspace.workspaceRoot
+      : undefined;
 
   useEffect(() => {
-    if (workspaceRoot === null) return;
+    if (workspaceRoot === undefined) return;
 
     api.subscribeWorkspaceTree((events) => {
       applyTreeEvents(modelRef.current, events);
@@ -30,12 +32,12 @@ export function WorkspaceFilesystem({ maxHeight }: WorkspaceFilesystemProps) {
 
     return () => {
       api.subscribeWorkspaceTree(() => {});
-      modelRef.current = null;
+      modelRef.current = undefined;
     };
   }, [api, workspaceRoot]);
 
-  if (workspaceRoot === null) return null;
-  if (pathsQuery.data === undefined) return null;
+  if (workspaceRoot === undefined) return;
+  if (pathsQuery.data === undefined) return;
 
   return (
     <Filesystem
@@ -50,10 +52,10 @@ export function WorkspaceFilesystem({ maxHeight }: WorkspaceFilesystemProps) {
 }
 
 function applyTreeEvents(
-  model: FileTreeModel | null,
+  model: FileTreeModel | undefined,
   events: WorkspaceTreeEvent[],
 ) {
-  if (model === null) return;
+  if (model === undefined) return;
   if (events.length === 0) return;
 
   model.batch(

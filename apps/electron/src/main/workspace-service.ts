@@ -68,11 +68,11 @@ export function isSkippedRelativePath(relativePath: string): boolean {
 export function toPosixRelative(
   workspaceRoot: string,
   absolutePath: string,
-): string | null {
+): string | undefined {
   const rel = relative(workspaceRoot, absolutePath);
-  if (rel.length === 0) return null;
-  if (rel === "..") return null;
-  if (rel.startsWith(`..${sep}`)) return null;
+  if (rel.length === 0) return undefined;
+  if (rel === "..") return undefined;
+  if (rel.startsWith(`..${sep}`)) return undefined;
   return rel.split(sep).join("/");
 }
 
@@ -98,7 +98,7 @@ export async function mapParcelEventsToTreeEvents(
     if (event.type === "update") continue;
 
     const relativePath = toPosixRelative(workspaceRoot, event.path);
-    if (relativePath === null) continue;
+    if (relativePath === undefined) continue;
     if (isSkippedRelativePath(relativePath)) continue;
 
     if (event.type === "delete") {
@@ -155,14 +155,14 @@ function removeDirectoryAndDescendants(
 
 export class WorkspaceService {
   private state: WorkspaceState = { status: "notStarted" };
-  private treeListener: TreeListener | null = null;
-  private watchSubscription: watcher.AsyncSubscription | null = null;
+  private treeListener: TreeListener | undefined;
+  private watchSubscription: watcher.AsyncSubscription | undefined;
   private directoryPaths = new Set<string>();
 
   constructor(private readonly appDataDir: string) {}
 
-  getWorkspace(): WorkspaceInfo | null {
-    if (this.state.status === "notStarted") return null;
+  getWorkspace(): WorkspaceInfo | undefined {
+    if (this.state.status === "notStarted") return undefined;
     return workspaceInfo(this.state.layout);
   }
 
@@ -180,7 +180,7 @@ export class WorkspaceService {
     return paths;
   }
 
-  setTreeListener(listener: TreeListener | null) {
+  setTreeListener(listener: TreeListener | undefined) {
     this.treeListener = listener;
   }
 
@@ -188,9 +188,9 @@ export class WorkspaceService {
     const preference = await readWorkspacePreference(this.appDataDir);
     if (preference instanceof Error) {
       console.warn("Workspace preference unreadable:", preference.message);
-      return null;
+      return undefined;
     }
-    if (preference === null) return null;
+    if (preference === undefined) return undefined;
 
     // Saved path may have been deleted since the last launch.
     const selected = await this.select(preference.workspaceRoot);
@@ -200,7 +200,7 @@ export class WorkspaceService {
       if (cleared instanceof Error) {
         console.warn("Could not clear workspace preference:", cleared.message);
       }
-      return null;
+      return undefined;
     }
     return selected;
   }
@@ -264,8 +264,8 @@ export class WorkspaceService {
 
   private async stopWatch() {
     const subscription = this.watchSubscription;
-    this.watchSubscription = null;
-    if (subscription === null) return;
+    this.watchSubscription = undefined;
+    if (subscription === undefined) return;
     const stopped = await subscription
       .unsubscribe()
       .catch((e) => new WorkspaceIoError({ cause: e }));
@@ -285,7 +285,7 @@ export class WorkspaceService {
     );
     if (mapped.length === 0) return;
     const listener = this.treeListener;
-    if (listener === null) return;
+    if (listener === undefined) return;
     listener(mapped);
   }
 }
@@ -357,7 +357,7 @@ function preferencePath(appDataDir: string): string {
 
 async function readWorkspacePreference(appDataDir: string) {
   const path = preferencePath(appDataDir);
-  if (!existsSync(path)) return null;
+  if (!existsSync(path)) return undefined;
 
   const raw = await readFile(path, "utf8").catch(
     (e) => new WorkspaceIoError({ cause: e }),
@@ -374,7 +374,7 @@ async function readWorkspacePreference(appDataDir: string) {
     if (cleared instanceof Error) {
       console.warn("Could not clear workspace preference:", cleared.message);
     }
-    return null;
+    return undefined;
   }
 
   if (
@@ -387,7 +387,7 @@ async function readWorkspacePreference(appDataDir: string) {
     if (cleared instanceof Error) {
       console.warn("Could not clear workspace preference:", cleared.message);
     }
-    return null;
+    return undefined;
   }
   return { workspaceRoot: parsed.workspaceRoot };
 }
@@ -405,7 +405,7 @@ async function writeWorkspacePreference(
   const preference: WorkspacePreference = { workspaceRoot };
   const written = await writeFile(
     preferencePath(appDataDir),
-    `${JSON.stringify(preference, null, 2)}\n`,
+    `${JSON.stringify(preference, undefined, 2)}\n`,
     { mode: 0o600 },
   ).catch((e) => new WorkspaceIoError({ cause: e }));
   if (written instanceof Error) return written;

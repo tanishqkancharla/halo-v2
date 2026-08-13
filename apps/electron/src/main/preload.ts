@@ -14,6 +14,8 @@ window.addEventListener("message", (event) => {
     return;
   }
   if (event.data !== RPC_CHANNELS.requestRpc) return;
+  // Electron IPC payload; the MessagePort is transferred separately.
+  // oxlint-disable-next-line unicorn/no-null
   ipcRenderer.postMessage(RPC_CHANNELS.requestRpc, null);
 });
 

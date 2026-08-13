@@ -73,12 +73,12 @@ describe("WorkspaceService", () => {
     });
   });
 
-  test("restore returns null when nothing is saved", async () => {
+  test("restore returns undefined when nothing is saved", async () => {
     const appDataDir = await testDirectory("app-data");
 
     await expect(
       new WorkspaceService(appDataDir).restore(),
-    ).resolves.toBeNull();
+    ).resolves.toBeUndefined();
   });
 
   test("restore clears a missing saved workspace", async () => {
@@ -90,7 +90,7 @@ describe("WorkspaceService", () => {
 
     await expect(
       new WorkspaceService(appDataDir).restore(),
-    ).resolves.toBeNull();
+    ).resolves.toBeUndefined();
     await expect(
       readFile(join(appDataDir, "workspace.json"), "utf8"),
     ).rejects.toThrow();
@@ -207,7 +207,7 @@ describe("workspace path helpers", () => {
     const root = await testDirectory("rel-root");
     const outside = await testDirectory("rel-outside");
     expect(toPosixRelative(root, join(root, "a", "b.txt"))).toBe("a/b.txt");
-    expect(toPosixRelative(root, outside)).toBeNull();
+    expect(toPosixRelative(root, outside)).toBeUndefined();
   });
 
   test("mapParcelEventsToTreeEvents drops updates and maps create/delete", async () => {

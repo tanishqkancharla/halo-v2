@@ -65,7 +65,7 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 const workspaceService = new WorkspaceService(applicationConfig.dataDir);
 const userService = new UserService(applicationConfig.dataDir);
 const piService = new PiService(workspaceService, userService);
-let mainWindow: BrowserWindow | null = null;
+let mainWindow: BrowserWindow | undefined;
 
 app.whenReady().then(async () => {
   await workspaceService.restore();
@@ -77,7 +77,7 @@ app.whenReady().then(async () => {
   logger.info({ event: "app-ready" });
 
   app.on("activate", () => {
-    if (mainWindow === null) openMainWindow();
+    if (mainWindow === undefined) openMainWindow();
   });
 });
 
@@ -93,7 +93,7 @@ function openMainWindow(): void {
   const window = createWindow();
   mainWindow = window;
   window.on("closed", () => {
-    if (mainWindow === window) mainWindow = null;
+    if (mainWindow === window) mainWindow = undefined;
   });
 }
 
@@ -162,7 +162,7 @@ function registerRpcBridge(): void {
         workspaceService,
         piService,
         () => {
-          if (mainWindow === null) {
+          if (mainWindow === undefined) {
             throw new Error("Halo main window is not open.");
           }
           return mainWindow;
@@ -170,6 +170,8 @@ function registerRpcBridge(): void {
         rpcLogger,
       ),
     );
+    // Electron's postMessage payload; the ports carry the RPC transport.
+    // oxlint-disable-next-line unicorn/no-null
     frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);
   });
 }
@@ -252,7 +254,7 @@ function installMenu(): void {
 }
 
 async function switchWorkspace(): Promise<void> {
-  if (mainWindow === null) return;
+  if (mainWindow === undefined) return;
 
   const selection = await dialog.showOpenDialog(mainWindow, {
     title: "Switch workspace",
@@ -274,7 +276,10 @@ async function switchWorkspace(): Promise<void> {
     });
     return;
   }
-  if (previous !== null && previous.workspaceRoot === workspace.workspaceRoot) {
+  if (
+    previous !== undefined &&
+    previous.workspaceRoot === workspace.workspaceRoot
+  ) {
     return;
   }
 

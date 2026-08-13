@@ -16,12 +16,12 @@ export class UserIoError extends errore.createTaggedError({
 const preferenceFileName = "user.json";
 
 export class UserService {
-  private user: User | null = null;
+  private user: User | undefined;
 
   constructor(private readonly appDataDir: string) {}
 
   async getUser() {
-    if (this.user !== null) return this.user;
+    if (this.user !== undefined) return this.user;
 
     const path = preferencePath(this.appDataDir);
     if (existsSync(path)) {
@@ -79,7 +79,7 @@ async function writeUserPreference(appDataDir: string, user: User) {
   const preference: User = { id: user.id };
   const written = await writeFile(
     preferencePath(appDataDir),
-    `${JSON.stringify(preference, null, 2)}\n`,
+    `${JSON.stringify(preference, undefined, 2)}\n`,
     { mode: 0o600 },
   ).catch((e) => new UserIoError({ cause: e }));
   if (written instanceof Error) return written;

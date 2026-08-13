@@ -62,7 +62,7 @@ describe("applyAgentSessionEvent", () => {
 
     expect(next.error).toBe("Vertex request failed");
     expect(next.messages).toEqual([message]);
-    expect(next.streamingMessage).toBeNull();
+    expect(next.streamingMessage).toBeUndefined();
   });
 
   test("extracts Google-style nested JSON errorMessage for the alert", () => {
@@ -139,7 +139,7 @@ describe("applyAgentSessionEvent", () => {
       message,
     });
 
-    expect(next.error).toBeNull();
+    expect(next.error).toBeUndefined();
     expect(next.messages).toEqual([message]);
   });
 
@@ -182,7 +182,7 @@ describe("agentSessionStateFromSession", () => {
 
     expect(state.error).toBe("API keys are not supported by this API.");
     expect(state.messages).toEqual([userMessage("hello", 10), failed]);
-    expect(state.streamingMessage).toBeNull();
+    expect(state.streamingMessage).toBeUndefined();
   });
 
   test("does not surface an earlier error when the last assistant turn succeeded", () => {
@@ -201,13 +201,13 @@ describe("agentSessionStateFromSession", () => {
       messages: [userMessage("one", 10), failed, userMessage("two", 30), ok],
     });
 
-    expect(state.error).toBeNull();
+    expect(state.error).toBeUndefined();
   });
 
-  test("returns null error when the session has no assistant messages", () => {
+  test("returns no error when the session has no assistant messages", () => {
     const state = agentSessionStateFromSession({
       messages: [userMessage("hello", 1)],
     });
-    expect(state.error).toBeNull();
+    expect(state.error).toBeUndefined();
   });
 });

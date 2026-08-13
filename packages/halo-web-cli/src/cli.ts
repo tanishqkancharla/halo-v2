@@ -122,6 +122,8 @@ Cli.create("halo-web", {
       return c.ok(
         {
           ...result,
+          // incur JSON output drops undefined; null keeps an explicit empty result.
+          // oxlint-disable-next-line unicorn/no-null
           result: result.result === undefined ? null : result.result,
         },
         {

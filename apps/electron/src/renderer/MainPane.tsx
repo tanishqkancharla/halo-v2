@@ -71,7 +71,7 @@ function SessionTitleSlot({ title }: { title?: string }) {
   const titleClassName = useStyles(styles.title);
   return (
     <header className={header} aria-label={title}>
-      {title === undefined ? null : (
+      {title === undefined ? undefined : (
         <div className={titleClassName}>{title}</div>
       )}
     </header>
@@ -136,7 +136,7 @@ function DraftPane({
         <SessionTitleSlot />
         {hasMessages ? (
           <SessionView state={state} isWorking={isWorking} />
-        ) : null}
+        ) : undefined}
         <div className={composer}>
           <PromptEditor
             key={draftId}
@@ -253,12 +253,12 @@ function SessionView({
           <Loader size="0.75em" variant="muted" aria-label="Thinking" />
           Thinking
         </span>
-      ) : null}
-      {state.error !== null ? (
+      ) : undefined}
+      {state.error !== undefined ? (
         <div className={liveStatus} role="alert">
           {state.error}
         </div>
-      ) : null}
+      ) : undefined}
     </div>
   );
 }
