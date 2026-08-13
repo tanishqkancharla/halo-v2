@@ -26,10 +26,7 @@ export class CreateAgentSessionError extends errore.createTaggedError({
  * for live AgentSession. Callers own subscribe / prompt / dispose.
  */
 export class PiService {
-  private readonly mcpClient = new McpHttpClient({
-    url: "https://search.parallel.ai/mcp",
-    authorization: parallelAuthorization(),
-  });
+  private readonly mcpClient = new McpHttpClient();
 
   constructor(
     private readonly workspace: WorkspaceService,
@@ -100,10 +97,4 @@ function sessionSummary(session: SessionInfo): SessionSummary {
     createdAt: session.created.toISOString(),
     updatedAt: session.modified.toISOString(),
   };
-}
-
-function parallelAuthorization() {
-  const apiKey = process.env.PARALLEL_API_KEY;
-  if (apiKey === undefined) return undefined;
-  return `Bearer ${apiKey}`;
 }
