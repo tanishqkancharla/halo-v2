@@ -1,9 +1,10 @@
-import type {
-  ExtensionContext,
-  ToolDefinition,
-} from "@mariozechner/pi-coding-agent";
+import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+  CallToolResultSchema,
+  type CallToolResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import { type Static, Type } from "@sinclair/typebox";
 import * as errore from "errore";
 
@@ -13,8 +14,6 @@ class ParallelMcpError extends errore.createTaggedError({
 }) {}
 
 const parallelSearchMcpUrl = "https://search.parallel.ai/mcp";
-const client = new Client({ name: "halo", version: "1" });
-let connectPromise: Promise<void | ParallelMcpError> | null = null;
 
 const webSearchParameters = Type.Object({
   objective: Type.String({
@@ -53,6 +52,71 @@ const webFetchParameters = Type.Object({
 });
 
 export function createParallelSearchTools(userId: string): ToolDefinition[] {
+  const client = new Client({ name: "halo", version: "1" });
+  let connectPromise: Promise<void | ParallelMcpError> | undefined;
+
+  function ensureConnected() {
+    if (connectPromise === undefined) {
+      connectPromise = client
+        .connect(
+          new StreamableHTTPClientTransport(new URL(parallelSearchMcpUrl)),
+        )
+        .catch((e) => new ParallelMcpError({ cause: e }))
+        .then((result) => {
+          if (result instanceof Error) connectPromise = undefined;
+          return result;
+        });
+    }
+    return connectPromise;
+  }
+
+  async function callParallelTool(args: {
+    name: string;
+    modelName: string | undefined;
+    arguments: Record<string, unknown>;
+    signal: AbortSignal | undefined;
+  }) {
+    const connected = await ensureConnected();
+    if (connected instanceof Error) {
+      return {
+        content: [{ type: "text" as const, text: connected.message }],
+        details: {},
+      };
+    }
+
+    const toolArguments: Record<string, unknown> = {
+      ...args.arguments,
+      // Parallel free-tier rate limits by session_id; Halo's user id is that key.
+      session_id: userId,
+    };
+    if (args.modelName !== undefined) {
+      toolArguments.model_name = args.modelName;
+    }
+
+    const result = await client
+      .callTool(
+        { name: args.name, arguments: toolArguments },
+        CallToolResultSchema,
+        { signal: args.signal },
+      )
+      .catch((e) => new ParallelMcpError({ cause: e }));
+    if (result instanceof Error) {
+      return {
+        content: [{ type: "text" as const, text: result.message }],
+        details: {},
+      };
+    }
+
+    const callResult = result as CallToolResult;
+    return {
+      content: callResult.content.flatMap((part) => {
+        if (part.type !== "text") return [];
+        return [{ type: "text" as const, text: part.text }];
+      }),
+      details: {},
+    };
+  }
+
   const webSearch: ToolDefinition = {
     name: "web_search",
     label: "Web search",
@@ -69,8 +133,7 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
       const search = params as Static<typeof webSearchParameters>;
       return callParallelTool({
         name: "web_search",
-        userId,
-        modelName: modelName(ctx),
+        modelName: ctx.model?.id,
         arguments: {
           objective: search.objective,
           search_queries: search.search_queries,
@@ -107,8 +170,7 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
       }
       return callParallelTool({
         name: "web_fetch",
-        userId,
-        modelName: modelName(ctx),
+        modelName: ctx.model?.id,
         arguments: toolArguments,
         signal,
       });
@@ -116,76 +178,4 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
   };
 
   return [webSearch, webFetch];
-}
-
-async function callParallelTool(args: {
-  name: string;
-  userId: string;
-  modelName: string | null;
-  arguments: Record<string, unknown>;
-  signal: AbortSignal | undefined;
-}) {
-  const connected = await ensureConnected();
-  if (connected instanceof Error) {
-    return {
-      content: [{ type: "text" as const, text: connected.message }],
-      details: {},
-    };
-  }
-
-  const toolArguments: Record<string, unknown> = {
-    ...args.arguments,
-    // Parallel free-tier rate limits by session_id; Halo's user id is that key.
-    session_id: args.userId,
-  };
-  if (args.modelName !== null) {
-    toolArguments.model_name = args.modelName;
-  }
-
-  const result = await client
-    .callTool({ name: args.name, arguments: toolArguments }, undefined, {
-      signal: args.signal,
-    })
-    .catch((e) => new ParallelMcpError({ cause: e }));
-  if (result instanceof Error) {
-    return {
-      content: [{ type: "text" as const, text: result.message }],
-      details: {},
-    };
-  }
-  return {
-    content: [{ type: "text" as const, text: toolResultText(result) }],
-    details: {},
-  };
-}
-
-function ensureConnected() {
-  if (connectPromise === null) {
-    connectPromise = client
-      .connect(new StreamableHTTPClientTransport(new URL(parallelSearchMcpUrl)))
-      .catch((e) => new ParallelMcpError({ cause: e }))
-      .then((result) => {
-        if (result instanceof Error) connectPromise = null;
-        return result;
-      });
-  }
-  return connectPromise;
-}
-
-function toolResultText(result: unknown) {
-  if (typeof result !== "object" || result === null) return "";
-  if (!("content" in result) || !Array.isArray(result.content)) return "";
-  return result.content
-    .flatMap((part) => {
-      if (typeof part !== "object" || part === null) return [];
-      if (!("type" in part) || part.type !== "text") return [];
-      if (!("text" in part) || typeof part.text !== "string") return [];
-      return [part.text];
-    })
-    .join("");
-}
-
-function modelName(ctx: ExtensionContext) {
-  if (ctx.model === undefined) return null;
-  return ctx.model.id;
 }
