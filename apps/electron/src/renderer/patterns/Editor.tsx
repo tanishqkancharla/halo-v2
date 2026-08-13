@@ -128,7 +128,7 @@ export function Editor({
   return (
     <div className={joinClassNames(shellClassName, className)}>
       <EditorContent editor={editor} />
-      {actions ? <div className={actionsClassName}>{actions}</div> : null}
+      {actions ? <div className={actionsClassName}>{actions}</div> : undefined}
     </div>
   );
 }

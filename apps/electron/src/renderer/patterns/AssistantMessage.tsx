@@ -53,7 +53,8 @@ function isSupportedCodeLang(lang: string): boolean {
 }
 
 function extractText(node: React.ReactNode): string {
-  if (node == null || typeof node === "boolean") return "";
+  if (node === undefined || node === null || typeof node === "boolean")
+    return "";
   if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(extractText).join("");
   if (typeof node === "object" && "props" in node) {

@@ -13,6 +13,7 @@ Bump `apps/electron/package.json` `version`, commit, then create and push a git 
 ## Code Style
 
 - Prefer explicit, straightforward code. Don't use fallbacks. Avoid patterns like `||` and `??`.
+- Use `undefined` for missing values, not `null` (`unicorn/no-null`). This differs from errore.org's `| null` default. Keep `null` only where an external API uses it (JSON `null`, DOM, Electron, Cap'n Web). Compare those values with `=== null`; the lint rule allows that.
 - Don't support backwards-compatibility unless explicitly asked to.
 - Simplify as you go. When you touch code, remove nearby indirection, compatibility paths, defensive branches, unused helpers, or duplicated state that no longer serve the current design. Simplification is iterative: after removing one unnecessary condition or abstraction, look again for variables, branches, helpers, or comments that only existed to support it.
 - Don't over-worry. Avoid guard clauses, `if`/`throw`, retries, fallback values, and defensive checks unless the user asked for them or you know a specific error can happen and this layer is responsible for handling it. When handling a known external quirk, add a short comment that names the source of the behavior.

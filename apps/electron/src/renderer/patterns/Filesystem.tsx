@@ -86,7 +86,7 @@ type FilesystemProps = {
   paths: readonly string[];
   header?: ReactNode;
   initialSelectedPath?: string;
-  onSelectionChange?: (path: string | null) => void;
+  onSelectionChange?: (path: string | undefined) => void;
   onModel?: (model: FileTreeModel) => void;
   showSelectionLabel?: boolean;
   maxHeight?: number;
@@ -121,7 +121,7 @@ export function Filesystem({
         return;
       }
       const nextPath = selectedPaths[0];
-      onSelectionChange(nextPath === undefined ? null : nextPath);
+      onSelectionChange(nextPath);
     },
     unsafeCSS: sidebarEntryTreeCss,
   });
@@ -169,7 +169,7 @@ export function Filesystem({
         <p className={selection}>
           Selected: {selectedPath === undefined ? "none" : selectedPath}
         </p>
-      ) : null}
+      ) : undefined}
     </div>
   );
 }
@@ -195,7 +195,7 @@ function useFileTreeOverflow(model: FileTreeModel) {
   const [overflow, setOverflow] = useState({ top: false, bottom: false });
 
   useEffect(() => {
-    let scroll: HTMLElement | null = null;
+    let scroll: HTMLElement | undefined;
     let cancelled = false;
     const resize = new ResizeObserver(() => {
       read();
@@ -203,19 +203,19 @@ function useFileTreeOverflow(model: FileTreeModel) {
 
     const getScroll = () => {
       const host = model.getFileTreeContainer();
-      if (host === undefined) return null;
+      if (host === undefined) return undefined;
       const element = host.shadowRoot?.querySelector(
         "[data-file-tree-virtualized-scroll='true']",
       );
       if (element instanceof HTMLElement) return element;
-      return null;
+      return undefined;
     };
 
     const attach = () => {
       const next = getScroll();
-      if (next === null) return null;
+      if (next === undefined) return undefined;
       if (next === scroll) return scroll;
-      if (scroll !== null) {
+      if (scroll !== undefined) {
         scroll.removeEventListener("scroll", read);
         resize.disconnect();
       }
@@ -228,7 +228,7 @@ function useFileTreeOverflow(model: FileTreeModel) {
     const read = () => {
       if (cancelled) return;
       const element = attach();
-      if (element === null) return;
+      if (element === undefined) return;
       const top = element.scrollTop > 0;
       const bottom =
         element.scrollTop + element.clientHeight < element.scrollHeight - 1;
@@ -249,7 +249,7 @@ function useFileTreeOverflow(model: FileTreeModel) {
       window.clearTimeout(retry);
       unsubscribe();
       resize.disconnect();
-      if (scroll !== null) scroll.removeEventListener("scroll", read);
+      if (scroll !== undefined) scroll.removeEventListener("scroll", read);
     };
   }, [model]);
 

@@ -17,7 +17,7 @@ class PromptFailedError extends errore.createTaggedError({
 }) {}
 
 export type UseAgentSessionResult = {
-  session: AgentSessionStub | null;
+  session: AgentSessionStub | undefined;
   state: AgentSessionState;
   isWorking: boolean;
   prompt: (text: string) => Promise<void | PromptFailedError>;
@@ -30,7 +30,9 @@ export type UseAgentSessionResult = {
 export function useAgentSession(sessionId: string): UseAgentSessionResult {
   const api = useApi();
   const queryClient = useQueryClient();
-  const [session, setSession] = useState<AgentSessionStub | null>(null);
+  const [session, setSession] = useState<AgentSessionStub | undefined>(
+    undefined,
+  );
   const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
   const [isWorking, setIsWorking] = useState(false);
 
@@ -40,7 +42,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
 
     setState(emptyAgentSessionState);
     setIsWorking(false);
-    setSession(null);
+    setSession(undefined);
 
     // If cleanup runs before this resolves, `stub` is still unset — dispose the
     // late result here. Effect cleanup only covers stubs already assigned.
@@ -67,15 +69,15 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
     return () => {
       cancelled = true;
       stub?.[Symbol.dispose]();
-      setSession(null);
+      setSession(undefined);
     };
   }, [api, sessionId]);
 
   async function prompt(text: string) {
-    if (session === null) {
+    if (session === undefined) {
       return new PromptFailedError({ reason: "Session is not ready." });
     }
-    setState((current) => ({ ...current, error: null }));
+    setState((current) => ({ ...current, error: undefined }));
     const result = await session.prompt(text).catch(
       (e) =>
         new PromptFailedError({
@@ -108,7 +110,7 @@ export function useDraftAgentSession(onCreated: (sessionId: string) => void): {
 } {
   const api = useApi();
   const queryClient = useQueryClient();
-  const sessionRef = useRef<AgentSessionStub | null>(null);
+  const sessionRef = useRef<AgentSessionStub | undefined>(undefined);
   const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
   const [isWorking, setIsWorking] = useState(false);
   const onCreatedRef = useRef(onCreated);
@@ -117,13 +119,13 @@ export function useDraftAgentSession(onCreated: (sessionId: string) => void): {
   useEffect(() => {
     return () => {
       sessionRef.current?.[Symbol.dispose]();
-      sessionRef.current = null;
+      sessionRef.current = undefined;
     };
   }, []);
 
   async function prompt(text: string) {
     let session = sessionRef.current;
-    if (session === null) {
+    if (session === undefined) {
       const created = await api.newAgentSession().catch(
         (e) =>
           new PromptFailedError({
@@ -144,7 +146,7 @@ export function useDraftAgentSession(onCreated: (sessionId: string) => void): {
       });
     }
 
-    setState((current) => ({ ...current, error: null }));
+    setState((current) => ({ ...current, error: undefined }));
     const result = await session.prompt(text).catch(
       (e) =>
         new PromptFailedError({

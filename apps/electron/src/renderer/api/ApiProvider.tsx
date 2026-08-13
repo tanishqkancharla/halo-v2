@@ -98,7 +98,7 @@ export function useChooseWorkspaceMutation() {
   return useMutation({
     mutationFn: () => api.chooseWorkspace(),
     onSuccess: (workspace) => {
-      if (workspace !== null) {
+      if (workspace !== undefined) {
         queryClient.setQueryData(workspaceQueryKey, readyWorkspace(workspace));
       }
     },
@@ -108,24 +108,28 @@ export function useChooseWorkspaceMutation() {
 export function useSessionsQuery(workspace: WorkspaceState | undefined) {
   const api = useApi();
   const workspaceRoot =
-    workspace?.status === "ready" ? workspace.workspace.workspaceRoot : null;
+    workspace?.status === "ready"
+      ? workspace.workspace.workspaceRoot
+      : undefined;
 
   return useQuery({
     queryKey: ["sessions", workspaceRoot],
     queryFn: () => api.listSessions(),
-    enabled: workspaceRoot !== null,
+    enabled: workspaceRoot !== undefined,
   });
 }
 
 export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
   const api = useApi();
   const workspaceRoot =
-    workspace?.status === "ready" ? workspace.workspace.workspaceRoot : null;
+    workspace?.status === "ready"
+      ? workspace.workspace.workspaceRoot
+      : undefined;
 
   return useQuery({
     queryKey: ["workspace-paths", workspaceRoot],
     queryFn: () => api.listWorkspacePaths(),
-    enabled: workspaceRoot !== null,
+    enabled: workspaceRoot !== undefined,
   });
 }
 
@@ -145,7 +149,7 @@ async function restoreWorkspace(api: HaloApiStub): Promise<WorkspaceState> {
   if (active instanceof Error) {
     return { status: "needs-workspace", message: active.message };
   }
-  if (active !== null) return readyWorkspace(active);
+  if (active !== undefined) return readyWorkspace(active);
 
   const selected = await api
     .chooseWorkspace()
@@ -153,7 +157,7 @@ async function restoreWorkspace(api: HaloApiStub): Promise<WorkspaceState> {
   if (selected instanceof Error) {
     return { status: "needs-workspace", message: selected.message };
   }
-  return selected === null
+  return selected === undefined
     ? { status: "needs-workspace" }
     : readyWorkspace(selected);
 }

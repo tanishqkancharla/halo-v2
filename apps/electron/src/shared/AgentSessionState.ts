@@ -7,15 +7,15 @@ import type { AgentMessage, AgentSessionEvent } from "./rpc.js";
  */
 export type AgentSessionState = {
   messages: AgentMessage[];
-  streamingMessage: AgentMessage | null;
-  error: string | null;
+  streamingMessage: AgentMessage | undefined;
+  error: string | undefined;
 };
 
 export function emptyAgentSessionState(): AgentSessionState {
   return {
     messages: [],
-    streamingMessage: null,
-    error: null,
+    streamingMessage: undefined,
+    error: undefined,
   };
 }
 
@@ -25,7 +25,7 @@ export function agentSessionStateFromSession(session: {
 }): AgentSessionState {
   return {
     messages: session.messages,
-    streamingMessage: null,
+    streamingMessage: undefined,
     error: errorFromLastAssistantMessage(session.messages),
   };
 }
@@ -40,14 +40,14 @@ export function applyAgentSessionEvent(
         return {
           ...state,
           messages: [...state.messages, event.message],
-          error: null,
+          error: undefined,
         };
       }
       if (event.message.role === "assistant") {
         return {
           ...state,
           streamingMessage: event.message,
-          error: null,
+          error: undefined,
         };
       }
       return state;
@@ -63,17 +63,17 @@ export function applyAgentSessionEvent(
       if (event.message.role === "user") return state;
       if (event.message.role === "assistant") {
         const error = assistantTurnError(event.message);
-        if (error === null) {
+        if (error === undefined) {
           return {
             ...state,
             messages: [...state.messages, event.message],
-            streamingMessage: null,
+            streamingMessage: undefined,
           };
         }
         return {
           ...state,
           messages: [...state.messages, event.message],
-          streamingMessage: null,
+          streamingMessage: undefined,
           error,
         };
       }
@@ -92,24 +92,24 @@ export function applyAgentSessionEvent(
 
 function errorFromLastAssistantMessage(
   messages: AgentMessage[],
-): string | null {
+): string | undefined {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i];
     if (message === undefined) continue;
     if (message.role !== "assistant") continue;
     return assistantTurnError(message);
   }
-  return null;
+  return undefined;
 }
 
-/** Readable alert text when an assistant turn failed; otherwise null. */
-function assistantTurnError(message: AgentMessage): string | null {
-  if (message.role !== "assistant") return null;
+/** Readable alert text when an assistant turn failed. */
+function assistantTurnError(message: AgentMessage): string | undefined {
+  if (message.role !== "assistant") return undefined;
 
   const errorMessage = message.errorMessage;
   const hasErrorMessage = errorMessage !== undefined && errorMessage.length > 0;
-  if (message.stopReason !== "error" && !hasErrorMessage) return null;
-  if (!hasErrorMessage) return null;
+  if (message.stopReason !== "error" && !hasErrorMessage) return undefined;
+  if (!hasErrorMessage) return undefined;
 
   return readableAgentErrorMessage(errorMessage);
 }
@@ -135,29 +135,29 @@ function readableAgentErrorMessage(errorMessage: string): string {
   }
 
   const extracted = humanMessageFromJson(parsed);
-  if (extracted === null) return errorMessage;
+  if (extracted === undefined) return errorMessage;
   return extracted;
 }
 
-function humanMessageFromJson(value: unknown): string | null {
+function humanMessageFromJson(value: unknown): string | undefined {
   if (typeof value === "string") {
     const nested = errore.try({
       try: () => JSON.parse(value) as unknown,
       catch: (e) => new AgentErrorMessageParseError({ cause: e }),
     });
     if (nested instanceof Error) {
-      if (value.length === 0) return null;
+      if (value.length === 0) return undefined;
       return value;
     }
     return humanMessageFromJson(nested);
   }
 
-  if (typeof value !== "object" || value === null) return null;
+  if (typeof value !== "object" || value === null) return undefined;
 
   if ("error" in value) {
     const error = value.error;
     if (typeof error === "string") {
-      if (error.length === 0) return null;
+      if (error.length === 0) return undefined;
       return error;
     }
     if (typeof error === "object" && error !== null && "message" in error) {
@@ -168,9 +168,9 @@ function humanMessageFromJson(value: unknown): string | null {
   }
 
   if ("message" in value && typeof value.message === "string") {
-    if (value.message.length === 0) return null;
+    if (value.message.length === 0) return undefined;
     return value.message;
   }
 
-  return null;
+  return undefined;
 }

@@ -34,7 +34,7 @@ console.log(user.name) // TypeScript knows: User
 5. Use `createTaggedError` for domain errors — gives you `_tag`, typed properties, `$variable` interpolation, `cause`, `findCause`, `toJSON`, and fingerprinting
 6. Let TypeScript infer return types — only add explicit annotations when they improve readability (complex unions, public APIs) or when inference produces a wider type than intended
 7. Use `cause` to wrap errors — `new MyError({ ..., cause: originalError })`
-8. Use `| null` for optional values, not `| undefined` — three-way narrowing: `instanceof Error`, `=== null`, then value
+8. Use `| undefined` for optional values, not `| null` — three-way narrowing: `instanceof Error`, `=== undefined`, then value. (Halo enables `unicorn/no-null`. errore.org's published default is `| null`; keep `null` only where an external API uses it.)
 9. Use `const` + expressions, never `let` + try-catch — ternaries, IIFEs, `instanceof Error`
 10. Always handle errors inside `if` branches with early exits, keep the happy path at root — like Go's `if err != nil { return err }`, check the error, exit (return/continue/break), and continue the success path at the top indentation level. This makes the happy path readable top-to-bottom with minimal nesting
 11. Always include `Error` handler in `matchError` — required fallback for plain Error instances
@@ -116,7 +116,7 @@ console.log(user.name) // TypeScript knows: User
   // explicit annotation when it adds clarity on a complex public API
   function processRequest(
     req: Request,
-  ): Promise<ValidationError | AuthError | DbError | null | Response> {
+  ): Promise<ValidationError | AuthError | DbError | undefined | Response> {
     // ...
   }
   ```
@@ -391,25 +391,25 @@ async function getUser(id: string) {
 
 > Think of `.catch()` and `errore.try` as the **adapter** between the throwing world (external code) and the errore world (errors as values). Once you've converted exceptions to values at the boundary, everything above is plain `instanceof` checks. Your own functions return errors as values — they never need `.catch()` or `try`.
 
-### Optional Values (| null)
+### Optional Values (| undefined)
 
 ```ts
-async function findUser(email: string): Promise<DbError | User | null> {
+async function findUser(email: string): Promise<DbError | User | undefined> {
   const result = await db
     .query(email)
     .catch((e) => new DbError({ message: 'Query failed', cause: e }))
   if (result instanceof Error) return result
-  return result ?? null
+  return result
 }
 
 // Caller: three-way narrowing
 const user = await findUser('alice@example.com')
 if (user instanceof Error) return user
-if (user === null) return
+if (user === undefined) return
 console.log(user.name) // User
 ```
 
-> `Error | T | null` gives you three distinct states without nesting Result and Option types.
+> `Error | T | undefined` gives you three distinct states without nesting Result and Option types. Keep `null` only at external boundaries (JSON `null`, DOM, Electron, Cap'n Web).
 
 ### Parallel Operations
 

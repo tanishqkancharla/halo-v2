@@ -24,7 +24,7 @@ type TreeListener = WorkspaceTreeEventHandler & {
 } & Partial<Disposable>;
 
 export class HaloRpc extends HaloApi {
-  private treeListener: TreeListener | null = null;
+  private treeListener: TreeListener | undefined;
 
   constructor(
     private readonly workspace: WorkspaceService,
@@ -39,7 +39,7 @@ export class HaloRpc extends HaloApi {
     return getAppInfo();
   }
 
-  getWorkspace(): WorkspaceInfo | null {
+  getWorkspace(): WorkspaceInfo | undefined {
     this.logger.info({ event: "getWorkspace" });
     return this.workspace.getWorkspace();
   }
@@ -51,7 +51,7 @@ export class HaloRpc extends HaloApi {
       buttonLabel: "Choose workspace",
       properties: ["openDirectory"],
     });
-    if (selection.canceled) return null;
+    if (selection.canceled) return undefined;
     const workspace = await this.workspace.select(selection.filePaths[0]!);
     if (workspace instanceof Error) throw workspace;
     return workspace;
@@ -76,13 +76,13 @@ export class HaloRpc extends HaloApi {
     const previous = this.treeListener;
     this.treeListener =
       typeof callback.dup === "function" ? callback.dup() : callback;
-    if (previous !== null) {
+    if (previous !== undefined) {
       const dispose = previous[Symbol.dispose];
       if (typeof dispose === "function") dispose.call(previous);
     }
     this.workspace.setTreeListener((events) => {
       const listener = this.treeListener;
-      if (listener === null) return;
+      if (listener === undefined) return;
       listener(events);
     });
   }
@@ -117,7 +117,7 @@ type SessionListener = AgentSessionEventHandler & {
 
 /** Cap'n Web stub wrapping a live Pi AgentSession. Forwards raw Pi events. */
 export class AgentSessionRpc extends AgentSessionApi {
-  private listener: SessionListener | null = null;
+  private listener: SessionListener | undefined;
   private deliveries = Promise.resolve();
   private readonly unsubscribePi: () => void;
 
@@ -128,7 +128,7 @@ export class AgentSessionRpc extends AgentSessionApi {
     super();
     this.unsubscribePi = session.subscribe((event: AgentSessionEvent) => {
       const listener = this.listener;
-      if (listener === null) return;
+      if (listener === undefined) return;
       this.deliveries = this.deliveries.then(() => listener(event));
     });
   }
@@ -159,11 +159,11 @@ export class AgentSessionRpc extends AgentSessionApi {
     this.logger.info({ event: "dispose" });
     this.unsubscribePi();
     const listener = this.listener;
-    if (listener !== null) {
+    if (listener !== undefined) {
       const dispose = listener[Symbol.dispose];
       if (typeof dispose === "function") dispose.call(listener);
     }
-    this.listener = null;
+    this.listener = undefined;
     void this.session.abort().catch((error) => {
       this.logger.warn({ event: "abort-failed", error });
     });
