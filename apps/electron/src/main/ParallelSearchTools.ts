@@ -2,8 +2,19 @@ import type {
   ExtensionContext,
   ToolDefinition,
 } from "@mariozechner/pi-coding-agent";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { type Static, Type } from "@sinclair/typebox";
-import type { McpHttpClient } from "./McpHttpClient.js";
+import * as errore from "errore";
+
+class ParallelMcpError extends errore.createTaggedError({
+  name: "ParallelMcpError",
+  message: "Parallel MCP request failed",
+}) {}
+
+const parallelSearchMcpUrl = "https://search.parallel.ai/mcp";
+const client = new Client({ name: "halo", version: "1" });
+let connectPromise: Promise<void | ParallelMcpError> | null = null;
 
 const webSearchParameters = Type.Object({
   objective: Type.String({
@@ -41,10 +52,7 @@ const webFetchParameters = Type.Object({
   ),
 });
 
-export function createParallelSearchTools(args: {
-  client: McpHttpClient;
-  userId: string;
-}): ToolDefinition[] {
+export function createParallelSearchTools(userId: string): ToolDefinition[] {
   const webSearch: ToolDefinition = {
     name: "web_search",
     label: "Web search",
@@ -60,9 +68,8 @@ export function createParallelSearchTools(args: {
     execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
       const search = params as Static<typeof webSearchParameters>;
       return callParallelTool({
-        client: args.client,
         name: "web_search",
-        userId: args.userId,
+        userId,
         modelName: modelName(ctx),
         arguments: {
           objective: search.objective,
@@ -99,9 +106,8 @@ export function createParallelSearchTools(args: {
         toolArguments.full_content = fetchParams.full_content;
       }
       return callParallelTool({
-        client: args.client,
         name: "web_fetch",
-        userId: args.userId,
+        userId,
         modelName: modelName(ctx),
         arguments: toolArguments,
         signal,
@@ -113,13 +119,20 @@ export function createParallelSearchTools(args: {
 }
 
 async function callParallelTool(args: {
-  client: McpHttpClient;
   name: string;
   userId: string;
   modelName: string | null;
   arguments: Record<string, unknown>;
   signal: AbortSignal | undefined;
 }) {
+  const connected = await ensureConnected();
+  if (connected instanceof Error) {
+    return {
+      content: [{ type: "text" as const, text: connected.message }],
+      details: {},
+    };
+  }
+
   const toolArguments: Record<string, unknown> = {
     ...args.arguments,
     // Parallel free-tier rate limits by session_id; Halo's user id is that key.
@@ -129,21 +142,47 @@ async function callParallelTool(args: {
     toolArguments.model_name = args.modelName;
   }
 
-  const text = await args.client.callTool({
-    name: args.name,
-    arguments: toolArguments,
-    signal: args.signal,
-  });
-  if (text instanceof Error) {
+  const result = await client
+    .callTool({ name: args.name, arguments: toolArguments }, undefined, {
+      signal: args.signal,
+    })
+    .catch((e) => new ParallelMcpError({ cause: e }));
+  if (result instanceof Error) {
     return {
-      content: [{ type: "text" as const, text: text.message }],
+      content: [{ type: "text" as const, text: result.message }],
       details: {},
     };
   }
   return {
-    content: [{ type: "text" as const, text }],
+    content: [{ type: "text" as const, text: toolResultText(result) }],
     details: {},
   };
+}
+
+function ensureConnected() {
+  if (connectPromise === null) {
+    connectPromise = client
+      .connect(new StreamableHTTPClientTransport(new URL(parallelSearchMcpUrl)))
+      .catch((e) => new ParallelMcpError({ cause: e }))
+      .then((result) => {
+        if (result instanceof Error) connectPromise = null;
+        return result;
+      });
+  }
+  return connectPromise;
+}
+
+function toolResultText(result: unknown) {
+  if (typeof result !== "object" || result === null) return "";
+  if (!("content" in result) || !Array.isArray(result.content)) return "";
+  return result.content
+    .flatMap((part) => {
+      if (typeof part !== "object" || part === null) return [];
+      if (!("type" in part) || part.type !== "text") return [];
+      if (!("text" in part) || typeof part.text !== "string") return [];
+      return [part.text];
+    })
+    .join("");
 }
 
 function modelName(ctx: ExtensionContext) {

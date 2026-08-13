@@ -6,7 +6,6 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
 import type { SessionSummary } from "../shared/rpc.js";
-import { McpHttpClient } from "./McpHttpClient.js";
 import { createParallelSearchTools } from "./ParallelSearchTools.js";
 import type { UserService } from "./UserService.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
@@ -26,8 +25,6 @@ export class CreateAgentSessionError extends errore.createTaggedError({
  * for live AgentSession. Callers own subscribe / prompt / dispose.
  */
 export class PiService {
-  private readonly mcpClient = new McpHttpClient();
-
   constructor(
     private readonly workspace: WorkspaceService,
     private readonly user: UserService,
@@ -60,10 +57,7 @@ export class PiService {
       agentDir: layout.agentDir,
       sessionManager: manager,
       tools: createCodingTools(layout.root),
-      customTools: createParallelSearchTools({
-        client: this.mcpClient,
-        userId: user.id,
-      }),
+      customTools: createParallelSearchTools(user.id),
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;
     return created.session;
