@@ -40,6 +40,7 @@
     "capnweb": "^0.10.0",
     "electron-squirrel-startup": "^1.0.1",
     "errore": "^0.14.1",
+    "esbuild": "^0.28.2",
     "maui": "npm:@tanishqkancharla/maui@0.0.2",
     "purse-styles": "^0.2.1",
     "react": "^19.2.8",

@@ -44,9 +44,18 @@ Halo uses the chosen folder as Pi's working directory and stores Pi data here:
 <workspace>/.pi/agent/
 ├── auth.json
 ├── models.json
+├── skills/halo-extension/SKILL.md
 └── sessions/
     └── *.jsonl
 ```
+
+UI extensions live in the same workspace:
+
+```text
+<workspace>/.halo/extensions/<id>/index.tsx
+```
+
+Halo seeds a Calendar extension and the `halo-extension` skill when those paths are missing. The in-app agent reads the skill and writes new extensions there. The renderer loads them without a restart.
 
 Pi's file and shell tools run on the host with the same rights as Halo. Halo does not import old AgentOS SQLite workspaces.
 

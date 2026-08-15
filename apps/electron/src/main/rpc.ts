@@ -10,12 +10,14 @@ import {
   HaloApi,
   type AgentSessionEventHandler,
   type AppInfo,
+  type ExtensionBundleHandler,
   type OpenedAgentSession,
   type WorkspaceInfo,
   type WorkspaceTreeEventHandler,
 } from "../shared/rpc.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
 import { getAppInfo } from "./AppUpdate.js";
+import type { ExtensionService } from "./ExtensionService.js";
 import type { PiService } from "./pi-service.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
@@ -23,12 +25,18 @@ type TreeListener = WorkspaceTreeEventHandler & {
   dup?: () => WorkspaceTreeEventHandler & Disposable;
 } & Partial<Disposable>;
 
+type ExtensionListener = ExtensionBundleHandler & {
+  dup?: () => ExtensionBundleHandler & Disposable;
+} & Partial<Disposable>;
+
 export class HaloRpc extends HaloApi {
   private treeListener: TreeListener | undefined;
+  private extensionListener: ExtensionListener | undefined;
 
   constructor(
     private readonly workspace: WorkspaceService,
     private readonly pi: PiService,
+    private readonly extensions: ExtensionService,
     private readonly getWindow: () => BrowserWindow,
     private readonly logger: Logger,
   ) {
@@ -84,6 +92,29 @@ export class HaloRpc extends HaloApi {
       const listener = this.treeListener;
       if (listener === undefined) return;
       listener(events);
+    });
+  }
+
+  async listExtensions() {
+    this.logger.info({ event: "listExtensions" });
+    const bundle = await this.extensions.list();
+    if (bundle instanceof Error) throw bundle;
+    return bundle;
+  }
+
+  subscribeExtensions(callback: ExtensionListener) {
+    this.logger.info({ event: "subscribeExtensions" });
+    const previous = this.extensionListener;
+    this.extensionListener =
+      typeof callback.dup === "function" ? callback.dup() : callback;
+    if (previous !== undefined) {
+      const dispose = previous[Symbol.dispose];
+      if (typeof dispose === "function") dispose.call(previous);
+    }
+    this.extensions.setListener((bundle) => {
+      const listener = this.extensionListener;
+      if (listener === undefined) return;
+      listener(bundle);
     });
   }
 
