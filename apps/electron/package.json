@@ -36,7 +36,6 @@
     "@tiptap/markdown": "^3.29.2",
     "@tiptap/react": "^3.29.2",
     "@tiptap/starter-kit": "^3.29.2",
-    "@types/three": "^0.185.1",
     "capnweb": "^0.10.0",
     "electron-squirrel-startup": "^1.0.1",
     "errore": "^0.14.1",
@@ -46,7 +45,6 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "streamdown": "^2.5.0",
-    "three": "^0.185.1",
     "update-electron-app": "^3.3.0"
   },
   "devDependencies": {

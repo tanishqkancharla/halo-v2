@@ -17,7 +17,6 @@ import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 import type { LoadedExtension } from "../shared/evaluateExtensionSource.ts";
 import type { ExtensionLoadError } from "../shared/extension.ts";
-import { HaloLogo } from "./HaloLogo.tsx";
 import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
 import { sidebarEntry, sidebarEntryLabel } from "./sidebarEntry.ts";
 
@@ -44,7 +43,6 @@ export function Sidebar({
 }: SidebarProps) {
   const sidebar = useStyles(styles.sidebar);
   const header = useStyles(styles.header);
-  const logo = useStyles(styles.logo);
   const newButton = useStyles(styles.newButton);
   const newIcon = useStyles(icon("sm"));
   const entry = useStyles(sidebarEntry);
@@ -61,7 +59,6 @@ export function Sidebar({
   return (
     <nav className={sidebar} aria-label="Sessions">
       <div className={header}>
-        <HaloLogo className={logo} />
         <Button variant="quiet" onClick={onToggleTheme}>
           {themeLabel}
         </Button>
@@ -285,16 +282,10 @@ const styles = {
       backgroundColor: `light-dark(${colors.gray[1]}, ${colors.gray[2]})`,
     },
   ),
-  header: style(flex({ align: "center", justify: "between" }), {
+  header: style(flex({ align: "center", justify: "end" }), {
     minWidth: 0,
     minHeight: "42px",
     paddingLeft: "67px",
-  }),
-  logo: style({
-    display: "block",
-    width: "20px",
-    height: "20px",
-    transform: "translateX(-1px) translateY(-3px)",
   }),
   newButton: style(flex({ align: "center", gap: 3 }), {
     alignSelf: "stretch",
