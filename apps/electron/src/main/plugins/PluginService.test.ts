@@ -1,48 +1,10 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, expect } from "vitest";
+import { pluginTest, src } from "../test/fixtures.js";
+import { WorkspaceNotReadyError } from "../workspace-service.js";
 import { PluginService } from "./PluginService.js";
-import { src, writePlugins } from "./writePlugin.js";
-import {
-  WorkspaceNotReadyError,
-  WorkspaceService,
-} from "./workspace-service.js";
-
-const pluginServiceTest = test.extend<{
-  appDataDir: string;
-  workspaceRoot: string;
-  workspace: WorkspaceService;
-  writePlugin: (
-    plugins: Record<string, Record<string, string>>,
-  ) => Promise<void>;
-}>({
-  appDataDir: async ({ task }, use) => {
-    const directory = await mkdtemp(join(tmpdir(), `halo-app-${task.id}-`));
-    await use(directory);
-    await rm(directory, { recursive: true, force: true });
-  },
-  workspaceRoot: async ({ task }, use) => {
-    const directory = await mkdtemp(join(tmpdir(), `halo-ws-${task.id}-`));
-    await use(directory);
-    await rm(directory, { recursive: true, force: true });
-  },
-  workspace: async ({ appDataDir }, use) => {
-    await use(new WorkspaceService(appDataDir));
-  },
-  writePlugin: async ({ workspace, workspaceRoot }, use) => {
-    const selected = await workspace.select(workspaceRoot);
-    if (selected instanceof Error) throw selected;
-    const layout = workspace.getLayout();
-    if (layout instanceof Error) throw layout;
-    await use(async (plugins) => {
-      await writePlugins(layout.root, plugins);
-    });
-  },
-});
 
 describe("PluginService", () => {
-  pluginServiceTest(
+  pluginTest(
     "returns WorkspaceNotReadyError before a workspace is chosen",
     async ({ workspace }) => {
       const listed = await new PluginService(workspace).list();
@@ -50,7 +12,7 @@ describe("PluginService", () => {
     },
   );
 
-  pluginServiceTest(
+  pluginTest(
     "lists a valid plugin folder",
     async ({ workspace, writePlugin }) => {
       await writePlugin({
@@ -76,7 +38,7 @@ describe("PluginService", () => {
     },
   );
 
-  pluginServiceTest(
+  pluginTest(
     "keeps a valid plugin when another package.json is broken",
     async ({ workspace, writePlugin }) => {
       await writePlugin({

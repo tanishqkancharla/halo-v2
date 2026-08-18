@@ -92,6 +92,8 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - [`apps/electron/src/shared/channels.ts`](../apps/electron/src/shared/channels.ts) — Existing `halo:request-rpc`. Add a plugin oRPC channel pair.
 - [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — Forward the plugin MessagePort like HaloApi.
 - [`apps/electron/src/main/main.ts`](../apps/electron/src/main/main.ts) — Construct `PluginService`.
+- [`apps/electron/src/main/plugins/PluginService.ts`](../apps/electron/src/main/plugins/PluginService.ts) — List `.halo/plugins`. Tests live beside it.
+- [`apps/electron/src/main/test/fixtures.ts`](../apps/electron/src/main/test/fixtures.ts) — Shared e2e helpers, including `src` and `pluginTest`.
 - [`apps/electron/src/main/workspace-service.ts`](../apps/electron/src/main/workspace-service.ts) — Today's `JSON.parse` + field checks. Do not change yet; the new helper is what new parsers call.
 - [`apps/electron/src/main/ParallelSearchTools.ts`](../apps/electron/src/main/ParallelSearchTools.ts) — Existing TypeBox `Type.Object` usage to match.
 - [`packages/logger/package.json`](../packages/logger/package.json) — Package export layout to copy for `@halo/plugin-sdk`.
@@ -258,7 +260,7 @@ class PluginManifestError extends errore.createTaggedError({
 #### Code diff preview
 
 ```diff
- // apps/electron/src/main/readPluginManifest.ts
+ // apps/electron/src/main/plugins/readPluginManifest.ts
 +const parsed = errore.try({
 +  try: () => JSON.parse(raw) as unknown,
 +  catch: (e) => new PluginManifestError({ id, detail: "invalid JSON", cause: e }),
@@ -278,7 +280,7 @@ class PluginManifestError extends errore.createTaggedError({
 - [x] Add `readPluginManifest({ id, directory })`. Missing file, invalid JSON, or failed `halo` parse returns `PluginManifestError`.
 - [x] Require `package.json` `name` as a non-empty string (plain check or a small TypeBox object around `{ name, halo }`). Resolve entries from `halo.view` / `halo.server` when set. Otherwise look for `view.tsx`, `view/index.tsx`, `view.ts`, `view/index.ts` (same pattern for `server`, `.ts` only).
 - [x] Do not read `engines` yet.
-- [x] Cover happy path, missing `version`, missing `halo.name`, explicit paths, and directory fallbacks in Vitest.
+- [x] Cover listing through `PluginService` tests. Do not add a separate `readPluginManifest` unit test file.
 - [x] Run `pnpm --filter @halo/desktop test`.
 
 ### Phase 4: Discover `.halo/plugins`

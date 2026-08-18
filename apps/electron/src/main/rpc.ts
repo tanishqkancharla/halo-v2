@@ -17,7 +17,7 @@ import {
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
 import { getAppInfo } from "./AppUpdate.js";
 import type { PiService } from "./pi-service.js";
-import type { PluginService } from "./PluginService.js";
+import type { PluginService } from "./plugins/PluginService.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
 type TreeListener = WorkspaceTreeEventHandler & {

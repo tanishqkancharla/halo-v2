@@ -2,9 +2,9 @@ import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import * as errore from "errore";
-import type { PluginList } from "../shared/plugin.js";
+import type { PluginList } from "../../shared/plugin.js";
+import type { WorkspaceService } from "../workspace-service.js";
 import { readPluginManifest } from "./readPluginManifest.js";
-import type { WorkspaceService } from "./workspace-service.js";
 
 export class PluginIoError extends errore.createTaggedError({
   name: "PluginIoError",

@@ -6,7 +6,7 @@ import * as errore from "errore";
 import {
   PluginManifestError,
   type PluginManifest,
-} from "../shared/pluginManifest.js";
+} from "../../shared/pluginManifest.js";
 
 const viewFallbacks = [
   "view.tsx",
