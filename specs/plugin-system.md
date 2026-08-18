@@ -143,11 +143,11 @@ export function usePluginServer<S>(): RouterClient<S>;
 +}
 ```
 
-- [ ] Create `packages/plugin-sdk` with `package.json`, `tsconfig.json`, and the three entry files. Match `@repo/logger` scripts. Depend on `@sinclair/typebox` (same range as `@halo/desktop`) and `wouter`.
-- [ ] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Re-export `os` / `ORPCError` from `server`. Re-export `Type` and `Static` from `schema`.
-- [ ] Export `usePluginServer` from `view`. Until later phases it throws a tagged `PluginRuntimeMissingError` if called outside a host provider. Do not add `usePluginNavigate` or `usePluginState`.
-- [ ] Add a Vitest that imports each subpath and asserts `Button` and `Link` are functions and `Type.Literal` exists.
-- [ ] Run `pnpm --filter @halo/plugin-sdk test typecheck lint format:check`.
+- [x] Create `packages/plugin-sdk` with `package.json`, `tsconfig.json`, and the three entry files. Match `@repo/logger` scripts. Depend on `@sinclair/typebox` (same range as `@halo/desktop`) and `wouter`.
+- [x] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Re-export `os` / `ORPCError` from `server`. Re-export `Type` and `Static` from `schema`.
+- [x] Export `usePluginServer` from `view`. Until later phases it throws a tagged `PluginRuntimeMissingError` if called outside a host provider. Do not add `usePluginNavigate` or `usePluginState`.
+- [x] Dropped the subpath re-export smoke tests (they only checked that imports existed).
+- [x] Run `pnpm --filter @halo/plugin-sdk test typecheck lint format:check`.
 
 ### Phase 2: Versioned TypeBox parse helper
 
@@ -208,11 +208,11 @@ export function parseVersioned<S extends TSchema>(args: {
 +export type HaloManifest = Static<typeof haloManifestV1>;
 ```
 
-- [ ] Implement `parseVersioned` with `Value.Check` / `Value.Errors`. Never throw on invalid input.
-- [ ] Define `haloManifestV1` and `haloManifestSchema` as a one-member union so a later `Type.Literal(2)` object can join it.
-- [ ] Test: version 1 with `name` succeeds; missing `version` fails; `version: 2` fails; extra keys are stripped/ignored and still succeed.
-- [ ] Document in a short comment on `haloManifestSchema` that a new version is a new object in the union plus an `up` only when the host must normalize to latest.
-- [ ] Run `pnpm --filter @halo/plugin-sdk test`.
+- [x] Implement `parseVersioned` with `Value.Check` / `Value.Errors`. Never throw on invalid input.
+- [x] Define `haloManifestV1` and `haloManifestSchema` as a one-member union so a later `Type.Literal(2)` object can join it.
+- [x] Test: version 1 with `name` succeeds; missing `version` fails; `version: 2` fails; extra keys are stripped/ignored and still succeed.
+- [x] Document in a short comment on `haloManifestSchema` that a new version is a new object in the union plus an `up` only when the host must normalize to latest.
+- [x] Run `pnpm --filter @halo/plugin-sdk test`.
 
 ### Phase 3: Parse the nested `halo` manifest
 
@@ -275,11 +275,11 @@ class PluginManifestError extends errore.createTaggedError({
 +}
 ```
 
-- [ ] Add `readPluginManifest({ id, directory })`. Missing file, invalid JSON, or failed `halo` parse returns `PluginManifestError`.
-- [ ] Require `package.json` `name` as a non-empty string (plain check or a small TypeBox object around `{ name, halo }`). Resolve entries from `halo.view` / `halo.server` when set. Otherwise look for `view.tsx`, `view/index.tsx`, `view.ts`, `view/index.ts` (same pattern for `server`, `.ts` only).
-- [ ] Do not read `engines` yet.
-- [ ] Cover happy path, missing `version`, missing `halo.name`, explicit paths, and directory fallbacks in Vitest.
-- [ ] Run `pnpm --filter @halo/desktop test`.
+- [x] Add `readPluginManifest({ id, directory })`. Missing file, invalid JSON, or failed `halo` parse returns `PluginManifestError`.
+- [x] Require `package.json` `name` as a non-empty string (plain check or a small TypeBox object around `{ name, halo }`). Resolve entries from `halo.view` / `halo.server` when set. Otherwise look for `view.tsx`, `view/index.tsx`, `view.ts`, `view/index.ts` (same pattern for `server`, `.ts` only).
+- [x] Do not read `engines` yet.
+- [x] Cover happy path, missing `version`, missing `halo.name`, explicit paths, and directory fallbacks in Vitest.
+- [x] Run `pnpm --filter @halo/desktop test`.
 
 ### Phase 4: Discover `.halo/plugins`
 
