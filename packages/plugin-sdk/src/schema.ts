@@ -4,9 +4,10 @@ import * as errore from "errore";
 
 export { Type, type Static };
 
+// errore reserves $name on tagged errors.
 export class SchemaParseError extends errore.createTaggedError({
   name: "SchemaParseError",
-  message: "Failed to parse $name: $detail",
+  message: "Failed to parse $document: $detail",
 }) {}
 
 export function parseVersioned<S extends TSchema>(args: {
@@ -19,7 +20,7 @@ export function parseVersioned<S extends TSchema>(args: {
   const path = first === undefined ? "" : first.path;
   const message = first === undefined ? "invalid" : first.message;
   return new SchemaParseError({
-    name: args.name,
+    document: args.name,
     detail: path.length === 0 ? message : `${path} ${message}`,
   });
 }
