@@ -17,7 +17,7 @@ flowchart TD
     Esbuild --> Eval["Renderer evaluate named exports"]
     Jiti --> Orpc["oRPC MessagePort router keyed by plugin id"]
     Eval --> SidebarSlot["export Sidebar into app sidebar"]
-    Eval --> RoutesSlot["export Routes into main pane"]
+    Eval --> RoutesSlot["export Routes component into main pane"]
     Orpc --> Hooks["usePluginServer / usePluginState"]
     Db --> Hooks
 ```
@@ -37,6 +37,7 @@ sequenceDiagram
     Main->>Main: esbuild view
     Main-->>UI: PluginBundle plus oRPC port
     UI->>UI: Evaluate Sidebar and Routes
+    UI->>UI: wouter /plugins/:pluginId nest → Routes
     UI->>Main: usePluginServer / usePluginState
 ```
 
@@ -46,17 +47,18 @@ The sidebar and main pane are fixed in the renderer. A user who asks the in-app 
 
 ## Solution overview
 
-Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` with a nested `halo` object, plus optional `view`, `server`, and `state` files. The view mounts named exports (`Sidebar`, `Routes`). The server is an oRPC router in main. State is Drizzle/Turso `sqliteTable`s in a per-plugin libSQL file. Parse every persisted JSON document with a versioned TypeBox union and a shared `parseVersioned` helper that returns an errore tagged error. TypeBox is already in `@halo/desktop`; do not add Zod.
+Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` with a nested `halo` object, plus optional `view`, `server`, and `state` files. The view mounts named exports (`Sidebar`, `Routes`), both React components. The app routes with [wouter](https://github.com/molefrog/wouter) and a memory location. Plugin `Routes` is the main pane for `/plugins/:pluginId/*`. The server is an oRPC router in main. State is Drizzle/Turso `sqliteTable`s in a per-plugin libSQL file. Parse every persisted JSON document with a versioned TypeBox union and a shared `parseVersioned` helper that returns an errore tagged error. TypeBox is already in `@halo/desktop`; do not add Zod.
 
 ## Goals
 
 - A plugin lives at `{workspace}/.halo/plugins/<id>/` with `package.json` and optional `view` / `server` / `state` files.
 - `package.json` has a nested `halo` field. `halo.version` is required. V1 is `1`.
-- `export const Sidebar` mounts in the app sidebar under Files / Sessions. `export const Routes` is the main-pane map.
+- `export const Sidebar` mounts in the app sidebar under Files / Sessions. `export const Routes` is a React component that fills the main pane. Both use wouter `Link` / `Route`.
 - `@halo/plugin-sdk` has `view`, `server`, `state`, and `schema` subpaths. Plugins declare it. The host aliases it to one copy.
 - `usePluginServer<S>()` is an oRPC client typed as the plugin router. `usePluginState<D>()` is a Drizzle client typed as the plugin tables.
 - Plugin data is `{pluginDir}/data.db`, so agents and humans can both see it.
 - Plugins load once when the workspace is ready (`listPlugins`). A load error shows in the sidebar and leaves other plugins up.
+- The renderer uses wouter (`memoryLocation`). Host paths are `/draft/:draftId`, `/sessions/:sessionId`, `/uikit`, and `/plugins/:pluginId` (nested). `SessionSelection` goes away.
 - New JSON documents (manifest first) parse through `parseVersioned`. Unknown or missing `version` is a parse error.
 - Calendar seeds as a plugin. A `halo-plugin` skill seeds under `.pi/agent/skills/`.
 
@@ -70,6 +72,8 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - No view exports beyond `Sidebar` and `Routes`. Unknown named exports are ignored.
 - No remote Turso sync, no cross-plugin database, no HTTP listener.
 - No plugin file watch, auto-reload, or `subscribePlugins`. Restart Halo (or reopen the workspace) to pick up plugin edits.
+- No `usePluginNavigate`. Plugins navigate with wouter `Link` / `useLocation`.
+- No React Router. Wouter is the router.
 - No bb-style exclusive thread list, content scripts, or composer slots.
 
 ## Assumptions
@@ -77,6 +81,8 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - Plugin id is the folder name. `halo.name` is the UI label.
 - `view`, `server`, and `state` are each optional.
 - View imports of `./server` and `./state` are type-only.
+- esbuild marks `wouter` external so plugin `Link` / `Route` share the app Router context.
+- Electron has no useful browser history for this UI. Use `memoryLocation` from `wouter/memory-location`, not `useBrowserLocation`.
 - Schema apply on load is create-table-if-missing. No rename/drop migrations.
 - oRPC procedure input uses TypeBox (Standard Schema), same library as manifests.
 - A later `halo` version is a new `Type.Object` with `version: Type.Literal(2)` added to the union, plus an explicit `up` in `parseVersioned` if the host should normalize to latest. This work ships only version 1 and returns that object as-is.
@@ -85,9 +91,9 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 
 ## Important files, docs, and websites
 
-- [`apps/electron/src/renderer/Sidebar.tsx`](../apps/electron/src/renderer/Sidebar.tsx) — Mount plugin `Sidebar` under Sessions.
-- [`apps/electron/src/renderer/App.tsx`](../apps/electron/src/renderer/App.tsx) — Add `{ kind: "plugin"; pluginId; route }`.
-- [`apps/electron/src/renderer/MainPane.tsx`](../apps/electron/src/renderer/MainPane.tsx) — Render `Routes[route]`.
+- [`apps/electron/src/renderer/App.tsx`](../apps/electron/src/renderer/App.tsx) — Replace `SessionSelection` with a wouter `Router` and `memoryLocation`.
+- [`apps/electron/src/renderer/MainPane.tsx`](../apps/electron/src/renderer/MainPane.tsx) — Host `Route`s plus nested `/plugins/:pluginId` for plugin `Routes`.
+- [`apps/electron/src/renderer/Sidebar.tsx`](../apps/electron/src/renderer/Sidebar.tsx) — `Link` for New session / sessions / UI kit; mount plugin `Sidebar`.
 - [`apps/electron/src/shared/rpc.ts`](../apps/electron/src/shared/rpc.ts) — Cap'n Web HaloApi. Add `listPlugins`; procedures use a second MessagePort.
 - [`apps/electron/src/shared/channels.ts`](../apps/electron/src/shared/channels.ts) — Existing `halo:request-rpc`. Add a plugin oRPC channel pair.
 - [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — Forward the plugin MessagePort like HaloApi.
@@ -99,7 +105,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - [oRPC getting started](https://orpc.dev/docs/getting-started) — Router + client. Any Standard Schema, including TypeBox.
 - [oRPC Electron adapter](https://orpc.dev/docs/adapters/electron) — MessagePort between main and renderer.
 - [Drizzle + Turso](https://orm.drizzle.team/docs/get-started/turso-new) — `sqliteTable` schema and libSQL.
-- [bb composer-customization package.json](https://github.com/get-bb/bb/blob/main/examples/plugins/composer-customization/package.json) — Nested `bb` field this `halo` field copies.
+- [wouter](https://github.com/molefrog/wouter) — Memory location, `Router base`, and `Route nest` for plugin-relative paths.
 
 ## Implementation
 
@@ -111,15 +117,10 @@ Add a workspace package that plugins compile against. `schema` re-exports TypeBo
 
 ```ts
 // packages/plugin-sdk/src/view.ts
-export type PluginRouteMap = Record<string, ComponentType>;
-export type PluginNavigate = {
-  open: (route: string) => void;
-  route: string | undefined;
-};
+export { Route, Switch, Link, Redirect, Router, useLocation, useRoute, useParams } from "wouter";
 
 export function usePluginServer<S>(): RouterClient<S>;
 export function usePluginState<D>(): PluginDatabase<D>;
-export function usePluginNavigate(): PluginNavigate;
 ```
 
 #### Call stack diff
@@ -152,9 +153,9 @@ export function usePluginNavigate(): PluginNavigate;
 +}
 ```
 
-- [ ] Create `packages/plugin-sdk` with `package.json`, `tsconfig.json`, and the four entry files. Match `@repo/logger` scripts. Depend on `@sinclair/typebox` (same range as `@halo/desktop`).
-- [ ] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export `os` / `ORPCError` from `server`. Re-export `sqliteTable`, `text`, `integer`, `real` from `state`. Re-export `Type` and `Static` from `schema`.
-- [ ] Export `usePluginServer`, `usePluginState`, and `usePluginNavigate` from `view`. Until later phases they throw a tagged `PluginRuntimeMissingError` if called outside a host provider.
+- [ ] Create `packages/plugin-sdk` with `package.json`, `tsconfig.json`, and the four entry files. Match `@repo/logger` scripts. Depend on `@sinclair/typebox` (same range as `@halo/desktop`) and `wouter`.
+- [ ] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Re-export `os` / `ORPCError` from `server`. Re-export `sqliteTable`, `text`, `integer`, `real` from `state`. Re-export `Type` and `Static` from `schema`.
+- [ ] Export `usePluginServer` and `usePluginState` from `view`. Until later phases they throw a tagged `PluginRuntimeMissingError` if called outside a host provider. Do not add `usePluginNavigate`.
 - [ ] Add a Vitest that imports each subpath and asserts `Button` and `sqliteTable` are functions and `Type.Literal` exists.
 - [ ] Run `pnpm --filter @halo/plugin-sdk test typecheck lint format:check`.
 
@@ -340,7 +341,64 @@ abstract class HaloApi extends RpcTarget {
 - [ ] Test: not-ready workspace returns `WorkspaceNotReadyError`; a valid plugin folder appears; a broken `package.json` is an error and does not hide the valid one.
 - [ ] Run `pnpm --filter @halo/desktop test`.
 
-### Phase 5: Compile and evaluate `Sidebar` and `Routes`
+### Phase 5: Put wouter in the renderer
+
+Replace `SessionSelection` with a memory-location wouter router. Host chrome keeps working. Plugin paths are reserved but unused until Routes mount.
+
+#### Important types
+
+```ts
+// apps/electron/src/renderer/App.tsx
+import { Route, Router, useLocation } from "wouter";
+import { memoryLocation } from "wouter/memory-location";
+
+// paths
+// /draft/:draftId
+// /sessions/:sessionId
+// /uikit
+// /plugins/:pluginId/*   (nested later)
+```
+
+#### Call stack diff
+
+```diff
+ App
+-├── useState SessionSelection
+-├── Sidebar onSelectionChange
+-└── MainPane selection
++├── memoryLocation + Router
++├── Sidebar Link href=/draft/:id /sessions/:id /uikit
++└── MainPane
++    ├── Route /uikit → UiKitPage
++    ├── Route /draft/:draftId → DraftPane
++    └── Route /sessions/:sessionId → SavedPane
+```
+
+#### Code diff preview
+
+```diff
+ // apps/electron/src/renderer/App.tsx
+-const [selection, setSelection] = useState<SessionSelection>();
++const { hook, navigate } = memoryLocation({ path: initialPath });
++return (
++  <Router hook={hook}>
++    <Sidebar />
++    <MainPane />
++  </Router>
++);
+
+ // apps/electron/src/renderer/Sidebar.tsx
+-<Button onClick={() => onSelectionChange({ kind: "draft", draftId })}>
++<Link href={`/draft/${crypto.randomUUID()}`}>
+```
+
+- [ ] Add `wouter` to `@halo/desktop`. Wrap the ready shell in `Router` with `memoryLocation`. Drop `SessionSelection` from `App.tsx`.
+- [ ] Point New session, session rows, and UI kit at `/draft/:draftId`, `/sessions/:sessionId`, and `/uikit`. Use `useRoute` for `aria-current`.
+- [ ] `MainPane` matches those three routes. After a draft prompt, `navigate` to `/sessions/:sessionId`. Default path: first saved session, else a new draft.
+- [ ] Add a renderer Vitest (or a small hook test) that `memoryLocation({ path: "/uikit", static: true })` renders the UI kit pane.
+- [ ] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that New session, a saved session, and UI kit still open.
+
+### Phase 6: Compile and evaluate `Sidebar` and `Routes`
 
 Compile the view with esbuild. Evaluate named exports. Host `require` serves `@halo/plugin-sdk/view` plus React/Maui.
 
@@ -352,7 +410,7 @@ type CompiledPluginView = { id: string; source: string };
 type LoadedPluginView = {
   id: string;
   Sidebar?: ComponentType;
-  routes: Record<string, ComponentType>;
+  Routes?: ComponentType;
 };
 
 class PluginViewExportError extends errore.createTaggedError({
@@ -368,9 +426,9 @@ class PluginViewExportError extends errore.createTaggedError({
  └── readPluginManifest
 +compilePluginView
 +└── esbuild view.tsx
-+    └── external: react, maui, purse-styles, @halo/plugin-sdk/view
++    └── external: react, maui, purse-styles, wouter, @halo/plugin-sdk/view
 +evaluatePluginView
-+└── named Sidebar (function) and Routes (component map)
++└── named Sidebar and Routes (both functions)
 ```
 
 #### Code diff preview
@@ -386,49 +444,54 @@ class PluginViewExportError extends errore.createTaggedError({
 +  platform: "browser",
 +  jsx: "automatic",
 +  external: ["react", "react/jsx-runtime", "react/jsx-dev-runtime",
-+    "react-dom", "maui", "purse-styles", "@halo/plugin-sdk/view"],
++    "react-dom", "maui", "purse-styles", "wouter", "@halo/plugin-sdk/view"],
 +});
 ```
 
-- [ ] Compile the resolved view file. Map `@halo/plugin-sdk/view` as external. Keep tagged compile errors.
-- [ ] Evaluate CJS. Read `Sidebar` if it is a function. Read `Routes` if it is a record of functions. Accept `module.exports` wrapping for CJS interop; the author-facing API is named exports.
+- [ ] Compile the resolved view file. Map `@halo/plugin-sdk/view` and `wouter` as external. Keep tagged compile errors.
+- [ ] Evaluate CJS. Read `Sidebar` and `Routes` if they are functions. Accept `module.exports` wrapping for CJS interop; the author-facing API is named exports.
 - [ ] Reject a view that exports neither `Sidebar` nor `Routes`. Ignore other names.
-- [ ] Test: compile a view that imports `Button` from `@halo/plugin-sdk/view`; parse `Sidebar` + `Routes`; fail on a view with neither.
+- [ ] Test: compile a view that imports `Button` and `Route` from `@halo/plugin-sdk/view`; parse both named components; fail on a view with neither.
 - [ ] Run `pnpm --filter @halo/desktop test`.
 
-### Phase 6: Mount plugin UI in the sidebar and main pane
+### Phase 7: Mount plugin Sidebar and Routes
 
-Put each plugin `Sidebar` under Sessions. Selecting a route renders `Routes[route]` in the main pane. Wrap both in a runtime provider so navigate (and later server/state hooks) know the plugin id.
+Put each plugin `Sidebar` under Sessions, always mounted. Wrap it in `Router` with `base={`/plugins/${id}`}` so its `Link href="/month"` writes `/plugins/:id/month`. In the main pane, a nested `/plugins/:pluginId` route renders that plugin's `Routes` with a scoped location.
 
 #### Important types
 
 ```ts
-// apps/electron/src/renderer/App.tsx
-type SessionSelection =
-  | { kind: "draft"; draftId: string }
-  | { kind: "saved"; sessionId: string }
-  | { kind: "uikit" }
-  | { kind: "plugin"; pluginId: string; route: string };
-
 // packages/plugin-sdk/src/view.ts
 type PluginRuntimeValue = {
   pluginId: string;
-  navigate: PluginNavigate;
 };
+
+// plugin view.tsx
+export function Sidebar() {
+  return <Link href="/">Month</Link>;
+}
+
+export function Routes() {
+  return (
+    <Switch>
+      <Route path="/" component={MonthView} />
+    </Switch>
+  );
+}
 ```
 
 #### Call stack diff
 
 ```diff
- App
+ App Router (memoryLocation)
  ├── Sidebar
- │   ├── Files / Sessions / Develop
-+│   └── PluginRuntimeProvider
+ │   ├── Link /draft /sessions /uikit
++│   └── Router base=/plugins/:id
 +       └── plugin.Sidebar
  └── MainPane
-     ├── UiKitPage / DraftPane / SavedPane
-+    └── PluginRuntimeProvider
-+        └── plugin.routes[route]
+     ├── Route /uikit /draft /sessions
++    └── Route path=/plugins/:pluginId nest
++        └── plugin.Routes
 ```
 
 #### Code diff preview
@@ -436,23 +499,38 @@ type PluginRuntimeValue = {
 ```diff
  // apps/electron/src/renderer/Sidebar.tsx
 +{plugins.map((plugin) => (
-+  <PluginRuntimeProvider key={plugin.id} pluginId={plugin.id}>
-+    {plugin.Sidebar !== undefined ? (
-+      <plugin.Sidebar />
-+    ) : (
-+      <DefaultPluginNav plugin={plugin} />
-+    )}
-+  </PluginRuntimeProvider>
++  <Router key={plugin.id} base={`/plugins/${plugin.id}`}>
++    <PluginRuntimeProvider pluginId={plugin.id}>
++      {plugin.Sidebar !== undefined ? (
++        <plugin.Sidebar />
++      ) : (
++        <Link href="/">{plugin.halo.name}</Link>
++      )}
++    </PluginRuntimeProvider>
++  </Router>
 +))}
+
+ // apps/electron/src/renderer/MainPane.tsx
++<Route path="/plugins/:pluginId" nest>
++  {(params) => {
++    const plugin = plugins.find((item) => item.id === params.pluginId);
++    if (plugin?.Routes === undefined) return <MissingPlugin />;
++    return (
++      <PluginRuntimeProvider pluginId={plugin.id}>
++        <plugin.Routes />
++      </PluginRuntimeProvider>
++    );
++  }}
++</Route>
 ```
 
-- [ ] Change selection to `{ kind: "plugin"; pluginId; route }`. `usePluginNavigate().open(route)` sets it. If `Routes` exists and `Sidebar` does not, render a host section labeled `halo.name` with one row per route key.
-- [ ] `MainPane` renders `routes[route]` or a missing-route message. Keep Files / Sessions / Develop as they are.
-- [ ] Show plugin load errors in the sidebar (`data-testid="plugin-error"`).
-- [ ] Load plugins with a one-shot `listPlugins` query when the workspace is ready. Do not subscribe.
-- [ ] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that a fixture plugin's `Sidebar` appears and its route fills the main pane.
+- [ ] Always mount every plugin `Sidebar` (or a host `Link` labeled `halo.name` when `Sidebar` is missing). Nested `Router base` so plugin links are relative.
+- [ ] Render `Routes` only when the location is under `/plugins/:pluginId`. Keep Files / Sessions / Develop as they are.
+- [ ] Show plugin load errors in the sidebar (`data-testid="plugin-error"`). Load plugins with a one-shot `listPlugins` query. Do not subscribe.
+- [ ] `loadExtensionModule` (or the plugin equivalent) must `require("wouter")` from the host map so plugin `Link` uses the app context.
+- [ ] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that a fixture plugin's sidebar link opens its `Routes` in the main pane.
 
-### Phase 7: Plugin state as Turso / libSQL tables
+### Phase 8: Plugin state as Turso / libSQL tables
 
 Load `state.ts` in main with jiti. Open `{pluginDir}/data.db` with `@libsql/client`. Apply exported `sqliteTable`s. In the renderer, `usePluginState<D>()` is a Drizzle sqlite-proxy client that runs SQL in main against that file.
 
@@ -508,7 +586,7 @@ type PluginDatabase<D> = DrizzleSqliteProxyDatabase<D>;
 - [ ] Implement `usePluginState<D>()` on the real runtime. After a write, invalidate so the next read sees new rows (same-process notify is enough).
 - [ ] Test: a `notes` table insert in main is visible through `executePluginSql`; a plugin cannot query another plugin's file. Run `pnpm --filter @halo/desktop test`.
 
-### Phase 8: Plugin server as an oRPC sub-router
+### Phase 9: Plugin server as an oRPC sub-router
 
 Load `server.ts` with jiti. The default export (or `export const router`) is an oRPC router whose procedure inputs are TypeBox schemas. Mount every plugin under `{ [pluginId]: router }` on an Electron MessagePort. `usePluginServer<S>()` is `createORPCClient` scoped to that plugin. Handlers receive `{ pluginId, workspaceRoot, db }`.
 
@@ -566,7 +644,7 @@ export const PLUGIN_RPC_CHANNELS = {
 - [ ] Implement `usePluginServer<S>()`. Document that `import type { router } from "./server.ts"` is type-only.
 - [ ] Test with an in-process MessageChannel: a `ping` procedure round-trips; a missing plugin id does not match. Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/plugin-sdk test`.
 
-### Phase 9: Seed Calendar as a plugin
+### Phase 10: Seed Calendar as a plugin
 
 Ship a plugin that uses `Sidebar`, `Routes`, `halo.version: 1`, and the SDK.
 
@@ -595,7 +673,7 @@ type CalendarPackage = {
 +├── .halo/plugins/calendar/view.tsx
 +└── .pi/agent/skills/halo-plugin
  App
-+└── kind: "plugin" → Calendar month route
++└── /plugins/calendar → Calendar Routes
 ```
 
 #### Code diff preview
@@ -611,7 +689,7 @@ type CalendarPackage = {
 +`parseVersioned` from `@halo/plugin-sdk/schema`.
 ```
 
-- [ ] Seed `calendar` (`package.json` with `halo.version: 1` + `view.tsx`) only when those files are missing. Sidebar uses `usePluginNavigate`. One route `month` with a Maui month grid. Import from `@halo/plugin-sdk/view` only.
+- [ ] Seed `calendar` (`package.json` with `halo.version: 1` + `view.tsx`) only when those files are missing. `Sidebar` uses wouter `Link`. `Routes` is a component with `Route path="/"`. Import from `@halo/plugin-sdk/view` only.
 - [ ] Add `halo-plugin` skill; seed it under `.pi/agent/skills/halo-plugin/SKILL.md`. Keep a test that the bundled skill matches the repo skill.
 - [ ] Update Cursor Cloud notes in `AGENTS.md` if they need the plugin path.
 - [ ] Run `pnpm run check-affected`. Prove with `pnpm halo-web` that Calendar opens from the sidebar after a cold workspace seed. Record the UI demo required for this change.
