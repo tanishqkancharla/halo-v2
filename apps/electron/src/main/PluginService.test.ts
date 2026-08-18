@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { PluginService } from "./PluginService.js";
+import { src, writePlugins } from "./writePlugin.js";
 import {
   WorkspaceNotReadyError,
   WorkspaceService,
@@ -12,6 +13,9 @@ const pluginServiceTest = test.extend<{
   appDataDir: string;
   workspaceRoot: string;
   workspace: WorkspaceService;
+  writePlugin: (
+    plugins: Record<string, Record<string, string>>,
+  ) => Promise<void>;
 }>({
   appDataDir: async ({ task }, use) => {
     const directory = await mkdtemp(join(tmpdir(), `halo-app-${task.id}-`));
@@ -26,6 +30,15 @@ const pluginServiceTest = test.extend<{
   workspace: async ({ appDataDir }, use) => {
     await use(new WorkspaceService(appDataDir));
   },
+  writePlugin: async ({ workspace, workspaceRoot }, use) => {
+    const selected = await workspace.select(workspaceRoot);
+    if (selected instanceof Error) throw selected;
+    const layout = workspace.getLayout();
+    if (layout instanceof Error) throw layout;
+    await use(async (plugins) => {
+      await writePlugins(layout.root, plugins);
+    });
+  },
 });
 
 describe("PluginService", () => {
@@ -39,25 +52,20 @@ describe("PluginService", () => {
 
   pluginServiceTest(
     "lists a valid plugin folder",
-    async ({ workspace, workspaceRoot }) => {
-      const selected = await workspace.select(workspaceRoot);
-      if (selected instanceof Error) throw selected;
-      const layout = workspace.getLayout();
-      if (layout instanceof Error) throw layout;
-
-      await writePluginFile(
-        layout.root,
-        ".halo/plugins/calendar/package.json",
-        JSON.stringify({
-          name: "halo-plugin-calendar",
-          halo: { version: 1, name: "Calendar" },
-        }),
-      );
-      await writePluginFile(
-        layout.root,
-        ".halo/plugins/calendar/view.tsx",
-        "export const Sidebar = () => null\n",
-      );
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        calendar: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-calendar",
+              "halo": { "version": 1, "name": "Calendar" }
+            }
+          `,
+          "view.tsx": src`
+            export const Sidebar = () => null
+          `,
+        },
+      });
 
       const listed = await new PluginService(workspace).list();
       if (listed instanceof Error) throw listed;
@@ -70,33 +78,30 @@ describe("PluginService", () => {
 
   pluginServiceTest(
     "keeps a valid plugin when another package.json is broken",
-    async ({ workspace, workspaceRoot }) => {
-      const selected = await workspace.select(workspaceRoot);
-      if (selected instanceof Error) throw selected;
-      const layout = workspace.getLayout();
-      if (layout instanceof Error) throw layout;
-
-      await writePluginFile(
-        layout.root,
-        ".halo/plugins/calendar/package.json",
-        JSON.stringify({
-          name: "halo-plugin-calendar",
-          halo: { version: 1, name: "Calendar" },
-        }),
-      );
-      await writePluginFile(
-        layout.root,
-        ".halo/plugins/broken/package.json",
-        "{ not json",
-      );
-      await writePluginFile(
-        layout.root,
-        ".halo/plugins/.hidden/package.json",
-        JSON.stringify({
-          name: "halo-plugin-hidden",
-          halo: { version: 1, name: "Hidden" },
-        }),
-      );
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        calendar: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-calendar",
+              "halo": { "version": 1, "name": "Calendar" }
+            }
+          `,
+        },
+        broken: {
+          "package.json": src`
+            { not json
+          `,
+        },
+        ".hidden": {
+          "package.json": src`
+            {
+              "name": "halo-plugin-hidden",
+              "halo": { "version": 1, "name": "Hidden" }
+            }
+          `,
+        },
+      });
 
       const listed = await new PluginService(workspace).list();
       if (listed instanceof Error) throw listed;
@@ -106,13 +111,3 @@ describe("PluginService", () => {
     },
   );
 });
-
-async function writePluginFile(
-  root: string,
-  relativePath: string,
-  contents: string,
-) {
-  const path = join(root, relativePath);
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, contents);
-}

@@ -68,6 +68,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "agentation": "^3.0.2",
     "electron": "^43.2.0",
+    "outdent": "^0.8.0",
     "typescript": "7.0.2",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"

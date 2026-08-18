@@ -1,9 +1,10 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { PluginManifestError } from "../shared/pluginManifest.js";
 import { readPluginManifest } from "./readPluginManifest.js";
+import { src, writePluginFiles } from "./writePlugin.js";
 
 const pluginTest = test.extend<{ directory: string }>({
   directory: async ({ task }, use) => {
@@ -17,19 +18,17 @@ describe("readPluginManifest", () => {
   pluginTest(
     "reads a version 1 plugin and the view.tsx fallback",
     async ({ directory }) => {
-      await writePluginFile(
-        directory,
-        "package.json",
-        JSON.stringify({
-          name: "halo-plugin-calendar",
-          halo: { version: 1, name: "Calendar" },
-        }),
-      );
-      await writePluginFile(
-        directory,
-        "view.tsx",
-        "export const Sidebar = () => null\n",
-      );
+      await writePluginFiles(directory, {
+        "package.json": src`
+          {
+            "name": "halo-plugin-calendar",
+            "halo": { "version": 1, "name": "Calendar" }
+          }
+        `,
+        "view.tsx": src`
+          export const Sidebar = () => null
+        `,
+      });
 
       const manifest = await readPluginManifest({
         id: "calendar",
@@ -54,14 +53,14 @@ describe("readPluginManifest", () => {
   });
 
   pluginTest("rejects a missing halo version", async ({ directory }) => {
-    await writePluginFile(
-      directory,
-      "package.json",
-      JSON.stringify({
-        name: "halo-plugin-calendar",
-        halo: { name: "Calendar" },
-      }),
-    );
+    await writePluginFiles(directory, {
+      "package.json": src`
+        {
+          "name": "halo-plugin-calendar",
+          "halo": { "name": "Calendar" }
+        }
+      `,
+    });
 
     const manifest = await readPluginManifest({
       id: "calendar",
@@ -71,14 +70,14 @@ describe("readPluginManifest", () => {
   });
 
   pluginTest("rejects a missing halo.name", async ({ directory }) => {
-    await writePluginFile(
-      directory,
-      "package.json",
-      JSON.stringify({
-        name: "halo-plugin-calendar",
-        halo: { version: 1 },
-      }),
-    );
+    await writePluginFiles(directory, {
+      "package.json": src`
+        {
+          "name": "halo-plugin-calendar",
+          "halo": { "version": 1 }
+        }
+      `,
+    });
 
     const manifest = await readPluginManifest({
       id: "calendar",
@@ -90,29 +89,25 @@ describe("readPluginManifest", () => {
   pluginTest(
     "resolves explicit view and server paths",
     async ({ directory }) => {
-      await writePluginFile(
-        directory,
-        "package.json",
-        JSON.stringify({
-          name: "halo-plugin-notes",
-          halo: {
-            version: 1,
-            name: "Notes",
-            view: "./src/ui.tsx",
-            server: "./src/rpc.ts",
-          },
-        }),
-      );
-      await writePluginFile(
-        directory,
-        "src/ui.tsx",
-        "export const Routes = () => null\n",
-      );
-      await writePluginFile(
-        directory,
-        "src/rpc.ts",
-        "export const router = {}\n",
-      );
+      await writePluginFiles(directory, {
+        "package.json": src`
+          {
+            "name": "halo-plugin-notes",
+            "halo": {
+              "version": 1,
+              "name": "Notes",
+              "view": "./src/ui.tsx",
+              "server": "./src/rpc.ts"
+            }
+          }
+        `,
+        "src/ui.tsx": src`
+          export const Routes = () => null
+        `,
+        "src/rpc.ts": src`
+          export const router = {}
+        `,
+      });
 
       const manifest = await readPluginManifest({ id: "notes", directory });
       if (manifest instanceof Error) throw manifest;
@@ -125,24 +120,20 @@ describe("readPluginManifest", () => {
   pluginTest(
     "resolves view/index and server/index fallbacks",
     async ({ directory }) => {
-      await writePluginFile(
-        directory,
-        "package.json",
-        JSON.stringify({
-          name: "halo-plugin-files",
-          halo: { version: 1, name: "Files" },
-        }),
-      );
-      await writePluginFile(
-        directory,
-        "view/index.tsx",
-        "export const Sidebar = () => null\n",
-      );
-      await writePluginFile(
-        directory,
-        "server/index.ts",
-        "export const router = {}\n",
-      );
+      await writePluginFiles(directory, {
+        "package.json": src`
+          {
+            "name": "halo-plugin-files",
+            "halo": { "version": 1, "name": "Files" }
+          }
+        `,
+        "view/index.tsx": src`
+          export const Sidebar = () => null
+        `,
+        "server/index.ts": src`
+          export const router = {}
+        `,
+      });
 
       const manifest = await readPluginManifest({ id: "files", directory });
       if (manifest instanceof Error) throw manifest;
@@ -152,13 +143,3 @@ describe("readPluginManifest", () => {
     },
   );
 });
-
-async function writePluginFile(
-  directory: string,
-  relativePath: string,
-  contents: string,
-) {
-  const path = join(directory, relativePath);
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, contents);
-}
