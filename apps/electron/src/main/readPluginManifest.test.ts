@@ -6,8 +6,8 @@ import { PluginManifestError } from "../shared/pluginManifest.js";
 import { readPluginManifest } from "./readPluginManifest.js";
 
 const pluginTest = test.extend<{ directory: string }>({
-  directory: async ({}, use) => {
-    const directory = await mkdtemp(join(tmpdir(), "halo-plugin-"));
+  directory: async ({ task }, use) => {
+    const directory = await mkdtemp(join(tmpdir(), `halo-plugin-${task.id}-`));
     await use(directory);
     await rm(directory, { recursive: true, force: true });
   },

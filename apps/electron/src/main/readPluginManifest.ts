@@ -43,7 +43,7 @@ export async function readPluginManifest(args: {
         cause: e,
       }),
   });
-  if (parsed instanceof Error) return parsed;
+  if (parsed instanceof PluginManifestError) return parsed;
   if (typeof parsed !== "object" || parsed === null) {
     return new PluginManifestError({
       id: args.id,
