@@ -107,8 +107,8 @@ Show a short unified diff of the main edit. Use real file and symbol names, enou
 
 - [ ] Make one concrete implementation change, with file and symbol names.
 - [ ] Wire the change into its nearest caller or consumer.
-- [ ] Cover the main failure case or boundary in a focused test.
-- [ ] Run the exact check, test, or command that proves the phase works.
+- [ ] Smoke the main failure case or boundary by hand. Do not commit this check until the feature is package-level end-to-end testable.
+- [ ] Run the exact command that proves the phase works.
 ````
 
 ## Phase rules
@@ -122,9 +122,29 @@ Show a short unified diff of the main edit. Use real file and symbol names, enou
 - Make the call-stack diff start from the current path and mark the proposed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
 - Make the code diff a short preview of the main edit, not a full patch. Include a file path comment and preserve useful surrounding control flow.
 - Use `Not applicable — no code path changes` only for a true docs, data, or config phase. Do not invent types or call paths.
-- Test the behavior most likely to make the phase fail or need a revert. Prefer an end-to-end check when the phase changes runtime behavior and the repository supports one.
-- Avoid setup-only or refactor-only phases unless later work cannot land safely without them.
+- Follow [Testing](#testing) for what to check and when to commit tests.
+- Avoid setup-only or refactor-only phases unless later work cannot land safely without them. Fixture setup for package-level tests is allowed once the feature is end-to-end testable.
+
+## Testing
+
+Specs commit only package-level end-to-end tests. Act and observe the way a user of that package would:
+
+- Electron / web UI: start the app separately when needed, drive the live renderer with Playwright through `pnpm halo-web`, and assert visible elements, roles, labels, and text.
+- Services and other APIs: call the public methods, then read results through the same public API or another real collaborator a user of that package would use.
+
+Do not use mocks such as `vi.fn`, `vi.mock`, or hand-rolled fake collaborators. Do not spec internal unit tests, or assert implementation details such as internal file layouts or exact formatting of private outputs. If a package-level end-to-end test is hard to build and none already exist for the area, do not add a lower-level test instead.
+
+Committed tests must read like end-user code or interactions: short, easy to follow, and free of setup noise. Put shared setup and teardown in Vitest fixtures (`test.extend`), not ad-hoc helpers or manual cleanup. See the [Vitest fixtures documentation](https://vitest.dev/guide/test-context.html#test-extend).
+
+Until the feature is end-to-end testable at the package, each phase still includes a check. Write that check as a smoke step the implementer runs by hand and does not commit:
+
+- [ ] Smoke the main failure case or boundary by hand. Do not commit this check.
+
+Once the feature is end-to-end testable, add the fixtures needed for those high-level tests, then commit the tests. Make fixture setup its own phase when it is more than a small add-on; fold it into the phase that first makes the feature testable when it is small:
+
+- [ ] Add Vitest fixtures that set up the package the way a user would.
+- [ ] Commit a short high-level test that acts and observes through the public API or live UI.
 
 ## Final check
 
-Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has key types, an accurate call-stack diff, a code-diff preview, and four or five steps; links and commands are real; and the full plan covers every goal without pulling in a non-goal.
+Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has key types, an accurate call-stack diff, a code-diff preview, and four or five steps; links and commands are real; committed tests are package-level end-to-end and earlier phases use uncommitted smoke checks; and the full plan covers every goal without pulling in a non-goal.
