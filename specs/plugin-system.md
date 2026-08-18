@@ -93,7 +93,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — Forward the plugin MessagePort like HaloApi.
 - [`apps/electron/src/main/main.ts`](../apps/electron/src/main/main.ts) — Construct `PluginService`.
 - [`apps/electron/src/main/plugins/PluginService.ts`](../apps/electron/src/main/plugins/PluginService.ts) — List `.halo/plugins`. Tests live beside it.
-- [`apps/electron/src/main/test/fixtures.ts`](../apps/electron/src/main/test/fixtures.ts) — Shared e2e helpers, including `src` and `pluginTest`.
+- [`apps/electron/src/main/test/fixtures.ts`](../apps/electron/src/main/test/fixtures.ts) — Shared e2e helpers, including `src`.
 - [`apps/electron/src/main/workspace-service.ts`](../apps/electron/src/main/workspace-service.ts) — Today's `JSON.parse` + field checks. Do not change yet; the new helper is what new parsers call.
 - [`apps/electron/src/main/ParallelSearchTools.ts`](../apps/electron/src/main/ParallelSearchTools.ts) — Existing TypeBox `Type.Object` usage to match.
 - [`packages/logger/package.json`](../packages/logger/package.json) — Package export layout to copy for `@halo/plugin-sdk`.
