@@ -30,7 +30,7 @@ sequenceDiagram
     participant UI as Renderer
 
     Agent->>Disk: Write package.json, view, server, state
-    Disk-->>Main: Parcel create/update
+    UI->>Main: listPlugins (once, on workspace ready)
     Main->>Main: JSON.parse then parseVersioned halo
     Main->>Main: Open libSQL, apply tables
     Main->>Main: jiti-import server router
@@ -56,7 +56,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - `@halo/plugin-sdk` has `view`, `server`, `state`, and `schema` subpaths. Plugins declare it. The host aliases it to one copy.
 - `usePluginServer<S>()` is an oRPC client typed as the plugin router. `usePluginState<D>()` is a Drizzle client typed as the plugin tables.
 - Plugin data is `{pluginDir}/data.db`, so agents and humans can both see it.
-- Save reloads that plugin. A load error shows in the sidebar and leaves other plugins up.
+- Plugins load once when the workspace is ready (`listPlugins`). A load error shows in the sidebar and leaves other plugins up.
 - New JSON documents (manifest first) parse through `parseVersioned`. Unknown or missing `version` is a parse error.
 - Calendar seeds as a plugin. A `halo-plugin` skill seeds under `.pi/agent/skills/`.
 
@@ -69,6 +69,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - No replacing Files, Sessions, New session, Develop, or the session composer.
 - No view exports beyond `Sidebar` and `Routes`. Unknown named exports are ignored.
 - No remote Turso sync, no cross-plugin database, no HTTP listener.
+- No plugin file watch, auto-reload, or `subscribePlugins`. Restart Halo (or reopen the workspace) to pick up plugin edits.
 - No bb-style exclusive thread list, content scripts, or composer slots.
 
 ## Assumptions
@@ -87,7 +88,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - [`apps/electron/src/renderer/Sidebar.tsx`](../apps/electron/src/renderer/Sidebar.tsx) — Mount plugin `Sidebar` under Sessions.
 - [`apps/electron/src/renderer/App.tsx`](../apps/electron/src/renderer/App.tsx) — Add `{ kind: "plugin"; pluginId; route }`.
 - [`apps/electron/src/renderer/MainPane.tsx`](../apps/electron/src/renderer/MainPane.tsx) — Render `Routes[route]`.
-- [`apps/electron/src/shared/rpc.ts`](../apps/electron/src/shared/rpc.ts) — Cap'n Web HaloApi. Add plugin list/subscribe; procedures use a second MessagePort.
+- [`apps/electron/src/shared/rpc.ts`](../apps/electron/src/shared/rpc.ts) — Cap'n Web HaloApi. Add `listPlugins`; procedures use a second MessagePort.
 - [`apps/electron/src/shared/channels.ts`](../apps/electron/src/shared/channels.ts) — Existing `halo:request-rpc`. Add a plugin oRPC channel pair.
 - [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — Forward the plugin MessagePort like HaloApi.
 - [`apps/electron/src/main/main.ts`](../apps/electron/src/main/main.ts) — Construct `PluginService`.
@@ -291,9 +292,9 @@ class PluginManifestError extends errore.createTaggedError({
 - [ ] Cover happy path, missing `version`, missing `halo.name`, explicit paths, and directory fallbacks in Vitest.
 - [ ] Run `pnpm --filter @halo/desktop test`.
 
-### Phase 4: Discover and watch `.halo/plugins`
+### Phase 4: Discover `.halo/plugins`
 
-Stand up `PluginService`. List manifests and load errors over RPC. The renderer still has no plugin UI.
+Stand up `PluginService`. List manifests and load errors over a one-shot RPC. Do not watch the folder. The renderer still has no plugin UI.
 
 #### Important types
 
@@ -308,7 +309,6 @@ type PluginList = {
 // apps/electron/src/shared/rpc.ts
 abstract class HaloApi extends RpcTarget {
   abstract listPlugins(): Promise<PluginList>;
-  abstract subscribePlugins(callback: (list: PluginList) => void): void;
 }
 ```
 
@@ -320,8 +320,7 @@ abstract class HaloApi extends RpcTarget {
 +HaloRpc.listPlugins
 +└── PluginService.list
 +    ├── readdir .halo/plugins
-+    ├── readPluginManifest per folder
-+    └── Parcel watch .halo/plugins (50ms debounce)
++    └── readPluginManifest per folder
 ```
 
 #### Code diff preview
@@ -335,9 +334,9 @@ abstract class HaloApi extends RpcTarget {
 +  new HaloRpc(workspaceService, piService, pluginService, getWindow, rpcLogger)
 ```
 
-- [ ] Add `PluginService` with `list`, `sync`, Parcel watch on `{workspace}/.halo/plugins`, and a 50ms debounce (same burst handling as a file-watch reload).
+- [ ] Add `PluginService` with `list` that reads `.halo/plugins` once per call. No Parcel watch, no listener, no debounce.
 - [ ] Skip dot-folders. Sort by folder name. A bad `package.json` is an error row, not a crash.
-- [ ] Add `listPlugins` / `subscribePlugins` on `HaloApi` / `HaloRpc` using the Cap'n Web `dup()` pattern already in `subscribeWorkspaceTree`.
+- [ ] Add `listPlugins` on `HaloApi` / `HaloRpc`. Do not add `subscribePlugins`.
 - [ ] Test: not-ready workspace returns `WorkspaceNotReadyError`; a valid plugin folder appears; a broken `package.json` is an error and does not hide the valid one.
 - [ ] Run `pnpm --filter @halo/desktop test`.
 
@@ -450,6 +449,7 @@ type PluginRuntimeValue = {
 - [ ] Change selection to `{ kind: "plugin"; pluginId; route }`. `usePluginNavigate().open(route)` sets it. If `Routes` exists and `Sidebar` does not, render a host section labeled `halo.name` with one row per route key.
 - [ ] `MainPane` renders `routes[route]` or a missing-route message. Keep Files / Sessions / Develop as they are.
 - [ ] Show plugin load errors in the sidebar (`data-testid="plugin-error"`).
+- [ ] Load plugins with a one-shot `listPlugins` query when the workspace is ready. Do not subscribe.
 - [ ] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that a fixture plugin's `Sidebar` appears and its route fills the main pane.
 
 ### Phase 7: Plugin state as Turso / libSQL tables
@@ -475,7 +475,7 @@ type PluginDatabase<D> = DrizzleSqliteProxyDatabase<D>;
 #### Call stack diff
 
 ```diff
- PluginService.reload
+ PluginService.list
  ├── readPluginManifest
  ├── compilePluginView
 +├── jiti.import(state.ts)
@@ -503,7 +503,7 @@ type PluginDatabase<D> = DrizzleSqliteProxyDatabase<D>;
 ```
 
 - [ ] jiti-import `state.ts` with `@halo/plugin-sdk` aliased to the workspace package. Collect exports that are sqlite tables. Other exports are ignored.
-- [ ] Open `data.db` in the plugin directory (`mode: 0o700` on the folder). Create missing tables from the schema. Keep the connection across view reloads; close and reopen on state file change.
+- [ ] Open `data.db` in the plugin directory (`mode: 0o700` on the folder). Create missing tables from the schema. Keep the connection for the process lifetime.
 - [ ] Add `executePluginSql` on HaloApi. Reject calls whose `pluginId` is not the runtime's plugin. Return rows in the sqlite-proxy shape Drizzle expects.
 - [ ] Implement `usePluginState<D>()` on the real runtime. After a write, invalidate so the next read sees new rows (same-process notify is enough).
 - [ ] Test: a `notes` table insert in main is visible through `executePluginSql`; a plugin cannot query another plugin's file. Run `pnpm --filter @halo/desktop test`.
@@ -560,7 +560,7 @@ export const PLUGIN_RPC_CHANNELS = {
 +export default router;
 ```
 
-- [ ] jiti-import the server file. Accept `default` or `router`. Alias `@halo/plugin-sdk/server` to the host package. On reload, replace that plugin's key in the combined router and dispose the old module cache (jiti `moduleCache: false` for the plugin directory).
+- [ ] jiti-import the server file. Accept `default` or `router`. Alias `@halo/plugin-sdk/server` to the host package. Load once when `listPlugins` runs; do not swap routers later.
 - [ ] Open a second MessagePort beside Cap'n Web (`channels.ts` + `preload.ts` + renderer connect). Follow the oRPC Electron adapter.
 - [ ] Pass `db` in context when state loaded. Convert handler failures at this boundary: if a handler returns an `Error`, map it to `ORPCError` before the port.
 - [ ] Implement `usePluginServer<S>()`. Document that `import type { router } from "./server.ts"` is type-only.
@@ -614,4 +614,4 @@ type CalendarPackage = {
 - [ ] Seed `calendar` (`package.json` with `halo.version: 1` + `view.tsx`) only when those files are missing. Sidebar uses `usePluginNavigate`. One route `month` with a Maui month grid. Import from `@halo/plugin-sdk/view` only.
 - [ ] Add `halo-plugin` skill; seed it under `.pi/agent/skills/halo-plugin/SKILL.md`. Keep a test that the bundled skill matches the repo skill.
 - [ ] Update Cursor Cloud notes in `AGENTS.md` if they need the plugin path.
-- [ ] Run `pnpm run check-affected`. Prove with `pnpm halo-web` that Calendar opens from the sidebar after a cold workspace seed, and that editing `view.tsx` hot-reloads. Record the UI demo required for this change.
+- [ ] Run `pnpm run check-affected`. Prove with `pnpm halo-web` that Calendar opens from the sidebar after a cold workspace seed. Record the UI demo required for this change.
