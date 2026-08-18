@@ -28,6 +28,9 @@ importers:
 
   apps/electron:
     dependencies:
+      '@halo/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
       '@mariozechner/pi-coding-agent':
         specifier: 0.60.0
         version: 0.60.0(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3))(supports-color@8.1.1)(ws@8.21.1)(zod@4.4.3)

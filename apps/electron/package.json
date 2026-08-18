@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.main.json"
   },
   "dependencies": {
+    "@halo/plugin-sdk": "workspace:*",
     "@mariozechner/pi-coding-agent": "0.60.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@parcel/watcher": "^2.6.0",
