@@ -386,7 +386,7 @@ import { memoryLocation } from "wouter/memory-location";
 - [x] Point New session, session rows, and UI kit at `/draft/:draftId`, `/sessions/:sessionId`, and `/uikit`. Use `useRoute` for `aria-current`.
 - [x] `MainPane` matches those three routes. After a draft prompt, `navigate` to `/sessions/:sessionId`. Default path: first saved session, else a new draft.
 - [x] Add a renderer Vitest (or a small hook test) that `memoryLocation({ path: "/uikit", static: true })` renders the UI kit pane.
-- [ ] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that New session, a saved session, and UI kit still open.
+- [x] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that New session, a saved session, and UI kit still open.
 
 ### Phase 6: Compile and evaluate `Sidebar` and `Routes`
 
