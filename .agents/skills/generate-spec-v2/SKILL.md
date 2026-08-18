@@ -127,11 +127,14 @@ Show a short unified diff of the main edit. Use real file and symbol names, enou
 
 ## Testing
 
-Follow the [testing](../testing/SKILL.md) skill. Specs commit only package-level end-to-end tests.
+Specs commit only package-level end-to-end tests. Act and observe the way a user of that package would:
 
-Act and observe the way a user of that package would: call the public API, or drive the live UI with `pnpm halo-web`. Do not spec mocks, internal unit tests, or checks of private layout or formatting.
+- Electron / web UI: start the app separately when needed, drive the live renderer with Playwright through `pnpm halo-web`, and assert visible elements, roles, labels, and text.
+- Services and other APIs: call the public methods, then read results through the same public API or another real collaborator a user of that package would use.
 
-Committed tests must read like end-user code or interactions: short, easy to follow, and free of setup noise. Put shared setup and teardown in Vitest fixtures (`test.extend`). See the [Vitest fixtures documentation](https://vitest.dev/guide/test-context.html#test-extend).
+Do not use mocks such as `vi.fn`, `vi.mock`, or hand-rolled fake collaborators. Do not spec internal unit tests, or assert implementation details such as internal file layouts or exact formatting of private outputs. If a package-level end-to-end test is hard to build and none already exist for the area, do not add a lower-level test instead.
+
+Committed tests must read like end-user code or interactions: short, easy to follow, and free of setup noise. Put shared setup and teardown in Vitest fixtures (`test.extend`), not ad-hoc helpers or manual cleanup. See the [Vitest fixtures documentation](https://vitest.dev/guide/test-context.html#test-extend).
 
 Until the feature is end-to-end testable at the package, each phase still includes a check. Write that check as a smoke step the implementer runs by hand and does not commit:
 
