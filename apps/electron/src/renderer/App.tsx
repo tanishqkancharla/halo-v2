@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { colors, spacing, text, useTheme } from "maui";
 import { style, useStyles } from "purse-styles";
+import { Router } from "wouter";
+import { memoryLocation } from "wouter/memory-location";
+import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import { LoadingPage } from "./LoadingPage.tsx";
 import { MainPane } from "./MainPane.tsx";
 import { Onboarding } from "./Onboarding.tsx";
@@ -12,40 +15,15 @@ import {
   useAppInfoQuery,
 } from "./api/ApiProvider.tsx";
 
-export type SessionSelection =
-  | { kind: "draft"; draftId: string }
-  | { kind: "saved"; sessionId: string }
-  | { kind: "uikit" };
-
 export function App() {
-  const [selection, setSelection] = useState<SessionSelection>();
-  const [emptyDraft] = useState<SessionSelection>(() => ({
-    kind: "draft",
-    draftId: crypto.randomUUID(),
-  }));
   const workspaceQuery = useWorkspaceQuery();
   const workspace = workspaceQuery.data;
   const chooseWorkspace = useChooseWorkspaceMutation();
   const sessionsQuery = useSessionsQuery(workspace);
   const appInfoQuery = useAppInfoQuery();
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
-  let activeSelection = selection;
-  if (activeSelection === undefined && sessions[0]) {
-    activeSelection = { kind: "saved", sessionId: sessions[0].sessionId };
-  }
-  if (
-    activeSelection === undefined &&
-    sessions[0] === undefined &&
-    sessionsQuery.isFetched
-  ) {
-    activeSelection = emptyDraft;
-  }
-  const { resolvedTheme, setPreference } = useTheme();
-  const readyApp = useStyles(styles.readyApp);
-  const shell = useStyles(styles.shell);
-  const errorClassName = useStyles(styles.error);
 
-  if (workspaceQuery.isPending || !workspace) {
+  if (workspaceQuery.isPending || workspace === undefined) {
     return <LoadingPage />;
   }
 
@@ -63,9 +41,37 @@ export function App() {
     );
   }
 
-  const alertMessage = sessionsQuery.error
-    ? String(sessionsQuery.error)
-    : undefined;
+  if (!sessionsQuery.isFetched) {
+    return <LoadingPage />;
+  }
+
+  return (
+    <WorkspaceShell
+      sessions={sessions}
+      alertMessage={
+        sessionsQuery.error ? String(sessionsQuery.error) : undefined
+      }
+      appInfo={appInfoQuery.data}
+    />
+  );
+}
+
+function WorkspaceShell({
+  sessions,
+  alertMessage,
+  appInfo,
+}: {
+  sessions: SessionSummary[];
+  alertMessage?: string;
+  appInfo?: AppInfo;
+}) {
+  const { resolvedTheme, setPreference } = useTheme();
+  const [{ hook }] = useState(() =>
+    memoryLocation({ path: initialHostPath(sessions) }),
+  );
+  const readyApp = useStyles(styles.readyApp);
+  const shell = useStyles(styles.shell);
+  const errorClassName = useStyles(styles.error);
 
   return (
     <div className={readyApp}>
@@ -74,27 +80,27 @@ export function App() {
           {alertMessage}
         </div>
       )}
-      <div className={shell} data-testid="sessions-shell">
-        <Sidebar
-          sessions={sessions}
-          selection={activeSelection}
-          onSelectionChange={setSelection}
-          onToggleTheme={() =>
-            setPreference(resolvedTheme === "dark" ? "light" : "dark")
-          }
-          themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
-          appInfo={appInfoQuery.data}
-        />
-        <MainPane
-          selection={activeSelection}
-          sessions={sessions}
-          onDraftSent={(_draftId, sessionId) =>
-            setSelection({ kind: "saved", sessionId })
-          }
-        />
-      </div>
+      <Router hook={hook}>
+        <div className={shell} data-testid="sessions-shell">
+          <Sidebar
+            sessions={sessions}
+            onToggleTheme={() =>
+              setPreference(resolvedTheme === "dark" ? "light" : "dark")
+            }
+            themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
+            appInfo={appInfo}
+          />
+          <MainPane sessions={sessions} />
+        </div>
+      </Router>
     </div>
   );
+}
+
+function initialHostPath(sessions: SessionSummary[]) {
+  const first = sessions[0];
+  if (first !== undefined) return `/sessions/${first.sessionId}`;
+  return `/draft/${crypto.randomUUID()}`;
 }
 
 const styles = {

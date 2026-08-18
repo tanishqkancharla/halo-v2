@@ -1,9 +1,9 @@
 import * as errore from "errore";
 import { useId, useLayoutEffect, useRef, useState } from "react";
+import { Route, Switch, useLocation } from "wouter";
 import {
   Button,
   Icons,
-  P,
   backgroundColor,
   colors,
   flex,
@@ -29,7 +29,6 @@ import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
-import type { SessionSelection } from "./App.tsx";
 import { UiKitPage } from "./UiKitPage.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
@@ -37,33 +36,22 @@ class PromptSubmitError extends errore.createTaggedError({
   message: "Failed to send prompt: $reason",
 }) {}
 
-export function MainPane({
-  selection,
-  sessions,
-  onDraftSent,
-}: {
-  selection?: SessionSelection;
-  sessions: SessionSummary[];
-  onDraftSent: (draftId: string, sessionId: string) => void;
-}) {
-  const pane = useStyles(styles.pane);
-  if (!selection) {
-    return (
-      <main className={pane} aria-label="Session">
-        <P>Loading sessions…</P>
-      </main>
-    );
-  }
-
-  if (selection.kind === "uikit") {
-    return <UiKitPage />;
-  }
-
-  if (selection.kind === "draft") {
-    return <DraftPane draftId={selection.draftId} onSent={onDraftSent} />;
-  }
-
-  return <SavedPane sessionId={selection.sessionId} sessions={sessions} />;
+export function MainPane({ sessions }: { sessions: SessionSummary[] }) {
+  return (
+    <Switch>
+      <Route path="/uikit">
+        <UiKitPage />
+      </Route>
+      <Route path="/draft/:draftId">
+        {(params) => <DraftPane draftId={params.draftId} />}
+      </Route>
+      <Route path="/sessions/:sessionId">
+        {(params) => (
+          <SavedPane sessionId={params.sessionId} sessions={sessions} />
+        )}
+      </Route>
+    </Switch>
+  );
 }
 
 function SessionTitleSlot({ title }: { title?: string }) {
@@ -115,15 +103,10 @@ function SavedPane({
   );
 }
 
-function DraftPane({
-  draftId,
-  onSent,
-}: {
-  draftId: string;
-  onSent: (draftId: string, sessionId: string) => void;
-}) {
+function DraftPane({ draftId }: { draftId: string }) {
+  const [, navigate] = useLocation();
   const { state, isWorking, prompt } = useDraftAgentSession((sessionId) => {
-    onSent(draftId, sessionId);
+    navigate(`/sessions/${sessionId}`);
   });
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);

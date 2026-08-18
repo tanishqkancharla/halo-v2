@@ -13,16 +13,14 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
+import { Link, useLocation, useRoute } from "wouter";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
-import type { SessionSelection } from "./App.tsx";
 import { HaloLogo } from "./HaloLogo.tsx";
 import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
 import { sidebarEntry, sidebarEntryLabel } from "./sidebarEntry.ts";
 
 type SidebarProps = {
   sessions: SessionSummary[];
-  selection?: SessionSelection;
-  onSelectionChange: (selection: SessionSelection) => void;
   onToggleTheme: () => void;
   themeLabel: string;
   appInfo?: AppInfo;
@@ -30,8 +28,6 @@ type SidebarProps = {
 
 export function Sidebar({
   sessions,
-  selection,
-  onSelectionChange,
   onToggleTheme,
   themeLabel,
   appInfo,
@@ -41,8 +37,6 @@ export function Sidebar({
   const logo = useStyles(styles.logo);
   const newButton = useStyles(styles.newButton);
   const newIcon = useStyles(icon("sm"));
-  const entry = useStyles(sidebarEntry);
-  const entryLabel = useStyles(sidebarEntryLabel);
   const section = useStyles(styles.section);
   const filesSection = useStyles(styles.filesSection);
   const filesTree = useStyles(styles.filesTree);
@@ -60,15 +54,7 @@ export function Sidebar({
           {themeLabel}
         </Button>
       </div>
-      <Button
-        className={newButton}
-        onClick={() =>
-          onSelectionChange({ kind: "draft", draftId: crypto.randomUUID() })
-        }
-      >
-        <Icons.Plus className={newIcon} aria-hidden="true" />
-        New session
-      </Button>
+      <NewSessionButton className={newButton} iconClassName={newIcon} />
       <section className={filesSection} aria-labelledby="files-label">
         <div className={sectionLabel} id="files-label">
           Files
@@ -82,31 +68,11 @@ export function Sidebar({
           Sessions
         </div>
         <ul className={sessionList}>
-          {sessions.map((session) => {
-            const active =
-              selection?.kind === "saved" &&
-              selection.sessionId === session.sessionId;
-
-            return (
-              <li key={session.sessionId}>
-                <button
-                  className={entry}
-                  type="button"
-                  aria-current={active ? "page" : undefined}
-                  onClick={() =>
-                    onSelectionChange({
-                      kind: "saved",
-                      sessionId: session.sessionId,
-                    })
-                  }
-                >
-                  <span className={entryLabel}>
-                    {session.title ? session.title : session.sessionId}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+          {sessions.map((session) => (
+            <li key={session.sessionId}>
+              <SessionNavLink session={session} />
+            </li>
+          ))}
         </ul>
       </section>
       <section className={section} aria-labelledby="uikit-label">
@@ -115,14 +81,7 @@ export function Sidebar({
         </div>
         <ul className={sessionList}>
           <li>
-            <button
-              className={entry}
-              type="button"
-              aria-current={selection?.kind === "uikit" ? "page" : undefined}
-              onClick={() => onSelectionChange({ kind: "uikit" })}
-            >
-              <span className={entryLabel}>UI kit</span>
-            </button>
+            <UiKitNavLink />
           </li>
         </ul>
       </section>
@@ -135,6 +94,59 @@ export function Sidebar({
         </div>
       )}
     </nav>
+  );
+}
+
+function NewSessionButton({
+  className,
+  iconClassName,
+}: {
+  className: string;
+  iconClassName: string;
+}) {
+  const [, navigate] = useLocation();
+  return (
+    <Button
+      className={className}
+      onClick={() => navigate(`/draft/${crypto.randomUUID()}`)}
+    >
+      <Icons.Plus className={iconClassName} aria-hidden="true" />
+      New session
+    </Button>
+  );
+}
+
+function SessionNavLink({ session }: { session: SessionSummary }) {
+  const entry = useStyles(sidebarEntry);
+  const entryLabel = useStyles(sidebarEntryLabel);
+  const sessionRoute = useRoute("/sessions/:sessionId");
+  const active =
+    sessionRoute[0] && sessionRoute[1].sessionId === session.sessionId;
+  return (
+    <Link
+      href={`/sessions/${session.sessionId}`}
+      className={entry}
+      aria-current={active ? "page" : undefined}
+    >
+      <span className={entryLabel}>
+        {session.title ? session.title : session.sessionId}
+      </span>
+    </Link>
+  );
+}
+
+function UiKitNavLink() {
+  const entry = useStyles(sidebarEntry);
+  const entryLabel = useStyles(sidebarEntryLabel);
+  const [isUiKit] = useRoute("/uikit");
+  return (
+    <Link
+      href="/uikit"
+      className={entry}
+      aria-current={isUiKit ? "page" : undefined}
+    >
+      <span className={entryLabel}>UI kit</span>
+    </Link>
   );
 }
 

@@ -1,18 +1,16 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
-  build: {
-    minify: false,
-  },
   resolve: {
     dedupe: ["react", "react-dom", "purse-styles", "wouter"],
-    preserveSymlinks: false,
   },
-  clearScreen: false,
-  server: {
-    port: 1420,
-    strictPort: true,
+  test: {
+    server: {
+      deps: {
+        inline: ["maui"],
+      },
+    },
   },
 });

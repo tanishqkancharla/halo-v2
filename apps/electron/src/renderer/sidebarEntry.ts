@@ -19,6 +19,8 @@ export const sidebarEntry = style(
     cursor: "default",
     background: "transparent",
     textAlign: "left",
+    textDecoration: "none",
+    color: "inherit",
     paddingInline: `calc(${spacing.value(2)} + ${spacing.value(4)})`,
     "&:hover": { background: sidebarEntrySurface },
     "&[aria-current='page']": {

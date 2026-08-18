@@ -382,10 +382,10 @@ import { memoryLocation } from "wouter/memory-location";
 +<Link href={`/draft/${crypto.randomUUID()}`}>
 ```
 
-- [ ] Add `wouter` to `@halo/desktop`. Wrap the ready shell in `Router` with `memoryLocation`. Drop `SessionSelection` from `App.tsx`.
-- [ ] Point New session, session rows, and UI kit at `/draft/:draftId`, `/sessions/:sessionId`, and `/uikit`. Use `useRoute` for `aria-current`.
-- [ ] `MainPane` matches those three routes. After a draft prompt, `navigate` to `/sessions/:sessionId`. Default path: first saved session, else a new draft.
-- [ ] Add a renderer Vitest (or a small hook test) that `memoryLocation({ path: "/uikit", static: true })` renders the UI kit pane.
+- [x] Add `wouter` to `@halo/desktop`. Wrap the ready shell in `Router` with `memoryLocation`. Drop `SessionSelection` from `App.tsx`.
+- [x] Point New session, session rows, and UI kit at `/draft/:draftId`, `/sessions/:sessionId`, and `/uikit`. Use `useRoute` for `aria-current`.
+- [x] `MainPane` matches those three routes. After a draft prompt, `navigate` to `/sessions/:sessionId`. Default path: first saved session, else a new draft.
+- [x] Add a renderer Vitest (or a small hook test) that `memoryLocation({ path: "/uikit", static: true })` renders the UI kit pane.
 - [ ] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that New session, a saved session, and UI kit still open.
 
 ### Phase 6: Compile and evaluate `Sidebar` and `Routes`
