@@ -53,7 +53,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 
 - A plugin lives at `{workspace}/.halo/plugins/<id>/` with `package.json` and optional `view` / `server` / `state` files.
 - `package.json` has a nested `halo` field. `halo.version` is required. V1 is `1`.
-- `export const Sidebar` mounts in the app sidebar under Files / Sessions. `export const Routes` is a React component that fills the main pane. Both use wouter `Link` / `Route`.
+- `export const Sidebar` mounts in the app sidebar under Files / Sessions only when the plugin exports it. A plugin with no `Sidebar` does not get a host-drawn row. `export const Routes` is a React component that fills the main pane at `/plugins/:pluginId`. Both use wouter `Link` / `Route`.
 - `@halo/plugin-sdk` has `view`, `server`, `state`, and `schema` subpaths. Plugins declare it. The host aliases it to one copy.
 - `usePluginServer<S>()` is an oRPC client typed as the plugin router. `usePluginState<D>()` is a Drizzle client typed as the plugin tables.
 - Plugin data is `{pluginDir}/data.db`, so agents and humans can both see it.
@@ -72,7 +72,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - No view exports beyond `Sidebar` and `Routes`. Unknown named exports are ignored.
 - No remote Turso sync, no cross-plugin database, no HTTP listener.
 - No plugin file watch, auto-reload, or `subscribePlugins`. Restart Halo (or reopen the workspace) to pick up plugin edits.
-- No `usePluginNavigate`. Plugins navigate with wouter `Link` / `useLocation`.
+- No default plugin nav. If the plugin does not export `Sidebar`, the host draws nothing for it in the sidebar.
 - No React Router. Wouter is the router.
 - No bb-style exclusive thread list, content scripts, or composer slots.
 
@@ -156,7 +156,7 @@ export function usePluginState<D>(): PluginDatabase<D>;
 - [ ] Create `packages/plugin-sdk` with `package.json`, `tsconfig.json`, and the four entry files. Match `@repo/logger` scripts. Depend on `@sinclair/typebox` (same range as `@halo/desktop`) and `wouter`.
 - [ ] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Re-export `os` / `ORPCError` from `server`. Re-export `sqliteTable`, `text`, `integer`, `real` from `state`. Re-export `Type` and `Static` from `schema`.
 - [ ] Export `usePluginServer` and `usePluginState` from `view`. Until later phases they throw a tagged `PluginRuntimeMissingError` if called outside a host provider. Do not add `usePluginNavigate`.
-- [ ] Add a Vitest that imports each subpath and asserts `Button` and `sqliteTable` are functions and `Type.Literal` exists.
+- [ ] Add a Vitest that imports each subpath and asserts `Button`, `sqliteTable`, and `Link` are functions and `Type.Literal` exists.
 - [ ] Run `pnpm --filter @halo/plugin-sdk test typecheck lint format:check`.
 
 ### Phase 2: Versioned TypeBox parse helper
@@ -456,7 +456,7 @@ class PluginViewExportError extends errore.createTaggedError({
 
 ### Phase 7: Mount plugin Sidebar and Routes
 
-Put each plugin `Sidebar` under Sessions, always mounted. Wrap it in `Router` with `base={`/plugins/${id}`}` so its `Link href="/month"` writes `/plugins/:id/month`. In the main pane, a nested `/plugins/:pluginId` route renders that plugin's `Routes` with a scoped location.
+Put each exported plugin `Sidebar` under Sessions. Skip plugins that do not export `Sidebar`. Wrap it in `Router` with `base={`/plugins/${id}`}` so its `Link href="/month"` writes `/plugins/:id/month`. In the main pane, a nested `/plugins/:pluginId` route renders that plugin's `Routes` with a scoped location.
 
 #### Important types
 
@@ -498,17 +498,16 @@ export function Routes() {
 
 ```diff
  // apps/electron/src/renderer/Sidebar.tsx
-+{plugins.map((plugin) => (
-+  <Router key={plugin.id} base={`/plugins/${plugin.id}`}>
-+    <PluginRuntimeProvider pluginId={plugin.id}>
-+      {plugin.Sidebar !== undefined ? (
++{plugins.map((plugin) => {
++  if (plugin.Sidebar === undefined) return undefined;
++  return (
++    <Router key={plugin.id} base={`/plugins/${plugin.id}`}>
++      <PluginRuntimeProvider pluginId={plugin.id}>
 +        <plugin.Sidebar />
-+      ) : (
-+        <Link href="/">{plugin.halo.name}</Link>
-+      )}
-+    </PluginRuntimeProvider>
-+  </Router>
-+))}
++      </PluginRuntimeProvider>
++    </Router>
++  );
++})}
 
  // apps/electron/src/renderer/MainPane.tsx
 +<Route path="/plugins/:pluginId" nest>
@@ -524,7 +523,7 @@ export function Routes() {
 +</Route>
 ```
 
-- [ ] Always mount every plugin `Sidebar` (or a host `Link` labeled `halo.name` when `Sidebar` is missing). Nested `Router base` so plugin links are relative.
+- [ ] Mount `plugin.Sidebar` only when it is exported. Nested `Router base` so plugin links are relative. Do not invent a fallback row.
 - [ ] Render `Routes` only when the location is under `/plugins/:pluginId`. Keep Files / Sessions / Develop as they are.
 - [ ] Show plugin load errors in the sidebar (`data-testid="plugin-error"`). Load plugins with a one-shot `listPlugins` query. Do not subscribe.
 - [ ] `loadExtensionModule` (or the plugin equivalent) must `require("wouter")` from the host map so plugin `Link` uses the app context.
