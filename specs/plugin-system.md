@@ -9,17 +9,13 @@ flowchart TD
     Parse --> Manifest["halo.version 1"]
     Manifest --> ViewEntry["view.tsx or view/index.tsx"]
     Manifest --> ServerEntry["server.ts or server/index.ts"]
-    Manifest --> StateEntry["state.ts or state/index.ts"]
-    StateEntry --> Db["libSQL file plugin/data.db"]
     ServerEntry --> Jiti["jiti load oRPC router"]
-    Db --> Jiti
     ViewEntry --> Esbuild["esbuild CJS, SDK/maui/react external"]
     Esbuild --> Eval["Renderer evaluate named exports"]
     Jiti --> Orpc["oRPC MessagePort router keyed by plugin id"]
     Eval --> SidebarSlot["export Sidebar into app sidebar"]
     Eval --> RoutesSlot["export Routes component into main pane"]
-    Orpc --> Hooks["usePluginServer / usePluginState"]
-    Db --> Hooks
+    Orpc --> Hooks["usePluginServer"]
 ```
 
 ```mermaid
@@ -29,34 +25,32 @@ sequenceDiagram
     participant Main as PluginService
     participant UI as Renderer
 
-    Agent->>Disk: Write package.json, view, server, state
+    Agent->>Disk: Write package.json, view, server
     UI->>Main: listPlugins (once, on workspace ready)
     Main->>Main: JSON.parse then parseVersioned halo
-    Main->>Main: Open libSQL, apply tables
     Main->>Main: jiti-import server router
     Main->>Main: esbuild view
     Main-->>UI: PluginBundle plus oRPC port
     UI->>UI: Evaluate Sidebar and Routes
     UI->>UI: wouter /plugins/:pluginId nest → Routes
-    UI->>Main: usePluginServer / usePluginState
+    UI->>Main: usePluginServer
 ```
 
 ## Problem overview
 
-The sidebar and main pane are fixed in the renderer. A user who asks the in-app agent to add a calendar or notes view has no plugin format, no main-process code, and no durable store. Hand-rolled `JSON.parse` plus field checks (as in `workspace.json` and `user.json`) will not scale once plugins ship versioned manifests.
+The sidebar and main pane are fixed in the renderer. A user who asks the in-app agent to add a calendar or notes view has no plugin format and no main-process code. Hand-rolled `JSON.parse` plus field checks (as in `workspace.json` and `user.json`) will not scale once plugins ship versioned manifests.
 
 ## Solution overview
 
-Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` with a nested `halo` object, plus optional `view`, `server`, and `state` files. The view mounts named exports (`Sidebar`, `Routes`), both React components. The app routes with [wouter](https://github.com/molefrog/wouter) and a memory location. Plugin `Routes` is the main pane for `/plugins/:pluginId/*`. The server is an oRPC router in main. State is Drizzle/Turso `sqliteTable`s in a per-plugin libSQL file. Parse every persisted JSON document with a versioned TypeBox union and a shared `parseVersioned` helper that returns an errore tagged error. TypeBox is already in `@halo/desktop`; do not add Zod.
+Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` with a nested `halo` object, plus optional `view` and `server` files. The view mounts named exports (`Sidebar`, `Routes`), both React components. The app routes with [wouter](https://github.com/molefrog/wouter) and a memory location. Plugin `Routes` is the main pane for `/plugins/:pluginId/*`. The server is an oRPC router in main. Parse every persisted JSON document with a versioned TypeBox union and a shared `parseVersioned` helper that returns an errore tagged error. TypeBox is already in `@halo/desktop`; do not add Zod.
 
 ## Goals
 
-- A plugin lives at `{workspace}/.halo/plugins/<id>/` with `package.json` and optional `view` / `server` / `state` files.
+- A plugin lives at `{workspace}/.halo/plugins/<id>/` with `package.json` and optional `view` / `server` files.
 - `package.json` has a nested `halo` field. `halo.version` is required. V1 is `1`.
 - `export const Sidebar` mounts in the app sidebar under Files / Sessions only when the plugin exports it. A plugin with no `Sidebar` does not get a host-drawn row. `export const Routes` is a React component that fills the main pane at `/plugins/:pluginId`. Both use wouter `Link` / `Route`.
-- `@halo/plugin-sdk` has `view`, `server`, `state`, and `schema` subpaths. Plugins declare it. The host aliases it to one copy.
-- `usePluginServer<S>()` is an oRPC client typed as the plugin router. `usePluginState<D>()` is a Drizzle client typed as the plugin tables.
-- Plugin data is `{pluginDir}/data.db`, so agents and humans can both see it.
+- `@halo/plugin-sdk` has `view`, `server`, and `schema` subpaths. Plugins declare it. The host aliases it to one copy.
+- `usePluginServer<S>()` is an oRPC client typed as the plugin router.
 - Plugins load once when the workspace is ready (`listPlugins`). A load error shows in the sidebar and leaves other plugins up.
 - The renderer uses wouter (`memoryLocation`). Host paths are `/draft/:draftId`, `/sessions/:sessionId`, `/uikit`, and `/plugins/:pluginId` (nested). `SessionSelection` goes away.
 - New JSON documents (manifest first) parse through `parseVersioned`. Unknown or missing `version` is a parse error.
@@ -70,7 +64,8 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - No npm/git marketplace, no `pnpm install` in the plugin folder, no extra plugin deps beyond the aliased SDK.
 - No replacing Files, Sessions, New session, Develop, or the session composer.
 - No view exports beyond `Sidebar` and `Routes`. Unknown named exports are ignored.
-- No remote Turso sync, no cross-plugin database, no HTTP listener.
+- No plugin database, `state.ts`, Turso, libSQL, Drizzle, or `usePluginState`. Server procedures hold any data they need for now.
+- No HTTP listener.
 - No plugin file watch, auto-reload, or `subscribePlugins`. Restart Halo (or reopen the workspace) to pick up plugin edits.
 - No default plugin nav. If the plugin does not export `Sidebar`, the host draws nothing for it in the sidebar.
 - No React Router. Wouter is the router.
@@ -79,11 +74,10 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 ## Assumptions
 
 - Plugin id is the folder name. `halo.name` is the UI label.
-- `view`, `server`, and `state` are each optional.
-- View imports of `./server` and `./state` are type-only.
+- `view` and `server` are each optional.
+- View imports of `./server` are type-only.
 - esbuild marks `wouter` external so plugin `Link` / `Route` share the app Router context.
 - Electron has no useful browser history for this UI. Use `memoryLocation` from `wouter/memory-location`, not `useBrowserLocation`.
-- Schema apply on load is create-table-if-missing. No rename/drop migrations.
 - oRPC procedure input uses TypeBox (Standard Schema), same library as manifests.
 - A later `halo` version is a new `Type.Object` with `version: Type.Literal(2)` added to the union, plus an explicit `up` in `parseVersioned` if the host should normalize to latest. This work ships only version 1 and returns that object as-is.
 - Plugin code is trusted workspace code.
@@ -104,12 +98,11 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - [`@sinclair/typebox` Value](https://github.com/sinclairzx81/typebox) — `Value.Check` / `Value.Errors` (no throw). Wrap `Value.Parse` with `errore.try` if used.
 - [oRPC getting started](https://orpc.dev/docs/getting-started) — Router + client. Any Standard Schema, including TypeBox.
 - [oRPC Electron adapter](https://orpc.dev/docs/adapters/electron) — MessagePort between main and renderer.
-- [Drizzle + Turso](https://orm.drizzle.team/docs/get-started/turso-new) — `sqliteTable` schema and libSQL.
 - [wouter](https://github.com/molefrog/wouter) — Memory location, `Router base`, and `Route nest` for plugin-relative paths.
 
 ## Implementation
 
-### Phase 1: Add `@halo/plugin-sdk` with view, server, state, and schema
+### Phase 1: Add `@halo/plugin-sdk` with view, server, and schema
 
 Add a workspace package that plugins compile against. `schema` re-exports TypeBox `Type` / `Static` and will own `parseVersioned` in phase 2. Hooks can be stubbed until later phases.
 
@@ -120,7 +113,6 @@ Add a workspace package that plugins compile against. `schema` re-exports TypeBo
 export { Route, Switch, Link, Redirect, Router, useLocation, useRoute, useParams } from "wouter";
 
 export function usePluginServer<S>(): RouterClient<S>;
-export function usePluginState<D>(): PluginDatabase<D>;
 ```
 
 #### Call stack diff
@@ -131,7 +123,6 @@ export function usePluginState<D>(): PluginDatabase<D>;
 +packages/plugin-sdk
 +├── src/view.ts     (@halo/plugin-sdk/view)
 +├── src/server.ts   (@halo/plugin-sdk/server)
-+├── src/state.ts    (@halo/plugin-sdk/state)
 +└── src/schema.ts   (@halo/plugin-sdk/schema)
 ```
 
@@ -147,16 +138,15 @@ export function usePluginState<D>(): PluginDatabase<D>;
 +  "exports": {
 +    "./view": "./src/view.ts",
 +    "./server": "./src/server.ts",
-+    "./state": "./src/state.ts",
 +    "./schema": "./src/schema.ts"
 +  }
 +}
 ```
 
-- [ ] Create `packages/plugin-sdk` with `package.json`, `tsconfig.json`, and the four entry files. Match `@repo/logger` scripts. Depend on `@sinclair/typebox` (same range as `@halo/desktop`) and `wouter`.
-- [ ] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Re-export `os` / `ORPCError` from `server`. Re-export `sqliteTable`, `text`, `integer`, `real` from `state`. Re-export `Type` and `Static` from `schema`.
-- [ ] Export `usePluginServer` and `usePluginState` from `view`. Until later phases they throw a tagged `PluginRuntimeMissingError` if called outside a host provider. Do not add `usePluginNavigate`.
-- [ ] Add a Vitest that imports each subpath and asserts `Button`, `sqliteTable`, and `Link` are functions and `Type.Literal` exists.
+- [ ] Create `packages/plugin-sdk` with `package.json`, `tsconfig.json`, and the three entry files. Match `@repo/logger` scripts. Depend on `@sinclair/typebox` (same range as `@halo/desktop`) and `wouter`.
+- [ ] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Re-export `os` / `ORPCError` from `server`. Re-export `Type` and `Static` from `schema`.
+- [ ] Export `usePluginServer` from `view`. Until later phases it throws a tagged `PluginRuntimeMissingError` if called outside a host provider. Do not add `usePluginNavigate` or `usePluginState`.
+- [ ] Add a Vitest that imports each subpath and asserts `Button` and `Link` are functions and `Type.Literal` exists.
 - [ ] Run `pnpm --filter @halo/plugin-sdk test typecheck lint format:check`.
 
 ### Phase 2: Versioned TypeBox parse helper
@@ -212,7 +202,6 @@ export function parseVersioned<S extends TSchema>(args: {
 +  description: Type.Optional(Type.String()),
 +  view: Type.Optional(Type.String({ minLength: 1 })),
 +  server: Type.Optional(Type.String({ minLength: 1 })),
-+  state: Type.Optional(Type.String({ minLength: 1 })),
 +});
 +
 +export const haloManifestSchema = Type.Union([haloManifestV1]);
@@ -227,7 +216,7 @@ export function parseVersioned<S extends TSchema>(args: {
 
 ### Phase 3: Parse the nested `halo` manifest
 
-Read `package.json`, parse JSON with `errore.try`, then `parseVersioned` on `halo`. Resolve `view` / `server` / `state` to files, including `view/index.tsx` fallbacks.
+Read `package.json`, parse JSON with `errore.try`, then `parseVersioned` on `halo`. Resolve `view` / `server` to files, including `view/index.tsx` fallbacks.
 
 #### Important types
 
@@ -247,7 +236,6 @@ type PluginManifest = {
   halo: HaloManifest;
   viewPath?: string;
   serverPath?: string;
-  statePath?: string;
 };
 
 class PluginManifestError extends errore.createTaggedError({
@@ -264,7 +252,7 @@ class PluginManifestError extends errore.createTaggedError({
 +    ├── readFile package.json
 +    ├── errore.try JSON.parse
 +    ├── parseVersioned haloManifestSchema on record.halo
-+    └── resolve view/server/state entries
++    └── resolve view/server entries
 ```
 
 #### Code diff preview
@@ -288,7 +276,7 @@ class PluginManifestError extends errore.createTaggedError({
 ```
 
 - [ ] Add `readPluginManifest({ id, directory })`. Missing file, invalid JSON, or failed `halo` parse returns `PluginManifestError`.
-- [ ] Require `package.json` `name` as a non-empty string (plain check or a small TypeBox object around `{ name, halo }`). Resolve entries from `halo.view` / `halo.server` / `halo.state` when set. Otherwise look for `view.tsx`, `view/index.tsx`, `view.ts`, `view/index.ts` (same pattern for `server` and `state`, `.ts` only for those).
+- [ ] Require `package.json` `name` as a non-empty string (plain check or a small TypeBox object around `{ name, halo }`). Resolve entries from `halo.view` / `halo.server` when set. Otherwise look for `view.tsx`, `view/index.tsx`, `view.ts`, `view/index.ts` (same pattern for `server`, `.ts` only).
 - [ ] Do not read `engines` yet.
 - [ ] Cover happy path, missing `version`, missing `halo.name`, explicit paths, and directory fallbacks in Vitest.
 - [ ] Run `pnpm --filter @halo/desktop test`.
@@ -529,76 +517,17 @@ export function Routes() {
 - [ ] `loadExtensionModule` (or the plugin equivalent) must `require("wouter")` from the host map so plugin `Link` uses the app context.
 - [ ] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that a fixture plugin's sidebar link opens its `Routes` in the main pane.
 
-### Phase 8: Plugin state as Turso / libSQL tables
+### Phase 8: Plugin server as an oRPC sub-router
 
-Load `state.ts` in main with jiti. Open `{pluginDir}/data.db` with `@libsql/client`. Apply exported `sqliteTable`s. In the renderer, `usePluginState<D>()` is a Drizzle sqlite-proxy client that runs SQL in main against that file.
-
-#### Important types
-
-```ts
-// packages/plugin-sdk/src/state.ts
-export { sqliteTable, text, integer, real, blob } from "drizzle-orm/sqlite-core";
-
-// apps/electron/src/main/pluginState.ts
-type PluginStateHandle = {
-  db: LibSQLDatabase<Record<string, unknown>>;
-  schema: Record<string, SQLiteTable>;
-};
-
-// packages/plugin-sdk/src/view.ts
-type PluginDatabase<D> = DrizzleSqliteProxyDatabase<D>;
-```
-
-#### Call stack diff
-
-```diff
- PluginService.list
- ├── readPluginManifest
- ├── compilePluginView
-+├── jiti.import(state.ts)
-+├── createClient({ url: "file:…/data.db" })
-+├── applySqliteTables(schema)
-+└── HaloRpc.executePluginSql({ pluginId, sql, params, method })
- usePluginState<D>
-+└── drizzle(sqlite-proxy → executePluginSql)
-```
-
-#### Code diff preview
-
-```diff
- // packages/plugin-sdk/src/view.ts
-+export function usePluginState<D>(): PluginDatabase<D> {
-+  const runtime = usePluginRuntime();
-+  return useMemo(
-+    () =>
-+      drizzle(async (sql, params, method) => {
-+        return runtime.executeSql({ sql, params, method });
-+      }, { schema: undefined as unknown as D }),
-+    [runtime],
-+  );
-+}
-```
-
-- [ ] jiti-import `state.ts` with `@halo/plugin-sdk` aliased to the workspace package. Collect exports that are sqlite tables. Other exports are ignored.
-- [ ] Open `data.db` in the plugin directory (`mode: 0o700` on the folder). Create missing tables from the schema. Keep the connection for the process lifetime.
-- [ ] Add `executePluginSql` on HaloApi. Reject calls whose `pluginId` is not the runtime's plugin. Return rows in the sqlite-proxy shape Drizzle expects.
-- [ ] Implement `usePluginState<D>()` on the real runtime. After a write, invalidate so the next read sees new rows (same-process notify is enough).
-- [ ] Test: a `notes` table insert in main is visible through `executePluginSql`; a plugin cannot query another plugin's file. Run `pnpm --filter @halo/desktop test`.
-
-### Phase 9: Plugin server as an oRPC sub-router
-
-Load `server.ts` with jiti. The default export (or `export const router`) is an oRPC router whose procedure inputs are TypeBox schemas. Mount every plugin under `{ [pluginId]: router }` on an Electron MessagePort. `usePluginServer<S>()` is `createORPCClient` scoped to that plugin. Handlers receive `{ pluginId, workspaceRoot, db }`.
+Load `server.ts` with jiti. The default export (or `export const router`) is an oRPC router whose procedure inputs are TypeBox schemas. Mount every plugin under `{ [pluginId]: router }` on an Electron MessagePort. `usePluginServer<S>()` is `createORPCClient` scoped to that plugin. Handlers receive `{ pluginId, workspaceRoot }`.
 
 #### Important types
 
 ```ts
 // packages/plugin-sdk/src/server.ts
-import type { LibSQLDatabase } from "drizzle-orm/libsql";
-
 export type PluginServerContext = {
   pluginId: string;
   workspaceRoot: string;
-  db?: LibSQLDatabase<Record<string, unknown>>;
 };
 
 export { os, ORPCError } from "@orpc/server";
@@ -627,23 +556,23 @@ export const PLUGIN_RPC_CHANNELS = {
 
 ```diff
  // example plugin server.ts
-+const listEvents = os
-+  .input(Type.Object({ year: Type.Integer(), month: Type.Integer() }))
-+  .handler(async ({ input, context }) => {
-+    return context.db.select().from(events);
++const ping = os
++  .input(Type.Object({}))
++  .handler(async ({ context }) => {
++    return { pluginId: context.pluginId };
 +  });
 +
-+export const router = { listEvents };
++export const router = { ping };
 +export default router;
 ```
 
 - [ ] jiti-import the server file. Accept `default` or `router`. Alias `@halo/plugin-sdk/server` to the host package. Load once when `listPlugins` runs; do not swap routers later.
 - [ ] Open a second MessagePort beside Cap'n Web (`channels.ts` + `preload.ts` + renderer connect). Follow the oRPC Electron adapter.
-- [ ] Pass `db` in context when state loaded. Convert handler failures at this boundary: if a handler returns an `Error`, map it to `ORPCError` before the port.
+- [ ] Convert handler failures at this boundary: if a handler returns an `Error`, map it to `ORPCError` before the port.
 - [ ] Implement `usePluginServer<S>()`. Document that `import type { router } from "./server.ts"` is type-only.
 - [ ] Test with an in-process MessageChannel: a `ping` procedure round-trips; a missing plugin id does not match. Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/plugin-sdk test`.
 
-### Phase 10: Seed Calendar as a plugin
+### Phase 9: Seed Calendar as a plugin
 
 Ship a plugin that uses `Sidebar`, `Routes`, `halo.version: 1`, and the SDK.
 
@@ -682,8 +611,7 @@ type CalendarPackage = {
 +# Halo plugins
 +Plugins live in `{workspace}/.halo/plugins/<id>/`.
 +Required: `package.json` with `halo.version` and `halo.name`.
-+Optional: `view.tsx` (`Sidebar`, `Routes`), `server.ts` (oRPC router),
-+`state.ts` (sqlite tables).
++Optional: `view.tsx` (`Sidebar`, `Routes`), `server.ts` (oRPC router).
 +Import UI from `@halo/plugin-sdk/view`. Parse JSON with
 +`parseVersioned` from `@halo/plugin-sdk/schema`.
 ```
