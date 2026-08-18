@@ -93,6 +93,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — Forward the plugin MessagePort like HaloApi.
 - [`apps/electron/src/main/main.ts`](../apps/electron/src/main/main.ts) — Construct `PluginService`.
 - [`apps/electron/src/main/plugins/PluginService.ts`](../apps/electron/src/main/plugins/PluginService.ts) — List `.halo/plugins`. Tests live beside it.
+- [`apps/electron/src/main/plugins/compilePluginView.ts`](../apps/electron/src/main/plugins/compilePluginView.ts) — esbuild the view to CJS.
 - [`apps/electron/src/main/test/fixtures.ts`](../apps/electron/src/main/test/fixtures.ts) — Shared e2e helpers, including `src`.
 - [`apps/electron/src/main/workspace-service.ts`](../apps/electron/src/main/workspace-service.ts) — Today's `JSON.parse` + field checks. Do not change yet; the new helper is what new parsers call.
 - [`apps/electron/src/main/ParallelSearchTools.ts`](../apps/electron/src/main/ParallelSearchTools.ts) — Existing TypeBox `Type.Object` usage to match.
@@ -424,7 +425,7 @@ class PluginViewExportError extends errore.createTaggedError({
 #### Code diff preview
 
 ```diff
- // apps/electron/src/main/compilePluginView.ts
+ // apps/electron/src/main/plugins/compilePluginView.ts
 +const built = await esbuild.build({
 +  absWorkingDir: directory,
 +  entryPoints: [viewPath],
@@ -438,11 +439,11 @@ class PluginViewExportError extends errore.createTaggedError({
 +});
 ```
 
-- [ ] Compile the resolved view file. Map `@halo/plugin-sdk/view` and `wouter` as external. Keep tagged compile errors.
-- [ ] Evaluate CJS. Read `Sidebar` and `Routes` if they are functions. Accept `module.exports` wrapping for CJS interop; the author-facing API is named exports.
-- [ ] Reject a view that exports neither `Sidebar` nor `Routes`. Ignore other names.
-- [ ] Test: compile a view that imports `Button` and `Route` from `@halo/plugin-sdk/view`; parse both named components; fail on a view with neither.
-- [ ] Run `pnpm --filter @halo/desktop test`.
+- [x] Compile the resolved view file. Map `@halo/plugin-sdk/view` and `wouter` as external. Keep tagged compile errors.
+- [x] Evaluate CJS. Read `Sidebar` and `Routes` if they are functions. Accept `module.exports` wrapping for CJS interop; the author-facing API is named exports.
+- [x] Reject a view that exports neither `Sidebar` nor `Routes`. Ignore other names.
+- [x] Test: compile a view that imports `Button` and `Route` from `@halo/plugin-sdk/view`; parse both named components; fail on a view with neither.
+- [x] Run `pnpm --filter @halo/desktop test`.
 
 ### Phase 7: Mount plugin Sidebar and Routes
 

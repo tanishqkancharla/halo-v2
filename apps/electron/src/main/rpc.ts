@@ -77,7 +77,11 @@ export class HaloRpc extends HaloApi {
     this.logger.info({ event: "listPlugins" });
     const listed = await this.plugins.list();
     if (listed instanceof Error) throw listed;
-    return listed;
+    return {
+      plugins: listed.plugins,
+      compiledViews: listed.compiledViews,
+      errors: listed.errors,
+    };
   }
 
   subscribeWorkspaceTree(callback: TreeListener) {

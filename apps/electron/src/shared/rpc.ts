@@ -4,7 +4,11 @@ import type { AgentSessionState } from "./AgentSessionState.js";
 import type { PluginList } from "./plugin.js";
 
 export type { AgentSessionEvent, AgentSessionState };
-export type { PluginList, PluginLoadError } from "./plugin.js";
+export type {
+  CompiledPluginView,
+  PluginList,
+  PluginLoadError,
+} from "./plugin.js";
 export {
   agentSessionStateFromSession,
   applyAgentSessionEvent,

@@ -2,14 +2,20 @@ import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import * as errore from "errore";
-import type { PluginList } from "../../shared/plugin.js";
+import type { LoadedPluginView, PluginList } from "../../shared/plugin.js";
 import type { WorkspaceService } from "../workspace-service.js";
+import { compilePluginView } from "./compilePluginView.js";
+import { evaluatePluginView } from "./evaluatePluginView.js";
 import { readPluginManifest } from "./readPluginManifest.js";
 
 export class PluginIoError extends errore.createTaggedError({
   name: "PluginIoError",
   message: "Failed to list plugins",
 }) {}
+
+export type PluginServiceList = PluginList & {
+  views: LoadedPluginView[];
+};
 
 export class PluginService {
   constructor(private readonly workspace: WorkspaceService) {}
@@ -20,7 +26,7 @@ export class PluginService {
 
     const pluginsRoot = join(layout.root, ".halo", "plugins");
     if (!existsSync(pluginsRoot)) {
-      return { plugins: [], errors: [] };
+      return { plugins: [], compiledViews: [], views: [], errors: [] };
     }
 
     const entries = await readdir(pluginsRoot, { withFileTypes: true }).catch(
@@ -34,6 +40,8 @@ export class PluginService {
       .toSorted((left, right) => left.localeCompare(right));
 
     const plugins: PluginList["plugins"] = [];
+    const compiledViews: PluginList["compiledViews"] = [];
+    const views: LoadedPluginView[] = [];
     const errors: PluginList["errors"] = [];
     for (const id of ids) {
       const manifest = await readPluginManifest({
@@ -44,8 +52,35 @@ export class PluginService {
         errors.push({ id, message: manifest.message });
         continue;
       }
+
+      if (manifest.viewPath === undefined) {
+        plugins.push(manifest);
+        continue;
+      }
+
+      const compiled = await compilePluginView({
+        id,
+        directory: manifest.directory,
+        viewPath: manifest.viewPath,
+      });
+      if (compiled instanceof Error) {
+        errors.push({ id, message: compiled.message });
+        continue;
+      }
+
+      const loaded = evaluatePluginView({
+        id,
+        source: compiled.source,
+      });
+      if (loaded instanceof Error) {
+        errors.push({ id, message: loaded.message });
+        continue;
+      }
+
       plugins.push(manifest);
+      compiledViews.push(compiled);
+      views.push(loaded);
     }
-    return { plugins, errors };
+    return { plugins, compiledViews, views, errors };
   }
 }

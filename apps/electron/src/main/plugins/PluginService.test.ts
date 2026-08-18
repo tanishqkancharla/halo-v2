@@ -83,7 +83,70 @@ describe("PluginService", () => {
 
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
       expect(listed.plugins[0]?.halo.name).toBe("Calendar");
+      expect(listed.views).toHaveLength(1);
+      expect(listed.views[0]?.Sidebar).toBeTypeOf("function");
+      expect(listed.views[0]?.Routes).toBeUndefined();
       expect(listed.errors).toEqual([]);
+    },
+  );
+
+  pluginTest(
+    "loads Sidebar and Routes from an @halo/plugin-sdk/view import",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        calendar: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-calendar",
+              "halo": { "version": 1, "name": "Calendar" }
+            }
+          `,
+          "view.tsx": src`
+            import { Button, Route } from "@halo/plugin-sdk/view"
+
+            export function Sidebar() {
+              return <Button>Calendar</Button>
+            }
+
+            export function Routes() {
+              return <Route path="/" />
+            }
+          `,
+        },
+      });
+
+      const listed = await new PluginService(workspace).list();
+      if (listed instanceof Error) throw listed;
+
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.views[0]?.Sidebar).toBeTypeOf("function");
+      expect(listed.views[0]?.Routes).toBeTypeOf("function");
+      expect(listed.errors).toEqual([]);
+    },
+  );
+
+  pluginTest(
+    "rejects a view that exports neither Sidebar nor Routes",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        calendar: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-calendar",
+              "halo": { "version": 1, "name": "Calendar" }
+            }
+          `,
+          "view.tsx": src`
+            export const unused = 1
+          `,
+        },
+      });
+
+      const listed = await new PluginService(workspace).list();
+      if (listed instanceof Error) throw listed;
+
+      expect(listed.plugins).toEqual([]);
+      expect(listed.errors.map((error) => error.id)).toEqual(["calendar"]);
     },
   );
 
