@@ -323,11 +323,11 @@ abstract class HaloApi extends RpcTarget {
 +  new HaloRpc(workspaceService, piService, pluginService, getWindow, rpcLogger)
 ```
 
-- [ ] Add `PluginService` with `list` that reads `.halo/plugins` once per call. No Parcel watch, no listener, no debounce.
-- [ ] Skip dot-folders. Sort by folder name. A bad `package.json` is an error row, not a crash.
-- [ ] Add `listPlugins` on `HaloApi` / `HaloRpc`. Do not add `subscribePlugins`.
-- [ ] Test: not-ready workspace returns `WorkspaceNotReadyError`; a valid plugin folder appears; a broken `package.json` is an error and does not hide the valid one.
-- [ ] Run `pnpm --filter @halo/desktop test`.
+- [x] Add `PluginService` with `list` that reads `.halo/plugins` once per call. No Parcel watch, no listener, no debounce.
+- [x] Skip dot-folders. Sort by folder name. A bad `package.json` is an error row, not a crash.
+- [x] Add `listPlugins` on `HaloApi` / `HaloRpc`. Do not add `subscribePlugins`.
+- [x] Test: not-ready workspace returns `WorkspaceNotReadyError`; a valid plugin folder appears; a broken `package.json` is an error and does not hide the valid one.
+- [x] Run `pnpm --filter @halo/desktop test`.
 
 ### Phase 5: Put wouter in the renderer
 

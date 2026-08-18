@@ -25,6 +25,7 @@ import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
 import { newMessagePortMainRpcSession } from "./MessagePortMainTransport.js";
 import { PiService } from "./pi-service.js";
 import { HaloRpc } from "./rpc.js";
+import { PluginService } from "./PluginService.js";
 import { UserService } from "./UserService.js";
 import { WorkspaceService } from "./workspace-service.js";
 
@@ -65,6 +66,7 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 const workspaceService = new WorkspaceService(applicationConfig.dataDir);
 const userService = new UserService(applicationConfig.dataDir);
 const piService = new PiService(workspaceService, userService);
+const pluginService = new PluginService(workspaceService);
 let mainWindow: BrowserWindow | undefined;
 
 app.whenReady().then(async () => {
@@ -161,6 +163,7 @@ function registerRpcBridge(): void {
       new HaloRpc(
         workspaceService,
         piService,
+        pluginService,
         () => {
           if (mainWindow === undefined) {
             throw new Error("Halo main window is not open.");

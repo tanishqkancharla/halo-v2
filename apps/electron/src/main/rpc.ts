@@ -17,6 +17,7 @@ import {
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
 import { getAppInfo } from "./AppUpdate.js";
 import type { PiService } from "./pi-service.js";
+import type { PluginService } from "./PluginService.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
 type TreeListener = WorkspaceTreeEventHandler & {
@@ -29,6 +30,7 @@ export class HaloRpc extends HaloApi {
   constructor(
     private readonly workspace: WorkspaceService,
     private readonly pi: PiService,
+    private readonly plugins: PluginService,
     private readonly getWindow: () => BrowserWindow,
     private readonly logger: Logger,
   ) {
@@ -69,6 +71,13 @@ export class HaloRpc extends HaloApi {
     const paths = await this.workspace.listPaths();
     if (paths instanceof Error) throw paths;
     return paths;
+  }
+
+  async listPlugins() {
+    this.logger.info({ event: "listPlugins" });
+    const listed = await this.plugins.list();
+    if (listed instanceof Error) throw listed;
+    return listed;
   }
 
   subscribeWorkspaceTree(callback: TreeListener) {

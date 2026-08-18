@@ -1,8 +1,10 @@
 import { RpcTarget } from "capnweb";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import type { AgentSessionState } from "./AgentSessionState.js";
+import type { PluginList } from "./plugin.js";
 
 export type { AgentSessionEvent, AgentSessionState };
+export type { PluginList, PluginLoadError } from "./plugin.js";
 export {
   agentSessionStateFromSession,
   applyAgentSessionEvent,
@@ -68,6 +70,7 @@ export abstract class HaloApi extends RpcTarget {
   abstract chooseWorkspace(): Promise<WorkspaceInfo | undefined>;
   abstract listSessions(): Promise<SessionSummary[]>;
   abstract listWorkspacePaths(): Promise<string[]>;
+  abstract listPlugins(): Promise<PluginList>;
   abstract subscribeWorkspaceTree(callback: WorkspaceTreeEventHandler): void;
   abstract newAgentSession(): Promise<AgentSessionApi>;
   abstract openAgentSession(sessionId: string): Promise<OpenedAgentSession>;
