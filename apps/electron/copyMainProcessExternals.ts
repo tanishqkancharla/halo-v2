@@ -1,11 +1,16 @@
-import { createRequire } from "node:module";
+import { existsSync } from "node:fs";
 import { cp, mkdir, readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
-import { mainProcessExternals } from "./mainExternals.js";
+import {
+  mainProcessDiskPackages,
+  mainProcessExternals,
+  pluginSdkJitiDependencies,
+} from "./mainExternals.js";
 
 const electronDir = path.dirname(fileURLToPath(import.meta.url));
 const requireFromElectron = createRequire(
@@ -27,6 +32,7 @@ class PackageJsonReadError extends errore.createTaggedError({
 /**
  * Copy Vite-external main-process packages (and their runtime closure) into
  * the packaged app so require() resolves after Forge Vite's `.vite`-only pack.
+ * Also copy @halo/plugin-sdk for jiti; the host still bundles that package.
  */
 export async function copyMainProcessExternals(
   buildPath: string,
@@ -35,18 +41,21 @@ export async function copyMainProcessExternals(
   for (const packageName of mainProcessExternals) {
     await copyPackageClosure(buildPath, packageName, copied);
   }
+  for (const packageName of mainProcessDiskPackages) {
+    await copyPackage(buildPath, packageName, copied);
+  }
+  for (const packageName of pluginSdkJitiDependencies) {
+    await copyPackageClosure(buildPath, packageName, copied);
+  }
 }
 
-async function copyPackageClosure(
+async function copyPackage(
   buildPath: string,
   packageName: string,
   copied: Set<string>,
-): Promise<void> {
+): Promise<string | undefined> {
   if (copied.has(packageName)) return;
-
-  const packageJsonPath = requireFromElectron.resolve(
-    `${packageName}/package.json`,
-  );
+  const packageJsonPath = resolvePackageJson(packageName);
   const sourceDir = path.dirname(packageJsonPath);
   const destDir = path.join(
     buildPath,
@@ -56,6 +65,18 @@ async function copyPackageClosure(
   await mkdir(path.dirname(destDir), { recursive: true });
   await cp(sourceDir, destDir, { recursive: true, dereference: true });
   copied.add(packageName);
+  return packageJsonPath;
+}
+
+async function copyPackageClosure(
+  buildPath: string,
+  packageName: string,
+  copied: Set<string>,
+): Promise<void> {
+  if (copied.has(packageName)) return;
+
+  const packageJsonPath = await copyPackage(buildPath, packageName, copied);
+  if (packageJsonPath === undefined) return;
 
   const packageJsonRaw = await readFile(packageJsonPath, "utf8");
   const packageJson = errore.try({
@@ -79,8 +100,7 @@ async function copyPackageClosure(
   if (optionalDependencies !== undefined) {
     for (const dependencyName of Object.keys(optionalDependencies)) {
       const resolved = errore.try({
-        try: () =>
-          requireFromElectron.resolve(`${dependencyName}/package.json`),
+        try: () => resolvePackageJson(dependencyName),
         catch: (e) =>
           new PackageJsonReadError({ packageName: dependencyName, cause: e }),
       });
@@ -88,4 +108,20 @@ async function copyPackageClosure(
       await copyPackageClosure(buildPath, dependencyName, copied);
     }
   }
+}
+
+function resolvePackageJson(packageName: string) {
+  const searchPaths = requireFromElectron.resolve.paths(packageName);
+  if (searchPaths === null) {
+    throw new PackageJsonReadError({ packageName });
+  }
+  for (const searchPath of searchPaths) {
+    const candidate = path.join(
+      searchPath,
+      ...packageName.split("/"),
+      "package.json",
+    );
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new PackageJsonReadError({ packageName });
 }
