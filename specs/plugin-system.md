@@ -442,8 +442,8 @@ class PluginViewExportError extends errore.createTaggedError({
 
 - [x] Compile the resolved view file. Map `@halo/plugin-sdk/view` and `wouter` as external. Keep tagged compile errors. `PluginService.list` does not evaluate.
 - [x] Evaluate CJS in the renderer (`loadPluginViews`). Read `Sidebar` and `Routes` if they are functions. Accept `module.exports` wrapping for CJS interop; the author-facing API is named exports.
-- [x] Reject a view that exports neither `Sidebar` nor `Routes`. Ignore other names. A missing export is a renderer error; the compiled plugin still lists.
-- [x] Test: compile a view that imports `Button` and `Route` from `@halo/plugin-sdk/view`; evaluate both named components in the renderer helper; fail on a view with neither.
+- [x] A view that exports neither `Sidebar` nor `Routes` is an empty view, not an error. Ignore other names. Compile/eval failures still list as errors.
+- [x] Test: compile a view that imports `Button` and `Route` from `@halo/plugin-sdk/view`; evaluate both named components in the renderer helper; list a view that exports neither with no errors.
 - [x] Run `pnpm --filter @halo/desktop test`.
 
 ### Phase 7: Mount plugin Sidebar and Routes
@@ -515,10 +515,10 @@ export function Routes() {
 +</Route>
 ```
 
-- [ ] Mount `plugin.Sidebar` only when it is exported. Nested `Router base` so plugin links are relative. Do not invent a fallback row.
-- [ ] Render `Routes` only when the location is under `/plugins/:pluginId`. Keep Files / Sessions / Develop as they are.
-- [ ] Show plugin load errors in the sidebar (`data-testid="plugin-error"`). Load plugins with a one-shot `listPlugins` query. Do not subscribe.
-- [ ] `loadExtensionModule` (or the plugin equivalent) must `require("wouter")` from the host map so plugin `Link` uses the app context.
+- [x] Mount `plugin.Sidebar` only when it is exported. Nested `Router base` so plugin links are relative. Do not invent a fallback row.
+- [x] Render `Routes` only when the location is under `/plugins/:pluginId`. Keep Files / Sessions / Develop as they are.
+- [x] Show plugin load errors in the sidebar (`data-testid="plugin-error"`). Load plugins with a one-shot `listPlugins` query. Do not subscribe.
+- [x] `evaluatePluginView` `require`s `wouter` from the host map so plugin `Link` uses the app context.
 - [ ] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that a fixture plugin's sidebar link opens its `Routes` in the main pane.
 
 ### Phase 8: Plugin server as an oRPC sub-router

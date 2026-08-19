@@ -1,3 +1,4 @@
+import { PluginRuntimeProvider } from "@halo/plugin-sdk/view";
 import * as errore from "errore";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Route, Switch, useLocation } from "wouter";
@@ -29,6 +30,7 @@ import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
+import type { LoadedPluginView } from "../shared/plugin.js";
 import { UiKitPage } from "./UiKitPage.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
@@ -36,7 +38,13 @@ class PromptSubmitError extends errore.createTaggedError({
   message: "Failed to send prompt: $reason",
 }) {}
 
-export function MainPane({ sessions }: { sessions: SessionSummary[] }) {
+export function MainPane({
+  sessions,
+  pluginViews,
+}: {
+  sessions: SessionSummary[];
+  pluginViews: LoadedPluginView[];
+}) {
   return (
     <Switch>
       <Route path="/uikit">
@@ -50,7 +58,32 @@ export function MainPane({ sessions }: { sessions: SessionSummary[] }) {
           <SavedPane sessionId={params.sessionId} sessions={sessions} />
         )}
       </Route>
+      <Route path="/plugins/:pluginId" nest>
+        {(params) => {
+          const plugin = pluginViews.find(
+            (item) => item.id === params.pluginId,
+          );
+          if (plugin === undefined || plugin.Routes === undefined) {
+            return <MissingPlugin pluginId={params.pluginId} />;
+          }
+          return (
+            <PluginRuntimeProvider pluginId={plugin.id}>
+              <plugin.Routes />
+            </PluginRuntimeProvider>
+          );
+        }}
+      </Route>
     </Switch>
+  );
+}
+
+function MissingPlugin({ pluginId }: { pluginId: string }) {
+  const pane = useStyles(styles.pane);
+  const content = useStyles(styles.content);
+  return (
+    <main className={pane} aria-label={pluginId}>
+      <div className={content}>Plugin '{pluginId}' has no Routes</div>
+    </main>
   );
 }
 

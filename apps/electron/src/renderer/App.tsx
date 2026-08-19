@@ -4,6 +4,7 @@ import { style, useStyles } from "purse-styles";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
+import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
 import { LoadingPage } from "./LoadingPage.tsx";
 import { MainPane } from "./MainPane.tsx";
 import { Onboarding } from "./Onboarding.tsx";
@@ -22,8 +23,12 @@ export function App() {
   const chooseWorkspace = useChooseWorkspaceMutation();
   const sessionsQuery = useSessionsQuery(workspace);
   const appInfoQuery = useAppInfoQuery();
-  usePluginsQuery(workspace);
+  const pluginsQuery = usePluginsQuery(workspace);
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
+  const pluginViews =
+    pluginsQuery.data === undefined ? [] : pluginsQuery.data.views;
+  const pluginErrors =
+    pluginsQuery.data === undefined ? [] : pluginsQuery.data.errors;
 
   if (workspaceQuery.isPending || workspace === undefined) {
     return <LoadingPage />;
@@ -43,13 +48,15 @@ export function App() {
     );
   }
 
-  if (!sessionsQuery.isFetched) {
+  if (!sessionsQuery.isFetched || !pluginsQuery.isFetched) {
     return <LoadingPage />;
   }
 
   return (
     <WorkspaceShell
       sessions={sessions}
+      pluginViews={pluginViews}
+      pluginErrors={pluginErrors}
       alertMessage={
         sessionsQuery.error ? String(sessionsQuery.error) : undefined
       }
@@ -60,10 +67,14 @@ export function App() {
 
 function WorkspaceShell({
   sessions,
+  pluginViews,
+  pluginErrors,
   alertMessage,
   appInfo,
 }: {
   sessions: SessionSummary[];
+  pluginViews: LoadedPluginView[];
+  pluginErrors: PluginLoadError[];
   alertMessage?: string;
   appInfo?: AppInfo;
 }) {
@@ -86,13 +97,15 @@ function WorkspaceShell({
         <div className={shell} data-testid="sessions-shell">
           <Sidebar
             sessions={sessions}
+            pluginViews={pluginViews}
+            pluginErrors={pluginErrors}
             onToggleTheme={() =>
               setPreference(resolvedTheme === "dark" ? "light" : "dark")
             }
             themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
             appInfo={appInfo}
           />
-          <MainPane sessions={sessions} />
+          <MainPane sessions={sessions} pluginViews={pluginViews} />
         </div>
       </Router>
     </div>

@@ -1,3 +1,4 @@
+import { PluginRuntimeProvider } from "@halo/plugin-sdk/view";
 import {
   Button,
   Icons,
@@ -13,14 +14,17 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import { Link, useLocation, useRoute } from "wouter";
+import { Link, Router, useLocation, useRoute } from "wouter";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
+import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
 import { HaloLogo } from "./HaloLogo.tsx";
 import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
 import { sidebarEntry, sidebarEntryLabel } from "./sidebarEntry.ts";
 
 type SidebarProps = {
   sessions: SessionSummary[];
+  pluginViews: LoadedPluginView[];
+  pluginErrors: PluginLoadError[];
   onToggleTheme: () => void;
   themeLabel: string;
   appInfo?: AppInfo;
@@ -28,6 +32,8 @@ type SidebarProps = {
 
 export function Sidebar({
   sessions,
+  pluginViews,
+  pluginErrors,
   onToggleTheme,
   themeLabel,
   appInfo,
@@ -45,6 +51,7 @@ export function Sidebar({
   const footer = useStyles(styles.footer);
   const versionLabel = useStyles(styles.versionLabel);
   const updateLabel = useStyles(styles.updateLabel);
+  const pluginError = useStyles(styles.pluginError);
 
   return (
     <nav className={sidebar} aria-label="Sessions">
@@ -75,6 +82,30 @@ export function Sidebar({
           ))}
         </ul>
       </section>
+      {pluginErrors.length > 0 ||
+      pluginViews.some((plugin) => plugin.Sidebar !== undefined) ? (
+        <ul className={sessionList}>
+          {pluginErrors.map((error) => (
+            <li key={error.id}>
+              <div className={pluginError} data-testid="plugin-error">
+                {error.id}: {error.message}
+              </div>
+            </li>
+          ))}
+          {pluginViews.map((plugin) => {
+            if (plugin.Sidebar === undefined) return undefined;
+            return (
+              <li key={plugin.id} data-testid={`plugin-sidebar-${plugin.id}`}>
+                <Router base={`/plugins/${plugin.id}`}>
+                  <PluginRuntimeProvider pluginId={plugin.id}>
+                    <plugin.Sidebar />
+                  </PluginRuntimeProvider>
+                </Router>
+              </li>
+            );
+          })}
+        </ul>
+      ) : undefined}
       <section className={section} aria-labelledby="uikit-label">
         <div className={sectionLabel} id="uikit-label">
           Develop
@@ -276,4 +307,13 @@ const styles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   }),
+  pluginError: style(
+    text("xs", 500, "highContrast"),
+    spacing.padding({ x: 4, y: 2 }),
+    {
+      color: "light-dark(#b42318, #ff9592)",
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere",
+    },
+  ),
 };
