@@ -67,7 +67,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - No view exports beyond `Sidebar` and `Routes`. Unknown named exports are ignored.
 - No plugin database, `state.ts`, Turso, libSQL, Drizzle, or `usePluginState`. Server methods hold any data they need for now.
 - No HTTP listener.
-- No plugin file watch, auto-reload, or `subscribePlugins`. Restart Halo (or reopen the workspace) to pick up plugin edits.
+- No plugin file watch, auto-reload, or `subscribePlugins`. Reload the window (View → Reload, Cmd-R / Ctrl-R) to pick up plugin edits.
 - No default plugin nav. If the plugin does not export `Sidebar`, the host draws nothing for it in the sidebar.
 - No React Router. Wouter is the router.
 - No bb-style exclusive thread list, content scripts, or composer slots.

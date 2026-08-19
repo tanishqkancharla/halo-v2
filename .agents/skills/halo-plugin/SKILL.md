@@ -24,7 +24,7 @@ Optional:
 
 Do not add extra npm dependencies. Import UI from `@halo/plugin-sdk/view`. Import `RpcTarget` from `@halo/plugin-sdk/server`. Parse JSON with `parseVersioned` from `@halo/plugin-sdk/schema`.
 
-Halo loads plugins once when the workspace is ready. Restart Halo to pick up edits.
+Halo loads plugins when the workspace is ready. Reload (View → Reload, or Cmd-R / Ctrl-R) to pick up plugin edits.
 
 ## package.json
 
