@@ -218,7 +218,7 @@ function PromptEditor({
         size="sm"
         className={editorSurface}
         actions={
-          <Button disabled={sendDisabled} onClick={submit}>
+          <Button aria-label="Send" disabled={sendDisabled} onClick={submit}>
             Send
           </Button>
         }
