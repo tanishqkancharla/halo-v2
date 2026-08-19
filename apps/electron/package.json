@@ -18,8 +18,8 @@
     "publish": "electron-forge publish",
     "format": "oxfmt src index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
     "format:check": "oxfmt --check src index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
-    "lint": "oxlint --deny-warnings src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
-    "lint:fix": "oxlint --fix src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
     "test": "vitest run src/main src/shared",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.main.json"
   },
