@@ -5,12 +5,10 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Route, Switch, useLocation } from "wouter";
 import {
   Button,
-  Icons,
   backgroundColor,
   colors,
   flex,
   flexItem,
-  icon,
   radius,
   shadowVars,
   spacing,
@@ -186,8 +184,6 @@ function PromptEditor({
   const errorId = useId();
   const editor = useStyles(styles.promptEditor);
   const editorSurface = useStyles(styles.editorSurface);
-  const sendButton = useStyles(styles.sendButton);
-  const sendIcon = useStyles(icon("sm"));
   const error = useStyles(styles.promptError);
   const trimmedText = draft.text.trim();
   const sendDisabled = trimmedText.length === 0;
@@ -222,13 +218,8 @@ function PromptEditor({
         size="sm"
         className={editorSurface}
         actions={
-          <Button
-            aria-label="Send"
-            className={sendButton}
-            disabled={sendDisabled}
-            onClick={submit}
-          >
-            <Icons.ArrowUp className={sendIcon} />
+          <Button disabled={sendDisabled} onClick={submit}>
+            Send
           </Button>
         }
       />
@@ -444,16 +435,6 @@ const styles = {
       outline: "none",
       boxShadow: shadowVars.subtle,
       zIndex: "auto",
-    },
-  }),
-  sendButton: style(radius.circle, {
-    boxShadow: "none",
-    backgroundColor: colors.gray[3],
-    "&:hover": {
-      backgroundColor: colors.gray[4],
-    },
-    "&:active": {
-      backgroundColor: colors.gray[5],
     },
   }),
   promptError: style(
