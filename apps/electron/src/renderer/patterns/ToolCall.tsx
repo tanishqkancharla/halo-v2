@@ -4,11 +4,17 @@ import {
   toolPartLabel,
   type SessionViewPart,
 } from "../agentSession/sessionView.ts";
+import { useWorkspaceQuery } from "../api/ApiProvider.tsx";
 
 type ToolPart = Extract<SessionViewPart, { kind: "tool" }>;
 
 export function ToolCall({ part }: { part: ToolPart }) {
-  const label = toolPartLabel(part);
+  const workspace = useWorkspaceQuery().data;
+  const workspaceRoot =
+    workspace?.status === "ready"
+      ? workspace.workspace.workspaceRoot
+      : undefined;
+  const label = toolPartLabel(part, workspaceRoot);
   const labelClassName = useStyles(styles.label);
   const shellClassName = useStyles(styles.shell);
 

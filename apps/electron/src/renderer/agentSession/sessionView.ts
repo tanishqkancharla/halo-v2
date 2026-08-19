@@ -121,22 +121,31 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
 }
 
 /** Maui AiChat labels for Pi coding tools. */
-export function toolPartLabel(part: {
-  toolName: string;
-  args: unknown;
-}): ToolPartLabel {
+export function toolPartLabel(
+  part: {
+    toolName: string;
+    args: unknown;
+  },
+  workspaceRoot: string | undefined,
+): ToolPartLabel {
   if (part.toolName === "read") {
     if (!Value.Check(pathArgsSchema, part.args)) {
       return { kind: "other", text: part.toolName };
     }
-    return { kind: "read", text: part.args.path };
+    return {
+      kind: "read",
+      text: stripWorkspaceRootPrefix(part.args.path, workspaceRoot),
+    };
   }
 
   if (part.toolName === "write" || part.toolName === "edit") {
     if (!Value.Check(pathArgsSchema, part.args)) {
       return { kind: "other", text: part.toolName };
     }
-    return { kind: "wrote", text: part.args.path };
+    return {
+      kind: "wrote",
+      text: stripWorkspaceRootPrefix(part.args.path, workspaceRoot),
+    };
   }
 
   if (part.toolName === "bash") {
@@ -165,6 +174,24 @@ export function toolPartLabel(part: {
   }
 
   return { kind: "other", text: part.toolName };
+}
+
+function stripWorkspaceRootPrefix(
+  filePath: string,
+  workspaceRoot: string | undefined,
+): string {
+  if (workspaceRoot === undefined) return filePath;
+  const root = toPosixPath(workspaceRoot).replace(/\/+$/, "");
+  const posix = toPosixPath(filePath);
+  if (posix === root) return ".";
+  if (!posix.startsWith(`${root}/`)) return filePath;
+  const relative = posix.slice(root.length + 1);
+  if (relative.length === 0) return ".";
+  return relative;
+}
+
+function toPosixPath(value: string): string {
+  return value.replaceAll("\\", "/");
 }
 
 function toolResultsByCallId(state: AgentSessionState): Map<string, string> {
