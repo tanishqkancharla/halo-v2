@@ -12,6 +12,7 @@ import { basename, join, relative, sep } from "node:path";
 import * as watcher from "@parcel/watcher";
 import * as errore from "errore";
 import type { WorkspaceTreeEvent } from "../shared/rpc.js";
+import { seedPluginWorkspace } from "./plugins/seedPluginWorkspace.js";
 
 export type WorkspaceLayout = {
   root: string;
@@ -230,6 +231,9 @@ export class WorkspaceService {
       mode: 0o700,
     }).catch((e) => new WorkspaceIoError({ cause: e }));
     if (sessionDir instanceof Error) return sessionDir;
+
+    const seeded = await seedPluginWorkspace(layout);
+    if (seeded instanceof Error) return seeded;
 
     const preference = await writeWorkspacePreference(this.appDataDir, root);
     if (preference instanceof Error) return preference;

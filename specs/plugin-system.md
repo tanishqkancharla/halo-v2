@@ -622,7 +622,7 @@ type CalendarPackage = {
 +`parseVersioned` from `@halo/plugin-sdk/schema`.
 ```
 
-- [ ] Seed `calendar` (`package.json` with `halo.version: 1` + `view.tsx`) only when those files are missing. `Sidebar` uses wouter `Link`. `Routes` is a component with `Route path="/"`. Import from `@halo/plugin-sdk/view` only.
-- [ ] Add `halo-plugin` skill; seed it under `.pi/agent/skills/halo-plugin/SKILL.md`. Keep a test that the bundled skill matches the repo skill.
-- [ ] Update Cursor Cloud notes in `AGENTS.md` if they need the plugin path.
-- [ ] Run `pnpm run check-affected`. Prove with `pnpm halo-web` that Calendar opens from the sidebar after a cold workspace seed. Record the UI demo required for this change.
+- [x] Seed `calendar` (`package.json` with `halo.version: 1` + `view.tsx`) only when those files are missing. `Sidebar` uses wouter `Link`. `Routes` is a component with `Route path="/"`. Import from `@halo/plugin-sdk/view` only.
+- [x] Add `halo-plugin` skill; seed it under `.pi/agent/skills/halo-plugin/SKILL.md`. Keep a test that the bundled skill matches the repo skill.
+- [x] Update Cursor Cloud notes in `AGENTS.md` if they need the plugin path.
+- [x] Run `pnpm run check-affected`. Prove with `pnpm halo-web` that Calendar opens from the sidebar after a cold workspace seed. Record the UI demo required for this change.

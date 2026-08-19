@@ -1,6 +1,7 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Logger } from "@repo/logger";
 import { newMessagePortRpcSession } from "capnweb";
 import { describe, expect, test } from "vitest";
@@ -65,6 +66,86 @@ describe("PluginService", () => {
     async ({ workspace }) => {
       const listed = await new PluginService(workspace).list();
       expect(listed).toBeInstanceOf(WorkspaceNotReadyError);
+    },
+  );
+
+  pluginTest(
+    "seeds calendar and the halo-plugin skill when a workspace is chosen",
+    async ({ workspace, workspaceRoot }) => {
+      const selected = await workspace.select(workspaceRoot);
+      if (selected instanceof Error) throw selected;
+
+      const listed = await new PluginService(workspace).list();
+      if (listed instanceof Error) throw listed;
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.plugins[0]?.halo.name).toBe("Calendar");
+      expect(listed.errors).toEqual([]);
+
+      const loaded = loadPluginViews(listed);
+      expect(loaded.views[0]?.Sidebar).toBeTypeOf("function");
+      expect(loaded.views[0]?.Routes).toBeTypeOf("function");
+      expect(loaded.errors).toEqual([]);
+
+      const repoSkill = await readFile(
+        fileURLToPath(
+          new URL(
+            "../../../../../.agents/skills/halo-plugin/SKILL.md",
+            import.meta.url,
+          ),
+        ),
+        "utf8",
+      );
+      const bundledSkill = await readFile(
+        fileURLToPath(
+          new URL("../bundled/haloPluginSkill.md", import.meta.url),
+        ),
+        "utf8",
+      );
+      expect(bundledSkill).toBe(repoSkill);
+
+      const seededSkill = await readFile(
+        join(
+          workspaceRoot,
+          ".pi",
+          "agent",
+          "skills",
+          "halo-plugin",
+          "SKILL.md",
+        ),
+        "utf8",
+      );
+      expect(seededSkill).toBe(repoSkill);
+    },
+  );
+
+  pluginTest(
+    "leaves an existing calendar plugin in place",
+    async ({ workspace, workspaceRoot }) => {
+      const packagePath = join(
+        workspaceRoot,
+        ".halo",
+        "plugins",
+        "calendar",
+        "package.json",
+      );
+      await mkdir(dirname(packagePath), { recursive: true });
+      await writeFile(
+        packagePath,
+        src`
+          {
+            "name": "halo-plugin-calendar",
+            "halo": { "version": 1, "name": "Custom" }
+          }
+        `,
+      );
+
+      const selected = await workspace.select(workspaceRoot);
+      if (selected instanceof Error) throw selected;
+
+      const listed = await new PluginService(workspace).list();
+      if (listed instanceof Error) throw listed;
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.plugins[0]?.halo.name).toBe("Custom");
     },
   );
 
