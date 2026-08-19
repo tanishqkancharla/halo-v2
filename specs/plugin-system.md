@@ -519,7 +519,7 @@ export function Routes() {
 - [x] Render `Routes` only when the location is under `/plugins/:pluginId`. Keep Files / Sessions / Develop as they are.
 - [x] Show plugin load errors in the sidebar (`data-testid="plugin-error"`). Load plugins with a one-shot `listPlugins` query. Do not subscribe.
 - [x] `evaluatePluginView` `require`s `wouter` from the host map so plugin `Link` uses the app context.
-- [ ] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that a fixture plugin's sidebar link opens its `Routes` in the main pane.
+- [x] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that a fixture plugin's sidebar link opens its `Routes` in the main pane.
 
 ### Phase 8: Plugin server as an oRPC sub-router
 
