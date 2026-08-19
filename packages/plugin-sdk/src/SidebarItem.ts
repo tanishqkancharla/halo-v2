@@ -74,7 +74,6 @@ const itemClass = style(navigationItem, sidebarPadding, {
   columnGap: spacing.value(3),
   minWidth: 0,
   width: "100%",
-  boxSizing: "border-box",
   borderRadius: 0,
   paddingTop: spacing.value(2),
   paddingBottom: spacing.value(2),

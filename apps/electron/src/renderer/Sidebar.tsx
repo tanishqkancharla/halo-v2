@@ -3,12 +3,12 @@ import {
   SidebarItem,
   SidebarSection,
   sidebarPadding,
+  sidebarSection,
 } from "@halo/plugin-sdk/view";
 import type { RpcStub, RpcTarget } from "capnweb";
 import {
   Button,
   Icons,
-  border,
   colors,
   flex,
   flexItem,
@@ -204,20 +204,12 @@ const styles = {
     alignSelf: "stretch",
     width: "100%",
   }),
-  filesSection: style(
-    flex({ direction: "column", gap: 4 }),
-    flexItem({ size: "hug" }),
-    border(["top", "bottom"], "outline"),
-    {
-      minWidth: 0,
-      minHeight: 0,
-      maxHeight: `${filesSectionMaxHeightPx}px`,
-      overflow: "hidden",
-      marginTop: spacing.value(8),
-      width: "100%",
-      boxSizing: "border-box",
-    },
-  ),
+  filesSection: style(sidebarSection, flexItem({ size: "hug" }), {
+    minHeight: 0,
+    maxHeight: `${filesSectionMaxHeightPx}px`,
+    overflow: "hidden",
+    marginTop: spacing.value(8),
+  }),
   filesTree: style(flexItem({ size: "hug" }), {
     minWidth: 0,
     minHeight: 0,

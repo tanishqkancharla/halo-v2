@@ -112,7 +112,11 @@ export {
   useRoute,
 } from "wouter";
 export { SidebarItem } from "./SidebarItem.js";
-export { SidebarSection, sidebarPadding } from "./SidebarSection.js";
+export {
+  SidebarSection,
+  sidebarPadding,
+  sidebarSection,
+} from "./SidebarSection.js";
 
 export type PluginRuntimeValue = {
   pluginId: string;

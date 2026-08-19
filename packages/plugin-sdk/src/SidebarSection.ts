@@ -1,8 +1,27 @@
 import { createElement, useId, type ReactNode } from "react";
-import { flex, spacing, text } from "maui";
+import {
+  borderColor,
+  flex,
+  motionDurationMs,
+  motionEasing,
+  spacing,
+  text,
+} from "maui";
 import { style, useStyles } from "purse-styles";
 
 export const sidebarPadding = style(spacing.padding({ x: 3 }));
+
+export const sidebarSection = style(flex({ direction: "column", gap: 4 }), {
+  minWidth: 0,
+  width: "100%",
+  borderTop: "1px solid transparent",
+  borderBottom: "1px solid transparent",
+  transition: `border-color ${motionDurationMs}ms ${motionEasing}`,
+  "&:hover": {
+    borderTopColor: borderColor.outline,
+    borderBottomColor: borderColor.outline,
+  },
+});
 
 type SidebarSectionProps = {
   label: string;
@@ -32,9 +51,7 @@ export function SidebarSection(props: SidebarSectionProps) {
   );
 }
 
-const sectionClass = style(flex({ direction: "column", gap: 4 }), {
-  minWidth: 0,
-  width: "100%",
+const sectionClass = style(sidebarSection, {
   marginTop: spacing.value(4),
 });
 
