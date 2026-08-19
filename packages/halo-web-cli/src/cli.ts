@@ -9,6 +9,7 @@ const readPageCommand = `exec '${readPageSource}'`;
 async function readStdin(): Promise<string> {
   process.stdin.setEncoding("utf8");
   let source = "";
+  // SAFETY: setEncoding("utf8") makes stdin yield strings.
   for await (const chunk of process.stdin as AsyncIterable<string>) {
     source += chunk;
   }

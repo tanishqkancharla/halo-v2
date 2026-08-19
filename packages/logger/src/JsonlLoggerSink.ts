@@ -1,42 +1,52 @@
 import { appendFileSync } from "node:fs";
-import type { LoggerEntry, LoggerSinkApi } from "./Logger.js";
+import type { LoggerEntry, LoggerSinkApi, LoggerValue } from "./Logger.js";
 
-function serializeLogValue(
-  value: unknown,
+export type JsonLogValue =
+  | string
+  | number
+  | boolean
+  | readonly JsonLogValue[]
+  | { readonly [key: string]: JsonLogValue };
+
+function serializeLoggerValue(
+  args: { value: LoggerValue },
   seen = new WeakSet<object>(),
-): unknown {
+): JsonLogValue {
+  const value = args.value;
   if (value instanceof Error) {
     return {
       name: value.name,
       message: value.message,
-      stack: value.stack,
+      stack: value.stack ?? "",
     };
   }
 
-  if (typeof value === "bigint") {
-    return value.toString();
-  }
-
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  if (seen.has(value)) {
-    return "[Circular]";
-  }
-
-  seen.add(value);
-
   if (Array.isArray(value)) {
-    return value.map((item) => serializeLogValue(item, seen));
+    return value.map((item) => serializeLoggerValue({ value: item }, seen));
   }
 
-  return Object.fromEntries(
-    Object.entries(value).map(([key, entryValue]) => [
-      key,
-      serializeLogValue(entryValue, seen),
-    ]),
-  );
+  const tag = {}.toString.call(value);
+  if (tag === "[object BigInt]") {
+    return String(value);
+  }
+
+  if (tag === "[object Object]") {
+    // SAFETY: remaining object LoggerValue is a string-keyed bag of LoggerValue.
+    const record = value as { readonly [key: string]: LoggerValue };
+    if (seen.has(record)) {
+      return "[Circular]";
+    }
+    seen.add(record);
+    return Object.fromEntries(
+      Object.entries(record).map(([key, entryValue]) => [
+        key,
+        serializeLoggerValue({ value: entryValue }, seen),
+      ]),
+    );
+  }
+
+  // SAFETY: remaining LoggerValue after Error, array, bigint, and object is a JSON primitive.
+  return value as string | number | boolean;
 }
 
 export class JsonlLoggerSink implements LoggerSinkApi {
@@ -49,7 +59,7 @@ export class JsonlLoggerSink implements LoggerSinkApi {
   log(entry: LoggerEntry) {
     appendFileSync(
       this.filePath,
-      `${JSON.stringify(serializeLogValue(entry))}\n`,
+      `${JSON.stringify(serializeLoggerValue({ value: entry }))}\n`,
     );
   }
 }
