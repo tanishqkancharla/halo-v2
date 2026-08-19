@@ -51,6 +51,15 @@ const webFetchParameters = Type.Object({
   ),
 });
 
+type ParallelToolArguments = {
+  session_id?: string;
+  model_name?: string;
+  objective?: string;
+  search_queries?: string[];
+  urls?: string[];
+  full_content?: boolean;
+};
+
 export function createParallelSearchTools(userId: string): ToolDefinition[] {
   const client = new Client({ name: "halo", version: "1" });
   let connectPromise: Promise<void | ParallelMcpError> | undefined;
@@ -73,7 +82,7 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
   async function callParallelTool(args: {
     name: string;
     modelName: string | undefined;
-    arguments: Record<string, unknown>;
+    arguments: ParallelToolArguments;
     signal: AbortSignal | undefined;
   }) {
     const connected = await ensureConnected();
@@ -84,7 +93,7 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
       };
     }
 
-    const toolArguments: Record<string, unknown> = {
+    const toolArguments: ParallelToolArguments = {
       ...args.arguments,
       // Parallel free-tier rate limits by session_id; Halo's user id is that key.
       session_id: userId,
@@ -107,6 +116,7 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
       };
     }
 
+    // SAFETY: CallToolResultSchema already validated this payload; the SDK index signature widens `content`.
     const callResult = result as CallToolResult;
     return {
       content: callResult.content.flatMap((part) => {
@@ -130,6 +140,7 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
     ],
     parameters: webSearchParameters,
     execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
+      // SAFETY: Pi validates params against webSearchParameters before execute.
       const search = params as Static<typeof webSearchParameters>;
       return callParallelTool({
         name: "web_search",
@@ -155,8 +166,9 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
     ],
     parameters: webFetchParameters,
     execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
+      // SAFETY: Pi validates params against webFetchParameters before execute.
       const fetchParams = params as Static<typeof webFetchParameters>;
-      const toolArguments: Record<string, unknown> = {
+      const toolArguments: ParallelToolArguments = {
         urls: fetchParams.urls,
       };
       if (fetchParams.objective !== undefined) {

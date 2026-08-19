@@ -9,15 +9,30 @@ export type SessionViewItem =
       parts: SessionViewPart[];
     };
 
+export type ToolCallArgs = {
+  path?: string;
+  command?: string;
+  objective?: string;
+  urls?: string[];
+};
+
 export type SessionViewPart =
   | { kind: "text"; id: string; text: string; streaming: boolean }
   | {
       kind: "tool";
       id: string;
       toolName: string;
-      args: unknown;
+      args: ToolCallArgs;
       resultText?: string;
     };
+
+export type ToolPartLabel = {
+  kind: "read" | "wrote" | "shell" | "other";
+  text: string;
+};
+
+type JsonObject = { readonly [key: string]: JsonValue };
+type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 
 /**
  * Project AgentSessionState into view rows: one user bubble per user message,
@@ -61,13 +76,16 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
       if (emittedTools.has(part.id)) continue;
       emittedTools.add(part.id);
       const resultText = toolResults.get(part.id);
-      assistantParts.push({
+      const toolPart: Extract<SessionViewPart, { kind: "tool" }> = {
         kind: "tool",
         id: part.id,
         toolName: part.name,
-        args: part.arguments,
-        ...(resultText === undefined ? {} : { resultText }),
-      });
+        args: parseToolCallArgs(part.arguments),
+      };
+      if (resultText !== undefined) {
+        toolPart.resultText = resultText;
+      }
+      assistantParts.push(toolPart);
     }
   }
 
@@ -95,55 +113,70 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
 }
 
 /** Maui AiChat labels for Pi coding tools. */
-export function toolPartLabel(part: { toolName: string; args: unknown }): {
-  kind: "read" | "wrote" | "shell" | "other";
-  text: string;
-} {
+export function toolPartLabel(part: {
+  toolName: string;
+  args: ToolCallArgs;
+}): ToolPartLabel {
   const args = part.args;
-  if (typeof args !== "object" || args === null) {
-    return { kind: "other", text: part.toolName };
-  }
 
   if (part.toolName === "read") {
-    if (!("path" in args) || typeof args.path !== "string") {
+    if (args.path === undefined) {
       return { kind: "other", text: part.toolName };
     }
     return { kind: "read", text: args.path };
   }
 
   if (part.toolName === "write" || part.toolName === "edit") {
-    if (!("path" in args) || typeof args.path !== "string") {
+    if (args.path === undefined) {
       return { kind: "other", text: part.toolName };
     }
     return { kind: "wrote", text: args.path };
   }
 
   if (part.toolName === "bash") {
-    if (!("command" in args) || typeof args.command !== "string") {
+    if (args.command === undefined) {
       return { kind: "other", text: part.toolName };
     }
     return { kind: "shell", text: args.command };
   }
 
   if (part.toolName === "web_search") {
-    if (!("objective" in args) || typeof args.objective !== "string") {
+    if (args.objective === undefined) {
       return { kind: "other", text: part.toolName };
     }
     return { kind: "other", text: `Search ${args.objective}` };
   }
 
   if (part.toolName === "web_fetch") {
-    if (!("urls" in args) || !Array.isArray(args.urls)) {
-      return { kind: "other", text: part.toolName };
-    }
-    const url = args.urls[0];
-    if (typeof url !== "string") {
+    const url = args.urls?.[0];
+    if (url === undefined) {
       return { kind: "other", text: part.toolName };
     }
     return { kind: "other", text: `Fetch ${url}` };
   }
 
   return { kind: "other", text: part.toolName };
+}
+
+function isJsonObject(value: JsonValue): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJsonString(value: JsonValue | undefined): value is string {
+  return typeof value === "string";
+}
+
+function parseToolCallArgs(value: JsonValue): ToolCallArgs {
+  if (!isJsonObject(value)) return {};
+  const args: ToolCallArgs = {};
+  if (isJsonString(value.path)) args.path = value.path;
+  if (isJsonString(value.command)) args.command = value.command;
+  if (isJsonString(value.objective)) args.objective = value.objective;
+  if (Array.isArray(value.urls)) {
+    const urls = value.urls.filter(isJsonString);
+    if (urls.length > 0) args.urls = urls;
+  }
+  return args;
 }
 
 function toolResultsByCallId(state: AgentSessionState): Map<string, string> {
@@ -167,11 +200,13 @@ function toolResultText(message: AgentMessage): string {
 
 function userText(message: AgentMessage): string {
   if (message.role !== "user") return "";
-  if (typeof message.content === "string") return message.content;
-  return message.content
-    .flatMap((part) => {
-      if (part.type !== "text") return [];
-      return [part.text];
-    })
-    .join("");
+  if (Array.isArray(message.content)) {
+    return message.content
+      .flatMap((part) => {
+        if (part.type !== "text") return [];
+        return [part.text];
+      })
+      .join("");
+  }
+  return message.content;
 }

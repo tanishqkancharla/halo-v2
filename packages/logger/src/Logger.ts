@@ -1,8 +1,17 @@
 export type LogLevel = "debug" | "info" | "warn" | "log" | "error";
 
-export type LoggerData = Record<string, unknown>;
+export type LoggerValue =
+  | string
+  | number
+  | boolean
+  | undefined
+  | Error
+  | readonly LoggerValue[]
+  | { readonly [key: string]: LoggerValue };
 
-export type LoggerScope = Record<string, LoggerData>;
+export type LoggerData = { readonly [key: string]: LoggerValue };
+
+export type LoggerScope = { readonly [key: string]: LoggerData };
 
 export type LoggerEntry = {
   timestamp: string;

@@ -12,9 +12,23 @@ export class BrowserToolsError extends errore.createTaggedError({
   message: "Browser tools failed: $reason",
 }) {}
 
-type DebuggerVersion = {
-  webSocketDebuggerUrl: string;
-};
+function isDebuggerUrl(value: string | undefined): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function parseDebuggerVersion(value: { webSocketDebuggerUrl?: string } | null) {
+  if (value === null) {
+    return new BrowserToolsError({
+      reason: "Missing webSocketDebuggerUrl",
+    });
+  }
+  if (!isDebuggerUrl(value.webSocketDebuggerUrl)) {
+    return new BrowserToolsError({
+      reason: "Missing webSocketDebuggerUrl",
+    });
+  }
+  return { webSocketDebuggerUrl: value.webSocketDebuggerUrl };
+}
 
 type ConnectedTools = {
   sessionId: string;
@@ -46,13 +60,15 @@ async function connect() {
   );
   if (response instanceof Error) return response;
 
-  const version = await (response.json() as Promise<DebuggerVersion>).catch(
+  const payload = await response.json().catch(
     (e) =>
       new BrowserToolsError({
         reason: "Invalid debugger version response",
         cause: e,
       }),
   );
+  if (payload instanceof Error) return payload;
+  const version = parseDebuggerVersion(payload);
   if (version instanceof Error) return version;
 
   const toolkit = createBrowserTools(new LocalBrowserProvider());

@@ -7,13 +7,26 @@ import {
 } from "capnweb";
 import * as errore from "errore";
 
+type StructuredCloneMessage =
+  | string
+  | number
+  | boolean
+  | bigint
+  | ArrayBuffer
+  | Uint8Array
+  | Date
+  | RegExp
+  | Error
+  | readonly StructuredCloneMessage[]
+  | { readonly [key: string]: StructuredCloneMessage };
+
 /**
  * Cap'n Web session over Electron's MessagePortMain.
  * Mirrors capnweb's MessagePortTransport, but uses the Node-style EventEmitter API.
  */
 export function newMessagePortMainRpcSession<T extends object>(
   port: MessagePortMain,
-  localMain?: unknown,
+  localMain?: T,
   options?: RpcSessionOptions,
 ): RpcStub<T> {
   const transport = new MessagePortMainTransport(port);
@@ -24,10 +37,12 @@ export function newMessagePortMainRpcSession<T extends object>(
 class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
   readonly encodingLevel = "structuredClonable" as const;
 
-  private receiveResolver: ((message: unknown) => void) | undefined;
-  private receiveRejecter: ((err: unknown) => void) | undefined;
-  private receiveQueue: unknown[] = [];
-  private error: unknown;
+  private receiveResolver:
+    | ((message: StructuredCloneMessage) => void)
+    | undefined;
+  private receiveRejecter: ((err: Error) => void) | undefined;
+  private receiveQueue: StructuredCloneMessage[] = [];
+  private error: Error | undefined;
 
   constructor(private port: MessagePortMain) {
     port.start();
@@ -50,14 +65,14 @@ class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
     });
   }
 
-  send(message: unknown): void {
+  send(message: StructuredCloneMessage): void {
     if (this.error !== undefined) throw this.error;
     // MessagePortMain.postMessage has no targetOrigin (unlike window.postMessage).
     // oxlint-disable-next-line unicorn/require-post-message-target-origin
     this.port.postMessage(message);
   }
 
-  async receive(): Promise<unknown> {
+  async receive(): Promise<StructuredCloneMessage> {
     const queued = this.receiveQueue.shift();
     if (queued !== undefined) return queued;
     if (this.error !== undefined) throw this.error;
@@ -67,7 +82,7 @@ class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
     });
   }
 
-  abort(reason: unknown): void {
+  abort(reason: Error): void {
     // Cap'n Web signals peer close with null; Electron may already have closed the port.
     const signaled = errore.try({
       try: () => {
@@ -85,7 +100,7 @@ class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
     if (this.error === undefined) this.error = reason;
   }
 
-  private receivedError(reason: unknown): void {
+  private receivedError(reason: Error): void {
     if (this.error !== undefined) return;
     this.error = reason;
     if (this.receiveRejecter !== undefined) {

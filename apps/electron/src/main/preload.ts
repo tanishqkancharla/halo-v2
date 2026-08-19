@@ -34,16 +34,19 @@ type LogMessage = {
   };
 };
 
-function isLogMessage(data: unknown): data is LogMessage {
-  if (typeof data !== "object" || data === null) return false;
-  if (!("channel" in data) || data.channel !== LOG_CHANNELS.log) return false;
-  if (!("payload" in data) || typeof data.payload !== "object") return false;
-  if (data.payload === null) return false;
-  if (
-    !("level" in data.payload) ||
-    !("scopes" in data.payload) ||
-    !("data" in data.payload)
-  ) {
+type WindowMessage = LogMessage | typeof RPC_CHANNELS.requestRpc;
+
+function isRecord(value: WindowMessage): value is LogMessage {
+  return typeof value === "object" && value !== null;
+}
+
+function isLogMessage(data: WindowMessage): data is LogMessage {
+  if (!isRecord(data)) return false;
+  if (data.channel !== LOG_CHANNELS.log) return false;
+  if (!("payload" in data)) return false;
+  const payload = data.payload;
+  if (payload === null || typeof payload !== "object") return false;
+  if (!("level" in payload) || !("scopes" in payload) || !("data" in payload)) {
     return false;
   }
   return true;

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { JsonlLoggerSink } from "./JsonlLoggerSink.js";
 import { Logger, type LoggerEntry, type LoggerSinkApi } from "./Logger.js";
+// LoggerEntry remains used by CollectingSink.
 
 class CollectingSink implements LoggerSinkApi {
   readonly entries: LoggerEntry[] = [];
@@ -86,7 +87,7 @@ describe("JsonlLoggerSink", () => {
 
     const lines = (await readFile(filePath, "utf8")).trimEnd().split("\n");
     expect(lines).toHaveLength(1);
-    const parsed = JSON.parse(lines[0]!) as LoggerEntry;
+    const parsed = JSON.parse(lines[0]!);
     expect(parsed.level).toBe("error");
     expect(parsed.scopes).toEqual([{ main: {} }]);
     expect(parsed.data).toEqual({

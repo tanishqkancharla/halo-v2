@@ -365,7 +365,7 @@ async function readWorkspacePreference(appDataDir: string) {
   if (raw instanceof Error) return raw;
 
   const parsed = errore.try({
-    try: () => JSON.parse(raw) as unknown,
+    try: () => JSON.parse(raw),
     catch: (e) => new WorkspaceIoError({ cause: e }),
   });
   if (parsed instanceof Error) {
@@ -377,19 +377,25 @@ async function readWorkspacePreference(appDataDir: string) {
     return undefined;
   }
 
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("workspaceRoot" in parsed) ||
-    typeof parsed.workspaceRoot !== "string"
-  ) {
+  const preference = parseWorkspacePreference(parsed);
+  if (preference === undefined) {
     const cleared = await clearWorkspacePreference(appDataDir);
     if (cleared instanceof Error) {
       console.warn("Could not clear workspace preference:", cleared.message);
     }
     return undefined;
   }
-  return { workspaceRoot: parsed.workspaceRoot };
+  return preference;
+}
+
+function isWorkspaceRoot(value: string | undefined): value is string {
+  return typeof value === "string";
+}
+
+function parseWorkspacePreference(value: { workspaceRoot?: string } | null) {
+  if (value === null) return undefined;
+  if (!isWorkspaceRoot(value.workspaceRoot)) return undefined;
+  return { workspaceRoot: value.workspaceRoot };
 }
 
 async function writeWorkspacePreference(
