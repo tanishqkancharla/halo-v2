@@ -1,4 +1,8 @@
-import { PluginRuntimeProvider } from "@halo/plugin-sdk/view";
+import {
+  PluginRuntimeProvider,
+  SidebarItem,
+  SidebarSection,
+} from "@halo/plugin-sdk/view";
 import type { RpcStub, RpcTarget } from "capnweb";
 import {
   Button,
@@ -15,12 +19,11 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import { Link, Router, useLocation, useRoute } from "wouter";
+import { Router, useLocation } from "wouter";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
 import { HaloLogo } from "./HaloLogo.tsx";
 import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
-import { sidebarEntry, sidebarEntryLabel } from "./sidebarEntry.ts";
 
 type SidebarProps = {
   sessions: SessionSummary[];
@@ -46,7 +49,6 @@ export function Sidebar({
   const logo = useStyles(styles.logo);
   const newButton = useStyles(styles.newButton);
   const newIcon = useStyles(icon("sm"));
-  const section = useStyles(styles.section);
   const filesSection = useStyles(styles.filesSection);
   const filesTree = useStyles(styles.filesTree);
   const sectionLabel = useStyles(styles.sectionLabel);
@@ -73,20 +75,17 @@ export function Sidebar({
           <WorkspaceFilesystem maxHeight={filesTreeMaxHeightPx} />
         </div>
       </section>
-      <section className={section} aria-labelledby="sessions-label">
-        <div className={sectionLabel} id="sessions-label">
-          Sessions
-        </div>
-        <ul className={sessionList}>
-          {sessions.map((session) => (
-            <li key={session.sessionId}>
-              <SessionNavLink session={session} />
-            </li>
-          ))}
-        </ul>
-      </section>
-      {pluginErrors.length > 0 ||
-      pluginViews.some((plugin) => plugin.Sidebar !== undefined) ? (
+      <SidebarSection label="Sessions">
+        {sessions.map((session) => (
+          <SidebarItem
+            key={session.sessionId}
+            href={`/sessions/${session.sessionId}`}
+          >
+            {session.title ? session.title : session.sessionId}
+          </SidebarItem>
+        ))}
+      </SidebarSection>
+      {pluginErrors.length > 0 ? (
         <ul className={sessionList}>
           {pluginErrors.map((error) => (
             <li key={error.id}>
@@ -95,33 +94,26 @@ export function Sidebar({
               </div>
             </li>
           ))}
-          {pluginViews.map((plugin) => {
-            if (plugin.Sidebar === undefined) return undefined;
-            return (
-              <li key={plugin.id} data-testid={`plugin-sidebar-${plugin.id}`}>
-                <Router base={`/plugins/${plugin.id}`}>
-                  <PluginRuntimeProvider
-                    pluginId={plugin.id}
-                    server={pluginServers[plugin.id]}
-                  >
-                    <plugin.Sidebar />
-                  </PluginRuntimeProvider>
-                </Router>
-              </li>
-            );
-          })}
         </ul>
       ) : undefined}
-      <section className={section} aria-labelledby="uikit-label">
-        <div className={sectionLabel} id="uikit-label">
-          Develop
-        </div>
-        <ul className={sessionList}>
-          <li>
-            <UiKitNavLink />
-          </li>
-        </ul>
-      </section>
+      {pluginViews.map((plugin) => {
+        if (plugin.Sidebar === undefined) return undefined;
+        return (
+          <div key={plugin.id} data-testid={`plugin-sidebar-${plugin.id}`}>
+            <Router base={`/plugins/${plugin.id}`}>
+              <PluginRuntimeProvider
+                pluginId={plugin.id}
+                server={pluginServers[plugin.id]}
+              >
+                <plugin.Sidebar />
+              </PluginRuntimeProvider>
+            </Router>
+          </div>
+        );
+      })}
+      <SidebarSection label="Develop">
+        <SidebarItem href="/uikit">UI kit</SidebarItem>
+      </SidebarSection>
       {appInfo !== undefined && (
         <div className={footer} data-testid="app-update-status">
           <div className={versionLabel}>Halo {appInfo.version}</div>
@@ -150,40 +142,6 @@ function NewSessionButton({
       <Icons.Plus className={iconClassName} aria-hidden="true" />
       New session
     </Button>
-  );
-}
-
-function SessionNavLink({ session }: { session: SessionSummary }) {
-  const entry = useStyles(sidebarEntry);
-  const entryLabel = useStyles(sidebarEntryLabel);
-  const sessionRoute = useRoute("/sessions/:sessionId");
-  const active =
-    sessionRoute[0] && sessionRoute[1].sessionId === session.sessionId;
-  return (
-    <Link
-      href={`/sessions/${session.sessionId}`}
-      className={entry}
-      aria-current={active ? "page" : undefined}
-    >
-      <span className={entryLabel}>
-        {session.title ? session.title : session.sessionId}
-      </span>
-    </Link>
-  );
-}
-
-function UiKitNavLink() {
-  const entry = useStyles(sidebarEntry);
-  const entryLabel = useStyles(sidebarEntryLabel);
-  const [isUiKit] = useRoute("/uikit");
-  return (
-    <Link
-      href="/uikit"
-      className={entry}
-      aria-current={isUiKit ? "page" : undefined}
-    >
-      <span className={entryLabel}>UI kit</span>
-    </Link>
   );
 }
 
@@ -243,10 +201,6 @@ const styles = {
     width: `calc(100% - ${spacing.value(4)} - ${spacing.value(4)})`,
     marginInline: spacing.value(4),
   }),
-  section: style(flex({ direction: "column", gap: 4 }), {
-    minWidth: 0,
-    marginTop: spacing.value(4),
-  }),
   filesSection: style(
     flex({ direction: "column", gap: 4 }),
     flexItem({ size: "hug" }),
@@ -283,7 +237,7 @@ const styles = {
   }),
   sectionLabel: style(
     text("xs", 500, "lowContrast"),
-    spacing.padding({ x: 4 }),
+    spacing.padding({ x: 3 }),
     {
       letterSpacing: "0.02em",
     },

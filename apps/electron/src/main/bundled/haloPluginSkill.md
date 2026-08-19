@@ -42,13 +42,22 @@ Halo loads plugins once when the workspace is ready. Restart Halo to pick up edi
 
 ## View
 
-`Sidebar` mounts in the app sidebar only when you export it. `Routes` fills the main pane at `/plugins/<id>`. Both are React components. Use wouter `Link` and `Route` from the SDK. Plugin links are relative to `/plugins/<id>`.
+`Sidebar` mounts in the app sidebar only when you export it. `Routes` fills the main pane at `/plugins/<id>`. Both are React components. Use `SidebarSection` and `SidebarItem` for sidebar chrome. Plugin links are relative to `/plugins/<id>`.
 
 ```tsx
-import { Link, Route, Switch } from "@halo/plugin-sdk/view";
+import {
+  Route,
+  SidebarItem,
+  SidebarSection,
+  Switch,
+} from "@halo/plugin-sdk/view";
 
 export function Sidebar() {
-  return <Link href="/">Notes</Link>;
+  return (
+    <SidebarSection label="Notes">
+      <SidebarItem href="/">Scratch</SidebarItem>
+    </SidebarSection>
+  );
 }
 
 export function Routes() {

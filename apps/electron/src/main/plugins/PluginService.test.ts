@@ -194,10 +194,14 @@ describe("PluginService", () => {
             }
           `,
           "view.tsx": src`
-            import { Button, Route } from "@halo/plugin-sdk/view"
+            import { Route, SidebarItem, SidebarSection } from "@halo/plugin-sdk/view"
 
             export function Sidebar() {
-              return <Button>Calendar</Button>
+              return (
+                <SidebarSection label="Calendar">
+                  <SidebarItem href="/">Month</SidebarItem>
+                </SidebarSection>
+              )
             }
 
             export function Routes() {

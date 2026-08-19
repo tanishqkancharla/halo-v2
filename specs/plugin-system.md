@@ -147,7 +147,7 @@ export function usePluginServer<S extends RpcTarget>(): RpcStub<S>;
 ```
 
 - [x] Create `packages/plugin-sdk` with `package.json`, `tsconfig.json`, and the three entry files. Match `@repo/logger` scripts. Depend on `@sinclair/typebox` (same range as `@halo/desktop`) and `wouter`.
-- [x] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Re-export `RpcTarget` from `server`. Re-export `Type` and `Static` from `schema`.
+- [x] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Export `SidebarSection` and `SidebarItem`. Re-export `RpcTarget` from `server`. Re-export `Type` and `Static` from `schema`.
 - [x] Export `usePluginServer` from `view`. Until later phases it throws a tagged `PluginRuntimeMissingError` if called outside a host provider. Do not add `usePluginNavigate` or `usePluginState`.
 - [x] Dropped the subpath re-export smoke tests (they only checked that imports existed).
 - [x] Run `pnpm --filter @halo/plugin-sdk test typecheck lint format:check`.
@@ -460,7 +460,11 @@ type PluginRuntimeValue = {
 
 // plugin view.tsx
 export function Sidebar() {
-  return <Link href="/">Month</Link>;
+  return (
+    <SidebarSection label="Calendar">
+      <SidebarItem href="/">Month</SidebarItem>
+    </SidebarSection>
+  );
 }
 
 export function Routes() {
@@ -622,7 +626,7 @@ type CalendarPackage = {
 +`parseVersioned` from `@halo/plugin-sdk/schema`.
 ```
 
-- [x] Seed `calendar` (`package.json` with `halo.version: 1` + `view.tsx`) only when those files are missing. `Sidebar` uses wouter `Link`. `Routes` is a component with `Route path="/"`. Import from `@halo/plugin-sdk/view` only.
+- [x] Seed `calendar` (`package.json` with `halo.version: 1` + `view.tsx`) only when those files are missing. `Sidebar` uses `SidebarSection` and `SidebarItem`. `Routes` is a component with `Route path="/"`. Import from `@halo/plugin-sdk/view` only.
 - [x] Add `halo-plugin` skill; seed it under `.pi/agent/skills/halo-plugin/SKILL.md`. Keep a test that the bundled skill matches the repo skill.
 - [x] Update Cursor Cloud notes in `AGENTS.md` if they need the plugin path.
 - [x] Run `pnpm run check-affected`. Prove with `pnpm halo-web` that Calendar opens from the sidebar after a cold workspace seed. Record the UI demo required for this change.

@@ -1,7 +1,18 @@
-import { Flex, H1, Link, Route, Switch } from "@halo/plugin-sdk/view";
+import {
+  Flex,
+  H1,
+  Route,
+  SidebarItem,
+  SidebarSection,
+  Switch,
+} from "@halo/plugin-sdk/view";
 
 export function Sidebar() {
-  return <Link href="/">Calendar</Link>;
+  return (
+    <SidebarSection label="Calendar">
+      <SidebarItem href="/">Month</SidebarItem>
+    </SidebarSection>
+  );
 }
 
 export function Routes() {

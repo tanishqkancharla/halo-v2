@@ -111,6 +111,8 @@ export {
   useParams,
   useRoute,
 } from "wouter";
+export { SidebarItem } from "./SidebarItem.js";
+export { SidebarSection } from "./SidebarSection.js";
 
 export type PluginRuntimeValue = {
   pluginId: string;
