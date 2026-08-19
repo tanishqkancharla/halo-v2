@@ -18,8 +18,9 @@
     "check-affected": "pnpm run check"
   },
   "devDependencies": {
+    "@oxlint/plugins": "^1.79.0",
     "oxfmt": "^0.60.0",
-    "oxlint": "^1.75.0",
+    "oxlint": "^1.79.0",
     "turbo": "^2.10.7",
     "typescript": "7.0.2"
   },
