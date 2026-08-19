@@ -104,7 +104,10 @@ function wrapPluginRpc(target: RpcTarget): RpcTarget {
   const seen = new Set<string>();
   let proto: object | null = Object.getPrototypeOf(target);
   while (proto !== null && proto !== Object.prototype) {
+    // Rolldown copies capnweb into the main bundle, so the plugin's RpcTarget
+    // prototype is a different object than this import.
     if (proto === RpcTarget.prototype) break;
+    if (proto.constructor.name === "RpcTarget") break;
     for (const name of Object.getOwnPropertyNames(proto)) {
       if (name === "constructor") continue;
       if (seen.has(name)) continue;
