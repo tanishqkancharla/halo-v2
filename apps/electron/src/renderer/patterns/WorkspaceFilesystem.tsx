@@ -1,11 +1,13 @@
 import { SidebarSection } from "@halo/plugin-sdk/view";
 import type { FileTree as FileTreeModel } from "@pierre/trees";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import type { WorkspaceTreeEvent } from "../../shared/rpc.js";
 import {
   useApi,
   useWorkspacePathsQuery,
   useWorkspaceQuery,
+  workspacePathsQueryKey,
 } from "../api/ApiProvider.tsx";
 import { Filesystem } from "./Filesystem.tsx";
 
@@ -21,6 +23,7 @@ export function WorkspaceFilesystem({
   const workspaceQuery = useWorkspaceQuery();
   const workspace = workspaceQuery.data;
   const pathsQuery = useWorkspacePathsQuery(workspace);
+  const queryClient = useQueryClient();
   const api = useApi();
   const modelRef = useRef<FileTreeModel | undefined>(undefined);
   const workspaceRoot =
@@ -33,13 +36,24 @@ export function WorkspaceFilesystem({
 
     api.subscribeWorkspaceTree((events) => {
       applyTreeEvents(modelRef.current, events);
+      queryClient.setQueryData(
+        workspacePathsQueryKey(workspaceRoot),
+        (current: string[] | undefined) => {
+          if (current === undefined) return current;
+          const next = applyPathEvents(current, events);
+          const wasEmpty = current.length === 0;
+          const isEmpty = next.length === 0;
+          if (wasEmpty === isEmpty) return current;
+          return next;
+        },
+      );
     });
 
     return () => {
       api.subscribeWorkspaceTree(() => {});
       modelRef.current = undefined;
     };
-  }, [api, workspaceRoot]);
+  }, [api, queryClient, workspaceRoot]);
 
   if (workspaceRoot === undefined) return;
   if (pathsQuery.data === undefined) return;
@@ -57,6 +71,19 @@ export function WorkspaceFilesystem({
       />
     </SidebarSection>
   );
+}
+
+function applyPathEvents(paths: string[], events: WorkspaceTreeEvent[]) {
+  return events.reduce((next, event) => {
+    if (event.type === "create") {
+      if (next.includes(event.path)) return next;
+      return [...next, event.path];
+    }
+    return next.filter((path) => {
+      if (path === event.path) return false;
+      return !path.startsWith(`${event.path}/`);
+    });
+  }, paths);
 }
 
 function applyTreeEvents(

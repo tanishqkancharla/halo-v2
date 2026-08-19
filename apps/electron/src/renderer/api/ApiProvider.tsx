@@ -125,6 +125,10 @@ export function useSessionsQuery(workspace: WorkspaceState | undefined) {
   });
 }
 
+export function workspacePathsQueryKey(workspaceRoot: string | undefined) {
+  return ["workspace-paths", workspaceRoot] as const;
+}
+
 export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
   const api = useApi();
   const workspaceRoot =
@@ -133,7 +137,7 @@ export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
       : undefined;
 
   return useQuery({
-    queryKey: ["workspace-paths", workspaceRoot],
+    queryKey: workspacePathsQueryKey(workspaceRoot),
     queryFn: () => api.listWorkspacePaths(),
     enabled: workspaceRoot !== undefined,
   });
