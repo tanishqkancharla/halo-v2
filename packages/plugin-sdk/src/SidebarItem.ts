@@ -42,13 +42,13 @@ export function SidebarItem(props: SidebarItemProps) {
         className: joinClassNames(itemClassName, props.className),
         "aria-current": isActive ? "page" : undefined,
       },
-      createElement(
-        "span",
-        { className: iconWrapClassName },
-        Icon === undefined
-          ? undefined
-          : createElement(Icon, { className: iconClassName }),
-      ),
+      Icon === undefined
+        ? undefined
+        : createElement(
+            "span",
+            { className: iconWrapClassName },
+            createElement(Icon, { className: iconClassName }),
+          ),
       createElement("span", { className: labelClassName }, props.children),
       props.trailing === undefined
         ? undefined
@@ -68,10 +68,9 @@ const listItemClass = style({
 });
 
 const itemClass = style(navigationItem, sidebarPadding, {
-  display: "grid",
-  gridTemplateColumns: "16px minmax(0, 1fr) auto",
+  display: "flex",
   alignItems: "center",
-  columnGap: spacing.value(3),
+  gap: spacing.value(3),
   minWidth: 0,
   width: "100%",
   borderRadius: 0,
