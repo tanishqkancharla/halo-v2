@@ -80,6 +80,13 @@ export class HaloRpc extends HaloApi {
     return listed;
   }
 
+  getPlugin(pluginId: string) {
+    this.logger.info({ event: "getPlugin", pluginId });
+    const server = this.plugins.getPlugin(pluginId);
+    if (server instanceof Error) throw server;
+    return server;
+  }
+
   subscribeWorkspaceTree(callback: TreeListener) {
     this.logger.info({ event: "subscribeWorkspaceTree" });
     const previous = this.treeListener;

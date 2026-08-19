@@ -1,8 +1,8 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/message-port";
+import { Logger } from "@repo/logger";
+import { newMessagePortRpcSession } from "capnweb";
 import { describe, expect, test } from "vitest";
 import { src } from "../test/fixtures.js";
 import {
@@ -10,6 +10,10 @@ import {
   WorkspaceService,
 } from "../workspace-service.js";
 import { loadPluginViews } from "../../renderer/evaluatePluginView.js";
+import { HaloRpc } from "../rpc.js";
+import { PiService } from "../pi-service.js";
+import { UserService } from "../UserService.js";
+import type { HaloApi } from "../../shared/rpc.js";
 import { PluginService } from "./PluginService.js";
 
 type PluginFiles = Record<string, string>;
@@ -204,8 +208,8 @@ describe("PluginService", () => {
   );
 
   pluginTest(
-    "round-trips a plugin ping over MessageChannel and rejects a missing plugin id",
-    async ({ workspace, writePlugin }) => {
+    "round-trips a plugin ping over Cap'n Web and rejects a missing plugin id",
+    async ({ workspace, writePlugin, appDataDir }) => {
       await writePlugin({
         calendar: {
           "package.json": src`
@@ -215,18 +219,21 @@ describe("PluginService", () => {
             }
           `,
           "server.ts": src`
-            import { os } from "@halo/plugin-sdk/server"
+            import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server"
 
-            const ping = os.handler(async ({ context }) => {
-              return { pluginId: context.pluginId }
-            })
+            export default class CalendarServer extends RpcTarget {
+              constructor(private readonly ctx: PluginServerContext) {
+                super()
+              }
 
-            const fail = os.handler(async () => {
-              return new Error("ping failed")
-            })
+              ping() {
+                return { pluginId: this.ctx.pluginId }
+              }
 
-            export const router = { ping, fail }
-            export default router
+              fail() {
+                return new Error("ping failed")
+              }
+            }
           `,
         },
       });
@@ -237,25 +244,29 @@ describe("PluginService", () => {
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
       expect(listed.errors).toEqual([]);
 
+      const rpc = new HaloRpc(
+        workspace,
+        new PiService(workspace, new UserService(appDataDir)),
+        plugins,
+        () => {
+          throw new Error("no window");
+        },
+        new Logger(),
+      );
       const { port1, port2 } = new MessageChannel();
-      const attached = plugins.attachRpc(port1);
-      if (attached instanceof Error) throw attached;
-      port1.start();
-      const link = new RPCLink({ port: port2 });
-      port2.start();
-      const client = createORPCClient(link) as {
-        calendar: {
-          ping: (input: Record<string, never>) => Promise<{ pluginId: string }>;
-          fail: (input: Record<string, never>) => Promise<unknown>;
-        };
-        missing: {
-          ping: (input: Record<string, never>) => Promise<unknown>;
-        };
+      newMessagePortRpcSession(port1, rpc);
+      const api = newMessagePortRpcSession<HaloApi>(port2);
+      type CalendarCalls = {
+        ping: () => Promise<{ pluginId: string }>;
+        fail: () => Promise<void>;
       };
+      const calendar = (await api.getPlugin(
+        "calendar",
+      )) as unknown as CalendarCalls;
 
-      expect(await client.calendar.ping({})).toEqual({ pluginId: "calendar" });
-      await expect(client.calendar.fail({})).rejects.toBeInstanceOf(Error);
-      await expect(client.missing.ping({})).rejects.toBeInstanceOf(Error);
+      expect(await calendar.ping()).toEqual({ pluginId: "calendar" });
+      await expect(calendar.fail()).rejects.toBeInstanceOf(Error);
+      await expect(api.getPlugin("missing")).rejects.toBeInstanceOf(Error);
 
       port1.close();
       port2.close();

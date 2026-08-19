@@ -75,6 +75,7 @@ export abstract class HaloApi extends RpcTarget {
   abstract listSessions(): Promise<SessionSummary[]>;
   abstract listWorkspacePaths(): Promise<string[]>;
   abstract listPlugins(): Promise<PluginList>;
+  abstract getPlugin(pluginId: string): RpcTarget;
   abstract subscribeWorkspaceTree(callback: WorkspaceTreeEventHandler): void;
   abstract newAgentSession(): Promise<AgentSessionApi>;
   abstract openAgentSession(sessionId: string): Promise<OpenedAgentSession>;

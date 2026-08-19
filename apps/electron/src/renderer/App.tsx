@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { RpcStub, RpcTarget } from "capnweb";
 import { colors, spacing, text, useTheme } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router } from "wouter";
@@ -16,10 +17,6 @@ import {
   useAppInfoQuery,
   usePluginsQuery,
 } from "./api/ApiProvider.tsx";
-import {
-  getPluginRpcClient,
-  type PluginHostClient,
-} from "./api/PluginRpcClient.ts";
 
 export function App() {
   const workspaceQuery = useWorkspaceQuery();
@@ -33,6 +30,8 @@ export function App() {
     pluginsQuery.data === undefined ? [] : pluginsQuery.data.views;
   const pluginErrors =
     pluginsQuery.data === undefined ? [] : pluginsQuery.data.errors;
+  const pluginServers =
+    pluginsQuery.data === undefined ? {} : pluginsQuery.data.servers;
 
   if (workspaceQuery.isPending || workspace === undefined) {
     return <LoadingPage />;
@@ -61,7 +60,7 @@ export function App() {
       sessions={sessions}
       pluginViews={pluginViews}
       pluginErrors={pluginErrors}
-      pluginClient={getPluginRpcClient()}
+      pluginServers={pluginServers}
       alertMessage={
         sessionsQuery.error ? String(sessionsQuery.error) : undefined
       }
@@ -74,14 +73,14 @@ function WorkspaceShell({
   sessions,
   pluginViews,
   pluginErrors,
-  pluginClient,
+  pluginServers,
   alertMessage,
   appInfo,
 }: {
   sessions: SessionSummary[];
   pluginViews: LoadedPluginView[];
   pluginErrors: PluginLoadError[];
-  pluginClient?: PluginHostClient;
+  pluginServers: Record<string, RpcStub<RpcTarget>>;
   alertMessage?: string;
   appInfo?: AppInfo;
 }) {
@@ -106,7 +105,7 @@ function WorkspaceShell({
             sessions={sessions}
             pluginViews={pluginViews}
             pluginErrors={pluginErrors}
-            pluginClient={pluginClient}
+            pluginServers={pluginServers}
             onToggleTheme={() =>
               setPreference(resolvedTheme === "dark" ? "light" : "dark")
             }
@@ -116,7 +115,7 @@ function WorkspaceShell({
           <MainPane
             sessions={sessions}
             pluginViews={pluginViews}
-            pluginClient={pluginClient}
+            pluginServers={pluginServers}
           />
         </div>
       </Router>

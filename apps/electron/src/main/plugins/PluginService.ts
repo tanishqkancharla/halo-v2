@@ -1,14 +1,7 @@
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { SupportedMessagePort } from "@orpc/client/message-port";
-import { RPCHandler } from "@orpc/server/message-port";
-import type { AnyRouter } from "@orpc/server";
-import {
-  ORPCError,
-  os,
-  type PluginServerContext,
-} from "@halo/plugin-sdk/server";
+import { RpcTarget } from "@halo/plugin-sdk/server";
 import * as errore from "errore";
 import type { PluginList } from "../../shared/plugin.js";
 import type { WorkspaceService } from "../workspace-service.js";
@@ -21,9 +14,13 @@ export class PluginIoError extends errore.createTaggedError({
   message: "Failed to list plugins",
 }) {}
 
+export class PluginNotFoundError extends errore.createTaggedError({
+  name: "PluginNotFoundError",
+  message: "Plugin '$pluginId' has no server",
+}) {}
+
 export class PluginService {
-  private readonly routers: Record<string, AnyRouter> = {};
-  private handler: RPCHandler<PluginServerContext> | undefined;
+  private servers: Record<string, RpcTarget> = {};
 
   constructor(private readonly workspace: WorkspaceService) {}
 
@@ -31,9 +28,7 @@ export class PluginService {
     const layout = this.workspace.getLayout();
     if (layout instanceof Error) return layout;
 
-    for (const id of Object.keys(this.routers)) {
-      delete this.routers[id];
-    }
+    this.servers = {};
 
     const pluginsRoot = join(layout.root, ".halo", "plugins");
     if (!existsSync(pluginsRoot)) {
@@ -81,12 +76,13 @@ export class PluginService {
         const server = await loadPluginServer({
           id,
           serverPath: manifest.serverPath,
+          context: { pluginId: id, workspaceRoot: layout.root },
         });
         if (server instanceof Error) {
           errors.push({ id, message: server.message });
           continue;
         }
-        this.routers[id] = mountPluginRouter(id, server);
+        this.servers[id] = wrapPluginRpc(server);
       }
 
       plugins.push(manifest);
@@ -95,32 +91,41 @@ export class PluginService {
     return { plugins, compiledViews, errors };
   }
 
-  attachRpc(port: SupportedMessagePort) {
-    const layout = this.workspace.getLayout();
-    if (layout instanceof Error) return layout;
-
-    if (this.handler === undefined) {
-      this.handler = new RPCHandler(this.routers);
-    }
-    this.handler.upgrade(port, {
-      context: { pluginId: "", workspaceRoot: layout.root },
-    });
+  getPlugin(pluginId: string) {
+    const server = this.servers[pluginId];
+    if (server === undefined) return new PluginNotFoundError({ pluginId });
+    return server;
   }
 }
 
-function mountPluginRouter(id: string, router: AnyRouter) {
-  return os
-    .use(async ({ next, context }) => {
-      const result = await next({
-        context: { ...context, pluginId: id },
+function wrapPluginRpc(target: RpcTarget): RpcTarget {
+  class PluginRpc extends RpcTarget {}
+
+  const seen = new Set<string>();
+  let proto: object | null = Object.getPrototypeOf(target);
+  while (proto !== null && proto !== Object.prototype) {
+    if (proto === RpcTarget.prototype) break;
+    for (const name of Object.getOwnPropertyNames(proto)) {
+      if (name === "constructor") continue;
+      if (seen.has(name)) continue;
+      const descriptor = Object.getOwnPropertyDescriptor(proto, name);
+      if (descriptor === undefined) continue;
+      if (typeof descriptor.value !== "function") continue;
+      seen.add(name);
+      const method = descriptor.value as (...args: unknown[]) => unknown;
+      Object.defineProperty(PluginRpc.prototype, name, {
+        enumerable: false,
+        configurable: true,
+        writable: true,
+        async value(...args: unknown[]) {
+          const result = await method.apply(target, args);
+          if (result instanceof Error) throw result;
+          return result;
+        },
       });
-      if (result.output instanceof Error) {
-        throw new ORPCError("PLUGIN_ERROR", {
-          message: result.output.message,
-          cause: result.output,
-        });
-      }
-      return result;
-    })
-    .router(router);
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+
+  return new PluginRpc();
 }

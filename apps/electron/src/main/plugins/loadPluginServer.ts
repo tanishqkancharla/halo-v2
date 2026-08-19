@@ -1,6 +1,6 @@
 import { createJiti } from "jiti";
 import { fileURLToPath } from "node:url";
-import type { AnyRouter } from "@orpc/server";
+import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server";
 import * as errore from "errore";
 
 export class PluginServerLoadError extends errore.createTaggedError({
@@ -19,10 +19,11 @@ const jiti = createJiti(import.meta.url, {
 export async function loadPluginServer(args: {
   id: string;
   serverPath: string;
-}): Promise<PluginServerLoadError | AnyRouter> {
+  context: PluginServerContext;
+}): Promise<PluginServerLoadError | RpcTarget> {
   const imported = await jiti
     .import(args.serverPath)
-    .then((value) => value as object)
+    .then((value) => value as unknown)
     .catch(
       (e) =>
         new PluginServerLoadError({
@@ -33,31 +34,58 @@ export async function loadPluginServer(args: {
     );
   if (imported instanceof PluginServerLoadError) return imported;
 
-  const router = exportedRouter(imported);
-  if (router === undefined) {
+  const exported = pluginServerExport(imported);
+  if (exported === undefined) {
     return new PluginServerLoadError({
       id: args.id,
-      detail: "server must export default or router",
+      detail: "server must export a default RpcTarget class or instance",
     });
   }
-  return router;
+  return instantiatePluginServer(args.id, exported, args.context);
 }
 
 function sdkEntry(subpath: "schema" | "server" | "view") {
   return fileURLToPath(import.meta.resolve(`@halo/plugin-sdk/${subpath}`));
 }
 
-function exportedRouter(moduleExports: unknown): AnyRouter | undefined {
+function pluginServerExport(moduleExports: unknown): unknown {
+  if (typeof moduleExports === "function") return moduleExports;
   if (typeof moduleExports !== "object" || moduleExports === null) {
     return undefined;
   }
   const record = moduleExports as Record<string, unknown>;
-  const fromDefault = asRouter(record.default);
-  if (fromDefault !== undefined) return fromDefault;
-  return asRouter(record.router);
+  if (record.default !== undefined) return record.default;
+  return record.Server;
 }
 
-function asRouter(value: unknown): AnyRouter | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
-  return value as AnyRouter;
+function instantiatePluginServer(
+  id: string,
+  exported: unknown,
+  context: PluginServerContext,
+): PluginServerLoadError | RpcTarget {
+  if (exported instanceof RpcTarget) return exported;
+
+  if (typeof exported !== "function") {
+    return new PluginServerLoadError({
+      id,
+      detail: "server must export a default RpcTarget class or instance",
+    });
+  }
+
+  const Server = exported as new (context: PluginServerContext) => unknown;
+  const constructed = errore.try({
+    try: () => new Server(context),
+    catch: (e) =>
+      new PluginServerLoadError({
+        id,
+        detail: String(e),
+        cause: e,
+      }),
+  });
+  if (constructed instanceof PluginServerLoadError) return constructed;
+  if (constructed instanceof RpcTarget) return constructed;
+  return new PluginServerLoadError({
+    id,
+    detail: "server class must extend RpcTarget",
+  });
 }

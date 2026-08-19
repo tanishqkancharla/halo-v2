@@ -1,4 +1,4 @@
-import type { AnyRouter, RouterClient } from "@orpc/server";
+import type { RpcStub, RpcTarget } from "capnweb";
 import * as errore from "errore";
 import {
   createContext,
@@ -114,7 +114,7 @@ export {
 
 export type PluginRuntimeValue = {
   pluginId: string;
-  server: RouterClient<AnyRouter>;
+  server?: RpcStub<RpcTarget>;
 };
 
 const PluginRuntimeContext = createContext<PluginRuntimeValue | undefined>(
@@ -123,7 +123,7 @@ const PluginRuntimeContext = createContext<PluginRuntimeValue | undefined>(
 
 export function PluginRuntimeProvider(args: {
   pluginId: string;
-  server: RouterClient<AnyRouter>;
+  server?: RpcStub<RpcTarget>;
   children: ReactNode;
 }) {
   return createElement(
@@ -138,9 +138,10 @@ export class PluginRuntimeMissingError extends errore.createTaggedError({
   message: "usePluginServer must run inside a Halo plugin view",
 }) {}
 
-// Import the plugin router as a type only: import type { router } from "./server.ts"
-export function usePluginServer<S extends AnyRouter>(): RouterClient<S> {
+// Import the plugin server as a type only: import type { CalendarServer } from "./server.ts"
+export function usePluginServer<S extends RpcTarget>(): RpcStub<S> {
   const runtime = useContext(PluginRuntimeContext);
   if (runtime === undefined) throw new PluginRuntimeMissingError();
-  return runtime.server as RouterClient<S>;
+  if (runtime.server === undefined) throw new PluginRuntimeMissingError();
+  return runtime.server as RpcStub<S>;
 }

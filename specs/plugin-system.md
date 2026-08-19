@@ -9,13 +9,13 @@ flowchart TD
     Parse --> Manifest["halo.version 1"]
     Manifest --> ViewEntry["view.tsx or view/index.tsx"]
     Manifest --> ServerEntry["server.ts or server/index.ts"]
-    ServerEntry --> Jiti["jiti load oRPC router"]
+    ServerEntry --> Jiti["jiti load RpcTarget class"]
     ViewEntry --> Esbuild["esbuild CJS, SDK/maui/react external"]
     Esbuild --> Eval["Renderer evaluate named exports"]
-    Jiti --> Orpc["oRPC MessagePort router keyed by plugin id"]
+    Jiti --> Rpc["HaloApi.getPlugin returns nested RpcTarget"]
     Eval --> SidebarSlot["export Sidebar into app sidebar"]
     Eval --> RoutesSlot["export Routes component into main pane"]
-    Orpc --> Hooks["usePluginServer"]
+    Rpc --> Hooks["usePluginServer"]
 ```
 
 ```mermaid
@@ -28,11 +28,12 @@ sequenceDiagram
     Agent->>Disk: Write package.json, view, server
     UI->>Main: listPlugins (once, on workspace ready)
     Main->>Main: JSON.parse then parseVersioned halo
-    Main->>Main: jiti-import server router
+    Main->>Main: jiti-import RpcTarget server
     Main->>Main: esbuild view
     Main-->>UI: manifests, compiledViews, errors
     UI->>UI: Evaluate Sidebar and Routes
     UI->>UI: wouter /plugins/:pluginId nest → Routes
+    UI->>Main: getPlugin(id) nested RpcTarget
     UI->>Main: usePluginServer
 ```
 
@@ -42,7 +43,7 @@ The sidebar and main pane are fixed in the renderer. A user who asks the in-app 
 
 ## Solution overview
 
-Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` with a nested `halo` object, plus optional `view` and `server` files. The view mounts named exports (`Sidebar`, `Routes`), both React components. The app routes with [wouter](https://github.com/molefrog/wouter) and a memory location. Plugin `Routes` is the main pane for `/plugins/:pluginId/*`. The server is an oRPC router in main. Parse every persisted JSON document with a versioned TypeBox union and a shared `parseVersioned` helper that returns an errore tagged error. TypeBox is already in `@halo/desktop`; do not add Zod.
+Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` with a nested `halo` object, plus optional `view` and `server` files. The view mounts named exports (`Sidebar`, `Routes`), both React components. The app routes with [wouter](https://github.com/molefrog/wouter) and a memory location. Plugin `Routes` is the main pane for `/plugins/:pluginId/*`. The server is a Cap'n Web `RpcTarget` nested on `HaloApi.getPlugin`. Parse every persisted JSON document with a versioned TypeBox union and a shared `parseVersioned` helper that returns an errore tagged error. TypeBox is already in `@halo/desktop`; do not add Zod.
 
 ## Goals
 
@@ -50,7 +51,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - `package.json` has a nested `halo` field. `halo.version` is required. V1 is `1`.
 - `export const Sidebar` mounts in the app sidebar under Files / Sessions only when the plugin exports it. A plugin with no `Sidebar` does not get a host-drawn row. `export const Routes` is a React component that fills the main pane at `/plugins/:pluginId`. Both use wouter `Link` / `Route`.
 - `@halo/plugin-sdk` has `view`, `server`, and `schema` subpaths. Plugins declare it. The host aliases it to one copy.
-- `usePluginServer<S>()` is an oRPC client typed as the plugin router.
+- `usePluginServer<S>()` is a Cap'n Web stub typed as the plugin `RpcTarget`.
 - Plugins load once when the workspace is ready (`listPlugins`). A load error shows in the sidebar and leaves other plugins up.
 - The renderer uses wouter (`memoryLocation`). Host paths are `/draft/:draftId`, `/sessions/:sessionId`, `/uikit`, and `/plugins/:pluginId` (nested). `SessionSelection` goes away.
 - New JSON documents (manifest first) parse through `parseVersioned`. Unknown or missing `version` is a parse error.
@@ -58,13 +59,13 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 
 ## Non-goals
 
-- No Zod. TypeBox covers schema, Standard Schema (oRPC), and version unions.
+- No Zod. TypeBox covers schema and version unions.
 - No rewrite of existing `workspace.json` / `user.json` parsers in this work. New parses use the helper; old files stay until those call sites change.
 - No automatic migrate from unversioned objects. Missing `version` fails.
 - No npm/git marketplace, no `pnpm install` in the plugin folder, no extra plugin deps beyond the aliased SDK.
 - No replacing Files, Sessions, New session, Develop, or the session composer.
 - No view exports beyond `Sidebar` and `Routes`. Unknown named exports are ignored.
-- No plugin database, `state.ts`, Turso, libSQL, Drizzle, or `usePluginState`. Server procedures hold any data they need for now.
+- No plugin database, `state.ts`, Turso, libSQL, Drizzle, or `usePluginState`. Server methods hold any data they need for now.
 - No HTTP listener.
 - No plugin file watch, auto-reload, or `subscribePlugins`. Restart Halo (or reopen the workspace) to pick up plugin edits.
 - No default plugin nav. If the plugin does not export `Sidebar`, the host draws nothing for it in the sidebar.
@@ -78,7 +79,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - View imports of `./server` are type-only.
 - esbuild marks `wouter` external so plugin `Link` / `Route` share the app Router context.
 - Electron has no useful browser history for this UI. Use `memoryLocation` from `wouter/memory-location`, not `useBrowserLocation`.
-- oRPC procedure input uses TypeBox (Standard Schema), same library as manifests.
+- Plugin server methods are the Cap'n Web edge: return an `Error` (errore style) and the host throws it over RPC.
 - A later `halo` version is a new `Type.Object` with `version: Type.Literal(2)` added to the union, plus an explicit `up` in `parseVersioned` if the host should normalize to latest. This work ships only version 1 and returns that object as-is.
 - Plugin code is trusted workspace code.
 - TypeBox `Type.Object` strips unknown keys by default. Extra `halo` keys are ignored. Do not use `additionalProperties: false` on the manifest.
@@ -88,9 +89,9 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - [`apps/electron/src/renderer/App.tsx`](../apps/electron/src/renderer/App.tsx) — Replace `SessionSelection` with a wouter `Router` and `memoryLocation`.
 - [`apps/electron/src/renderer/MainPane.tsx`](../apps/electron/src/renderer/MainPane.tsx) — Host `Route`s plus nested `/plugins/:pluginId` for plugin `Routes`.
 - [`apps/electron/src/renderer/Sidebar.tsx`](../apps/electron/src/renderer/Sidebar.tsx) — `Link` for New session / sessions / UI kit; mount plugin `Sidebar`.
-- [`apps/electron/src/shared/rpc.ts`](../apps/electron/src/shared/rpc.ts) — Cap'n Web HaloApi. Add `listPlugins`; procedures use a second MessagePort.
-- [`apps/electron/src/shared/channels.ts`](../apps/electron/src/shared/channels.ts) — Existing `halo:request-rpc`. Add a plugin oRPC channel pair.
-- [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — Forward the plugin MessagePort like HaloApi.
+- [`apps/electron/src/shared/rpc.ts`](../apps/electron/src/shared/rpc.ts) — Cap'n Web HaloApi. Add `listPlugins` and `getPlugin` (nested `RpcTarget`).
+- [`apps/electron/src/shared/channels.ts`](../apps/electron/src/shared/channels.ts) — Existing `halo:request-rpc`. Do not add a second plugin port.
+- [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — Forward the HaloApi MessagePort.
 - [`apps/electron/src/main/main.ts`](../apps/electron/src/main/main.ts) — Construct `PluginService`.
 - [`apps/electron/src/main/plugins/PluginService.ts`](../apps/electron/src/main/plugins/PluginService.ts) — List `.halo/plugins`. Tests live beside it.
 - [`apps/electron/src/main/plugins/compilePluginView.ts`](../apps/electron/src/main/plugins/compilePluginView.ts) — esbuild the view to CJS.
@@ -99,8 +100,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - [`apps/electron/src/main/ParallelSearchTools.ts`](../apps/electron/src/main/ParallelSearchTools.ts) — Existing TypeBox `Type.Object` usage to match.
 - [`packages/logger/package.json`](../packages/logger/package.json) — Package export layout to copy for `@halo/plugin-sdk`.
 - [`@sinclair/typebox` Value](https://github.com/sinclairzx81/typebox) — `Value.Check` / `Value.Errors` (no throw). Wrap `Value.Parse` with `errore.try` if used.
-- [oRPC getting started](https://orpc.dev/docs/getting-started) — Router + client. Any Standard Schema, including TypeBox.
-- [oRPC Electron adapter](https://orpc.dev/docs/adapters/electron) — MessagePort between main and renderer.
+- [Cap'n Web](https://github.com/cloudflare/capnweb) — `RpcTarget` nested on HaloApi, same port as sessions.
 - [wouter](https://github.com/molefrog/wouter) — Memory location, `Router base`, and `Route nest` for plugin-relative paths.
 
 ## Implementation
@@ -115,7 +115,7 @@ Add a workspace package that plugins compile against. `schema` re-exports TypeBo
 // packages/plugin-sdk/src/view.ts
 export { Route, Switch, Link, Redirect, Router, useLocation, useRoute, useParams } from "wouter";
 
-export function usePluginServer<S>(): RouterClient<S>;
+export function usePluginServer<S extends RpcTarget>(): RpcStub<S>;
 ```
 
 #### Call stack diff
@@ -147,7 +147,7 @@ export function usePluginServer<S>(): RouterClient<S>;
 ```
 
 - [x] Create `packages/plugin-sdk` with `package.json`, `tsconfig.json`, and the three entry files. Match `@repo/logger` scripts. Depend on `@sinclair/typebox` (same range as `@halo/desktop`) and `wouter`.
-- [x] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Re-export `os` / `ORPCError` from `server`. Re-export `Type` and `Static` from `schema`.
+- [x] Re-export Maui components, tokens, and `style` / `useStyles` from `view`. Re-export wouter `Route`, `Switch`, `Link`, `Redirect`, `Router`, `useLocation`, `useRoute`, and `useParams`. Re-export `RpcTarget` from `server`. Re-export `Type` and `Static` from `schema`.
 - [x] Export `usePluginServer` from `view`. Until later phases it throws a tagged `PluginRuntimeMissingError` if called outside a host provider. Do not add `usePluginNavigate` or `usePluginState`.
 - [x] Dropped the subpath re-export smoke tests (they only checked that imports existed).
 - [x] Run `pnpm --filter @halo/plugin-sdk test typecheck lint format:check`.
@@ -521,9 +521,9 @@ export function Routes() {
 - [x] `evaluatePluginView` `require`s `wouter` from the host map so plugin `Link` uses the app context.
 - [x] Run `pnpm --filter @halo/desktop test`. Prove with `pnpm halo-web` that a fixture plugin's sidebar link opens its `Routes` in the main pane.
 
-### Phase 8: Plugin server as an oRPC sub-router
+### Phase 8: Plugin server as a nested Cap'n Web RpcTarget
 
-Load `server.ts` with jiti. The default export (or `export const router`) is an oRPC router whose procedure inputs are TypeBox schemas. Mount every plugin under `{ [pluginId]: router }` on an Electron MessagePort. `usePluginServer<S>()` is `createORPCClient` scoped to that plugin. Handlers receive `{ pluginId, workspaceRoot }`.
+Load `server.ts` with jiti. The default export is a class that extends `RpcTarget` (or an instance). `HaloApi.getPlugin(id)` returns that target on the existing Cap'n Web port. `usePluginServer<S>()` is `RpcStub<S>`. The class constructor receives `{ pluginId, workspaceRoot }`.
 
 #### Important types
 
@@ -534,13 +534,13 @@ export type PluginServerContext = {
   workspaceRoot: string;
 };
 
-export { os, ORPCError } from "@orpc/server";
+export { RpcTarget } from "capnweb";
 
-// apps/electron/src/shared/channels.ts
-export const PLUGIN_RPC_CHANNELS = {
-  requestRpc: "halo:request-plugin-rpc",
-  provideRpc: "halo:provide-plugin-rpc",
-} as const;
+// apps/electron/src/shared/rpc.ts
+abstract class HaloApi extends RpcTarget {
+  abstract listPlugins(): Promise<PluginList>;
+  abstract getPlugin(pluginId: string): RpcTarget;
+}
 ```
 
 #### Call stack diff
@@ -548,33 +548,35 @@ export const PLUGIN_RPC_CHANNELS = {
 ```diff
  preload MessagePort
  └── halo:request-rpc → HaloRpc (Cap'n Web)
-+preload MessagePort
-+└── halo:request-plugin-rpc → oRPC RPCHandler
-+    └── { [pluginId]: pluginRouter }
++    ├── listPlugins
++    └── getPlugin(id) → plugin RpcTarget
  view component
-+└── usePluginServer<typeof router>()
-+    └── RPCLink(pluginPort).pluginId.*
++└── usePluginServer<CalendarServer>()
++    └── api.getPlugin(id)
 ```
 
 #### Code diff preview
 
 ```diff
  // example plugin server.ts
-+const ping = os
-+  .input(Type.Object({}))
-+  .handler(async ({ context }) => {
-+    return { pluginId: context.pluginId };
-+  });
++import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server"
 +
-+export const router = { ping };
-+export default router;
++export default class CalendarServer extends RpcTarget {
++  constructor(private readonly ctx: PluginServerContext) {
++    super()
++  }
++
++  ping() {
++    return { pluginId: this.ctx.pluginId }
++  }
++}
 ```
 
-- [x] jiti-import the server file. Accept `default` or `router`. Alias `@halo/plugin-sdk/server` to the host package. Load once when `listPlugins` runs; do not swap routers later.
-- [x] Open a second MessagePort beside Cap'n Web (`channels.ts` + `preload.ts` + renderer connect). Follow the oRPC Electron adapter.
-- [x] Convert handler failures at this boundary: if a handler returns an `Error`, map it to `ORPCError` before the port.
-- [x] Implement `usePluginServer<S>()`. Document that `import type { router } from "./server.ts"` is type-only.
-- [x] Test with an in-process MessageChannel: a `ping` procedure round-trips; a missing plugin id does not match. Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/plugin-sdk test`.
+- [x] jiti-import the server file. Accept a default `RpcTarget` class or instance (or named `Server`). Alias `@halo/plugin-sdk/server` to the host package. Load once when `listPlugins` runs; do not swap servers later.
+- [x] Nest the plugin target on `HaloApi.getPlugin`. Do not open a second MessagePort.
+- [x] Convert handler failures at this boundary: if a method returns an `Error`, throw it over Cap'n Web.
+- [x] Implement `usePluginServer<S>()`. Document that `import type { CalendarServer } from "./server.ts"` is type-only.
+- [x] Test with an in-process Cap'n Web MessageChannel: a `ping` method round-trips; a missing plugin id does not match. Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/plugin-sdk test`.
 
 ### Phase 9: Seed Calendar as a plugin
 
@@ -615,7 +617,7 @@ type CalendarPackage = {
 +# Halo plugins
 +Plugins live in `{workspace}/.halo/plugins/<id>/`.
 +Required: `package.json` with `halo.version` and `halo.name`.
-+Optional: `view.tsx` (`Sidebar`, `Routes`), `server.ts` (oRPC router).
++Optional: `view.tsx` (`Sidebar`, `Routes`), `server.ts` (`RpcTarget`).
 +Import UI from `@halo/plugin-sdk/view`. Parse JSON with
 +`parseVersioned` from `@halo/plugin-sdk/schema`.
 ```

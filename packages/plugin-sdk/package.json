@@ -17,8 +17,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@orpc/server": "^1.15.0",
     "@sinclair/typebox": "^0.34.52",
+    "capnweb": "^0.10.0",
     "errore": "^0.14.1",
     "maui": "npm:@tanishqkancharla/maui@0.0.2",
     "purse-styles": "^0.2.1",

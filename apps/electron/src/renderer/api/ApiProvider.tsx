@@ -4,14 +4,18 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type UseQueryResult,
 } from "@tanstack/react-query";
+import type { RpcStub, RpcTarget } from "capnweb";
 import * as errore from "errore";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { WorkspaceInfo } from "../../shared/rpc.js";
-import { loadPluginViews } from "../evaluatePluginView.js";
+import {
+  loadPluginViews,
+  type LoadedPluginList,
+} from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
 import type { HaloApiStub } from "./HaloRpcClient.js";
-import { connectPluginRpc } from "./PluginRpcClient.ts";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
   name: "WorkspaceRestoreError",
@@ -144,7 +148,15 @@ export function useAppInfoQuery() {
   });
 }
 
-export function usePluginsQuery(workspace: WorkspaceState | undefined) {
+type PluginServers = Record<string, RpcStub<RpcTarget>>;
+
+type PluginsQueryData = LoadedPluginList & {
+  servers: PluginServers;
+};
+
+export function usePluginsQuery(
+  workspace: WorkspaceState | undefined,
+): UseQueryResult<PluginsQueryData> {
   const api = useApi();
   const workspaceRoot =
     workspace?.status === "ready"
@@ -153,10 +165,15 @@ export function usePluginsQuery(workspace: WorkspaceState | undefined) {
 
   return useQuery({
     queryKey: ["plugins", workspaceRoot],
-    queryFn: async () => {
+    queryFn: async (): Promise<PluginsQueryData> => {
       const list = await api.listPlugins();
-      await connectPluginRpc();
-      return loadPluginViews(list);
+      const loaded = loadPluginViews(list);
+      const servers: PluginServers = {};
+      for (const plugin of list.plugins) {
+        if (plugin.serverPath === undefined) continue;
+        servers[plugin.id] = await api.getPlugin(plugin.id);
+      }
+      return { ...loaded, servers };
     },
     enabled: workspaceRoot !== undefined,
   });
