@@ -31,7 +31,7 @@ const config: ForgeConfig = {
   rebuildConfig: {
     // @parcel/watcher ships N-API prebuilds. Rebuilding from source fails on
     // windows-latest (VS 2026 / node-gyp) and downloads Electron headers from GitHub.
-    ignoreModules: ["@parcel/watcher"],
+    ignoreModules: ["@parcel/watcher", "esbuild"],
   },
   hooks: {
     packageAfterCopy: async (_forgeConfig, buildPath) => {

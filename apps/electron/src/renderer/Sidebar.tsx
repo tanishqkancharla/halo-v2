@@ -15,7 +15,8 @@ import {
 import { style, useStyles } from "purse-styles";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
-import { HaloLogo } from "./HaloLogo.tsx";
+import type { LoadedExtension } from "../shared/evaluateExtensionSource.ts";
+import type { ExtensionLoadError } from "../shared/extension.ts";
 import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
 import { sidebarEntry, sidebarEntryLabel } from "./sidebarEntry.ts";
 
@@ -26,6 +27,8 @@ type SidebarProps = {
   onToggleTheme: () => void;
   themeLabel: string;
   appInfo?: AppInfo;
+  extensionSections: LoadedExtension[];
+  extensionErrors: ExtensionLoadError[];
 };
 
 export function Sidebar({
@@ -35,10 +38,11 @@ export function Sidebar({
   onToggleTheme,
   themeLabel,
   appInfo,
+  extensionSections,
+  extensionErrors,
 }: SidebarProps) {
   const sidebar = useStyles(styles.sidebar);
   const header = useStyles(styles.header);
-  const logo = useStyles(styles.logo);
   const newButton = useStyles(styles.newButton);
   const newIcon = useStyles(icon("sm"));
   const entry = useStyles(sidebarEntry);
@@ -55,7 +59,6 @@ export function Sidebar({
   return (
     <nav className={sidebar} aria-label="Sessions">
       <div className={header}>
-        <HaloLogo className={logo} />
         <Button variant="quiet" onClick={onToggleTheme}>
           {themeLabel}
         </Button>
@@ -109,6 +112,41 @@ export function Sidebar({
           })}
         </ul>
       </section>
+      {extensionSections.map((extension) => (
+        <ExtensionSidebarSection
+          key={extension.id}
+          extension={extension}
+          selection={selection}
+          onSelectionChange={onSelectionChange}
+          entry={entry}
+          entryLabel={entryLabel}
+          section={section}
+          sectionLabel={sectionLabel}
+          sessionList={sessionList}
+        />
+      ))}
+      {extensionErrors.length > 0 && (
+        <section className={section} aria-labelledby="extension-errors-label">
+          <div className={sectionLabel} id="extension-errors-label">
+            Extensions
+          </div>
+          <ul className={sessionList}>
+            {extensionErrors.map((error) => (
+              <li key={error.id}>
+                <div
+                  className={entry}
+                  data-testid="extension-error"
+                  role="alert"
+                >
+                  <span className={entryLabel}>
+                    {error.id}: {error.message}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className={section} aria-labelledby="uikit-label">
         <div className={sectionLabel} id="uikit-label">
           Develop
@@ -135,6 +173,72 @@ export function Sidebar({
         </div>
       )}
     </nav>
+  );
+}
+
+function ExtensionSidebarSection({
+  extension,
+  selection,
+  onSelectionChange,
+  entry,
+  entryLabel,
+  section,
+  sectionLabel,
+  sessionList,
+}: {
+  extension: LoadedExtension;
+  selection?: SessionSelection;
+  onSelectionChange: (selection: SessionSelection) => void;
+  entry: string;
+  entryLabel: string;
+  section: string;
+  sectionLabel: string;
+  sessionList: string;
+}) {
+  return (
+    <>
+      {extension.sidebarEntries.map((sidebarSection) => (
+        <section
+          key={sidebarSection.id}
+          className={section}
+          aria-labelledby={`${extension.id}-${sidebarSection.id}-label`}
+        >
+          <div
+            className={sectionLabel}
+            id={`${extension.id}-${sidebarSection.id}-label`}
+          >
+            {sidebarSection.label}
+          </div>
+          <ul className={sessionList}>
+            {sidebarSection.items.map((item) => {
+              const active =
+                selection?.kind === "extension" &&
+                selection.extensionId === extension.id &&
+                selection.viewId === item.viewId;
+
+              return (
+                <li key={item.id}>
+                  <button
+                    className={entry}
+                    type="button"
+                    aria-current={active ? "page" : undefined}
+                    onClick={() =>
+                      onSelectionChange({
+                        kind: "extension",
+                        extensionId: extension.id,
+                        viewId: item.viewId,
+                      })
+                    }
+                  >
+                    <span className={entryLabel}>{item.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </>
   );
 }
 
@@ -178,16 +282,10 @@ const styles = {
       backgroundColor: `light-dark(${colors.gray[1]}, ${colors.gray[2]})`,
     },
   ),
-  header: style(flex({ align: "center", justify: "between" }), {
+  header: style(flex({ align: "center", justify: "end" }), {
     minWidth: 0,
     minHeight: "42px",
     paddingLeft: "67px",
-  }),
-  logo: style({
-    display: "block",
-    width: "20px",
-    height: "20px",
-    transform: "translateX(-1px) translateY(-3px)",
   }),
   newButton: style(flex({ align: "center", gap: 3 }), {
     alignSelf: "stretch",

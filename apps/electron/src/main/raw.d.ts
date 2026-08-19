@@ -1,4 +1,4 @@
-declare module "*.obj?url" {
+declare module "*?raw" {
   const source: string;
   export default source;
 }

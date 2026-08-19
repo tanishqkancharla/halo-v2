@@ -1,21 +1,23 @@
 import { useState } from "react";
 import { colors, spacing, text, useTheme } from "maui";
 import { style, useStyles } from "purse-styles";
-import { LoadingPage } from "./LoadingPage.tsx";
-import { MainPane } from "./MainPane.tsx";
-import { Onboarding } from "./Onboarding.tsx";
-import { Sidebar } from "./Sidebar.tsx";
 import {
   useSessionsQuery,
   useChooseWorkspaceMutation,
   useWorkspaceQuery,
   useAppInfoQuery,
 } from "./api/ApiProvider.tsx";
+import { LoadingPage } from "./LoadingPage.tsx";
+import { MainPane } from "./MainPane.tsx";
+import { Onboarding } from "./Onboarding.tsx";
+import { Sidebar } from "./Sidebar.tsx";
+import { useLoadedExtensions } from "./useExtensions.ts";
 
 export type SessionSelection =
   | { kind: "draft"; draftId: string }
   | { kind: "saved"; sessionId: string }
-  | { kind: "uikit" };
+  | { kind: "uikit" }
+  | { kind: "extension"; extensionId: string; viewId: string };
 
 export function App() {
   const [selection, setSelection] = useState<SessionSelection>();
@@ -28,6 +30,7 @@ export function App() {
   const chooseWorkspace = useChooseWorkspaceMutation();
   const sessionsQuery = useSessionsQuery(workspace);
   const appInfoQuery = useAppInfoQuery();
+  const { extensions, errors: extensionErrors } = useLoadedExtensions();
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
   let activeSelection = selection;
   if (activeSelection === undefined && sessions[0]) {
@@ -84,10 +87,13 @@ export function App() {
           }
           themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
           appInfo={appInfoQuery.data}
+          extensionSections={extensions}
+          extensionErrors={extensionErrors}
         />
         <MainPane
           selection={activeSelection}
           sessions={sessions}
+          extensions={extensions}
           onDraftSent={(_draftId, sessionId) =>
             setSelection({ kind: "saved", sessionId })
           }

@@ -31,6 +31,8 @@ import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { SessionSelection } from "./App.tsx";
 import { UiKitPage } from "./UiKitPage.tsx";
+import { ExtensionView } from "./ExtensionView.tsx";
+import type { LoadedExtension } from "../shared/evaluateExtensionSource.ts";
 
 class PromptSubmitError extends errore.createTaggedError({
   name: "PromptSubmitError",
@@ -40,10 +42,12 @@ class PromptSubmitError extends errore.createTaggedError({
 export function MainPane({
   selection,
   sessions,
+  extensions,
   onDraftSent,
 }: {
   selection?: SessionSelection;
   sessions: SessionSummary[];
+  extensions: LoadedExtension[];
   onDraftSent: (draftId: string, sessionId: string) => void;
 }) {
   const pane = useStyles(styles.pane);
@@ -57,6 +61,20 @@ export function MainPane({
 
   if (selection.kind === "uikit") {
     return <UiKitPage />;
+  }
+
+  if (selection.kind === "extension") {
+    const extension = extensions.find(
+      (candidate) => candidate.id === selection.extensionId,
+    );
+    if (extension === undefined) {
+      return (
+        <main className={pane} aria-label="Missing extension">
+          <P>Extension {selection.extensionId} is not loaded.</P>
+        </main>
+      );
+    }
+    return <ExtensionView extension={extension} viewId={selection.viewId} />;
   }
 
   if (selection.kind === "draft") {
