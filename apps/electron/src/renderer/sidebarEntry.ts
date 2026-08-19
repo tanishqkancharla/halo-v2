@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { backgroundColor, colors, flex, fontFamily, spacing, text } from "maui";
 import { style } from "purse-styles";
 
@@ -19,6 +18,8 @@ export const sidebarEntry = style(
     cursor: "default",
     background: "transparent",
     textAlign: "left",
+    textDecoration: "none",
+    color: "inherit",
     paddingInline: `calc(${spacing.value(2)} + ${spacing.value(4)})`,
     "&:hover": { background: sidebarEntrySurface },
     "&[aria-current='page']": {
@@ -52,13 +53,13 @@ export const sidebarEntryTreeStyles = {
   "--trees-border-color-override": "transparent",
   "--trees-border-radius-override": "0px",
   "--trees-padding-inline-override": "0px",
-  "--trees-item-padding-x-override": spacing.value(4),
+  "--trees-item-padding-x-override": spacing.value(3),
   "--trees-item-margin-x-override": "0px",
   "--trees-indent-guide-bg-override": colors.gray[6],
   "--trees-scrollbar-thumb-override": colors.gray[7],
   "--trees-icon-width-override": "14px",
   "--trees-file-icon-color": sidebarEntryMutedFg,
-} as CSSProperties;
+};
 
 export const sidebarEntryTreeCss = `
   [data-type="item"] {

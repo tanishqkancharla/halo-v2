@@ -17,6 +17,7 @@ import {
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
 import { getAppInfo } from "./AppUpdate.js";
 import type { PiService } from "./pi-service.js";
+import type { PluginService } from "./plugins/PluginService.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
 type TreeListener = WorkspaceTreeEventHandler & {
@@ -29,6 +30,7 @@ export class HaloRpc extends HaloApi {
   constructor(
     private readonly workspace: WorkspaceService,
     private readonly pi: PiService,
+    private readonly plugins: PluginService,
     private readonly getWindow: () => BrowserWindow,
     private readonly logger: Logger,
   ) {
@@ -71,14 +73,27 @@ export class HaloRpc extends HaloApi {
     return paths;
   }
 
+  async listPlugins() {
+    this.logger.info({ event: "listPlugins" });
+    const listed = await this.plugins.list();
+    if (listed instanceof Error) throw listed;
+    return listed;
+  }
+
+  getPlugin(pluginId: string) {
+    this.logger.info({ event: "getPlugin", pluginId });
+    const server = this.plugins.getPlugin(pluginId);
+    if (server instanceof Error) throw server;
+    return server;
+  }
+
   subscribeWorkspaceTree(callback: TreeListener) {
     this.logger.info({ event: "subscribeWorkspaceTree" });
     const previous = this.treeListener;
-    this.treeListener =
-      typeof callback.dup === "function" ? callback.dup() : callback;
+    this.treeListener = callback.dup === undefined ? callback : callback.dup();
     if (previous !== undefined) {
       const dispose = previous[Symbol.dispose];
-      if (typeof dispose === "function") dispose.call(previous);
+      if (dispose !== undefined) dispose.call(previous);
     }
     this.workspace.setTreeListener((events) => {
       const listener = this.treeListener;
@@ -141,8 +156,7 @@ export class AgentSessionRpc extends AgentSessionApi {
   subscribe(callback: SessionListener) {
     this.logger.info({ event: "subscribe" });
     // Cap'n Web releases arg stubs when the call returns unless we dup().
-    this.listener =
-      typeof callback.dup === "function" ? callback.dup() : callback;
+    this.listener = callback.dup === undefined ? callback : callback.dup();
   }
 
   async prompt(text: string) {
@@ -161,7 +175,7 @@ export class AgentSessionRpc extends AgentSessionApi {
     const listener = this.listener;
     if (listener !== undefined) {
       const dispose = listener[Symbol.dispose];
-      if (typeof dispose === "function") dispose.call(listener);
+      if (dispose !== undefined) dispose.call(listener);
     }
     this.listener = undefined;
     void this.session.abort().catch((error) => {

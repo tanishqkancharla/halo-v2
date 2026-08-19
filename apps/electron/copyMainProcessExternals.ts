@@ -2,6 +2,8 @@ import { createRequire } from "node:module";
 import { cp, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import { mainProcessExternals } from "./mainExternals.js";
 
@@ -10,10 +12,17 @@ const requireFromElectron = createRequire(
   path.join(electronDir, "package.json"),
 );
 
-type PackageJson = {
-  dependencies?: Record<string, string>;
-  optionalDependencies?: Record<string, string>;
-};
+const packageJsonSchema = Type.Object({
+  dependencies: Type.Optional(Type.Record(Type.String(), Type.String())),
+  optionalDependencies: Type.Optional(
+    Type.Record(Type.String(), Type.String()),
+  ),
+});
+
+class PackageJsonReadError extends errore.createTaggedError({
+  name: "PackageJsonReadError",
+  message: "Failed to read package.json for $packageName",
+}) {}
 
 /**
  * Copy Vite-external main-process packages (and their runtime closure) into
@@ -50,10 +59,14 @@ async function copyPackageClosure(
 
   const packageJsonRaw = await readFile(packageJsonPath, "utf8");
   const packageJson = errore.try({
-    try: () => JSON.parse(packageJsonRaw) as PackageJson,
-    catch: (e) => e as Error,
+    try: () => {
+      // SAFETY: JSON.parse is untyped; packageJsonSchema is the file contract.
+      return JSON.parse(packageJsonRaw) as unknown;
+    },
+    catch: (e) => new PackageJsonReadError({ packageName, cause: e }),
   });
   if (packageJson instanceof Error) throw packageJson;
+  if (!Value.Check(packageJsonSchema, packageJson)) return;
 
   const dependencies = packageJson.dependencies;
   if (dependencies !== undefined) {
@@ -68,7 +81,8 @@ async function copyPackageClosure(
       const resolved = errore.try({
         try: () =>
           requireFromElectron.resolve(`${dependencyName}/package.json`),
-        catch: (e) => e as Error,
+        catch: (e) =>
+          new PackageJsonReadError({ packageName: dependencyName, cause: e }),
       });
       if (resolved instanceof Error) continue;
       await copyPackageClosure(buildPath, dependencyName, copied);

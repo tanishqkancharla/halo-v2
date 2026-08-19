@@ -1,4 +1,9 @@
-import type { LogLevel, LoggerEntry, LoggerSinkApi } from "./Logger.js";
+import type {
+  LogLevel,
+  LoggerEntry,
+  LoggerSinkApi,
+  LoggerValue,
+} from "./Logger.js";
 
 const colors = {
   reset: "\x1b[0m",
@@ -16,14 +21,16 @@ function levelColor(level: LogLevel): string {
   return colors.blue;
 }
 
-function selectLogger(
-  level: LogLevel,
-): (message?: unknown, ...optionalParams: unknown[]) => void {
+function selectLogger(level: LogLevel) {
   if (level === "error") return console.error;
   if (level === "warn") return console.warn;
   if (level === "info") return console.info;
   if (level === "debug") return console.debug;
   return console.log;
+}
+
+function isStringValue(args: { value: LoggerValue | undefined }) {
+  return {}.toString.call(args.value) === "[object String]";
 }
 
 export class PrettyConsoleLoggerSink implements LoggerSinkApi {
@@ -32,8 +39,13 @@ export class PrettyConsoleLoggerSink implements LoggerSinkApi {
       .flatMap((scope) => Object.keys(scope))
       .map((name) => `${colors.cyan}[${name}]${colors.reset}`)
       .join("");
-    const event = typeof entry.data.event === "string" ? entry.data.event : "";
-    const data: Record<string, unknown> = {};
+    const eventField = entry.data.event;
+    const event = (() => {
+      if (!isStringValue({ value: eventField })) return "";
+      // SAFETY: [object String] is a string primitive or String object.
+      return eventField as string;
+    })();
+    const data: { [key: string]: LoggerValue } = {};
     for (const scope of entry.scopes) {
       for (const value of Object.values(scope)) {
         Object.assign(data, value);

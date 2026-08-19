@@ -139,6 +139,8 @@ export function Filesystem({
     onModel(model);
   }, [model, onModel]);
 
+  if (paths.length === 0) return;
+
   return (
     <div className={shell}>
       <div
@@ -154,6 +156,7 @@ export function Filesystem({
             )
           }
           style={
+            // SAFETY: Pierre FileTree style accepts Halo's --trees-* custom properties.
             {
               height:
                 maxHeight === undefined
@@ -301,9 +304,6 @@ const styles = {
   header: style(
     text("xs", 500, "lowContrast"),
     spacing.padding({ x: 4, y: 2 }),
-    {
-      letterSpacing: "0.02em",
-    },
   ),
   selection: style(flexItem({ size: "hug" }), text("sm", 400, "lowContrast"), {
     margin: 0,

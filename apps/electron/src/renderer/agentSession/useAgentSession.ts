@@ -35,14 +35,18 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
   );
   const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
   const [isWorking, setIsWorking] = useState(false);
+  const [openedFor, setOpenedFor] = useState(sessionId);
+
+  if (openedFor !== sessionId) {
+    setOpenedFor(sessionId);
+    setSession(undefined);
+    setState(emptyAgentSessionState);
+    setIsWorking(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
     let stub: AgentSessionStub | undefined;
-
-    setState(emptyAgentSessionState);
-    setIsWorking(false);
-    setSession(undefined);
 
     // If cleanup runs before this resolves, `stub` is still unset — dispose the
     // late result here. Effect cleanup only covers stubs already assigned.
@@ -69,7 +73,6 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
     return () => {
       cancelled = true;
       stub?.[Symbol.dispose]();
-      setSession(undefined);
     };
   }, [api, sessionId]);
 
@@ -99,22 +102,29 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
   return { session, state, isWorking, prompt };
 }
 
+export type UseDraftAgentSessionResult = {
+  state: AgentSessionState;
+  isWorking: boolean;
+  prompt: (text: string) => Promise<void | PromptFailedError>;
+};
+
 /**
  * Draft chat: creates a Pi session on first prompt, then behaves like
  * useAgentSession for that live session.
  */
-export function useDraftAgentSession(onCreated: (sessionId: string) => void): {
-  state: AgentSessionState;
-  isWorking: boolean;
-  prompt: (text: string) => Promise<void | PromptFailedError>;
-} {
+export function useDraftAgentSession(
+  onCreated: (sessionId: string) => void,
+): UseDraftAgentSessionResult {
   const api = useApi();
   const queryClient = useQueryClient();
   const sessionRef = useRef<AgentSessionStub | undefined>(undefined);
   const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
   const [isWorking, setIsWorking] = useState(false);
   const onCreatedRef = useRef(onCreated);
-  onCreatedRef.current = onCreated;
+
+  useEffect(() => {
+    onCreatedRef.current = onCreated;
+  }, [onCreated]);
 
   useEffect(() => {
     return () => {

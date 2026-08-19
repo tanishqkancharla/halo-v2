@@ -4,10 +4,16 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type UseQueryResult,
 } from "@tanstack/react-query";
+import type { RpcStub, RpcTarget } from "capnweb";
 import * as errore from "errore";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { WorkspaceInfo } from "../../shared/rpc.js";
+import {
+  loadPluginViews,
+  type LoadedPluginList,
+} from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
 import type { HaloApiStub } from "./HaloRpcClient.js";
 
@@ -119,6 +125,10 @@ export function useSessionsQuery(workspace: WorkspaceState | undefined) {
   });
 }
 
+export function workspacePathsQueryKey(workspaceRoot: string | undefined) {
+  return ["workspace-paths", workspaceRoot] as const;
+}
+
 export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
   const api = useApi();
   const workspaceRoot =
@@ -127,7 +137,7 @@ export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
       : undefined;
 
   return useQuery({
-    queryKey: ["workspace-paths", workspaceRoot],
+    queryKey: workspacePathsQueryKey(workspaceRoot),
     queryFn: () => api.listWorkspacePaths(),
     enabled: workspaceRoot !== undefined,
   });
@@ -139,6 +149,37 @@ export function useAppInfoQuery() {
     queryKey: ["app-info"],
     queryFn: () => api.getAppInfo(),
     refetchInterval: 5_000,
+  });
+}
+
+type PluginServers = Record<string, RpcStub<RpcTarget>>;
+
+type PluginsQueryData = LoadedPluginList & {
+  servers: PluginServers;
+};
+
+export function usePluginsQuery(
+  workspace: WorkspaceState | undefined,
+): UseQueryResult<PluginsQueryData> {
+  const api = useApi();
+  const workspaceRoot =
+    workspace?.status === "ready"
+      ? workspace.workspace.workspaceRoot
+      : undefined;
+
+  return useQuery({
+    queryKey: ["plugins", workspaceRoot],
+    queryFn: async (): Promise<PluginsQueryData> => {
+      const list = await api.listPlugins();
+      const loaded = loadPluginViews(list);
+      const servers: PluginServers = {};
+      for (const plugin of list.plugins) {
+        if (plugin.serverPath === undefined) continue;
+        servers[plugin.id] = await api.getPlugin(plugin.id);
+      }
+      return { ...loaded, servers };
+    },
+    enabled: workspaceRoot !== undefined,
   });
 }
 

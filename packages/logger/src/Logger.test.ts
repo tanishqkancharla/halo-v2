@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { JsonlLoggerSink } from "./JsonlLoggerSink.js";
-import { Logger, type LoggerEntry, type LoggerSinkApi } from "./Logger.js";
+import {
+  Logger,
+  type LoggerData,
+  type LoggerEntry,
+  type LoggerSinkApi,
+} from "./Logger.js";
 
 class CollectingSink implements LoggerSinkApi {
   readonly entries: LoggerEntry[] = [];
@@ -86,10 +91,19 @@ describe("JsonlLoggerSink", () => {
 
     const lines = (await readFile(filePath, "utf8")).trimEnd().split("\n");
     expect(lines).toHaveLength(1);
-    const parsed = JSON.parse(lines[0]!) as LoggerEntry;
-    expect(parsed.level).toBe("error");
-    expect(parsed.scopes).toEqual([{ main: {} }]);
-    expect(parsed.data).toEqual({
+    const parsed = JSON.parse(lines[0]!);
+    // SAFETY: JsonlLoggerSink writes one JSON object per line with Error values serialized.
+    const entry = parsed as {
+      level: string;
+      scopes: readonly { readonly [key: string]: LoggerData }[];
+      data: {
+        message: string;
+        error: { name: string; message: string; stack?: string };
+      };
+    };
+    expect(entry.level).toBe("error");
+    expect(entry.scopes).toEqual([{ main: {} }]);
+    expect(entry.data).toEqual({
       message: "failed",
       error: {
         name: "Error",

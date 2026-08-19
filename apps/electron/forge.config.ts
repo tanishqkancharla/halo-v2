@@ -9,25 +9,25 @@ const shouldNotarize =
   appleApiKeyId !== undefined &&
   appleApiIssuer !== undefined;
 
+const packagerConfig: NonNullable<ForgeConfig["packagerConfig"]> = {
+  asar: true,
+  appBundleId: "com.saffronhealth.halo",
+  appCategoryType: "public.app-category.medical",
+  icon: "icons/icon",
+  name: "Halo",
+  executableName: "Halo",
+  osxSign: {},
+};
+if (shouldNotarize) {
+  packagerConfig.osxNotarize = {
+    appleApiKey,
+    appleApiKeyId,
+    appleApiIssuer,
+  };
+}
+
 const config: ForgeConfig = {
-  packagerConfig: {
-    asar: true,
-    appBundleId: "com.saffronhealth.halo",
-    appCategoryType: "public.app-category.medical",
-    icon: "icons/icon",
-    name: "Halo",
-    executableName: "Halo",
-    osxSign: {},
-    ...(shouldNotarize
-      ? {
-          osxNotarize: {
-            appleApiKey,
-            appleApiKeyId,
-            appleApiIssuer,
-          },
-        }
-      : {}),
-  },
+  packagerConfig,
   rebuildConfig: {
     // @parcel/watcher ships N-API prebuilds. Rebuilding from source fails on
     // windows-latest (VS 2026 / node-gyp) and downloads Electron headers from GitHub.

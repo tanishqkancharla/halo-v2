@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 
 export type User = {
@@ -14,6 +16,10 @@ export class UserIoError extends errore.createTaggedError({
 }) {}
 
 const preferenceFileName = "user.json";
+
+const userPreferenceSchema = Type.Object({
+  id: Type.String({ minLength: 1 }),
+});
 
 export class UserService {
   private user: User | undefined;
@@ -53,19 +59,14 @@ async function readUserPreference(path: string) {
   if (raw instanceof Error) return raw;
 
   const parsed = errore.try({
-    try: () => JSON.parse(raw) as unknown,
+    try: () => {
+      // SAFETY: JSON.parse is untyped; userPreferenceSchema is the file contract.
+      return JSON.parse(raw) as unknown;
+    },
     catch: (e) => new UserIoError({ cause: e }),
   });
   if (parsed instanceof Error) return parsed;
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("id" in parsed) ||
-    typeof parsed.id !== "string" ||
-    parsed.id.length === 0
-  ) {
-    return new UserIoError();
-  }
+  if (!Value.Check(userPreferenceSchema, parsed)) return new UserIoError();
   return { id: parsed.id };
 }
 

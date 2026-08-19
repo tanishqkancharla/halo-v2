@@ -1,3 +1,5 @@
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import type { AgentMessage } from "../../shared/rpc.js";
 import type { AgentSessionState } from "../../shared/AgentSessionState.js";
 
@@ -18,6 +20,27 @@ export type SessionViewPart =
       args: unknown;
       resultText?: string;
     };
+
+export type ToolPartLabel = {
+  kind: "read" | "wrote" | "shell" | "other";
+  text: string;
+};
+
+const pathArgsSchema = Type.Object({
+  path: Type.String(),
+});
+
+const bashArgsSchema = Type.Object({
+  command: Type.String(),
+});
+
+const webSearchArgsSchema = Type.Object({
+  objective: Type.String(),
+});
+
+const webFetchArgsSchema = Type.Object({
+  urls: Type.Array(Type.String()),
+});
 
 /**
  * Project AgentSessionState into view rows: one user bubble per user message,
@@ -61,13 +84,16 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
       if (emittedTools.has(part.id)) continue;
       emittedTools.add(part.id);
       const resultText = toolResults.get(part.id);
-      assistantParts.push({
+      const toolPart: Extract<SessionViewPart, { kind: "tool" }> = {
         kind: "tool",
         id: part.id,
         toolName: part.name,
         args: part.arguments,
-        ...(resultText === undefined ? {} : { resultText }),
-      });
+      };
+      if (resultText !== undefined) {
+        toolPart.resultText = resultText;
+      }
+      assistantParts.push(toolPart);
     }
   }
 
@@ -96,57 +122,52 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
 
 /** Maui AiChat labels for Pi coding tools. */
 export function toolPartLabel(
-  part: { toolName: string; args: unknown },
+  part: {
+    toolName: string;
+    args: unknown;
+  },
   workspaceRoot: string | undefined,
-): {
-  kind: "read" | "wrote" | "shell" | "other";
-  text: string;
-} {
-  const args = part.args;
-  if (typeof args !== "object" || args === null) {
-    return { kind: "other", text: part.toolName };
-  }
-
+): ToolPartLabel {
   if (part.toolName === "read") {
-    if (!("path" in args) || typeof args.path !== "string") {
+    if (!Value.Check(pathArgsSchema, part.args)) {
       return { kind: "other", text: part.toolName };
     }
     return {
       kind: "read",
-      text: stripWorkspaceRootPrefix(args.path, workspaceRoot),
+      text: stripWorkspaceRootPrefix(part.args.path, workspaceRoot),
     };
   }
 
   if (part.toolName === "write" || part.toolName === "edit") {
-    if (!("path" in args) || typeof args.path !== "string") {
+    if (!Value.Check(pathArgsSchema, part.args)) {
       return { kind: "other", text: part.toolName };
     }
     return {
       kind: "wrote",
-      text: stripWorkspaceRootPrefix(args.path, workspaceRoot),
+      text: stripWorkspaceRootPrefix(part.args.path, workspaceRoot),
     };
   }
 
   if (part.toolName === "bash") {
-    if (!("command" in args) || typeof args.command !== "string") {
+    if (!Value.Check(bashArgsSchema, part.args)) {
       return { kind: "other", text: part.toolName };
     }
-    return { kind: "shell", text: args.command };
+    return { kind: "shell", text: part.args.command };
   }
 
   if (part.toolName === "web_search") {
-    if (!("objective" in args) || typeof args.objective !== "string") {
+    if (!Value.Check(webSearchArgsSchema, part.args)) {
       return { kind: "other", text: part.toolName };
     }
-    return { kind: "other", text: `Search ${args.objective}` };
+    return { kind: "other", text: `Search ${part.args.objective}` };
   }
 
   if (part.toolName === "web_fetch") {
-    if (!("urls" in args) || !Array.isArray(args.urls)) {
+    if (!Value.Check(webFetchArgsSchema, part.args)) {
       return { kind: "other", text: part.toolName };
     }
-    const url = args.urls[0];
-    if (typeof url !== "string") {
+    const url = part.args.urls[0];
+    if (url === undefined) {
       return { kind: "other", text: part.toolName };
     }
     return { kind: "other", text: `Fetch ${url}` };
@@ -194,11 +215,13 @@ function toolResultText(message: AgentMessage): string {
 
 function userText(message: AgentMessage): string {
   if (message.role !== "user") return "";
-  if (typeof message.content === "string") return message.content;
-  return message.content
-    .flatMap((part) => {
-      if (part.type !== "text") return [];
-      return [part.text];
-    })
-    .join("");
+  if (Array.isArray(message.content)) {
+    return message.content
+      .flatMap((part) => {
+        if (part.type !== "text") return [];
+        return [part.text];
+      })
+      .join("");
+  }
+  return message.content;
 }

@@ -16,14 +16,15 @@
     "dev": "electron-forge start",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "format": "oxfmt src index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
-    "format:check": "oxfmt --check src index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
-    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
-    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src forge.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
+    "format": "oxfmt src index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
+    "format:check": "oxfmt --check src index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts mainExternals.ts copyMainProcessExternals.ts",
     "test": "vitest run src/main src/shared src/renderer/agentSession",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.main.json"
   },
   "dependencies": {
+    "@halo/plugin-sdk": "workspace:*",
     "@mariozechner/pi-coding-agent": "0.60.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@parcel/watcher": "^2.6.0",
@@ -40,13 +41,16 @@
     "capnweb": "^0.10.0",
     "electron-squirrel-startup": "^1.0.1",
     "errore": "^0.14.1",
+    "esbuild": "^0.28.1",
+    "jiti": "2.7.0",
     "maui": "npm:@tanishqkancharla/maui@0.0.2",
     "purse-styles": "^0.2.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "streamdown": "^2.5.0",
     "three": "^0.185.1",
-    "update-electron-app": "^3.3.0"
+    "update-electron-app": "^3.3.0",
+    "wouter": "^3.10.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
@@ -67,6 +71,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "agentation": "^3.0.2",
     "electron": "^43.2.0",
+    "outdent": "^0.8.0",
     "typescript": "7.0.2",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"

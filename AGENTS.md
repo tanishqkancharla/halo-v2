@@ -31,6 +31,7 @@ Bump `apps/electron/package.json` `version`, commit, then create and push a git 
 
 - When working on issues that seem like they would be common (e.g. issues hooking up popular libraries to each other), do research into the Github issues of those repos or research code of projects that use the same libraries. Here's some reference projects you can look at:
   - Craft Agents: https://github.com/craft-ai-agents/craft-agents-oss. Uses Electron, Pi (`@mariozechner/pi-coding-agent`), Vite, and esbuild.
+  - bb: https://github.com/get-bb/bb. Electron + Vite + React agent IDE with a plugin system (`package.json` + nested `halo`).
 
 ## Error handling (errore.org)
 
@@ -78,4 +79,4 @@ mkdir -p /home/ubuntu/halo-workspace /workspace/.halo
 echo '{"workspaceRoot":"/home/ubuntu/halo-workspace"}' > /workspace/.halo/workspace.json
 ```
 
-`.halo/` holds dev userData and is gitignored.
+`.halo/` holds dev userData and is gitignored. Choosing a workspace seeds `{workspace}/.halo/plugins/calendar` and `{workspace}/.pi/agent/skills/halo-plugin/SKILL.md` when those files are missing. Calendar then appears in the sidebar. Reload (View → Reload, or Cmd-R / Ctrl-R) to pick up plugin edits.

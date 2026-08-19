@@ -7,7 +7,7 @@ export default defineConfig({
     minify: false,
   },
   resolve: {
-    dedupe: ["react", "react-dom", "purse-styles"],
+    dedupe: ["react", "react-dom", "purse-styles", "wouter"],
     preserveSymlinks: false,
   },
   clearScreen: false,

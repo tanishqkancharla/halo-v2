@@ -1,0 +1,9 @@
+{
+  "name": "halo-plugin-calendar",
+  "halo": {
+    "version": 1,
+    "name": "Calendar",
+    "description": "Month view.",
+    "view": "./view.tsx"
+  }
+}

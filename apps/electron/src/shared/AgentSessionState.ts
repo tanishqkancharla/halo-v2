@@ -1,4 +1,6 @@
 import * as errore from "errore";
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import type { AgentMessage, AgentSessionEvent } from "./rpc.js";
 
 /**
@@ -126,7 +128,10 @@ function readableAgentErrorMessage(errorMessage: string): string {
   }
 
   const parsed = errore.try({
-    try: () => JSON.parse(trimmed) as unknown,
+    try: () => {
+      // SAFETY: JSON.parse is untyped; humanMessageFromJson decodes the payload.
+      return JSON.parse(trimmed) as unknown;
+    },
     catch: (e) => new AgentErrorMessageParseError({ cause: e }),
   });
   if (parsed instanceof Error) {
@@ -134,43 +139,54 @@ function readableAgentErrorMessage(errorMessage: string): string {
     return errorMessage;
   }
 
-  const extracted = humanMessageFromJson(parsed);
+  const extracted = humanMessageFromJson({ value: parsed });
   if (extracted === undefined) return errorMessage;
   return extracted;
 }
 
-function humanMessageFromJson(value: unknown): string | undefined {
-  if (typeof value === "string") {
+const agentErrorJsonSchema = Type.Object({
+  error: Type.Optional(
+    Type.Union([
+      Type.String(),
+      Type.Object({
+        message: Type.String(),
+      }),
+    ]),
+  ),
+  message: Type.Optional(Type.String()),
+});
+
+function humanMessageFromJson(args: { value: unknown }): string | undefined {
+  if (Value.Check(Type.String(), args.value)) {
+    const value = args.value;
     const nested = errore.try({
-      try: () => JSON.parse(value) as unknown,
+      try: () => {
+        // SAFETY: JSON.parse is untyped; nested error JSON is decoded by this function.
+        return JSON.parse(value) as unknown;
+      },
       catch: (e) => new AgentErrorMessageParseError({ cause: e }),
     });
     if (nested instanceof Error) {
       if (value.length === 0) return undefined;
       return value;
     }
-    return humanMessageFromJson(nested);
+    return humanMessageFromJson({ value: nested });
   }
 
-  if (typeof value !== "object" || value === null) return undefined;
+  if (!Value.Check(agentErrorJsonSchema, args.value)) return undefined;
 
-  if ("error" in value) {
-    const error = value.error;
-    if (typeof error === "string") {
-      if (error.length === 0) return undefined;
-      return error;
-    }
-    if (typeof error === "object" && error !== null && "message" in error) {
-      if (typeof error.message === "string" && error.message.length > 0) {
-        return error.message;
-      }
-    }
+  const error = args.value.error;
+  if (Value.Check(Type.String(), error)) {
+    if (error.length === 0) return undefined;
+    return error;
+  }
+  if (
+    Value.Check(Type.Object({ message: Type.String({ minLength: 1 }) }), error)
+  ) {
+    return error.message;
   }
 
-  if ("message" in value && typeof value.message === "string") {
-    if (value.message.length === 0) return undefined;
-    return value.message;
-  }
-
-  return undefined;
+  const message = args.value.message;
+  if (message === undefined || message.length === 0) return undefined;
+  return message;
 }

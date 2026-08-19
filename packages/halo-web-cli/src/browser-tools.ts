@@ -46,13 +46,15 @@ async function connect() {
   );
   if (response instanceof Error) return response;
 
-  const version = await (response.json() as Promise<DebuggerVersion>).catch(
-    (e) =>
-      new BrowserToolsError({
-        reason: "Invalid debugger version response",
-        cause: e,
-      }),
-  );
+  const version =
+    await // SAFETY: CDP /json/version returns DebuggerVersion JSON.
+    (response.json() as Promise<DebuggerVersion>).catch(
+      (e) =>
+        new BrowserToolsError({
+          reason: "Invalid debugger version response",
+          cause: e,
+        }),
+    );
   if (version instanceof Error) return version;
 
   const toolkit = createBrowserTools(new LocalBrowserProvider());

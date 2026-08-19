@@ -1,14 +1,14 @@
+import { PluginRuntimeProvider } from "@halo/plugin-sdk/view";
+import type { RpcStub, RpcTarget } from "capnweb";
 import * as errore from "errore";
 import { useId, useLayoutEffect, useRef, useState } from "react";
+import { Route, Switch, useLocation } from "wouter";
 import {
   Button,
-  Icons,
-  P,
   backgroundColor,
   colors,
   flex,
   flexItem,
-  icon,
   radius,
   shadowVars,
   spacing,
@@ -29,7 +29,7 @@ import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
-import type { SessionSelection } from "./App.tsx";
+import type { LoadedPluginView } from "../shared/plugin.js";
 import { UiKitPage } from "./UiKitPage.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
@@ -38,32 +38,57 @@ class PromptSubmitError extends errore.createTaggedError({
 }) {}
 
 export function MainPane({
-  selection,
   sessions,
-  onDraftSent,
+  pluginViews,
+  pluginServers,
 }: {
-  selection?: SessionSelection;
   sessions: SessionSummary[];
-  onDraftSent: (draftId: string, sessionId: string) => void;
+  pluginViews: LoadedPluginView[];
+  pluginServers: Record<string, RpcStub<RpcTarget>>;
 }) {
+  return (
+    <Switch>
+      <Route path="/uikit">
+        <UiKitPage />
+      </Route>
+      <Route path="/draft/:draftId">
+        {(params) => <DraftPane draftId={params.draftId} />}
+      </Route>
+      <Route path="/sessions/:sessionId">
+        {(params) => (
+          <SavedPane sessionId={params.sessionId} sessions={sessions} />
+        )}
+      </Route>
+      <Route path="/plugins/:pluginId" nest>
+        {(params) => {
+          const plugin = pluginViews.find(
+            (item) => item.id === params.pluginId,
+          );
+          if (plugin === undefined || plugin.Routes === undefined) {
+            return <MissingPlugin pluginId={params.pluginId} />;
+          }
+          return (
+            <PluginRuntimeProvider
+              pluginId={plugin.id}
+              server={pluginServers[plugin.id]}
+            >
+              <plugin.Routes />
+            </PluginRuntimeProvider>
+          );
+        }}
+      </Route>
+    </Switch>
+  );
+}
+
+function MissingPlugin({ pluginId }: { pluginId: string }) {
   const pane = useStyles(styles.pane);
-  if (!selection) {
-    return (
-      <main className={pane} aria-label="Session">
-        <P>Loading sessions…</P>
-      </main>
-    );
-  }
-
-  if (selection.kind === "uikit") {
-    return <UiKitPage />;
-  }
-
-  if (selection.kind === "draft") {
-    return <DraftPane draftId={selection.draftId} onSent={onDraftSent} />;
-  }
-
-  return <SavedPane sessionId={selection.sessionId} sessions={sessions} />;
+  const content = useStyles(styles.content);
+  return (
+    <main className={pane} aria-label={pluginId}>
+      <div className={content}>Plugin '{pluginId}' has no Routes</div>
+    </main>
+  );
 }
 
 function SessionTitleSlot({ title }: { title?: string }) {
@@ -115,15 +140,10 @@ function SavedPane({
   );
 }
 
-function DraftPane({
-  draftId,
-  onSent,
-}: {
-  draftId: string;
-  onSent: (draftId: string, sessionId: string) => void;
-}) {
+function DraftPane({ draftId }: { draftId: string }) {
+  const [, navigate] = useLocation();
   const { state, isWorking, prompt } = useDraftAgentSession((sessionId) => {
-    onSent(draftId, sessionId);
+    navigate(`/sessions/${sessionId}`);
   });
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);
@@ -158,14 +178,12 @@ type PromptDraft = { text: string; error?: string };
 function PromptEditor({
   onSubmit,
 }: {
-  onSubmit: (prompt: string) => Promise<unknown>;
+  onSubmit: (prompt: string) => Promise<void | PromptSubmitError>;
 }) {
   const [draft, setDraft] = useState<PromptDraft>({ text: "" });
   const errorId = useId();
   const editor = useStyles(styles.promptEditor);
   const editorSurface = useStyles(styles.editorSurface);
-  const sendButton = useStyles(styles.sendButton);
-  const sendIcon = useStyles(icon("sm"));
   const error = useStyles(styles.promptError);
   const trimmedText = draft.text.trim();
   const sendDisabled = trimmedText.length === 0;
@@ -200,13 +218,8 @@ function PromptEditor({
         size="sm"
         className={editorSurface}
         actions={
-          <Button
-            aria-label="Send"
-            className={sendButton}
-            disabled={sendDisabled}
-            onClick={submit}
-          >
-            <Icons.ArrowUp className={sendIcon} />
+          <Button aria-label="Send" disabled={sendDisabled} onClick={submit}>
+            Send
           </Button>
         }
       />
@@ -234,8 +247,9 @@ function SessionView({
 
   useLayoutEffect(() => {
     const element = viewRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [state, isWorking]);
+    if (element === null) return;
+    element.scrollTop = element.scrollHeight;
+  });
 
   return (
     <div
@@ -422,16 +436,6 @@ const styles = {
       outline: "none",
       boxShadow: shadowVars.subtle,
       zIndex: "auto",
-    },
-  }),
-  sendButton: style(radius.circle, {
-    boxShadow: "none",
-    backgroundColor: colors.gray[3],
-    "&:hover": {
-      backgroundColor: colors.gray[4],
-    },
-    "&:active": {
-      backgroundColor: colors.gray[5],
     },
   }),
   promptError: style(
