@@ -1,6 +1,7 @@
 import { createElement, useId, type ReactNode } from "react";
 import { flex, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
+import { sidebarPadding } from "./sidebar.js";
 
 type SidebarSectionProps = {
   label: string;
@@ -32,15 +33,13 @@ export function SidebarSection(props: SidebarSectionProps) {
 
 const sectionClass = style(flex({ direction: "column", gap: 4 }), {
   minWidth: 0,
-  // Halo's nav pads x: 2; bleed so hover/current fill the sidebar.
-  marginInline: `calc(-1 * ${spacing.value(2)})`,
-  width: `calc(100% + ${spacing.value(2)} + ${spacing.value(2)})`,
+  width: "100%",
   marginTop: spacing.value(4),
 });
 
 const sectionLabelClass = style(
   text("xs", 500, "lowContrast"),
-  spacing.padding({ x: 3 }),
+  sidebarPadding,
   {
     letterSpacing: "0.02em",
   },

@@ -7,6 +7,7 @@ import {
 import { backgroundColor, colors, navigationItem, radius, spacing } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Link, useRoute } from "wouter";
+import { sidebarPadding } from "./sidebar.js";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -66,7 +67,7 @@ const listItemClass = style({
   minWidth: 0,
 });
 
-const itemClass = style(navigationItem, {
+const itemClass = style(navigationItem, sidebarPadding, {
   display: "grid",
   gridTemplateColumns: "16px minmax(0, 1fr) auto",
   alignItems: "center",
@@ -75,8 +76,6 @@ const itemClass = style(navigationItem, {
   width: "100%",
   boxSizing: "border-box",
   borderRadius: 0,
-  paddingLeft: spacing.value(3),
-  paddingRight: spacing.value(3),
   paddingTop: spacing.value(2),
   paddingBottom: spacing.value(2),
   border: 0,

@@ -2,18 +2,17 @@ import {
   PluginRuntimeProvider,
   SidebarItem,
   SidebarSection,
+  sidebarPadding,
 } from "@halo/plugin-sdk/view";
 import type { RpcStub, RpcTarget } from "capnweb";
 import {
   Button,
   Icons,
-  borderColor,
+  border,
   colors,
   flex,
   flexItem,
   icon,
-  motionDurationMs,
-  motionEasing,
   shadow,
   spacing,
   text,
@@ -58,6 +57,7 @@ export function Sidebar({
   const updateLabel = useStyles(styles.updateLabel);
   const pluginError = useStyles(styles.pluginError);
   const pluginSidebar = useStyles(styles.pluginSidebar);
+  const newSessionPad = useStyles(sidebarPadding);
 
   return (
     <nav className={sidebar} aria-label="Sessions">
@@ -67,7 +67,9 @@ export function Sidebar({
           {themeLabel}
         </Button>
       </div>
-      <NewSessionButton className={newButton} iconClassName={newIcon} />
+      <div className={newSessionPad}>
+        <NewSessionButton className={newButton} iconClassName={newIcon} />
+      </div>
       <section className={filesSection} aria-labelledby="files-label">
         <div className={sectionLabel} id="files-label">
           Files
@@ -169,28 +171,25 @@ function formatUpdateStatus(update: AppInfo["update"]): string {
 
 const filesSectionMaxHeightPx = 240;
 const filesLabelLineHeightPx = 18;
+const filesSectionBorderPx = 2;
 const filesTreeMaxHeightPx =
   filesSectionMaxHeightPx -
   filesLabelLineHeightPx -
-  Number.parseInt(spacing.value(4), 10);
+  Number.parseInt(spacing.value(4), 10) -
+  filesSectionBorderPx;
 
 const styles = {
-  sidebar: style(
-    shadow.medium,
-    spacing.padding({ x: 2, bottom: 2 }),
-    flex({ direction: "column", gap: 4 }),
-    {
-      width: "100%",
-      minWidth: 0,
-      height: "100%",
-      minHeight: 0,
-      overflowY: "auto",
-      position: "relative",
-      zIndex: 1,
-      backgroundColor: `light-dark(${colors.gray[1]}, ${colors.gray[2]})`,
-    },
-  ),
-  header: style(flex({ align: "center", justify: "between" }), {
+  sidebar: style(shadow.medium, flex({ direction: "column", gap: 4 }), {
+    width: "100%",
+    minWidth: 0,
+    height: "100%",
+    minHeight: 0,
+    overflowY: "auto",
+    position: "relative",
+    zIndex: 1,
+    backgroundColor: `light-dark(${colors.gray[1]}, ${colors.gray[2]})`,
+  }),
+  header: style(flex({ align: "center", justify: "between" }), sidebarPadding, {
     minWidth: 0,
     minHeight: "42px",
     paddingLeft: "67px",
@@ -203,64 +202,47 @@ const styles = {
   }),
   newButton: style(flex({ align: "center", gap: 3 }), {
     alignSelf: "stretch",
-    width: `calc(100% - ${spacing.value(4)} - ${spacing.value(4)})`,
-    marginInline: spacing.value(4),
+    width: "100%",
   }),
   filesSection: style(
     flex({ direction: "column", gap: 4 }),
     flexItem({ size: "hug" }),
+    border(["top", "bottom"], "outline"),
     {
       minWidth: 0,
       minHeight: 0,
       maxHeight: `${filesSectionMaxHeightPx}px`,
       overflow: "hidden",
       marginTop: spacing.value(8),
-      position: "relative",
-      "&::before, &::after": {
-        content: "''",
-        position: "absolute",
-        right: 0,
-        left: 0,
-        height: "1px",
-        backgroundColor: borderColor.outline,
-        opacity: 0,
-        pointerEvents: "none",
-        zIndex: 3,
-        transition: `opacity ${motionDurationMs}ms ${motionEasing}`,
-      },
-      "&::before": { top: 0 },
-      "&::after": { bottom: 0 },
-      "&:hover::before, &:hover::after": { opacity: 1 },
+      width: "100%",
+      boxSizing: "border-box",
     },
   ),
   filesTree: style(flexItem({ size: "hug" }), {
     minWidth: 0,
     minHeight: 0,
     overflow: "hidden",
-    marginInline: `calc(-1 * ${spacing.value(2)})`,
-    width: `calc(100% + ${spacing.value(2)} + ${spacing.value(2)})`,
+    width: "100%",
   }),
-  sectionLabel: style(
-    text("xs", 500, "lowContrast"),
-    spacing.padding({ x: 3 }),
-    {
-      letterSpacing: "0.02em",
-    },
-  ),
+  sectionLabel: style(text("xs", 500, "lowContrast"), sidebarPadding, {
+    letterSpacing: "0.02em",
+  }),
   sessionList: style(flex({ direction: "column" }), {
     listStyleType: "none",
     padding: 0,
-    margin: `0 calc(-1 * ${spacing.value(2)})`,
-    width: `calc(100% + ${spacing.value(2)} + ${spacing.value(2)})`,
+    margin: 0,
+    width: "100%",
     gap: "1px",
   }),
   footer: style(
     flex({ direction: "column", gap: 1 }),
-    spacing.padding({ x: 4, top: 4, bottom: 8 }),
+    sidebarPadding,
     flexItem({ size: "hug" }),
     {
       marginTop: "auto",
       minWidth: 0,
+      paddingTop: spacing.value(4),
+      paddingBottom: spacing.value(8),
     },
   ),
   versionLabel: style(text("xs", 500, "highContrast"), {
@@ -272,15 +254,13 @@ const styles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   }),
-  pluginError: style(
-    text("xs", 500, "highContrast"),
-    spacing.padding({ x: 4, y: 2 }),
-    {
-      color: "light-dark(#b42318, #ff9592)",
-      whiteSpace: "pre-wrap",
-      overflowWrap: "anywhere",
-    },
-  ),
+  pluginError: style(text("xs", 500, "highContrast"), sidebarPadding, {
+    color: "light-dark(#b42318, #ff9592)",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+    paddingTop: spacing.value(2),
+    paddingBottom: spacing.value(2),
+  }),
   pluginSidebar: style({
     width: "100%",
     minWidth: 0,
