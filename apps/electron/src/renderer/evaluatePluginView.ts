@@ -8,7 +8,11 @@ import * as jsxRuntime from "react/jsx-runtime";
 import * as reactDom from "react-dom";
 import type { ComponentType } from "react";
 import * as wouter from "wouter";
-import type { LoadedPluginView } from "../../shared/plugin.js";
+import type {
+  LoadedPluginView,
+  PluginList,
+  PluginLoadError,
+} from "../shared/plugin.js";
 
 const hostModules: Record<string, unknown> = {
   react,
@@ -30,6 +34,26 @@ export class PluginViewExportError extends errore.createTaggedError({
   name: "PluginViewExportError",
   message: "Plugin '$id' view must export Sidebar and/or Routes",
 }) {}
+
+export type LoadedPluginList = {
+  plugins: PluginList["plugins"];
+  views: LoadedPluginView[];
+  errors: PluginLoadError[];
+};
+
+export function loadPluginViews(list: PluginList): LoadedPluginList {
+  const views: LoadedPluginView[] = [];
+  const errors: PluginLoadError[] = [...list.errors];
+  for (const compiled of list.compiledViews) {
+    const loaded = evaluatePluginView(compiled);
+    if (loaded instanceof Error) {
+      errors.push({ id: compiled.id, message: loaded.message });
+      continue;
+    }
+    views.push(loaded);
+  }
+  return { plugins: list.plugins, views, errors };
+}
 
 export function evaluatePluginView(args: {
   id: string;

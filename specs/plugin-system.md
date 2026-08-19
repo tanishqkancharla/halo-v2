@@ -30,7 +30,7 @@ sequenceDiagram
     Main->>Main: JSON.parse then parseVersioned halo
     Main->>Main: jiti-import server router
     Main->>Main: esbuild view
-    Main-->>UI: PluginBundle plus oRPC port
+    Main-->>UI: manifests, compiledViews, errors
     UI->>UI: Evaluate Sidebar and Routes
     UI->>UI: wouter /plugins/:pluginId nest → Routes
     UI->>Main: usePluginServer
@@ -418,7 +418,8 @@ class PluginViewExportError extends errore.createTaggedError({
 +compilePluginView
 +└── esbuild view.tsx
 +    └── external: react, maui, purse-styles, wouter, @halo/plugin-sdk/view
-+evaluatePluginView
++listPlugins → compiledViews
++evaluatePluginView (renderer)
 +└── named Sidebar and Routes (both functions)
 ```
 
@@ -439,10 +440,10 @@ class PluginViewExportError extends errore.createTaggedError({
 +});
 ```
 
-- [x] Compile the resolved view file. Map `@halo/plugin-sdk/view` and `wouter` as external. Keep tagged compile errors.
-- [x] Evaluate CJS. Read `Sidebar` and `Routes` if they are functions. Accept `module.exports` wrapping for CJS interop; the author-facing API is named exports.
-- [x] Reject a view that exports neither `Sidebar` nor `Routes`. Ignore other names.
-- [x] Test: compile a view that imports `Button` and `Route` from `@halo/plugin-sdk/view`; parse both named components; fail on a view with neither.
+- [x] Compile the resolved view file. Map `@halo/plugin-sdk/view` and `wouter` as external. Keep tagged compile errors. `PluginService.list` does not evaluate.
+- [x] Evaluate CJS in the renderer (`loadPluginViews`). Read `Sidebar` and `Routes` if they are functions. Accept `module.exports` wrapping for CJS interop; the author-facing API is named exports.
+- [x] Reject a view that exports neither `Sidebar` nor `Routes`. Ignore other names. A missing export is a renderer error; the compiled plugin still lists.
+- [x] Test: compile a view that imports `Button` and `Route` from `@halo/plugin-sdk/view`; evaluate both named components in the renderer helper; fail on a view with neither.
 - [x] Run `pnpm --filter @halo/desktop test`.
 
 ### Phase 7: Mount plugin Sidebar and Routes

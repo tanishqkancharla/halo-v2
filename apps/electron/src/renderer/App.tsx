@@ -13,6 +13,7 @@ import {
   useChooseWorkspaceMutation,
   useWorkspaceQuery,
   useAppInfoQuery,
+  usePluginsQuery,
 } from "./api/ApiProvider.tsx";
 
 export function App() {
@@ -21,6 +22,7 @@ export function App() {
   const chooseWorkspace = useChooseWorkspaceMutation();
   const sessionsQuery = useSessionsQuery(workspace);
   const appInfoQuery = useAppInfoQuery();
+  usePluginsQuery(workspace);
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
 
   if (workspaceQuery.isPending || workspace === undefined) {

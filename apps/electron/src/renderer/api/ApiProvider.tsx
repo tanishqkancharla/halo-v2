@@ -8,6 +8,7 @@ import {
 import * as errore from "errore";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { WorkspaceInfo } from "../../shared/rpc.js";
+import { loadPluginViews } from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
 import type { HaloApiStub } from "./HaloRpcClient.js";
 
@@ -139,6 +140,20 @@ export function useAppInfoQuery() {
     queryKey: ["app-info"],
     queryFn: () => api.getAppInfo(),
     refetchInterval: 5_000,
+  });
+}
+
+export function usePluginsQuery(workspace: WorkspaceState | undefined) {
+  const api = useApi();
+  const workspaceRoot =
+    workspace?.status === "ready"
+      ? workspace.workspace.workspaceRoot
+      : undefined;
+
+  return useQuery({
+    queryKey: ["plugins", workspaceRoot],
+    queryFn: async () => loadPluginViews(await api.listPlugins()),
+    enabled: workspaceRoot !== undefined,
   });
 }
 

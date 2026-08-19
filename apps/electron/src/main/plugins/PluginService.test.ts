@@ -7,6 +7,7 @@ import {
   WorkspaceNotReadyError,
   WorkspaceService,
 } from "../workspace-service.js";
+import { loadPluginViews } from "../../renderer/evaluatePluginView.js";
 import { PluginService } from "./PluginService.js";
 
 type PluginFiles = Record<string, string>;
@@ -83,10 +84,14 @@ describe("PluginService", () => {
 
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
       expect(listed.plugins[0]?.halo.name).toBe("Calendar");
-      expect(listed.views).toHaveLength(1);
-      expect(listed.views[0]?.Sidebar).toBeTypeOf("function");
-      expect(listed.views[0]?.Routes).toBeUndefined();
+      expect(listed.compiledViews).toHaveLength(1);
       expect(listed.errors).toEqual([]);
+
+      const loaded = loadPluginViews(listed);
+      expect(loaded.views).toHaveLength(1);
+      expect(loaded.views[0]?.Sidebar).toBeTypeOf("function");
+      expect(loaded.views[0]?.Routes).toBeUndefined();
+      expect(loaded.errors).toEqual([]);
     },
   );
 
@@ -119,9 +124,13 @@ describe("PluginService", () => {
       if (listed instanceof Error) throw listed;
 
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
-      expect(listed.views[0]?.Sidebar).toBeTypeOf("function");
-      expect(listed.views[0]?.Routes).toBeTypeOf("function");
+      expect(listed.compiledViews).toHaveLength(1);
       expect(listed.errors).toEqual([]);
+
+      const loaded = loadPluginViews(listed);
+      expect(loaded.views[0]?.Sidebar).toBeTypeOf("function");
+      expect(loaded.views[0]?.Routes).toBeTypeOf("function");
+      expect(loaded.errors).toEqual([]);
     },
   );
 
@@ -145,8 +154,13 @@ describe("PluginService", () => {
       const listed = await new PluginService(workspace).list();
       if (listed instanceof Error) throw listed;
 
-      expect(listed.plugins).toEqual([]);
-      expect(listed.errors.map((error) => error.id)).toEqual(["calendar"]);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.compiledViews).toHaveLength(1);
+      expect(listed.errors).toEqual([]);
+
+      const loaded = loadPluginViews(listed);
+      expect(loaded.views).toEqual([]);
+      expect(loaded.errors.map((error) => error.id)).toEqual(["calendar"]);
     },
   );
 
