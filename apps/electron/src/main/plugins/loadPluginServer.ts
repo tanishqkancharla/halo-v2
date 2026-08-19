@@ -117,7 +117,7 @@ function pluginServerFromExport(args: {
 
 function pluginServerFromCandidate(args: {
   RpcTarget: abstract new (...args: never[]) => RpcTarget;
-  candidate: PluginServerClass | RpcTarget | undefined;
+  candidate: PluginServerExport | undefined;
 }): PluginServerClass | RpcTarget | undefined {
   const candidate = args.candidate;
   if (candidate === undefined) return undefined;
