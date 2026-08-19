@@ -1,7 +1,8 @@
 import { createElement, useId, type ReactNode } from "react";
 import { flex, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
-import { sidebarPadding } from "./sidebar.js";
+
+export const sidebarPadding = style(spacing.padding({ x: 3 }));
 
 type SidebarSectionProps = {
   label: string;

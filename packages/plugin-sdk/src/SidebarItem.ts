@@ -7,7 +7,7 @@ import {
 import { backgroundColor, colors, navigationItem, radius, spacing } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Link, useRoute } from "wouter";
-import { sidebarPadding } from "./sidebar.js";
+import { sidebarPadding } from "./SidebarSection.js";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
