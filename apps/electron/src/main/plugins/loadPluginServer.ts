@@ -97,19 +97,33 @@ function pluginServerFromExport(args: {
   exported: PluginServerExport;
 }): PluginServerClass | RpcTarget | undefined {
   const JitiRpcTarget = args.RpcTarget;
-  const exported = args.exported;
-  if (exported instanceof JitiRpcTarget) return exported;
-  if (isCallable({ value: exported })) {
-    // SAFETY: a function export from a plugin server module is the RpcTarget subclass.
-    return exported as PluginServerClass;
-  }
+  const fromExport = pluginServerFromCandidate({
+    RpcTarget: JitiRpcTarget,
+    candidate: args.exported,
+  });
+  if (fromExport !== undefined) return fromExport;
   // SAFETY: remaining jiti exports are the module namespace object.
-  const record = exported as PluginModuleExports;
-  const candidate = record.default ?? record.Server;
+  const record = args.exported as PluginModuleExports;
+  const fromDefault = pluginServerFromCandidate({
+    RpcTarget: JitiRpcTarget,
+    candidate: record.default,
+  });
+  if (fromDefault !== undefined) return fromDefault;
+  return pluginServerFromCandidate({
+    RpcTarget: JitiRpcTarget,
+    candidate: record.Server,
+  });
+}
+
+function pluginServerFromCandidate(args: {
+  RpcTarget: abstract new (...args: never[]) => RpcTarget;
+  candidate: PluginServerClass | RpcTarget | undefined;
+}): PluginServerClass | RpcTarget | undefined {
+  const candidate = args.candidate;
   if (candidate === undefined) return undefined;
-  if (candidate instanceof JitiRpcTarget) return candidate;
+  if (candidate instanceof args.RpcTarget) return candidate;
   if (isCallable({ value: candidate })) {
-    // SAFETY: default/Server function export is the RpcTarget subclass constructor.
+    // SAFETY: a function export from a plugin server module is the RpcTarget subclass.
     return candidate as PluginServerClass;
   }
   return undefined;
