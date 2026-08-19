@@ -67,9 +67,10 @@ export function Sidebar({
       <div className={newSessionPad}>
         <NewSessionButton className={newButton} iconClassName={newIcon} />
       </div>
-      <SidebarSection label="Files" role="none" className={filesSection}>
-        <WorkspaceFilesystem maxHeight={filesTreeMaxHeightPx} />
-      </SidebarSection>
+      <WorkspaceFilesystem
+        maxHeight={filesTreeMaxHeightPx}
+        className={filesSection}
+      />
       <SidebarSection label="Sessions">
         {sessions.map((session) => (
           <SidebarItem
@@ -168,6 +169,7 @@ const filesTreeMaxHeightPx =
   filesSectionMaxHeightPx -
   filesLabelLineHeightPx -
   Number.parseInt(spacing.value(4), 10) -
+  Number.parseInt(spacing.value(2), 10) * 2 -
   filesSectionBorderPx;
 
 const styles = {
@@ -200,7 +202,6 @@ const styles = {
     minHeight: 0,
     maxHeight: `${filesSectionMaxHeightPx}px`,
     overflow: "hidden",
-    marginTop: spacing.value(8),
   }),
   sessionList: style(flex({ direction: "column" }), {
     listStyleType: "none",

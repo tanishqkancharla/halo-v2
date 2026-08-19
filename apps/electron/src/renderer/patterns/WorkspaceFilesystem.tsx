@@ -1,3 +1,4 @@
+import { SidebarSection } from "@halo/plugin-sdk/view";
 import type { FileTree as FileTreeModel } from "@pierre/trees";
 import { useEffect, useRef } from "react";
 import type { WorkspaceTreeEvent } from "../../shared/rpc.js";
@@ -10,9 +11,13 @@ import { Filesystem } from "./Filesystem.tsx";
 
 type WorkspaceFilesystemProps = {
   maxHeight?: number;
+  className?: string;
 };
 
-export function WorkspaceFilesystem({ maxHeight }: WorkspaceFilesystemProps) {
+export function WorkspaceFilesystem({
+  maxHeight,
+  className,
+}: WorkspaceFilesystemProps) {
   const workspaceQuery = useWorkspaceQuery();
   const workspace = workspaceQuery.data;
   const pathsQuery = useWorkspacePathsQuery(workspace);
@@ -38,16 +43,19 @@ export function WorkspaceFilesystem({ maxHeight }: WorkspaceFilesystemProps) {
 
   if (workspaceRoot === undefined) return;
   if (pathsQuery.data === undefined) return;
+  if (pathsQuery.data.length === 0) return;
 
   return (
-    <Filesystem
-      key={workspaceRoot}
-      paths={pathsQuery.data}
-      maxHeight={maxHeight}
-      onModel={(model) => {
-        modelRef.current = model;
-      }}
-    />
+    <SidebarSection label="Files" role="none" className={className}>
+      <Filesystem
+        key={workspaceRoot}
+        paths={pathsQuery.data}
+        maxHeight={maxHeight}
+        onModel={(model) => {
+          modelRef.current = model;
+        }}
+      />
+    </SidebarSection>
   );
 }
 

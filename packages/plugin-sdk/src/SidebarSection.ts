@@ -11,17 +11,21 @@ import { style, useStyles } from "purse-styles";
 
 export const sidebarPadding = style(spacing.padding({ x: 3 }));
 
-export const sidebarSection = style(flex({ direction: "column", gap: 4 }), {
-  minWidth: 0,
-  width: "100%",
-  borderTop: "1px solid transparent",
-  borderBottom: "1px solid transparent",
-  transition: `border-color ${motionDurationMs}ms ${motionEasing}`,
-  "&:hover": {
-    borderTopColor: borderColor.outline,
-    borderBottomColor: borderColor.outline,
+export const sidebarSection = style(
+  flex({ direction: "column", gap: 4 }),
+  spacing.padding({ y: 2 }),
+  {
+    minWidth: 0,
+    width: "100%",
+    borderTop: "1px solid transparent",
+    borderBottom: "1px solid transparent",
+    transition: `border-color ${motionDurationMs}ms ${motionEasing}`,
+    "&:hover": {
+      borderTopColor: borderColor.outline,
+      borderBottomColor: borderColor.outline,
+    },
   },
-});
+);
 
 type SidebarSectionProps = {
   label: string;
@@ -32,7 +36,7 @@ type SidebarSectionProps = {
 
 export function SidebarSection(props: SidebarSectionProps) {
   const labelId = useId();
-  const sectionClassName = useStyles(sectionClass);
+  const sectionClassName = useStyles(sidebarSection);
   const labelClassName = useStyles(sectionLabelClass);
   const bodyClassName = useStyles(sectionBodyClass);
   const role = props.role === undefined ? "list" : props.role;
@@ -52,10 +56,6 @@ export function SidebarSection(props: SidebarSectionProps) {
     ),
   );
 }
-
-const sectionClass = style(sidebarSection, {
-  marginTop: spacing.value(4),
-});
 
 const sectionLabelClass = style(text("xs", 500, "lowContrast"), sidebarPadding);
 

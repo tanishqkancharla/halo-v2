@@ -139,6 +139,8 @@ export function Filesystem({
     onModel(model);
   }, [model, onModel]);
 
+  if (paths.length === 0) return;
+
   return (
     <div className={shell}>
       <div
