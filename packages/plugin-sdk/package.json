@@ -9,8 +9,8 @@
     "./schema": "./src/schema.ts"
   },
   "scripts": {
-    "lint": "oxlint --deny-warnings .",
-    "lint:fix": "oxlint --fix .",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings .",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix .",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "test": "vitest run src",

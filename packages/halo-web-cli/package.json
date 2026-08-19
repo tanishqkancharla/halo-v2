@@ -11,8 +11,8 @@
     "cli": "node --import tsx src/cli.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "lint": "oxlint --deny-warnings src",
-    "lint:fix": "oxlint --fix src",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src",
     "test": "vitest run src --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
