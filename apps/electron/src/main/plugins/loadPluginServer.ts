@@ -51,13 +51,18 @@ function sdkEntry(subpath: "schema" | "server" | "view") {
 }
 
 function pluginServerExport(moduleExports: unknown): unknown {
-  if (typeof moduleExports === "function") return moduleExports;
+  if (isPluginServerExport(moduleExports)) return moduleExports;
   if (typeof moduleExports !== "object" || moduleExports === null) {
     return undefined;
   }
   const record = moduleExports as Record<string, unknown>;
-  if (record.default !== undefined) return record.default;
-  return record.Server;
+  if (isPluginServerExport(record.default)) return record.default;
+  if (isPluginServerExport(record.Server)) return record.Server;
+  return undefined;
+}
+
+function isPluginServerExport(value: unknown) {
+  return typeof value === "function" || value instanceof RpcTarget;
 }
 
 function instantiatePluginServer(
