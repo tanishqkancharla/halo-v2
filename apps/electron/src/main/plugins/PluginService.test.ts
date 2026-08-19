@@ -1,6 +1,8 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/message-port";
 import { describe, expect, test } from "vitest";
 import { src } from "../test/fixtures.js";
 import {
@@ -198,6 +200,65 @@ describe("PluginService", () => {
 
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
       expect(listed.errors.map((error) => error.id)).toEqual(["broken"]);
+    },
+  );
+
+  pluginTest(
+    "round-trips a plugin ping over MessageChannel and rejects a missing plugin id",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        calendar: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-calendar",
+              "halo": { "version": 1, "name": "Calendar" }
+            }
+          `,
+          "server.ts": src`
+            import { os } from "@halo/plugin-sdk/server"
+
+            const ping = os.handler(async ({ context }) => {
+              return { pluginId: context.pluginId }
+            })
+
+            const fail = os.handler(async () => {
+              return new Error("ping failed")
+            })
+
+            export const router = { ping, fail }
+            export default router
+          `,
+        },
+      });
+
+      const plugins = new PluginService(workspace);
+      const listed = await plugins.list();
+      if (listed instanceof Error) throw listed;
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.errors).toEqual([]);
+
+      const { port1, port2 } = new MessageChannel();
+      const attached = plugins.attachRpc(port1);
+      if (attached instanceof Error) throw attached;
+      port1.start();
+      const link = new RPCLink({ port: port2 });
+      port2.start();
+      const client = createORPCClient(link) as {
+        calendar: {
+          ping: (input: Record<string, never>) => Promise<{ pluginId: string }>;
+          fail: (input: Record<string, never>) => Promise<unknown>;
+        };
+        missing: {
+          ping: (input: Record<string, never>) => Promise<unknown>;
+        };
+      };
+
+      expect(await client.calendar.ping({})).toEqual({ pluginId: "calendar" });
+      await expect(client.calendar.fail({})).rejects.toBeInstanceOf(Error);
+      await expect(client.missing.ping({})).rejects.toBeInstanceOf(Error);
+
+      port1.close();
+      port2.close();
     },
   );
 });
