@@ -45,4 +45,71 @@ describe("parseVersioned", () => {
     expect(parsed.version).toBe(1);
     expect(parsed.name).toBe("Calendar");
   });
+
+  test("rejects an empty name", () => {
+    const parsed = parseVersioned({
+      name: "halo",
+      schema: haloManifestSchema,
+      value: { version: 1, name: "" },
+    });
+    expect(parsed).toBeInstanceOf(SchemaParseError);
+  });
+
+  test("rejects an empty view path", () => {
+    const parsed = parseVersioned({
+      name: "halo",
+      schema: haloManifestSchema,
+      value: { version: 1, name: "Calendar", view: "" },
+    });
+    expect(parsed).toBeInstanceOf(SchemaParseError);
+  });
+
+  test("rejects an empty server path", () => {
+    const parsed = parseVersioned({
+      name: "halo",
+      schema: haloManifestSchema,
+      value: { version: 1, name: "Calendar", server: "" },
+    });
+    expect(parsed).toBeInstanceOf(SchemaParseError);
+  });
+
+  test("rejects a missing halo object", () => {
+    const parsed = parseVersioned({
+      name: "halo",
+      schema: haloManifestSchema,
+      value: undefined,
+    });
+    expect(parsed).toBeInstanceOf(SchemaParseError);
+  });
+
+  test("rejects a non-object halo value", () => {
+    const parsed = parseVersioned({
+      name: "halo",
+      schema: haloManifestSchema,
+      value: "Calendar",
+    });
+    expect(parsed).toBeInstanceOf(SchemaParseError);
+  });
+
+  test("accepts optional description, view, and server", () => {
+    const parsed = parseVersioned({
+      name: "halo",
+      schema: haloManifestSchema,
+      value: {
+        version: 1,
+        name: "Notes",
+        description: "Scratch notes.",
+        view: "./view.tsx",
+        server: "./server.ts",
+      },
+    });
+    if (parsed instanceof Error) throw parsed;
+    expect(parsed).toEqual({
+      version: 1,
+      name: "Notes",
+      description: "Scratch notes.",
+      view: "./view.tsx",
+      server: "./server.ts",
+    });
+  });
 });

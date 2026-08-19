@@ -15,7 +15,7 @@ import { HaloRpc } from "../rpc.js";
 import { PiService } from "../pi-service.js";
 import { UserService } from "../UserService.js";
 import type { HaloApi } from "../../shared/rpc.js";
-import { PluginService } from "./PluginService.js";
+import { PluginNotFoundError, PluginService } from "./PluginService.js";
 
 type PluginFiles = Record<string, string>;
 type PluginTree = Record<string, PluginFiles>;
@@ -58,6 +58,24 @@ async function writePluginFiles(workspaceRoot: string, plugins: PluginTree) {
       await writeFile(path, contents);
     }
   }
+}
+
+async function listPlugins(workspace: WorkspaceService) {
+  const listed = await new PluginService(workspace).list();
+  if (listed instanceof Error) throw listed;
+  return listed;
+}
+
+async function loadedPluginServer<T extends object>(
+  workspace: WorkspaceService,
+  id: string,
+) {
+  const service = new PluginService(workspace);
+  const listed = await service.list();
+  if (listed instanceof Error) throw listed;
+  const server = service.getPlugin(id);
+  if (server instanceof Error) throw server;
+  return server as unknown as T;
 }
 
 describe("PluginService", () => {
@@ -355,6 +373,596 @@ describe("PluginService", () => {
 
       port1.close();
       port2.close();
+    },
+  );
+
+  pluginTest(
+    "leaves an existing halo-plugin skill in place",
+    async ({ workspace, workspaceRoot }) => {
+      const skillPath = join(
+        workspaceRoot,
+        ".pi",
+        "agent",
+        "skills",
+        "halo-plugin",
+        "SKILL.md",
+      );
+      await mkdir(dirname(skillPath), { recursive: true });
+      await writeFile(skillPath, "keep me\n");
+
+      const selected = await workspace.select(workspaceRoot);
+      if (selected instanceof Error) throw selected;
+
+      expect(await readFile(skillPath, "utf8")).toBe("keep me\n");
+    },
+  );
+
+  pluginTest(
+    "returns an empty list when the plugins folder is gone",
+    async ({ workspace, workspaceRoot }) => {
+      const selected = await workspace.select(workspaceRoot);
+      if (selected instanceof Error) throw selected;
+      await rm(join(workspaceRoot, ".halo", "plugins"), {
+        recursive: true,
+        force: true,
+      });
+
+      expect(await listPlugins(workspace)).toEqual({
+        plugins: [],
+        compiledViews: [],
+        errors: [],
+      });
+    },
+  );
+
+  pluginTest(
+    "lists plugin ids in sorted order",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        zeta: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-zeta",
+              "halo": { "version": 1, "name": "Zeta" }
+            }
+          `,
+        },
+        alpha: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-alpha",
+              "halo": { "version": 1, "name": "Alpha" }
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
+        "alpha",
+        "calendar",
+        "zeta",
+      ]);
+    },
+  );
+
+  pluginTest(
+    "records a folder with no package.json and keeps other plugins",
+    async ({ workspace, workspaceRoot, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "version": 1, "name": "Notes" }
+            }
+          `,
+        },
+      });
+      await mkdir(join(workspaceRoot, ".halo", "plugins", "empty"));
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
+        "calendar",
+        "notes",
+      ]);
+      expect(listed.errors.map((error) => error.id)).toEqual(["empty"]);
+      expect(listed.errors[0]?.message).toMatch(/missing package.json/);
+    },
+  );
+
+  pluginTest(
+    "records an empty halo name",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "version": 1, "name": "" }
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.errors.map((error) => error.id)).toEqual(["notes"]);
+    },
+  );
+
+  pluginTest(
+    "records a missing halo version",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "name": "Notes" }
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.errors.map((error) => error.id)).toEqual(["notes"]);
+    },
+  );
+
+  pluginTest(
+    "records a missing package.json name",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "halo": { "version": 1, "name": "Notes" }
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.errors.map((error) => error.id)).toEqual(["notes"]);
+      expect(listed.errors[0]?.message).toMatch(
+        /name must be a non-empty string/,
+      );
+    },
+  );
+
+  pluginTest(
+    "lists extra halo keys and an explicit view path",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": {
+                "version": 1,
+                "name": "Notes",
+                "view": "./src/page.tsx",
+                "extra": "ok"
+              }
+            }
+          `,
+          "src/page.tsx": src`
+            export const Sidebar = () => undefined
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
+        "calendar",
+        "notes",
+      ]);
+      expect(listed.plugins[1]?.halo.name).toBe("Notes");
+      expect(listed.errors).toEqual([]);
+
+      const loaded = loadPluginViews(listed);
+      expect(loaded.views.map((view) => view.id)).toEqual([
+        "calendar",
+        "notes",
+      ]);
+      expect(loaded.views[1]?.Sidebar).toBeTypeOf("function");
+    },
+  );
+
+  pluginTest(
+    "records a missing explicit view file",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "version": 1, "name": "Notes", "view": "./missing.tsx" }
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.errors.map((error) => error.id)).toEqual(["notes"]);
+      expect(listed.errors[0]?.message).toMatch(/missing view file/);
+    },
+  );
+
+  pluginTest(
+    "loads view/index.tsx when view.tsx is absent",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "version": 1, "name": "Notes" }
+            }
+          `,
+          "view/index.tsx": src`
+            export const Routes = () => undefined
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
+        "calendar",
+        "notes",
+      ]);
+      expect(listed.errors).toEqual([]);
+
+      const loaded = loadPluginViews(listed);
+      const notes = loaded.views.find((view) => view.id === "notes");
+      expect(notes?.Sidebar).toBeUndefined();
+      expect(notes?.Routes).toBeTypeOf("function");
+    },
+  );
+
+  pluginTest(
+    "loads a Routes-only view and a server-only plugin",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "version": 1, "name": "Notes" }
+            }
+          `,
+          "view.tsx": src`
+            export function Routes() {
+              return undefined
+            }
+          `,
+        },
+        ping: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-ping",
+              "halo": { "version": 1, "name": "Ping" }
+            }
+          `,
+          "server.ts": src`
+            import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server"
+
+            export default class PingServer extends RpcTarget {
+              constructor(private readonly ctx: PluginServerContext) {
+                super()
+              }
+
+              ping() {
+                return {
+                  pluginId: this.ctx.pluginId,
+                  workspaceRoot: this.ctx.workspaceRoot,
+                }
+              }
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
+        "calendar",
+        "notes",
+        "ping",
+      ]);
+      expect(listed.compiledViews.map((view) => view.id)).toEqual([
+        "calendar",
+        "notes",
+      ]);
+      expect(listed.errors).toEqual([]);
+
+      const loaded = loadPluginViews(listed);
+      expect(
+        loaded.views.find((view) => view.id === "notes")?.Sidebar,
+      ).toBeUndefined();
+      expect(
+        loaded.views.find((view) => view.id === "notes")?.Routes,
+      ).toBeTypeOf("function");
+
+      type PingCalls = {
+        ping: () => Promise<{ pluginId: string; workspaceRoot: string }>;
+      };
+      const ping = await loadedPluginServer<PingCalls>(workspace, "ping");
+      const layout = workspace.getLayout();
+      if (layout instanceof Error) throw layout;
+      expect(await ping.ping()).toEqual({
+        pluginId: "ping",
+        workspaceRoot: layout.root,
+      });
+
+      const service = new PluginService(workspace);
+      await service.list();
+      expect(service.getPlugin("calendar")).toBeInstanceOf(PluginNotFoundError);
+      expect(service.getPlugin("notes")).toBeInstanceOf(PluginNotFoundError);
+    },
+  );
+
+  pluginTest(
+    "loads a named Server export and a default RpcTarget instance",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        named: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-named",
+              "halo": { "version": 1, "name": "Named" }
+            }
+          `,
+          "server.ts": src`
+            import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server"
+
+            export class Server extends RpcTarget {
+              constructor(private readonly ctx: PluginServerContext) {
+                super()
+              }
+
+              ping() {
+                return this.ctx.pluginId
+              }
+            }
+          `,
+        },
+        instance: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-instance",
+              "halo": { "version": 1, "name": "Instance" }
+            }
+          `,
+          "server.ts": src`
+            import { RpcTarget } from "@halo/plugin-sdk/server"
+
+            export default new (class extends RpcTarget {
+              ping() {
+                return "instance"
+              }
+            })()
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
+        "calendar",
+        "instance",
+        "named",
+      ]);
+      expect(listed.errors).toEqual([]);
+
+      type PingCalls = { ping: () => Promise<string> };
+      const named = await loadedPluginServer<PingCalls>(workspace, "named");
+      const instance = await loadedPluginServer<PingCalls>(
+        workspace,
+        "instance",
+      );
+      expect(await named.ping()).toBe("named");
+      expect(await instance.ping()).toBe("instance");
+    },
+  );
+
+  pluginTest(
+    "loads server/index.ts and methods inherited from a parent class",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        ping: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-ping",
+              "halo": { "version": 1, "name": "Ping" }
+            }
+          `,
+          "server/index.ts": src`
+            import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server"
+
+            class Base extends RpcTarget {
+              ping() {
+                return "pong"
+              }
+            }
+
+            export default class PingServer extends Base {
+              constructor(_ctx: PluginServerContext) {
+                super()
+              }
+            }
+          `,
+        },
+      });
+
+      type PingCalls = { ping: () => Promise<string> };
+      const ping = await loadedPluginServer<PingCalls>(workspace, "ping");
+      expect(await ping.ping()).toBe("pong");
+    },
+  );
+
+  pluginTest(
+    "records a server that does not extend RpcTarget",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        boom: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-boom",
+              "halo": { "version": 1, "name": "Boom" }
+            }
+          `,
+          "server.ts": src`
+            export default class Boom {
+              ping() {
+                return 1
+              }
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.errors.map((error) => error.id)).toEqual(["boom"]);
+      expect(listed.errors[0]?.message).toMatch(/must extend RpcTarget/);
+
+      const service = new PluginService(workspace);
+      await service.list();
+      expect(service.getPlugin("boom")).toBeInstanceOf(PluginNotFoundError);
+    },
+  );
+
+  pluginTest(
+    "records a server constructor that throws",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        boom: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-boom",
+              "halo": { "version": 1, "name": "Boom" }
+            }
+          `,
+          "server.ts": src`
+            import { RpcTarget } from "@halo/plugin-sdk/server"
+
+            export default class Boom extends RpcTarget {
+              constructor() {
+                super()
+                throw new Error("boom")
+              }
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.errors.map((error) => error.id)).toEqual(["boom"]);
+      expect(listed.errors[0]?.message).toMatch(/failed to load/);
+    },
+  );
+
+  pluginTest(
+    "keeps a valid plugin when another view fails to compile",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        boom: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-boom",
+              "halo": { "version": 1, "name": "Boom" }
+            }
+          `,
+          "view.tsx": src`
+            export const Sidebar = (
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.errors.map((error) => error.id)).toEqual(["boom"]);
+      expect(listed.errors[0]?.message).toMatch(/failed to compile/);
+
+      const loaded = loadPluginViews(listed);
+      expect(loaded.views.map((view) => view.id)).toEqual(["calendar"]);
+      expect(loaded.views[0]?.Sidebar).toBeTypeOf("function");
+    },
+  );
+
+  pluginTest(
+    "keeps a valid plugin when another view throws while evaluating",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        boom: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-boom",
+              "halo": { "version": 1, "name": "Boom" }
+            }
+          `,
+          "view.tsx": src`
+            throw new Error("view boom")
+            export function Sidebar() {
+              return undefined
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
+        "boom",
+        "calendar",
+      ]);
+      expect(listed.errors).toEqual([]);
+
+      const loaded = loadPluginViews(listed);
+      expect(loaded.views.map((view) => view.id)).toEqual(["calendar"]);
+      expect(loaded.errors.map((error) => error.id)).toEqual(["boom"]);
+      expect(loaded.errors[0]?.message).toMatch(/failed to evaluate/);
+    },
+  );
+
+  pluginTest(
+    "reloads compiled views from disk on the next list",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "version": 1, "name": "Notes" }
+            }
+          `,
+          "view.tsx": src`
+            export const Sidebar = () => undefined
+          `,
+        },
+      });
+
+      const first = loadPluginViews(await listPlugins(workspace));
+      expect(
+        first.views.find((view) => view.id === "notes")?.Routes,
+      ).toBeUndefined();
+
+      await writePlugin({
+        notes: {
+          "view.tsx": src`
+            export const Sidebar = () => undefined
+            export const Routes = () => undefined
+          `,
+        },
+      });
+
+      const second = loadPluginViews(await listPlugins(workspace));
+      expect(
+        second.views.find((view) => view.id === "notes")?.Routes,
+      ).toBeTypeOf("function");
     },
   );
 });
