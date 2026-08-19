@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import type {
   FileTree as FileTreeModel,
@@ -153,16 +153,14 @@ export function Filesystem({
               <div className={headerClassName}>{header}</div>
             )
           }
-          style={
-            {
-              height:
-                maxHeight === undefined
-                  ? "100%"
-                  : `${Math.min(contentHeight, maxHeight)}px`,
-              minHeight: 0,
-              ...sidebarEntryTreeStyles,
-            } as CSSProperties
-          }
+          style={{
+            height:
+              maxHeight === undefined
+                ? "100%"
+                : `${Math.min(contentHeight, maxHeight)}px`,
+            minHeight: 0,
+            ...sidebarEntryTreeStyles,
+          }}
         />
       </div>
       {showSelectionLabel ? (

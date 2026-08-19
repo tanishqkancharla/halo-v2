@@ -11,6 +11,9 @@ export type AgentSessionState = {
   error: string | undefined;
 };
 
+type JsonObject = { readonly [key: string]: JsonValue };
+type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
+
 export function emptyAgentSessionState(): AgentSessionState {
   return {
     messages: [],
@@ -119,6 +122,14 @@ class AgentErrorMessageParseError extends errore.createTaggedError({
   message: "Assistant errorMessage was not valid JSON",
 }) {}
 
+function isJsonObject(value: JsonValue): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJsonString(value: JsonValue): value is string {
+  return typeof value === "string";
+}
+
 function readableAgentErrorMessage(errorMessage: string): string {
   const trimmed = errorMessage.trim();
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
@@ -126,7 +137,7 @@ function readableAgentErrorMessage(errorMessage: string): string {
   }
 
   const parsed = errore.try({
-    try: () => JSON.parse(trimmed) as unknown,
+    try: () => JSON.parse(trimmed),
     catch: (e) => new AgentErrorMessageParseError({ cause: e }),
   });
   if (parsed instanceof Error) {
@@ -139,10 +150,10 @@ function readableAgentErrorMessage(errorMessage: string): string {
   return extracted;
 }
 
-function humanMessageFromJson(value: unknown): string | undefined {
-  if (typeof value === "string") {
+function humanMessageFromJson(value: JsonValue): string | undefined {
+  if (isJsonString(value)) {
     const nested = errore.try({
-      try: () => JSON.parse(value) as unknown,
+      try: () => JSON.parse(value),
       catch: (e) => new AgentErrorMessageParseError({ cause: e }),
     });
     if (nested instanceof Error) {
@@ -152,22 +163,24 @@ function humanMessageFromJson(value: unknown): string | undefined {
     return humanMessageFromJson(nested);
   }
 
-  if (typeof value !== "object" || value === null) return undefined;
+  if (!isJsonObject(value)) return undefined;
 
   if ("error" in value) {
     const error = value.error;
-    if (typeof error === "string") {
+    if (isJsonString(error)) {
       if (error.length === 0) return undefined;
       return error;
     }
-    if (typeof error === "object" && error !== null && "message" in error) {
-      if (typeof error.message === "string" && error.message.length > 0) {
-        return error.message;
-      }
+    if (
+      isJsonObject(error) &&
+      "message" in error &&
+      isJsonString(error.message)
+    ) {
+      if (error.message.length > 0) return error.message;
     }
   }
 
-  if ("message" in value && typeof value.message === "string") {
+  if ("message" in value && isJsonString(value.message)) {
     if (value.message.length === 0) return undefined;
     return value.message;
   }

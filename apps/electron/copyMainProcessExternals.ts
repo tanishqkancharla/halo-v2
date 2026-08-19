@@ -50,28 +50,29 @@ async function copyPackageClosure(
 
   const packageJsonRaw = await readFile(packageJsonPath, "utf8");
   const packageJson = errore.try({
-    try: () => JSON.parse(packageJsonRaw) as PackageJson,
-    catch: (e) => e as Error,
+    try: () => JSON.parse(packageJsonRaw),
+    catch: (e) => new Error("Failed to parse package.json", { cause: e }),
   });
   if (packageJson instanceof Error) throw packageJson;
 
-  const dependencies = packageJson.dependencies;
-  if (dependencies !== undefined) {
-    for (const dependencyName of Object.keys(dependencies)) {
-      await copyPackageClosure(buildPath, dependencyName, copied);
-    }
+  for (const dependencyName of dependencyNames(packageJson.dependencies)) {
+    await copyPackageClosure(buildPath, dependencyName, copied);
   }
 
-  const optionalDependencies = packageJson.optionalDependencies;
-  if (optionalDependencies !== undefined) {
-    for (const dependencyName of Object.keys(optionalDependencies)) {
-      const resolved = errore.try({
-        try: () =>
-          requireFromElectron.resolve(`${dependencyName}/package.json`),
-        catch: (e) => e as Error,
-      });
-      if (resolved instanceof Error) continue;
-      await copyPackageClosure(buildPath, dependencyName, copied);
-    }
+  for (const dependencyName of dependencyNames(
+    packageJson.optionalDependencies,
+  )) {
+    const resolved = errore.try({
+      try: () => requireFromElectron.resolve(`${dependencyName}/package.json`),
+      catch: (e) =>
+        new Error("Could not resolve optional dependency", { cause: e }),
+    });
+    if (resolved instanceof Error) continue;
+    await copyPackageClosure(buildPath, dependencyName, copied);
   }
+}
+
+function dependencyNames(dependencies: PackageJson["dependencies"]) {
+  if (dependencies === undefined) return [];
+  return Object.keys(dependencies);
 }

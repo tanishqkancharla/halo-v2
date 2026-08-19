@@ -63,7 +63,13 @@ export function MainPane({
     return <DraftPane draftId={selection.draftId} onSent={onDraftSent} />;
   }
 
-  return <SavedPane sessionId={selection.sessionId} sessions={sessions} />;
+  return (
+    <SavedPane
+      key={selection.sessionId}
+      sessionId={selection.sessionId}
+      sessions={sessions}
+    />
+  );
 }
 
 function SessionTitleSlot({ title }: { title?: string }) {
@@ -158,7 +164,7 @@ type PromptDraft = { text: string; error?: string };
 function PromptEditor({
   onSubmit,
 }: {
-  onSubmit: (prompt: string) => Promise<unknown>;
+  onSubmit: (prompt: string) => Promise<void | PromptSubmitError>;
 }) {
   const [draft, setDraft] = useState<PromptDraft>({ text: "" });
   const errorId = useId();
@@ -231,11 +237,11 @@ function SessionView({
   const liveStatus = useStyles(styles.liveStatus);
   const thinking = useStyles(styles.thinking);
   const items = sessionViewItems(state);
-
   useLayoutEffect(() => {
     const element = viewRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [state, isWorking]);
+    if (element === null) return;
+    element.scrollTop = element.scrollHeight;
+  });
 
   return (
     <div

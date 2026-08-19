@@ -1,5 +1,9 @@
-import type React from "react";
-import { useMemo } from "react";
+import {
+  isValidElement,
+  useMemo,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from "react";
 import type { Components } from "streamdown";
 import {
   Streamdown,
@@ -52,18 +56,15 @@ function isSupportedCodeLang(lang: string): boolean {
   return supportedCodeLangs.has(lang.toLowerCase());
 }
 
-function extractText(node: React.ReactNode): string {
-  if (node === undefined || node === null || typeof node === "boolean")
+function extractText(node: ReactNode): string {
+  if (node === undefined || node === null || node === true || node === false)
     return "";
-  if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(extractText).join("");
-  if (typeof node === "object" && "props" in node) {
-    return extractText(
-      (node as React.ReactElement<{ children?: React.ReactNode }>).props
-        .children,
-    );
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return extractText(node.props.children);
   }
-  return "";
+  if (node instanceof Object) return "";
+  return String(node);
 }
 
 function MauiFencedCode({
@@ -71,7 +72,7 @@ function MauiFencedCode({
   children,
   node: _node,
   ...props
-}: React.ComponentPropsWithoutRef<"code"> & { node?: unknown }) {
+}: ComponentPropsWithoutRef<"code"> & { node?: unknown }) {
   const isIncomplete = useIsCodeFenceIncomplete();
   const pendingClassName = useStyles(pendingCodeShellClass);
   const language = /language-([\w-]+)/.exec(className ?? "")?.[1] ?? "text";
@@ -127,7 +128,7 @@ function InlineCode({
   className: _className,
   children,
   ...props
-}: React.ComponentPropsWithoutRef<"code"> & { node?: unknown }) {
+}: ComponentPropsWithoutRef<"code"> & { node?: unknown }) {
   const chipClassName = useStyles(proseInlineCode);
   return (
     <code className={chipClassName} {...props}>

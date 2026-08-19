@@ -53,20 +53,25 @@ async function readUserPreference(path: string) {
   if (raw instanceof Error) return raw;
 
   const parsed = errore.try({
-    try: () => JSON.parse(raw) as unknown,
+    try: () => JSON.parse(raw),
     catch: (e) => new UserIoError({ cause: e }),
   });
   if (parsed instanceof Error) return parsed;
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("id" in parsed) ||
-    typeof parsed.id !== "string" ||
-    parsed.id.length === 0
-  ) {
-    return new UserIoError();
-  }
-  return { id: parsed.id };
+  return parseUser(parsed);
+}
+
+type UserJson = {
+  id?: string;
+};
+
+function isUserJson(value: UserJson): value is User {
+  return typeof value.id === "string" && value.id.length > 0;
+}
+
+function parseUser(value: UserJson | null) {
+  if (value === null) return new UserIoError();
+  if (!isUserJson(value)) return new UserIoError();
+  return { id: value.id };
 }
 
 async function writeUserPreference(appDataDir: string, user: User) {
