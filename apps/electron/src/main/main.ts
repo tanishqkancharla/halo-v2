@@ -19,7 +19,11 @@ import {
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
-import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
+import {
+  LOG_CHANNELS,
+  PLUGIN_RPC_CHANNELS,
+  RPC_CHANNELS,
+} from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
 import { newMessagePortMainRpcSession } from "./MessagePortMainTransport.js";
@@ -73,6 +77,7 @@ app.whenReady().then(async () => {
   await workspaceService.restore();
   registerLogBridge();
   registerRpcBridge();
+  registerPluginRpcBridge();
   installMenu();
   openMainWindow();
   startAppUpdates(isDevelopment);
@@ -176,6 +181,20 @@ function registerRpcBridge(): void {
     // Electron's postMessage payload; the ports carry the RPC transport.
     // oxlint-disable-next-line unicorn/no-null
     frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);
+  });
+}
+
+function registerPluginRpcBridge(): void {
+  ipcMain.on(PLUGIN_RPC_CHANNELS.requestRpc, (event) => {
+    assertTrustedSender(event);
+    const port = event.ports[0];
+    if (port === undefined) return;
+    const attached = pluginService.attachRpc(port);
+    if (attached instanceof Error) {
+      rpcLogger.warn({ event: "plugin-rpc-attach-failed", error: attached });
+      return;
+    }
+    port.start();
   });
 }
 

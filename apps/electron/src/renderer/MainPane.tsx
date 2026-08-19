@@ -31,6 +31,7 @@ import { Loader } from "./patterns/Loader.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView } from "../shared/plugin.js";
+import type { PluginHostClient } from "./api/PluginRpcClient.ts";
 import { UiKitPage } from "./UiKitPage.tsx";
 
 class PromptSubmitError extends errore.createTaggedError({
@@ -41,9 +42,11 @@ class PromptSubmitError extends errore.createTaggedError({
 export function MainPane({
   sessions,
   pluginViews,
+  pluginClient,
 }: {
   sessions: SessionSummary[];
   pluginViews: LoadedPluginView[];
+  pluginClient?: PluginHostClient;
 }) {
   return (
     <Switch>
@@ -66,8 +69,15 @@ export function MainPane({
           if (plugin === undefined || plugin.Routes === undefined) {
             return <MissingPlugin pluginId={params.pluginId} />;
           }
+          if (pluginClient === undefined) {
+            return <MissingPlugin pluginId={params.pluginId} />;
+          }
+          const server = pluginClient[plugin.id];
+          if (server === undefined) {
+            return <MissingPlugin pluginId={params.pluginId} />;
+          }
           return (
-            <PluginRuntimeProvider pluginId={plugin.id}>
+            <PluginRuntimeProvider pluginId={plugin.id} server={server}>
               <plugin.Routes />
             </PluginRuntimeProvider>
           );

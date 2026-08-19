@@ -17,6 +17,7 @@ import { style, useStyles } from "purse-styles";
 import { Link, Router, useLocation, useRoute } from "wouter";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
+import type { PluginHostClient } from "./api/PluginRpcClient.ts";
 import { HaloLogo } from "./HaloLogo.tsx";
 import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
 import { sidebarEntry, sidebarEntryLabel } from "./sidebarEntry.ts";
@@ -25,6 +26,7 @@ type SidebarProps = {
   sessions: SessionSummary[];
   pluginViews: LoadedPluginView[];
   pluginErrors: PluginLoadError[];
+  pluginClient?: PluginHostClient;
   onToggleTheme: () => void;
   themeLabel: string;
   appInfo?: AppInfo;
@@ -34,6 +36,7 @@ export function Sidebar({
   sessions,
   pluginViews,
   pluginErrors,
+  pluginClient,
   onToggleTheme,
   themeLabel,
   appInfo,
@@ -94,10 +97,13 @@ export function Sidebar({
           ))}
           {pluginViews.map((plugin) => {
             if (plugin.Sidebar === undefined) return undefined;
+            if (pluginClient === undefined) return undefined;
+            const server = pluginClient[plugin.id];
+            if (server === undefined) return undefined;
             return (
               <li key={plugin.id} data-testid={`plugin-sidebar-${plugin.id}`}>
                 <Router base={`/plugins/${plugin.id}`}>
-                  <PluginRuntimeProvider pluginId={plugin.id}>
+                  <PluginRuntimeProvider pluginId={plugin.id} server={server}>
                     <plugin.Sidebar />
                   </PluginRuntimeProvider>
                 </Router>

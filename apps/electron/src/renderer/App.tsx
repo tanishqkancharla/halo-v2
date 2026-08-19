@@ -16,6 +16,10 @@ import {
   useAppInfoQuery,
   usePluginsQuery,
 } from "./api/ApiProvider.tsx";
+import {
+  getPluginRpcClient,
+  type PluginHostClient,
+} from "./api/PluginRpcClient.ts";
 
 export function App() {
   const workspaceQuery = useWorkspaceQuery();
@@ -57,6 +61,7 @@ export function App() {
       sessions={sessions}
       pluginViews={pluginViews}
       pluginErrors={pluginErrors}
+      pluginClient={getPluginRpcClient()}
       alertMessage={
         sessionsQuery.error ? String(sessionsQuery.error) : undefined
       }
@@ -69,12 +74,14 @@ function WorkspaceShell({
   sessions,
   pluginViews,
   pluginErrors,
+  pluginClient,
   alertMessage,
   appInfo,
 }: {
   sessions: SessionSummary[];
   pluginViews: LoadedPluginView[];
   pluginErrors: PluginLoadError[];
+  pluginClient?: PluginHostClient;
   alertMessage?: string;
   appInfo?: AppInfo;
 }) {
@@ -99,13 +106,18 @@ function WorkspaceShell({
             sessions={sessions}
             pluginViews={pluginViews}
             pluginErrors={pluginErrors}
+            pluginClient={pluginClient}
             onToggleTheme={() =>
               setPreference(resolvedTheme === "dark" ? "light" : "dark")
             }
             themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
             appInfo={appInfo}
           />
-          <MainPane sessions={sessions} pluginViews={pluginViews} />
+          <MainPane
+            sessions={sessions}
+            pluginViews={pluginViews}
+            pluginClient={pluginClient}
+          />
         </div>
       </Router>
     </div>

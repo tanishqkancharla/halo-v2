@@ -11,6 +11,7 @@ import type { WorkspaceInfo } from "../../shared/rpc.js";
 import { loadPluginViews } from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
 import type { HaloApiStub } from "./HaloRpcClient.js";
+import { connectPluginRpc } from "./PluginRpcClient.ts";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
   name: "WorkspaceRestoreError",
@@ -152,7 +153,11 @@ export function usePluginsQuery(workspace: WorkspaceState | undefined) {
 
   return useQuery({
     queryKey: ["plugins", workspaceRoot],
-    queryFn: async () => loadPluginViews(await api.listPlugins()),
+    queryFn: async () => {
+      const list = await api.listPlugins();
+      await connectPluginRpc();
+      return loadPluginViews(list);
+    },
     enabled: workspaceRoot !== undefined,
   });
 }

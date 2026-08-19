@@ -570,11 +570,11 @@ export const PLUGIN_RPC_CHANNELS = {
 +export default router;
 ```
 
-- [ ] jiti-import the server file. Accept `default` or `router`. Alias `@halo/plugin-sdk/server` to the host package. Load once when `listPlugins` runs; do not swap routers later.
-- [ ] Open a second MessagePort beside Cap'n Web (`channels.ts` + `preload.ts` + renderer connect). Follow the oRPC Electron adapter.
-- [ ] Convert handler failures at this boundary: if a handler returns an `Error`, map it to `ORPCError` before the port.
-- [ ] Implement `usePluginServer<S>()`. Document that `import type { router } from "./server.ts"` is type-only.
-- [ ] Test with an in-process MessageChannel: a `ping` procedure round-trips; a missing plugin id does not match. Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/plugin-sdk test`.
+- [x] jiti-import the server file. Accept `default` or `router`. Alias `@halo/plugin-sdk/server` to the host package. Load once when `listPlugins` runs; do not swap routers later.
+- [x] Open a second MessagePort beside Cap'n Web (`channels.ts` + `preload.ts` + renderer connect). Follow the oRPC Electron adapter.
+- [x] Convert handler failures at this boundary: if a handler returns an `Error`, map it to `ORPCError` before the port.
+- [x] Implement `usePluginServer<S>()`. Document that `import type { router } from "./server.ts"` is type-only.
+- [x] Test with an in-process MessageChannel: a `ping` procedure round-trips; a missing plugin id does not match. Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/plugin-sdk test`.
 
 ### Phase 9: Seed Calendar as a plugin
 

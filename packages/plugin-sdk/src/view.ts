@@ -1,6 +1,11 @@
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import * as errore from "errore";
-import { createContext, createElement, type ReactNode } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  type ReactNode,
+} from "react";
 
 export type * from "maui";
 // Maui also exports Link and Switch. Plugin views use wouter's.
@@ -109,6 +114,7 @@ export {
 
 export type PluginRuntimeValue = {
   pluginId: string;
+  server: RouterClient<AnyRouter>;
 };
 
 const PluginRuntimeContext = createContext<PluginRuntimeValue | undefined>(
@@ -117,11 +123,12 @@ const PluginRuntimeContext = createContext<PluginRuntimeValue | undefined>(
 
 export function PluginRuntimeProvider(args: {
   pluginId: string;
+  server: RouterClient<AnyRouter>;
   children: ReactNode;
 }) {
   return createElement(
     PluginRuntimeContext.Provider,
-    { value: { pluginId: args.pluginId } },
+    { value: { pluginId: args.pluginId, server: args.server } },
     args.children,
   );
 }
@@ -131,6 +138,9 @@ export class PluginRuntimeMissingError extends errore.createTaggedError({
   message: "usePluginServer must run inside a Halo plugin view",
 }) {}
 
+// Import the plugin router as a type only: import type { router } from "./server.ts"
 export function usePluginServer<S extends AnyRouter>(): RouterClient<S> {
-  throw new PluginRuntimeMissingError();
+  const runtime = useContext(PluginRuntimeContext);
+  if (runtime === undefined) throw new PluginRuntimeMissingError();
+  return runtime.server as RouterClient<S>;
 }
