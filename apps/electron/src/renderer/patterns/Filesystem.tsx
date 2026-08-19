@@ -154,6 +154,7 @@ export function Filesystem({
             )
           }
           style={
+            // SAFETY: Pierre FileTree style accepts Halo's --trees-* custom properties.
             {
               height:
                 maxHeight === undefined

@@ -6,6 +6,7 @@ import {
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { type Static, Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 
 class ParallelMcpError extends errore.createTaggedError({
@@ -51,6 +52,18 @@ const webFetchParameters = Type.Object({
   ),
 });
 
+type ParallelSearchArgs = Static<typeof webSearchParameters>;
+type ParallelFetchArgs = Static<typeof webFetchParameters>;
+
+type ParallelMcpCall = {
+  objective?: string;
+  search_queries?: string[];
+  urls?: string[];
+  full_content?: boolean;
+  session_id: string;
+  model_name?: string;
+};
+
 export function createParallelSearchTools(userId: string): ToolDefinition[] {
   const client = new Client({ name: "halo", version: "1" });
   let connectPromise: Promise<void | ParallelMcpError> | undefined;
@@ -73,7 +86,7 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
   async function callParallelTool(args: {
     name: string;
     modelName: string | undefined;
-    arguments: Record<string, unknown>;
+    arguments: ParallelSearchArgs | ParallelFetchArgs;
     signal: AbortSignal | undefined;
   }) {
     const connected = await ensureConnected();
@@ -84,7 +97,7 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
       };
     }
 
-    const toolArguments: Record<string, unknown> = {
+    const toolArguments: ParallelMcpCall = {
       ...args.arguments,
       // Parallel free-tier rate limits by session_id; Halo's user id is that key.
       session_id: userId,
@@ -107,6 +120,7 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
       };
     }
 
+    // SAFETY: callTool was invoked with CallToolResultSchema, so the payload is CallToolResult.
     const callResult = result as CallToolResult;
     return {
       content: callResult.content.flatMap((part) => {
@@ -130,13 +144,20 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
     ],
     parameters: webSearchParameters,
     execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
-      const search = params as Static<typeof webSearchParameters>;
+      if (!Value.Check(webSearchParameters, params)) {
+        return {
+          content: [
+            { type: "text" as const, text: "Invalid web_search arguments" },
+          ],
+          details: {},
+        };
+      }
       return callParallelTool({
         name: "web_search",
         modelName: ctx.model?.id,
         arguments: {
-          objective: search.objective,
-          search_queries: search.search_queries,
+          objective: params.objective,
+          search_queries: params.search_queries,
         },
         signal,
       });
@@ -155,18 +176,25 @@ export function createParallelSearchTools(userId: string): ToolDefinition[] {
     ],
     parameters: webFetchParameters,
     execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
-      const fetchParams = params as Static<typeof webFetchParameters>;
-      const toolArguments: Record<string, unknown> = {
-        urls: fetchParams.urls,
+      if (!Value.Check(webFetchParameters, params)) {
+        return {
+          content: [
+            { type: "text" as const, text: "Invalid web_fetch arguments" },
+          ],
+          details: {},
+        };
+      }
+      const toolArguments: ParallelFetchArgs = {
+        urls: params.urls,
       };
-      if (fetchParams.objective !== undefined) {
-        toolArguments.objective = fetchParams.objective;
+      if (params.objective !== undefined) {
+        toolArguments.objective = params.objective;
       }
-      if (fetchParams.search_queries !== undefined) {
-        toolArguments.search_queries = fetchParams.search_queries;
+      if (params.search_queries !== undefined) {
+        toolArguments.search_queries = params.search_queries;
       }
-      if (fetchParams.full_content !== undefined) {
-        toolArguments.full_content = fetchParams.full_content;
+      if (params.full_content !== undefined) {
+        toolArguments.full_content = params.full_content;
       }
       return callParallelTool({
         name: "web_fetch",

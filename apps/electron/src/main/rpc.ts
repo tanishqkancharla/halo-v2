@@ -90,11 +90,10 @@ export class HaloRpc extends HaloApi {
   subscribeWorkspaceTree(callback: TreeListener) {
     this.logger.info({ event: "subscribeWorkspaceTree" });
     const previous = this.treeListener;
-    this.treeListener =
-      typeof callback.dup === "function" ? callback.dup() : callback;
+    this.treeListener = callback.dup === undefined ? callback : callback.dup();
     if (previous !== undefined) {
       const dispose = previous[Symbol.dispose];
-      if (typeof dispose === "function") dispose.call(previous);
+      if (dispose !== undefined) dispose.call(previous);
     }
     this.workspace.setTreeListener((events) => {
       const listener = this.treeListener;
@@ -157,8 +156,7 @@ export class AgentSessionRpc extends AgentSessionApi {
   subscribe(callback: SessionListener) {
     this.logger.info({ event: "subscribe" });
     // Cap'n Web releases arg stubs when the call returns unless we dup().
-    this.listener =
-      typeof callback.dup === "function" ? callback.dup() : callback;
+    this.listener = callback.dup === undefined ? callback : callback.dup();
   }
 
   async prompt(text: string) {
@@ -177,7 +175,7 @@ export class AgentSessionRpc extends AgentSessionApi {
     const listener = this.listener;
     if (listener !== undefined) {
       const dispose = listener[Symbol.dispose];
-      if (typeof dispose === "function") dispose.call(listener);
+      if (dispose !== undefined) dispose.call(listener);
     }
     this.listener = undefined;
     void this.session.abort().catch((error) => {

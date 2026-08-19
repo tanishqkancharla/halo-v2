@@ -145,5 +145,6 @@ export function usePluginServer<S extends RpcTarget>(): RpcStub<S> {
   const runtime = useContext(PluginRuntimeContext);
   if (runtime === undefined) throw new PluginRuntimeMissingError();
   if (runtime.server === undefined) throw new PluginRuntimeMissingError();
+  // SAFETY: this view is compiled against server class S; the host stub is that instance.
   return runtime.server as RpcStub<S>;
 }

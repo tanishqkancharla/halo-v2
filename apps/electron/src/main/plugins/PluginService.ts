@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { RpcTarget } from "@halo/plugin-sdk/server";
 import * as errore from "errore";
 import type { PluginList } from "../../shared/plugin.js";
+import { isCallable } from "../../shared/isCallable.js";
 import type { WorkspaceService } from "../workspace-service.js";
 import { compilePluginView } from "./compilePluginView.js";
 import { loadPluginServer } from "./loadPluginServer.js";
@@ -113,14 +114,14 @@ function wrapPluginRpc(target: RpcTarget): RpcTarget {
       if (seen.has(name)) continue;
       const descriptor = Object.getOwnPropertyDescriptor(proto, name);
       if (descriptor === undefined) continue;
-      if (typeof descriptor.value !== "function") continue;
+      if (!isCallable({ value: descriptor.value })) continue;
       seen.add(name);
-      const method = descriptor.value as (...args: unknown[]) => unknown;
+      const method = descriptor.value;
       Object.defineProperty(PluginRpc.prototype, name, {
         enumerable: false,
         configurable: true,
         writable: true,
-        async value(...args: unknown[]) {
+        async value(...args: never[]) {
           const result = await method.apply(target, args);
           if (result instanceof Error) throw result;
           return result;

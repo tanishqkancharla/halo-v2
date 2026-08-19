@@ -10,6 +10,8 @@ import {
 } from "node:fs/promises";
 import { basename, join, relative, sep } from "node:path";
 import * as watcher from "@parcel/watcher";
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import type { WorkspaceTreeEvent } from "../shared/rpc.js";
 import { seedPluginWorkspace } from "./plugins/seedPluginWorkspace.js";
@@ -47,6 +49,10 @@ type WorkspaceState =
 type WorkspacePreference = {
   workspaceRoot: string;
 };
+
+const workspacePreferenceSchema = Type.Object({
+  workspaceRoot: Type.String({ minLength: 1 }),
+});
 
 type TreeListener = (events: WorkspaceTreeEvent[]) => void;
 
@@ -369,7 +375,10 @@ async function readWorkspacePreference(appDataDir: string) {
   if (raw instanceof Error) return raw;
 
   const parsed = errore.try({
-    try: () => JSON.parse(raw) as unknown,
+    try: () => {
+      // SAFETY: JSON.parse is untyped; workspacePreferenceSchema is the file contract.
+      return JSON.parse(raw) as unknown;
+    },
     catch: (e) => new WorkspaceIoError({ cause: e }),
   });
   if (parsed instanceof Error) {
@@ -381,12 +390,7 @@ async function readWorkspacePreference(appDataDir: string) {
     return undefined;
   }
 
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("workspaceRoot" in parsed) ||
-    typeof parsed.workspaceRoot !== "string"
-  ) {
+  if (!Value.Check(workspacePreferenceSchema, parsed)) {
     const cleared = await clearWorkspacePreference(appDataDir);
     if (cleared instanceof Error) {
       console.warn("Could not clear workspace preference:", cleared.message);

@@ -13,7 +13,7 @@ import * as errore from "errore";
  */
 export function newMessagePortMainRpcSession<T extends object>(
   port: MessagePortMain,
-  localMain?: unknown,
+  localMain?: T,
   options?: RpcSessionOptions,
 ): RpcStub<T> {
   const transport = new MessagePortMainTransport(port);
@@ -21,6 +21,8 @@ export function newMessagePortMainRpcSession<T extends object>(
   return session.getRemoteMain();
 }
 
+// Cap'n Web RpcTransportWithCustomEncoding uses unknown for structured-clone frames.
+/* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns */
 class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
   readonly encodingLevel = "structuredClonable" as const;
 
@@ -95,3 +97,4 @@ class MessagePortMainTransport implements RpcTransportWithCustomEncoding {
     }
   }
 }
+/* oxlint-enable anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns */

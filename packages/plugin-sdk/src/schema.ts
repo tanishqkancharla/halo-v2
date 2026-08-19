@@ -37,3 +37,9 @@ export const haloManifestV1 = Type.Object({
 // host must normalize to latest.
 export const haloManifestSchema = Type.Union([haloManifestV1]);
 export type HaloManifest = Static<typeof haloManifestV1>;
+
+export const pluginPackageJsonSchema = Type.Object({
+  name: Type.String({ minLength: 1 }),
+  halo: haloManifestSchema,
+});
+export type PluginPackageJson = Static<typeof pluginPackageJsonSchema>;

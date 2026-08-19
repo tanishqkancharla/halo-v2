@@ -2,11 +2,25 @@ import { createRequire } from "node:module";
 import { createJiti } from "jiti";
 import type { PluginServerContext, RpcTarget } from "@halo/plugin-sdk/server";
 import * as errore from "errore";
+import { isCallable } from "../../shared/isCallable.js";
 
 export class PluginServerLoadError extends errore.createTaggedError({
   name: "PluginServerLoadError",
   message: "Plugin '$id' server failed to load: $detail",
 }) {}
+
+type PluginServerClass = new (context: PluginServerContext) => RpcTarget;
+
+type PluginSdkServerModule = {
+  RpcTarget: abstract new (...args: never[]) => RpcTarget;
+};
+
+type PluginModuleExports = {
+  default?: PluginServerClass | RpcTarget;
+  Server?: PluginServerClass | RpcTarget;
+};
+
+type PluginServerExport = PluginServerClass | RpcTarget | PluginModuleExports;
 
 // Rolldown's CJS build turns `import.meta.resolve` into `{}.resolve` and
 // copies capnweb into the main bundle. jiti loads @halo/plugin-sdk/server from
@@ -19,46 +33,32 @@ const jiti = createJiti(import.meta.url, {
     "@halo/plugin-sdk/view": sdkEntry("view"),
   },
 });
-const pluginSdkServer = jiti.import("@halo/plugin-sdk/server") as Promise<{
-  RpcTarget: abstract new (...args: never[]) => RpcTarget;
-}>;
+const pluginSdkServer = jiti.import("@halo/plugin-sdk/server");
 
 export async function loadPluginServer(args: {
   id: string;
   serverPath: string;
   context: PluginServerContext;
 }): Promise<PluginServerLoadError | RpcTarget> {
-  const { RpcTarget: JitiRpcTarget } = await pluginSdkServer;
+  const sdk = await pluginSdkServer;
+  // SAFETY: jiti loads this alias from disk; the SDK module exports RpcTarget.
+  const { RpcTarget: JitiRpcTarget } = sdk as PluginSdkServerModule;
 
-  function isServerExport(value: unknown) {
-    return typeof value === "function" || value instanceof JitiRpcTarget;
-  }
-
-  function serverExport(moduleExports: unknown): unknown {
-    if (isServerExport(moduleExports)) return moduleExports;
-    if (typeof moduleExports !== "object" || moduleExports === null) {
-      return undefined;
-    }
-    const record = moduleExports as Record<string, unknown>;
-    if (isServerExport(record.default)) return record.default;
-    if (isServerExport(record.Server)) return record.Server;
-    return undefined;
-  }
-
-  const imported = await jiti
-    .import(args.serverPath)
-    .then((value) => value as unknown)
-    .catch(
-      (e) =>
-        new PluginServerLoadError({
-          id: args.id,
-          detail: String(e),
-          cause: e,
-        }),
-    );
+  const imported = await jiti.import(args.serverPath).catch(
+    (e) =>
+      new PluginServerLoadError({
+        id: args.id,
+        detail: String(e),
+        cause: e,
+      }),
+  );
   if (imported instanceof PluginServerLoadError) return imported;
 
-  const exported = serverExport(imported);
+  // SAFETY: jiti.import returns a module namespace, a class, or an RpcTarget instance.
+  const exported = pluginServerFromExport({
+    RpcTarget: JitiRpcTarget,
+    exported: imported as PluginServerExport,
+  });
   if (exported === undefined) {
     return new PluginServerLoadError({
       id: args.id,
@@ -66,14 +66,15 @@ export async function loadPluginServer(args: {
     });
   }
   if (exported instanceof JitiRpcTarget) return exported;
-  if (typeof exported !== "function") {
+  if (!isCallable({ value: exported })) {
     return new PluginServerLoadError({
       id: args.id,
       detail: "server must export a default RpcTarget class or instance",
     });
   }
 
-  const Server = exported as new (context: PluginServerContext) => unknown;
+  // SAFETY: function exports that are not RpcTarget instances are the server class.
+  const Server = exported as PluginServerClass;
   const constructed = errore.try({
     try: () => new Server(args.context),
     catch: (e) =>
@@ -89,6 +90,29 @@ export async function loadPluginServer(args: {
     id: args.id,
     detail: "server class must extend RpcTarget",
   });
+}
+
+function pluginServerFromExport(args: {
+  RpcTarget: abstract new (...args: never[]) => RpcTarget;
+  exported: PluginServerExport;
+}): PluginServerClass | RpcTarget | undefined {
+  const JitiRpcTarget = args.RpcTarget;
+  const exported = args.exported;
+  if (exported instanceof JitiRpcTarget) return exported;
+  if (isCallable({ value: exported })) {
+    // SAFETY: a function export from a plugin server module is the RpcTarget subclass.
+    return exported as PluginServerClass;
+  }
+  // SAFETY: remaining jiti exports are the module namespace object.
+  const record = exported as PluginModuleExports;
+  const candidate = record.default ?? record.Server;
+  if (candidate === undefined) return undefined;
+  if (candidate instanceof JitiRpcTarget) return candidate;
+  if (isCallable({ value: candidate })) {
+    // SAFETY: default/Server function export is the RpcTarget subclass constructor.
+    return candidate as PluginServerClass;
+  }
+  return undefined;
 }
 
 function sdkEntry(subpath: "schema" | "server" | "view") {

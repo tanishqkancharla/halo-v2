@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { backgroundColor, colors, flex, fontFamily, spacing, text } from "maui";
 import { style } from "purse-styles";
 
@@ -60,7 +59,7 @@ export const sidebarEntryTreeStyles = {
   "--trees-scrollbar-thumb-override": colors.gray[7],
   "--trees-icon-width-override": "14px",
   "--trees-file-icon-color": sidebarEntryMutedFg,
-} as CSSProperties;
+};
 
 export const sidebarEntryTreeCss = `
   [data-type="item"] {

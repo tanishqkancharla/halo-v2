@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { haloManifestSchema, parseVersioned } from "@halo/plugin-sdk/schema";
+import {
+  parseVersioned,
+  pluginPackageJsonSchema,
+} from "@halo/plugin-sdk/schema";
 import * as errore from "errore";
 import {
   PluginManifestError,
@@ -35,7 +38,10 @@ export async function readPluginManifest(args: {
   if (raw instanceof Error) return raw;
 
   const parsed = errore.try({
-    try: () => JSON.parse(raw) as unknown,
+    try: () => {
+      // SAFETY: JSON.parse is untyped; pluginPackageJsonSchema is the file contract.
+      return JSON.parse(raw) as unknown;
+    },
     catch: (e) =>
       new PluginManifestError({
         id: args.id,
@@ -44,34 +50,17 @@ export async function readPluginManifest(args: {
       }),
   });
   if (parsed instanceof PluginManifestError) return parsed;
-  if (typeof parsed !== "object" || parsed === null) {
-    return new PluginManifestError({
-      id: args.id,
-      detail: "package.json must be an object",
-    });
-  }
 
-  if (
-    !("name" in parsed) ||
-    typeof parsed.name !== "string" ||
-    parsed.name.length === 0
-  ) {
-    return new PluginManifestError({
-      id: args.id,
-      detail: "package.json name must be a non-empty string",
-    });
-  }
-
-  const halo = parseVersioned({
-    name: `plugin.${args.id}.halo`,
-    schema: haloManifestSchema,
-    value: "halo" in parsed ? parsed.halo : undefined,
+  const packageJson = parseVersioned({
+    name: `plugin.${args.id}.package.json`,
+    schema: pluginPackageJsonSchema,
+    value: parsed,
   });
-  if (halo instanceof Error) {
+  if (packageJson instanceof Error) {
     return new PluginManifestError({
       id: args.id,
-      detail: halo.message,
-      cause: halo,
+      detail: packageJson.message,
+      cause: packageJson,
     });
   }
 
@@ -79,7 +68,7 @@ export async function readPluginManifest(args: {
     id: args.id,
     directory: args.directory,
     kind: "view",
-    explicit: halo.view,
+    explicit: packageJson.halo.view,
     fallbacks: viewFallbacks,
   });
   if (viewPath instanceof Error) return viewPath;
@@ -88,7 +77,7 @@ export async function readPluginManifest(args: {
     id: args.id,
     directory: args.directory,
     kind: "server",
-    explicit: halo.server,
+    explicit: packageJson.halo.server,
     fallbacks: serverFallbacks,
   });
   if (serverPath instanceof Error) return serverPath;
@@ -96,8 +85,8 @@ export async function readPluginManifest(args: {
   return {
     id: args.id,
     directory: args.directory,
-    packageName: parsed.name,
-    halo,
+    packageName: packageJson.name,
+    halo: packageJson.halo,
     viewPath,
     serverPath,
   };

@@ -1,4 +1,6 @@
 import type { LogLevel, LoggerData, LoggerScope } from "@repo/logger";
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import { ipcRenderer } from "electron";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 
@@ -6,11 +8,27 @@ const windowLoaded = new Promise<void>((resolve) => {
   window.addEventListener("load", () => resolve());
 });
 
+const logMessageSchema = Type.Object({
+  channel: Type.Literal(LOG_CHANNELS.log),
+  payload: Type.Object({
+    level: Type.Union([
+      Type.Literal("debug"),
+      Type.Literal("info"),
+      Type.Literal("warn"),
+      Type.Literal("log"),
+      Type.Literal("error"),
+    ]),
+    scopes: Type.Array(Type.Unknown()),
+    data: Type.Unknown(),
+  }),
+});
+
 // Renderer requests a Cap'n Web MessagePort; we forward it into the main world.
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
-  if (isLogMessage(event.data)) {
-    ipcRenderer.send(LOG_CHANNELS.log, event.data.payload);
+  const log = parseLogMessage({ data: event.data });
+  if (log !== undefined) {
+    ipcRenderer.send(LOG_CHANNELS.log, log.payload);
     return;
   }
   if (event.data !== RPC_CHANNELS.requestRpc) return;
@@ -34,17 +52,8 @@ type LogMessage = {
   };
 };
 
-function isLogMessage(data: unknown): data is LogMessage {
-  if (typeof data !== "object" || data === null) return false;
-  if (!("channel" in data) || data.channel !== LOG_CHANNELS.log) return false;
-  if (!("payload" in data) || typeof data.payload !== "object") return false;
-  if (data.payload === null) return false;
-  if (
-    !("level" in data.payload) ||
-    !("scopes" in data.payload) ||
-    !("data" in data.payload)
-  ) {
-    return false;
-  }
-  return true;
+function parseLogMessage(args: { data: unknown }): LogMessage | undefined {
+  if (!Value.Check(logMessageSchema, args.data)) return undefined;
+  // SAFETY: logMessageSchema is the halo:log window-message contract.
+  return args.data as LogMessage;
 }

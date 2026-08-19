@@ -8,21 +8,17 @@ import * as jsxRuntime from "react/jsx-runtime";
 import * as reactDom from "react-dom";
 import type { ComponentType } from "react";
 import * as wouter from "wouter";
+import { isCallable } from "../shared/isCallable.js";
 import type {
   LoadedPluginView,
   PluginList,
   PluginLoadError,
 } from "../shared/plugin.js";
 
-const hostModules: Record<string, unknown> = {
-  react,
-  "react/jsx-runtime": jsxRuntime,
-  "react/jsx-dev-runtime": jsxDevRuntime,
-  "react-dom": reactDom,
-  maui,
-  "purse-styles": purseStyles,
-  wouter,
-  "@halo/plugin-sdk/view": pluginSdkView,
+type PluginViewExports = {
+  Sidebar?: ComponentType;
+  Routes?: ComponentType;
+  default?: PluginViewExports;
 };
 
 export class PluginViewEvaluateError extends errore.createTaggedError({
@@ -54,7 +50,8 @@ export function evaluatePluginView(args: {
   id: string;
   source: string;
 }): PluginViewEvaluateError | LoadedPluginView {
-  const cjs = { exports: {} as unknown };
+  const moduleExports: PluginViewExports = {};
+  const cjs = { exports: moduleExports };
   const evaluated = errore.try({
     try: () => {
       const run = new Function(
@@ -84,32 +81,43 @@ export function evaluatePluginView(args: {
 }
 
 function requireHost(specifier: string) {
-  const resolved = hostModules[specifier];
-  if (resolved === undefined) {
-    throw new Error(`plugin view cannot require '${specifier}'`);
+  switch (specifier) {
+    case "react":
+      return react;
+    case "react/jsx-runtime":
+      return jsxRuntime;
+    case "react/jsx-dev-runtime":
+      return jsxDevRuntime;
+    case "react-dom":
+      return reactDom;
+    case "maui":
+      return maui;
+    case "purse-styles":
+      return purseStyles;
+    case "wouter":
+      return wouter;
+    case "@halo/plugin-sdk/view":
+      return pluginSdkView;
+    default:
+      throw new Error(`plugin view cannot require '${specifier}'`);
   }
-  return resolved;
 }
 
-function namedViewExports(moduleExports: unknown): Record<string, unknown> {
-  if (typeof moduleExports !== "object" || moduleExports === null) {
-    return {};
-  }
-  const record = moduleExports as Record<string, unknown>;
-  if (hasViewExport(record)) return record;
-  const nested = record.default;
-  if (typeof nested === "object" && nested !== null) {
-    const nestedRecord = nested as Record<string, unknown>;
-    if (hasViewExport(nestedRecord)) return nestedRecord;
-  }
-  return record;
+function namedViewExports(moduleExports: PluginViewExports): PluginViewExports {
+  if (hasViewExport(moduleExports)) return moduleExports;
+  const nested = moduleExports.default;
+  if (nested !== undefined && hasViewExport(nested)) return nested;
+  return moduleExports;
 }
 
-function hasViewExport(record: Record<string, unknown>) {
-  return "Sidebar" in record || "Routes" in record;
+function hasViewExport(record: PluginViewExports) {
+  return record.Sidebar !== undefined || record.Routes !== undefined;
 }
 
-function componentExport(value: unknown): ComponentType | undefined {
-  if (typeof value === "function") return value as ComponentType;
-  return undefined;
+function componentExport(
+  value: ComponentType | undefined,
+): ComponentType | undefined {
+  if (value === undefined) return undefined;
+  if (!isCallable({ value })) return undefined;
+  return value;
 }

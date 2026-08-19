@@ -178,7 +178,7 @@ type PromptDraft = { text: string; error?: string };
 function PromptEditor({
   onSubmit,
 }: {
-  onSubmit: (prompt: string) => Promise<unknown>;
+  onSubmit: (prompt: string) => Promise<void | PromptSubmitError>;
 }) {
   const [draft, setDraft] = useState<PromptDraft>({ text: "" });
   const errorId = useId();
@@ -247,8 +247,9 @@ function SessionView({
 
   useLayoutEffect(() => {
     const element = viewRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [state, isWorking]);
+    if (element === null) return;
+    element.scrollTop = element.scrollHeight;
+  });
 
   return (
     <div
