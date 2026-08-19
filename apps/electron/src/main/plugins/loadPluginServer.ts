@@ -1,5 +1,5 @@
+import { createRequire } from "node:module";
 import { createJiti } from "jiti";
-import { fileURLToPath } from "node:url";
 import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server";
 import * as errore from "errore";
 
@@ -8,6 +8,8 @@ export class PluginServerLoadError extends errore.createTaggedError({
   message: "Plugin '$id' server failed to load: $detail",
 }) {}
 
+// Rolldown's CJS build turns `import.meta.resolve` into `{}.resolve`.
+const requireFromThisFile = createRequire(import.meta.url);
 const jiti = createJiti(import.meta.url, {
   alias: {
     "@halo/plugin-sdk/schema": sdkEntry("schema"),
@@ -45,7 +47,7 @@ export async function loadPluginServer(args: {
 }
 
 function sdkEntry(subpath: "schema" | "server" | "view") {
-  return fileURLToPath(import.meta.resolve(`@halo/plugin-sdk/${subpath}`));
+  return requireFromThisFile.resolve(`@halo/plugin-sdk/${subpath}`);
 }
 
 function pluginServerExport(moduleExports: unknown): unknown {
