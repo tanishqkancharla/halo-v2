@@ -21,6 +21,7 @@ type SidebarItemProps = {
 export function SidebarItem(props: SidebarItemProps) {
   const [isActive] = useRoute(props.href);
   const itemClassName = useStyles(itemClass);
+  const listItemClassName = useStyles(listItemClass);
   const iconWrapClassName = useStyles(
     iconWrapClass,
     ...(isActive ? [iconWrapActiveClass] : []),
@@ -32,7 +33,7 @@ export function SidebarItem(props: SidebarItemProps) {
 
   return createElement(
     "li",
-    undefined,
+    { className: listItemClassName },
     createElement(
       Link,
       {
@@ -59,6 +60,12 @@ export function SidebarItem(props: SidebarItemProps) {
   );
 }
 
+const listItemClass = style({
+  display: "block",
+  width: "100%",
+  minWidth: 0,
+});
+
 const itemClass = style(navigationItem, {
   display: "grid",
   gridTemplateColumns: "16px minmax(0, 1fr) auto",
@@ -66,6 +73,8 @@ const itemClass = style(navigationItem, {
   columnGap: spacing.value(3),
   minWidth: 0,
   width: "100%",
+  boxSizing: "border-box",
+  borderRadius: 0,
   paddingLeft: spacing.value(3),
   paddingRight: spacing.value(3),
   paddingTop: spacing.value(2),

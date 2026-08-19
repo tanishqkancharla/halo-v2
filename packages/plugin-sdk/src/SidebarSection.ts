@@ -32,6 +32,9 @@ export function SidebarSection(props: SidebarSectionProps) {
 
 const sectionClass = style(flex({ direction: "column", gap: 4 }), {
   minWidth: 0,
+  // Halo's nav pads x: 2; bleed so hover/current fill the sidebar.
+  marginInline: `calc(-1 * ${spacing.value(2)})`,
+  width: `calc(100% + ${spacing.value(2)} + ${spacing.value(2)})`,
   marginTop: spacing.value(4),
 });
 
@@ -47,6 +50,8 @@ const sectionListClass = style(flex({ direction: "column" }), {
   listStyleType: "none",
   margin: 0,
   padding: 0,
+  width: "100%",
+  minWidth: 0,
   gap: "1px",
 });
 

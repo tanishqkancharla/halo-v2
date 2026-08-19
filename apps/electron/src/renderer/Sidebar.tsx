@@ -57,6 +57,7 @@ export function Sidebar({
   const versionLabel = useStyles(styles.versionLabel);
   const updateLabel = useStyles(styles.updateLabel);
   const pluginError = useStyles(styles.pluginError);
+  const pluginSidebar = useStyles(styles.pluginSidebar);
 
   return (
     <nav className={sidebar} aria-label="Sessions">
@@ -99,7 +100,11 @@ export function Sidebar({
       {pluginViews.map((plugin) => {
         if (plugin.Sidebar === undefined) return undefined;
         return (
-          <div key={plugin.id} data-testid={`plugin-sidebar-${plugin.id}`}>
+          <div
+            key={plugin.id}
+            data-testid={`plugin-sidebar-${plugin.id}`}
+            className={pluginSidebar}
+          >
             <Router base={`/plugins/${plugin.id}`}>
               <PluginRuntimeProvider
                 pluginId={plugin.id}
@@ -276,4 +281,8 @@ const styles = {
       overflowWrap: "anywhere",
     },
   ),
+  pluginSidebar: style({
+    width: "100%",
+    minWidth: 0,
+  }),
 };
