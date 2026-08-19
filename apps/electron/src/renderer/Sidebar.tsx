@@ -3,7 +3,6 @@ import {
   SidebarItem,
   SidebarSection,
   sidebarPadding,
-  sidebarSection,
 } from "@halo/plugin-sdk/view";
 import type { RpcStub, RpcTarget } from "capnweb";
 import {
@@ -49,8 +48,6 @@ export function Sidebar({
   const newButton = useStyles(styles.newButton);
   const newIcon = useStyles(icon("sm"));
   const filesSection = useStyles(styles.filesSection);
-  const filesTree = useStyles(styles.filesTree);
-  const sectionLabel = useStyles(styles.sectionLabel);
   const sessionList = useStyles(styles.sessionList);
   const footer = useStyles(styles.footer);
   const versionLabel = useStyles(styles.versionLabel);
@@ -70,14 +67,9 @@ export function Sidebar({
       <div className={newSessionPad}>
         <NewSessionButton className={newButton} iconClassName={newIcon} />
       </div>
-      <section className={filesSection} aria-labelledby="files-label">
-        <div className={sectionLabel} id="files-label">
-          Files
-        </div>
-        <div className={filesTree}>
-          <WorkspaceFilesystem maxHeight={filesTreeMaxHeightPx} />
-        </div>
-      </section>
+      <SidebarSection label="Files" role="none" className={filesSection}>
+        <WorkspaceFilesystem maxHeight={filesTreeMaxHeightPx} />
+      </SidebarSection>
       <SidebarSection label="Sessions">
         {sessions.map((session) => (
           <SidebarItem
@@ -204,20 +196,11 @@ const styles = {
     alignSelf: "stretch",
     width: "100%",
   }),
-  filesSection: style(sidebarSection, flexItem({ size: "hug" }), {
+  filesSection: style(flexItem({ size: "hug" }), {
     minHeight: 0,
     maxHeight: `${filesSectionMaxHeightPx}px`,
     overflow: "hidden",
     marginTop: spacing.value(8),
-  }),
-  filesTree: style(flexItem({ size: "hug" }), {
-    minWidth: 0,
-    minHeight: 0,
-    overflow: "hidden",
-    width: "100%",
-  }),
-  sectionLabel: style(text("xs", 500, "lowContrast"), sidebarPadding, {
-    letterSpacing: "0.02em",
   }),
   sessionList: style(flex({ direction: "column" }), {
     listStyleType: "none",

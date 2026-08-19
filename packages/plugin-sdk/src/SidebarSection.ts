@@ -1,4 +1,4 @@
-import { createElement, useId, type ReactNode } from "react";
+import { createElement, useId, type AriaRole, type ReactNode } from "react";
 import {
   borderColor,
   flex,
@@ -27,13 +27,15 @@ type SidebarSectionProps = {
   label: string;
   children: ReactNode;
   className?: string;
+  role?: AriaRole;
 };
 
 export function SidebarSection(props: SidebarSectionProps) {
   const labelId = useId();
   const sectionClassName = useStyles(sectionClass);
   const labelClassName = useStyles(sectionLabelClass);
-  const listClassName = useStyles(sectionListClass);
+  const bodyClassName = useStyles(sectionBodyClass);
+  const role = props.role === undefined ? "list" : props.role;
 
   return createElement(
     "section",
@@ -44,8 +46,8 @@ export function SidebarSection(props: SidebarSectionProps) {
       props.label,
     ),
     createElement(
-      "ul",
-      { className: listClassName, "aria-labelledby": labelId },
+      "div",
+      { className: bodyClassName, role, "aria-labelledby": labelId },
       props.children,
     ),
   );
@@ -63,8 +65,7 @@ const sectionLabelClass = style(
   },
 );
 
-const sectionListClass = style(flex({ direction: "column" }), {
-  listStyleType: "none",
+const sectionBodyClass = style(flex({ direction: "column" }), {
   margin: 0,
   padding: 0,
   width: "100%",

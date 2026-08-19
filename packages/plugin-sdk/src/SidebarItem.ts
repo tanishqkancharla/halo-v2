@@ -33,8 +33,8 @@ export function SidebarItem(props: SidebarItemProps) {
   const Icon = props.icon;
 
   return createElement(
-    "li",
-    { className: listItemClassName },
+    "div",
+    { className: listItemClassName, role: "listitem" },
     createElement(
       Link,
       {
