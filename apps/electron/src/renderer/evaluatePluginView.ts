@@ -30,11 +30,6 @@ export class PluginViewEvaluateError extends errore.createTaggedError({
   message: "Plugin '$id' view failed to evaluate: $detail",
 }) {}
 
-export class PluginViewExportError extends errore.createTaggedError({
-  name: "PluginViewExportError",
-  message: "Plugin '$id' view must export Sidebar and/or Routes",
-}) {}
-
 export type LoadedPluginList = {
   plugins: PluginList["plugins"];
   views: LoadedPluginView[];
@@ -58,7 +53,7 @@ export function loadPluginViews(list: PluginList): LoadedPluginList {
 export function evaluatePluginView(args: {
   id: string;
   source: string;
-}): PluginViewEvaluateError | PluginViewExportError | LoadedPluginView {
+}): PluginViewEvaluateError | LoadedPluginView {
   const cjs = { exports: {} as unknown };
   const evaluated = errore.try({
     try: () => {
@@ -85,10 +80,6 @@ export function evaluatePluginView(args: {
   const exported = namedViewExports(evaluated);
   const Sidebar = componentExport(exported.Sidebar);
   const Routes = componentExport(exported.Routes);
-  if (Sidebar === undefined && Routes === undefined) {
-    return new PluginViewExportError({ id: args.id });
-  }
-
   return { id: args.id, Sidebar, Routes };
 }
 

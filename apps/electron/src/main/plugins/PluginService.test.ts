@@ -135,7 +135,7 @@ describe("PluginService", () => {
   );
 
   pluginTest(
-    "rejects a view that exports neither Sidebar nor Routes",
+    "lists a view that exports neither Sidebar nor Routes",
     async ({ workspace, writePlugin }) => {
       await writePlugin({
         calendar: {
@@ -159,8 +159,10 @@ describe("PluginService", () => {
       expect(listed.errors).toEqual([]);
 
       const loaded = loadPluginViews(listed);
-      expect(loaded.views).toEqual([]);
-      expect(loaded.errors.map((error) => error.id)).toEqual(["calendar"]);
+      expect(loaded.views).toHaveLength(1);
+      expect(loaded.views[0]?.Sidebar).toBeUndefined();
+      expect(loaded.views[0]?.Routes).toBeUndefined();
+      expect(loaded.errors).toEqual([]);
     },
   );
 
