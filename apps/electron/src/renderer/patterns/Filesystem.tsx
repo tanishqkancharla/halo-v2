@@ -302,9 +302,6 @@ const styles = {
   header: style(
     text("xs", 500, "lowContrast"),
     spacing.padding({ x: 4, y: 2 }),
-    {
-      letterSpacing: "0.02em",
-    },
   ),
   selection: style(flexItem({ size: "hug" }), text("sm", 400, "lowContrast"), {
     margin: 0,

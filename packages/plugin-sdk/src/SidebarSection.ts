@@ -57,13 +57,7 @@ const sectionClass = style(sidebarSection, {
   marginTop: spacing.value(4),
 });
 
-const sectionLabelClass = style(
-  text("xs", 500, "lowContrast"),
-  sidebarPadding,
-  {
-    letterSpacing: "0.02em",
-  },
-);
+const sectionLabelClass = style(text("xs", 500, "lowContrast"), sidebarPadding);
 
 const sectionBodyClass = style(flex({ direction: "column" }), {
   margin: 0,
