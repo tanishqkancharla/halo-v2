@@ -16,11 +16,6 @@ class PromptFailedError extends errore.createTaggedError({
   message: "$reason",
 }) {}
 
-function failureReason(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
-
 export type UseAgentSessionResult = {
   session: AgentSessionStub | undefined;
   state: AgentSessionState;
@@ -91,7 +86,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
     const result = await session.prompt(text).catch(
       (e) =>
         new PromptFailedError({
-          reason: failureReason(e),
+          reason: e instanceof Error ? e.message : String(e),
           cause: e,
         }),
     );
@@ -146,7 +141,7 @@ export function useDraftAgentSession(
       const created = await api.newAgentSession().catch(
         (e) =>
           new PromptFailedError({
-            reason: failureReason(e),
+            reason: e instanceof Error ? e.message : String(e),
             cause: e,
           }),
       );
@@ -167,7 +162,7 @@ export function useDraftAgentSession(
     const result = await session.prompt(text).catch(
       (e) =>
         new PromptFailedError({
-          reason: failureReason(e),
+          reason: e instanceof Error ? e.message : String(e),
           cause: e,
         }),
     );

@@ -182,25 +182,25 @@ function PromptEditor({
 }: {
   onSubmit: (prompt: string) => Promise<void | Error>;
 }) {
-  const [text, setText] = useState("");
+  const [draft, setDraft] = useState("");
   const editorSurface = useStyles(styles.editorSurface);
-  const trimmedText = text.trim();
+  const trimmedText = draft.trim();
   const sendDisabled = trimmedText.length === 0;
 
   async function submit() {
     if (!trimmedText) return;
 
-    setText("");
+    setDraft("");
     const result = await onSubmit(trimmedText);
     if (result instanceof Error) {
-      setText(trimmedText);
+      setDraft(trimmedText);
     }
   }
 
   return (
     <Editor
-      content={text}
-      onChange={setText}
+      content={draft}
+      onChange={setDraft}
       onSubmit={submit}
       placeholder="Message Halo"
       aria-label="Message"
