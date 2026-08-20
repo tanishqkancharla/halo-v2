@@ -117,11 +117,7 @@ function SavedPane({
       <div className={content}>
         <SessionTitleSlot title={title} />
         <SessionView state={state} isWorking={isWorking} />
-        <PromptComposer
-          editorKey={sessionId}
-          error={state.error}
-          onSubmit={prompt}
-        />
+        <Composer key={sessionId} error={state.error} onSubmit={prompt} />
       </div>
     </main>
   );
@@ -143,47 +139,22 @@ function DraftPane({ draftId }: { draftId: string }) {
         {hasMessages ? (
           <SessionView state={state} isWorking={isWorking} />
         ) : undefined}
-        <PromptComposer
-          editorKey={draftId}
-          error={state.error}
-          onSubmit={prompt}
-        />
+        <Composer key={draftId} error={state.error} onSubmit={prompt} />
       </div>
     </main>
   );
 }
 
-function PromptComposer({
-  editorKey,
+function Composer({
   error,
   onSubmit,
 }: {
-  editorKey: string;
   error: string | undefined;
   onSubmit: (prompt: string) => Promise<void | Error>;
 }) {
+  const [draft, setDraft] = useState("");
   const composer = useStyles(styles.composer);
   const liveStatus = useStyles(styles.liveStatus);
-
-  return (
-    <div className={composer}>
-      {error !== undefined ? (
-        <div className={liveStatus} role="alert">
-          {error}
-        </div>
-      ) : undefined}
-      <PromptEditor key={editorKey} onSubmit={onSubmit} />
-    </div>
-  );
-}
-
-function PromptEditor({
-  onSubmit,
-}: {
-  onSubmit: (prompt: string) => Promise<void | Error>;
-}) {
-  const [draft, setDraft] = useState("");
-  const editorSurface = useStyles(styles.editorSurface);
   const trimmedText = draft.trim();
   const sendDisabled = trimmedText.length === 0;
 
@@ -205,7 +176,14 @@ function PromptEditor({
       placeholder="Message Halo"
       aria-label="Message"
       size="sm"
-      className={editorSurface}
+      className={composer}
+      error={
+        error === undefined ? undefined : (
+          <div className={liveStatus} role="alert">
+            {error}
+          </div>
+        )
+      }
       actions={
         <Button aria-label="Send" disabled={sendDisabled} onClick={submit}>
           Send
@@ -344,28 +322,30 @@ const styles = {
       "&::-webkit-scrollbar": { display: "none" },
     },
   ),
-  composer: style(
-    flex({ direction: "column", gap: 2 }),
-    flexItem({ size: "hug" }),
-    {
-      width: "100%",
-      minWidth: 0,
-      position: "relative",
-      zIndex: 1,
-      overflow: "visible",
-      paddingTop: "2px",
-      "&::before": {
-        position: "absolute",
-        right: 0,
-        bottom: "100%",
-        left: 0,
-        height: spacing.value(6),
-        content: "''",
-        pointerEvents: "none",
-        background: `linear-gradient(to bottom, transparent, ${backgroundColor.app})`,
-      },
+  composer: style(flexItem({ size: "hug" }), {
+    width: "100%",
+    maxWidth: "none",
+    minWidth: 0,
+    position: "relative",
+    zIndex: 1,
+    overflow: "visible",
+    paddingTop: "2px",
+    "&:focus-within": {
+      outline: "none",
+      boxShadow: shadowVars.subtle,
+      zIndex: "auto",
     },
-  ),
+    "&::before": {
+      position: "absolute",
+      right: 0,
+      bottom: "100%",
+      left: 0,
+      height: spacing.value(6),
+      content: "''",
+      pointerEvents: "none",
+      background: `linear-gradient(to bottom, transparent, ${backgroundColor.app})`,
+    },
+  }),
   liveStatus: style(
     flexItem({ size: "hug" }),
     text("xs", 500, "highContrast"),
@@ -405,14 +385,5 @@ const styles = {
     minWidth: 0,
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
-  }),
-  editorSurface: style({
-    maxWidth: "none",
-    width: "100%",
-    "&:focus-within": {
-      outline: "none",
-      boxShadow: shadowVars.subtle,
-      zIndex: "auto",
-    },
   }),
 };

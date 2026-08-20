@@ -34,6 +34,7 @@ type EditorProps = {
   onSubmit?: () => void;
   /** Optional actions rendered inside the editor shell (e.g. Send). */
   actions?: React.ReactNode;
+  error?: React.ReactNode;
 };
 
 /**
@@ -50,6 +51,7 @@ export function Editor({
   "aria-label": ariaLabel = "Message editor",
   onSubmit,
   actions,
+  error,
 }: EditorProps) {
   const shellClassName = useStyles(editorShellClass);
   const actionsClassName = useStyles(editorActionsClass);
@@ -128,6 +130,7 @@ export function Editor({
   return (
     <div className={joinClassNames(shellClassName, className)}>
       <EditorContent editor={editor} />
+      {error}
       {actions ? <div className={actionsClassName}>{actions}</div> : undefined}
     </div>
   );
