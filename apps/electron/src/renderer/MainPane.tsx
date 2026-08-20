@@ -4,10 +4,12 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Route, Switch, useLocation } from "wouter";
 import {
   Button,
+  Icons,
   backgroundColor,
   colors,
   flex,
   flexItem,
+  icon,
   radius,
   shadowVars,
   spacing,
@@ -155,6 +157,8 @@ function Composer({
   const [draft, setDraft] = useState("");
   const composer = useStyles(styles.composer);
   const liveStatus = useStyles(styles.liveStatus);
+  const sendButton = useStyles(styles.sendButton);
+  const sendIcon = useStyles(icon("sm"));
   const trimmedText = draft.trim();
   const sendDisabled = trimmedText.length === 0;
 
@@ -185,8 +189,13 @@ function Composer({
         )
       }
       actions={
-        <Button aria-label="Send" disabled={sendDisabled} onClick={submit}>
-          Send
+        <Button
+          aria-label="Send"
+          className={sendButton}
+          disabled={sendDisabled}
+          onClick={submit}
+        >
+          <Icons.ArrowUp className={sendIcon} aria-hidden="true" />
         </Button>
       }
     />
@@ -385,5 +394,15 @@ const styles = {
     minWidth: 0,
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
+  }),
+  sendButton: style(radius.circle, {
+    boxShadow: "none",
+    backgroundColor: colors.grayAlpha[4],
+    "&:hover": {
+      backgroundColor: colors.grayAlpha[5],
+    },
+    "&:active": {
+      backgroundColor: colors.grayAlpha[6],
+    },
   }),
 };
