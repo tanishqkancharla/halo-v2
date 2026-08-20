@@ -94,7 +94,7 @@ describe("PluginService", () => {
   );
 
   pluginTest(
-    "seeds calendar and the halo-plugin skill when a workspace is chosen",
+    "seeds calendar, the halo-plugin skill, and the maui skill when a workspace is chosen",
     async ({ workspace, workspaceRoot }) => {
       const selected = await workspace.select(workspaceRoot);
       if (selected instanceof Error) throw selected;
@@ -110,23 +110,15 @@ describe("PluginService", () => {
       expect(loaded.views[0]?.Routes).toBeTypeOf("function");
       expect(loaded.errors).toEqual([]);
 
-      const repoSkill = await readFile(
-        fileURLToPath(
-          new URL(
-            "../../../../../.agents/skills/halo-plugin/SKILL.md",
-            import.meta.url,
-          ),
-        ),
+      const skillTemplate = await readFile(
+        fileURLToPath(new URL("./haloPluginSkill.md", import.meta.url)),
         "utf8",
       );
-      const bundledSkill = await readFile(
-        fileURLToPath(
-          new URL("../bundled/haloPluginSkill.md", import.meta.url),
-        ),
-        "utf8",
-      );
-      expect(bundledSkill).toBe(repoSkill);
+      expect(skillTemplate).toContain("{{HALO_COMPILE_PLUGIN_VIEW}}");
 
+      const compilePluginViewPath = fileURLToPath(
+        new URL("./compilePluginView.ts", import.meta.url),
+      );
       const seededSkill = await readFile(
         join(
           workspaceRoot,
@@ -138,7 +130,33 @@ describe("PluginService", () => {
         ),
         "utf8",
       );
-      expect(seededSkill).toBe(repoSkill);
+      expect(seededSkill).toBe(
+        skillTemplate.replaceAll(
+          "{{HALO_COMPILE_PLUGIN_VIEW}}",
+          compilePluginViewPath,
+        ),
+      );
+      expect(seededSkill).not.toContain("{{HALO_COMPILE_PLUGIN_VIEW}}");
+
+      const repoMauiSkill = await readFile(
+        fileURLToPath(
+          new URL(
+            "../../../../../.agents/skills/maui/SKILL.md",
+            import.meta.url,
+          ),
+        ),
+        "utf8",
+      );
+      const bundledMauiSkill = await readFile(
+        fileURLToPath(new URL("../bundled/mauiSkill.md", import.meta.url)),
+        "utf8",
+      );
+      expect(bundledMauiSkill).toBe(repoMauiSkill);
+      const seededMauiSkill = await readFile(
+        join(workspaceRoot, ".pi", "agent", "skills", "maui", "SKILL.md"),
+        "utf8",
+      );
+      expect(seededMauiSkill).toBe(repoMauiSkill);
     },
   );
 
@@ -383,9 +401,9 @@ describe("PluginService", () => {
   );
 
   pluginTest(
-    "leaves an existing halo-plugin skill in place",
+    "leaves existing halo-plugin and maui skills in place",
     async ({ workspace, workspaceRoot }) => {
-      const skillPath = join(
+      const pluginSkillPath = join(
         workspaceRoot,
         ".pi",
         "agent",
@@ -393,13 +411,24 @@ describe("PluginService", () => {
         "halo-plugin",
         "SKILL.md",
       );
-      await mkdir(dirname(skillPath), { recursive: true });
-      await writeFile(skillPath, "keep me\n");
+      const mauiSkillPath = join(
+        workspaceRoot,
+        ".pi",
+        "agent",
+        "skills",
+        "maui",
+        "SKILL.md",
+      );
+      await mkdir(dirname(pluginSkillPath), { recursive: true });
+      await mkdir(dirname(mauiSkillPath), { recursive: true });
+      await writeFile(pluginSkillPath, "keep plugin\n");
+      await writeFile(mauiSkillPath, "keep maui\n");
 
       const selected = await workspace.select(workspaceRoot);
       if (selected instanceof Error) throw selected;
 
-      expect(await readFile(skillPath, "utf8")).toBe("keep me\n");
+      expect(await readFile(pluginSkillPath, "utf8")).toBe("keep plugin\n");
+      expect(await readFile(mauiSkillPath, "utf8")).toBe("keep maui\n");
     },
   );
 
