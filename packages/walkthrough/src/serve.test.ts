@@ -6,6 +6,7 @@ import { startWalkthroughServer } from "./serve.js";
 
 const packageRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const sampleMdx = path.join(packageRoot, "fixtures", "sample.mdx");
+const sampleSpec = path.join(packageRoot, "fixtures", "sample-spec.md");
 
 describe("walkthrough server", () => {
   test("serves the page, file excerpts, and shutdown", async () => {
@@ -44,5 +45,28 @@ describe("walkthrough server", () => {
       method: "POST",
     });
     expect(shutdown.status).toBe(200);
+  }, 60_000);
+
+  test("serves a spec-shaped markdown file", async () => {
+    await using cleanup = new errore.AsyncDisposableStack();
+    const server = await startWalkthroughServer({
+      mdxPath: sampleSpec,
+      workspaceRoot: packageRoot,
+      port: 0,
+    });
+    expect(server).not.toBeInstanceOf(Error);
+    if (server instanceof Error) return;
+    cleanup.defer(() => server.shutdown());
+
+    const page = await fetch(server.url);
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain("<title>Spec fixture</title>");
+
+    const metaResponse = await fetch(`${server.url}/__walkthrough/meta`);
+    expect(metaResponse.status).toBe(200);
+    // SAFETY: the meta route returns WalkthroughMeta JSON.
+    const meta = (await metaResponse.json()) as { title: string };
+    expect(meta.title).toBe("Spec fixture");
   }, 60_000);
 });

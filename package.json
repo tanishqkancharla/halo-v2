@@ -5,6 +5,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "halo-web": "pnpm --silent --filter @halo/web-cli cli",
+    "spec": "pnpm --silent --filter @halo/walkthrough cli",
     "walkthrough": "pnpm --silent --filter @halo/walkthrough cli",
     "infra:deploy": "pnpm --filter @halo/infra run deploy",
     "infra:dev": "pnpm --filter @halo/infra run dev",

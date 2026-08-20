@@ -22,7 +22,7 @@ type WalkthroughMeta = {
 export function WalkthroughApp() {
   const meta = useWalkthroughMeta();
   const [shutDown, setShutDown] = useState(false);
-  const title = meta === undefined ? "Walkthrough" : meta.title;
+  const title = meta === undefined ? document.title : meta.title;
   const shell = useStyles(styles.shell);
   const header = useStyles(styles.header);
   const titleClass = useStyles(styles.title);
@@ -30,8 +30,13 @@ export function WalkthroughApp() {
   const prose = useStyles(styles.prose, proseHtml("md"));
   const closed = useStyles(styles.closed);
 
+  useEffect(() => {
+    if (meta === undefined) return;
+    document.title = meta.title;
+  }, [meta]);
+
   if (shutDown) {
-    return <main className={closed}>Walkthrough done.</main>;
+    return <main className={closed}>Closed.</main>;
   }
 
   return (

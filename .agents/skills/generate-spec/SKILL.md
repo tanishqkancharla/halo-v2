@@ -170,4 +170,13 @@ async function searchProviders(input: SearchProvidersInput) {
 
 - Avoid introducing new infrastructure, abstractions, or optimization work unless explicitly required for the requested outcome.
 - Avoid refactor-only phases that do not produce user-visible or test-visible progress.
+
+## Serve it
+
+After the spec file exists, serve it from the repo root with the same local page as walkthroughs:
+
+```sh
+pnpm spec specs/<name>.md
 ```
+
+Tell the user the spec path and the printed URL.

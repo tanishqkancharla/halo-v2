@@ -5,10 +5,10 @@ import { Cli, z } from "incur";
 import { startWalkthroughServer } from "./serve.js";
 
 Cli.create("walkthrough", {
-  description: "Serve a local MDX walkthrough of code that already landed",
+  description: "Serve a local MDX spec or walkthrough",
   version: "0.1.0",
   args: z.object({
-    file: z.string().describe("Path to the walkthrough MDX file"),
+    file: z.string().describe("Path to the spec or walkthrough MDX file"),
   }),
   options: z.object({
     port: z.coerce.number().optional().describe("Port (default 4177)"),
