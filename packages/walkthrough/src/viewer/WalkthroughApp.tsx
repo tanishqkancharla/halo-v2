@@ -12,8 +12,8 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import Content from "virtual:walkthrough";
+import { DiffHeaderGallery } from "./DiffHeaderGallery.tsx";
 import { DoneButton } from "./DoneButton.tsx";
-import { HeaderOptionsGallery } from "./HeaderOptionsGallery.tsx";
 import { walkthroughComponents } from "./mdxComponents.tsx";
 
 type WalkthroughMeta = {
@@ -34,7 +34,7 @@ export function WalkthroughApp() {
   if (
     new URLSearchParams(window.location.search).get("gallery") === "headers"
   ) {
-    return <HeaderOptionsGallery />;
+    return <DiffHeaderGallery />;
   }
 
   if (shutDown) {
