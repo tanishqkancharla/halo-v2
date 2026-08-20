@@ -15,29 +15,20 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import Content from "virtual:walkthrough";
-import type { WalkthroughFile } from "../extractWalkthrough.js";
-import { ChangedFilesTree } from "./ChangedFilesTree.tsx";
 import { walkthroughComponents } from "./mdxComponents.tsx";
 
 type WalkthroughMeta = {
   title: string;
-  files: WalkthroughFile[];
 };
 
 export function WalkthroughApp() {
   const meta = useWalkthroughMeta();
   const [shutDown, setShutDown] = useState(false);
-  const files = meta === undefined ? [] : meta.files;
   const title = meta === undefined ? "Walkthrough" : meta.title;
   const shell = useStyles(styles.shell);
   const header = useStyles(styles.header);
   const titleClass = useStyles(styles.title);
   const closeIcon = useStyles(icon("sm"));
-  const body = useStyles(
-    styles.body,
-    files.length === 0 ? styles.bodySolo : undefined,
-  );
-  const aside = useStyles(styles.aside);
   const article = useStyles(styles.article);
   const prose = useStyles(styles.prose, proseHtml("md"));
   const closed = useStyles(styles.closed);
@@ -61,27 +52,13 @@ export function WalkthroughApp() {
           <Icons.CircleX className={closeIcon} />
         </Button>
       </header>
-      <div className={body}>
-        {files.length === 0 ? undefined : (
-          <aside className={aside} aria-label="Changed files">
-            <ChangedFilesTree
-              files={files}
-              onSelect={(path) => {
-                document
-                  .querySelector(`[data-file-path="${CSS.escape(path)}"]`)
-                  ?.scrollIntoView({ block: "start" });
-              }}
-            />
-          </aside>
-        )}
-        <article className={article}>
-          <div className={prose}>
-            <MDXProvider components={walkthroughComponents}>
-              <Content />
-            </MDXProvider>
-          </div>
-        </article>
-      </div>
+      <article className={article}>
+        <div className={prose}>
+          <MDXProvider components={walkthroughComponents}>
+            <Content />
+          </MDXProvider>
+        </div>
+      </article>
     </div>
   );
 }
@@ -127,29 +104,8 @@ const styles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   }),
-  body: style({
-    display: "grid",
-    gridTemplateColumns: "240px minmax(0, 1fr)",
-    flex: "1 1 auto",
-    minWidth: 0,
-    minHeight: 0,
-    "@media (max-width: 720px)": {
-      gridTemplateColumns: "minmax(0, 1fr)",
-    },
-  }),
-  bodySolo: style({
-    gridTemplateColumns: "minmax(0, 1fr)",
-  }),
-  aside: style({
-    minWidth: 0,
-    minHeight: 0,
-    overflow: "hidden",
-    backgroundColor: backgroundColor.app,
-    "@media (max-width: 720px)": {
-      display: "none",
-    },
-  }),
   article: style(spacing.padding({ x: 12, y: 12 }), {
+    flex: "1 1 auto",
     minWidth: 0,
     minHeight: 0,
     overflowY: "auto",

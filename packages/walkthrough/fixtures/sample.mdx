@@ -1,6 +1,17 @@
 # Walkthrough fixture
 
-Opening flow after the change.
+## Problem
+
+The CLI had no way to show a landed change as a page.
+
+```mermaid
+flowchart TD
+  A[MDX file] --> B[Nothing served]
+```
+
+## Solution
+
+`pnpm walkthrough` compiles the MDX and serves a Maui page. Close stops the server.
 
 ```mermaid
 flowchart TD
@@ -9,7 +20,16 @@ flowchart TD
   C --> D[Close]
 ```
 
-## Chapter: Parse fences
+## Goals
+
+- A local page renders mermaid, diffs, call stacks, and excerpts.
+- Close in the top right stops the server.
+
+Out of scope:
+
+- A file sidebar.
+
+## Parse fences
 
 `parseFence` classifies mermaid, diffs, call stacks, and file excerpts.
 
@@ -38,10 +58,4 @@ flowchart TD
 <aside>
   <strong>Note.</strong> Close in the top right stops the local server.
 </aside>
-```
-
-```tree
-src/parseFence.ts
-src/serve.ts
-src/cli.ts
 ```

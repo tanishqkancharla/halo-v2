@@ -8,7 +8,7 @@ import {
 
 const sample = `# Input validation
 
-## Chapter: Check first
+## Check first
 
 \`\`\`mermaid
 flowchart TD

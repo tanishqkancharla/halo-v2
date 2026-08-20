@@ -26,14 +26,24 @@ Choose a short kebab-case name. Create a temp directory and write one MDX file t
 mkdir -p /tmp/walkthrough-<name>
 ```
 
-Write `/tmp/walkthrough-<name>/walkthrough.mdx`. Use this structure. Interleave chapters of prose with Mermaid, call-stack diffs, code diffs, file excerpts, HTML, and the changed-file tree. Do not dump every artifact into one section at the bottom.
+Write `/tmp/walkthrough-<name>/walkthrough.mdx`. Use this structure. Interleave chapter prose with Mermaid, call-stack diffs, code diffs, file excerpts, and HTML. Do not dump every artifact into one section at the bottom.
 
 ````mdx
 # <Name of the landed change>
 
-## System flow
+## Problem
 
-Put one or more Mermaid diagrams immediately after the title. Show the runtime flow as it exists after the change. Label removed and added paths when that is clearer. Keep node text short and use valid Mermaid syntax.
+Explain the problem that existed before the change, in a few plain sentences. Add a Mermaid diagram when it makes the old path clearer.
+
+```mermaid
+flowchart TD
+  A[Entry point] --> B[Old helper]
+  B --> C[Broken or missing result]
+```
+
+## Solution
+
+Explain what landed and why that design, in a few plain sentences. Write in the past tense. Add a Mermaid diagram when it makes the new path clearer.
 
 ```mermaid
 flowchart TD
@@ -42,27 +52,19 @@ flowchart TD
   C --> D[Observable result]
 ```
 
-## What landed
+## Goals
 
-Explain the change and why it matters in a few plain sentences. Write in the past tense: this already shipped in the working tree or the named commits.
+- State a user-visible or system-level result that is true after the change.
 
-## Goals that now hold
-
-- State the user-visible or system-level results that are true after the change.
-
-## Out of scope
+Out of scope:
 
 - State what this walkthrough does not cover.
 
-## Important files, docs, and websites
+## <One outcome that is now true>
 
-- [`path/to/file.ts`](../../path/to/file.ts) — State what the reader should learn here.
+No `Chapter:` prefix. The heading is the outcome name only.
 
-List only sources that help read the change. Paths in this list are repo-relative.
-
-## Chapter: <One outcome that is now true>
-
-Explain the intent of this slice of the change in one or two sentences. Then show the evidence, in any order the reader needs:
+Explain this slice in one or two sentences. Then show the evidence, in any order the reader needs:
 
 ### Important types
 
@@ -112,18 +114,9 @@ Use JSX HTML in the MDX, or an `html` fence, for callouts, tables, and small dia
   <strong>Failure path.</strong> `validateInput` returns a tagged error. The handler returns that error. It does not throw.
 </aside>
 ```
-
-### Changed files
-
-A `tree` fence lists repo-relative paths. The viewer renders them with Pierre Trees and Git status.
-
-```tree
-path/to/handler.ts
-path/to/types.ts
-```
 ````
 
-Repeat `## Chapter:` for each slice of the change. Put Mermaid in a chapter when a local flow is clearer than the top-level diagram. Keep each chapter on one outcome.
+Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter when a local flow is clearer than the Problem or Solution diagram. Keep each chapter on one outcome. Skip a Mermaid fence in Problem or Solution when prose is enough.
 
 ## Fence reference
 
@@ -134,10 +127,11 @@ Repeat `## Chapter:` for each slice of the change. Put Mermaid in a chapter when
 | `diff` or `diff:path` | Pierre Diffs patch |
 | `start:end:path` | Pierre Diffs file excerpt |
 | `html` | Trusted HTML from this walkthrough |
-| `tree` | Pierre Trees file list |
 | other langs | Maui `CodeBlock` |
 
 Fenced code is not JSX. `{` inside fences is safe. In prose, write `\{` if you need a literal brace.
+
+Do not write a `tree` fence. The file sidebar is off.
 
 ## Serve it
 
@@ -151,9 +145,9 @@ Options:
 
 - `--port <n>` — listen port (default `4177`)
 - `--root <dir>` — workspace root for file excerpts (default cwd)
-- `--base <ref>` — Git ref for the file-tree diff, e.g. `main`
+- `--base <ref>` — Git ref unused while the file sidebar is off
 
-The command prints a local URL and keeps running. Open that URL. The page uses Maui, Pierre Diffs, and Pierre Trees. The close button in the top right posts `/__walkthrough/shutdown` and stops the server.
+The command prints a local URL and keeps running. Open that URL. The page uses Maui and Pierre Diffs. The close button in the top right posts `/__walkthrough/shutdown` and stops the server.
 
 Tell the user the MDX path and the URL.
 
@@ -169,4 +163,4 @@ Tell the user the MDX path and the URL.
 
 ## Final check
 
-Confirm that the MDX lives in a temp directory; Mermaid at the top matches the landed flow; each code chapter has the types, call stack, and diff that belong to it; file excerpt paths and line numbers are real; the CLI is serving the page; and the walkthrough covers the change without turning into a plan for new work.
+Confirm that the MDX lives in a temp directory; Problem and Solution match the landed change; Mermaid appears only where it helps; each code chapter has the types, call stack, and diff that belong to it; file excerpt paths and line numbers are real; the CLI is serving the page; and the walkthrough covers the change without turning into a plan for new work.
