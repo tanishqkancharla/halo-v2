@@ -1,13 +1,12 @@
 import { PatchDiff } from "@pierre/diffs/react";
 import { useTheme } from "maui";
-import { radius, shadow } from "maui";
-import { style, useStyles } from "purse-styles";
+import { useStyles } from "purse-styles";
 import { toUnifiedDiff } from "../normalizeDiff.js";
-import { diffsTheme } from "./diffsTheme.ts";
+import { pierreDiffOptions, pierreShell } from "./pierre.ts";
 
 export function CodeDiff(props: { source: string; path?: string }) {
   const { resolvedTheme } = useTheme();
-  const shell = useStyles(styles.shell);
+  const shell = useStyles(pierreShell);
   const path = props.path === undefined ? "change.ts" : props.path;
   const patch = toUnifiedDiff(props.source, path);
 
@@ -16,20 +15,8 @@ export function CodeDiff(props: { source: string; path?: string }) {
       <PatchDiff
         patch={patch}
         disableWorkerPool
-        options={{
-          theme: diffsTheme,
-          themeType: resolvedTheme,
-          diffStyle: "unified",
-          overflow: "wrap",
-        }}
+        options={pierreDiffOptions(resolvedTheme)}
       />
     </div>
   );
 }
-
-const styles = {
-  shell: style(radius.md, shadow.subtle, {
-    overflow: "hidden",
-    minWidth: 0,
-  }),
-};

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { File } from "@pierre/diffs/react";
 import { useTheme } from "maui";
-import { radius, shadow } from "maui";
-import { style, useStyles } from "purse-styles";
-import { diffsTheme } from "./diffsTheme.ts";
+import { useStyles } from "purse-styles";
+import { pierreFileOptions, pierreShell } from "./pierre.ts";
 
 type FileExcerptPayload = {
   path: string;
@@ -19,8 +18,9 @@ export function FileExcerpt(props: {
   fallback: string;
 }) {
   const { resolvedTheme } = useTheme();
-  const shell = useStyles(styles.shell);
+  const shell = useStyles(pierreShell);
   const excerpt = useFileExcerpt(props);
+  const pierre = pierreFileOptions(resolvedTheme);
 
   return (
     <div
@@ -35,9 +35,10 @@ export function FileExcerpt(props: {
         }}
         disableWorkerPool
         options={{
-          theme: diffsTheme,
-          themeType: resolvedTheme,
-          overflow: "wrap",
+          theme: pierre.theme,
+          themeType: pierre.themeType,
+          overflow: pierre.overflow,
+          unsafeCSS: pierre.unsafeCSS,
           renderHeaderMetadata: () => {
             const range = document.createElement("span");
             range.textContent = `${props.start}–${props.end}`;
@@ -66,10 +67,3 @@ function useFileExcerpt(input: { path: string; start: number; end: number }) {
   }, [input.path, input.start, input.end]);
   return excerpt;
 }
-
-const styles = {
-  shell: style(radius.md, shadow.subtle, {
-    overflow: "hidden",
-    minWidth: 0,
-  }),
-};

@@ -122,8 +122,8 @@ Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter whe
 
 | Fence info string | Viewer |
 | --- | --- |
-| `mermaid` | Mermaid diagram |
-| `callstack` or `diff` containing `└──` / `├──` | Call-stack diff |
+| `mermaid` | Beautiful Mermaid ([Craft](https://agents.craft.do/mermaid)) |
+| `callstack` or `diff` containing `└──` / `├──` | Pierre Diffs patch |
 | `diff` or `diff:path` | Pierre Diffs patch |
 | `start:end:path` | Pierre Diffs file excerpt |
 | `html` | Trusted HTML from this walkthrough |

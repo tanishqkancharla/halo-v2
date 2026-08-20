@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { colors, radius, spacing } from "maui";
+import { colors, monospace, radius, spacing } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Fence } from "./Fence.tsx";
 
@@ -23,6 +23,11 @@ function InlineChip(props: { children?: ReactNode }) {
   return <code className={className}>{props.children}</code>;
 }
 
-const inlineCodeClass = style(radius.md, spacing.padding({ x: 2, y: 1 }), {
-  backgroundColor: colors.gray[4],
-});
+const inlineCodeClass = style(
+  monospace,
+  radius.md,
+  spacing.padding({ x: 2, y: 1 }),
+  {
+    backgroundColor: colors.gray[4],
+  },
+);

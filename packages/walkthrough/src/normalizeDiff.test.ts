@@ -19,4 +19,14 @@ describe("toUnifiedDiff", () => {
     expect(wrapped).toContain("-  return existingService(input);");
     expect(wrapped).toContain("+  const valid = validateInput(input);");
   });
+
+  test("wraps a call-stack preview so Pierre can render it", () => {
+    const wrapped = toUnifiedDiff(
+      " requestHandler\n-└── oldService\n+└── newService\n    └── dataStore\n",
+      "callstack",
+    );
+    expect(wrapped.startsWith("--- a/callstack\n+++ b/callstack\n")).toBe(true);
+    expect(wrapped).toContain("-└── oldService");
+    expect(wrapped).toContain("+└── newService");
+  });
 });
