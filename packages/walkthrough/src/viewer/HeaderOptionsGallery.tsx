@@ -4,6 +4,7 @@ import {
   Button,
   Icons,
   backgroundColor,
+  border,
   colors,
   flex,
   flexItem,
@@ -221,6 +222,7 @@ const styles = {
     flex({ direction: "row", align: "center", justify: "end" }),
     spacing.padding({ x: 6, y: 3 }),
     flexItem({ size: "hug" }),
+    border(["top"], "border"),
     {
       backgroundColor: backgroundColor.app,
     },
