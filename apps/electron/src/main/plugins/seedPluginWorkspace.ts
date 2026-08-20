@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import * as errore from "errore";
 import calendarPackageJson from "../bundled/calendar/package.json?raw";
 import calendarView from "../bundled/calendar/view.tsx?raw";
-import haloPluginSkill from "../bundled/haloPluginSkill.md?raw";
+import haloPluginSkill from "./haloPluginSkill.md?raw";
 import mauiSkill from "../bundled/mauiSkill.md?raw";
 import type { WorkspaceLayout } from "../workspace-service.js";
 
@@ -14,6 +14,7 @@ export class PluginSeedError extends errore.createTaggedError({
   message: "Failed to seed workspace plugins",
 }) {}
 
+const compilePluginViewMarker = "{{HALO_COMPILE_PLUGIN_VIEW}}";
 const compilePluginViewRel =
   "apps/electron/src/main/plugins/compilePluginView.ts";
 
@@ -45,9 +46,8 @@ export async function seedPluginWorkspace(layout: WorkspaceLayout) {
 }
 
 function skillWithHaloSourcePaths(skill: string) {
-  const absolute = compilePluginViewSourcePath();
-  if (absolute === undefined) return skill;
-  return skill.replaceAll(`\`${compilePluginViewRel}\``, `\`${absolute}\``);
+  const path = compilePluginViewSourcePath() ?? compilePluginViewRel;
+  return skill.replaceAll(compilePluginViewMarker, path);
 }
 
 function compilePluginViewSourcePath() {

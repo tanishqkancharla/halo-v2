@@ -110,22 +110,11 @@ describe("PluginService", () => {
       expect(loaded.views[0]?.Routes).toBeTypeOf("function");
       expect(loaded.errors).toEqual([]);
 
-      const repoSkill = await readFile(
-        fileURLToPath(
-          new URL(
-            "../../../../../.agents/skills/halo-plugin/SKILL.md",
-            import.meta.url,
-          ),
-        ),
+      const skillTemplate = await readFile(
+        fileURLToPath(new URL("./haloPluginSkill.md", import.meta.url)),
         "utf8",
       );
-      const bundledSkill = await readFile(
-        fileURLToPath(
-          new URL("../bundled/haloPluginSkill.md", import.meta.url),
-        ),
-        "utf8",
-      );
-      expect(bundledSkill).toBe(repoSkill);
+      expect(skillTemplate).toContain("{{HALO_COMPILE_PLUGIN_VIEW}}");
 
       const compilePluginViewPath = fileURLToPath(
         new URL("./compilePluginView.ts", import.meta.url),
@@ -142,11 +131,12 @@ describe("PluginService", () => {
         "utf8",
       );
       expect(seededSkill).toBe(
-        repoSkill.replaceAll(
-          "`apps/electron/src/main/plugins/compilePluginView.ts`",
-          `\`${compilePluginViewPath}\``,
+        skillTemplate.replaceAll(
+          "{{HALO_COMPILE_PLUGIN_VIEW}}",
+          compilePluginViewPath,
         ),
       );
+      expect(seededSkill).not.toContain("{{HALO_COMPILE_PLUGIN_VIEW}}");
 
       const repoMauiSkill = await readFile(
         fileURLToPath(

@@ -28,7 +28,7 @@ Halo loads plugins when the workspace is ready. Reload (View → Reload, or Cmd-
 
 ## View bundle
 
-Halo compiles the plugin view with esbuild on load. Read `apps/electron/src/main/plugins/compilePluginView.ts` for the config it runs. Do not edit that file.
+Halo compiles the plugin view with esbuild on load. Read `{{HALO_COMPILE_PLUGIN_VIEW}}` for the config it runs. Do not edit that file.
 
 Packages in `external` are Halo's copies. Import UI from `@halo/plugin-sdk/view`. That module is Maui, purse-styles (`style`, `useStyles`), and wouter. Read the `maui` skill for tokens, shadows, focus, and Flex spacing. Import those names from `@halo/plugin-sdk/view`, not `"maui"`. Do not wrap `MauiProvider`. Do not `npm install` `react`, `maui`, `purse-styles`, or `wouter`.
 
