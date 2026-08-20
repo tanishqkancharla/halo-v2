@@ -1,6 +1,6 @@
 {
   "name": "@halo/desktop",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "description": "Halo desktop app",
   "license": "MIT",
