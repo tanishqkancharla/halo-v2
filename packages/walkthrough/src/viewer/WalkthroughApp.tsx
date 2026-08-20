@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { MDXProvider } from "@mdx-js/react";
 import {
-  Button,
-  Icons,
   backgroundColor,
   colors,
   flex,
   flexItem,
-  icon,
   proseHtml,
   proseMaxWidth,
   spacing,
@@ -15,6 +12,7 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import Content from "virtual:walkthrough";
+import { DoneButton } from "./DoneButton.tsx";
 import { walkthroughComponents } from "./mdxComponents.tsx";
 
 type WalkthroughMeta = {
@@ -28,29 +26,24 @@ export function WalkthroughApp() {
   const shell = useStyles(styles.shell);
   const header = useStyles(styles.header);
   const titleClass = useStyles(styles.title);
-  const closeIcon = useStyles(icon("sm"));
   const article = useStyles(styles.article);
   const prose = useStyles(styles.prose, proseHtml("md"));
   const closed = useStyles(styles.closed);
 
   if (shutDown) {
-    return <main className={closed}>Walkthrough closed.</main>;
+    return <main className={closed}>Walkthrough done.</main>;
   }
 
   return (
     <div className={shell}>
       <header className={header}>
         <div className={titleClass}>{title}</div>
-        <Button
-          variant="quiet"
-          aria-label="Close"
+        <DoneButton
           onClick={() => {
             setShutDown(true);
             void closeWalkthrough();
           }}
-        >
-          <Icons.CircleX className={closeIcon} />
-        </Button>
+        />
       </header>
       <article className={article}>
         <div className={prose}>

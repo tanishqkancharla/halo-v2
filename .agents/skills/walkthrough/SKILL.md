@@ -147,7 +147,7 @@ Options:
 - `--root <dir>` — workspace root for file excerpts (default cwd)
 - `--base <ref>` — Git ref unused while the file sidebar is off
 
-The command prints a local URL and keeps running. Open that URL. The page uses Maui and Pierre Diffs. The close button in the top right posts `/__walkthrough/shutdown` and stops the server.
+The command prints a local URL and keeps running. Open that URL. The page uses Maui and Pierre Diffs. **Done** in the top right posts `/__walkthrough/shutdown` and stops the server.
 
 Tell the user the MDX path and the URL.
 

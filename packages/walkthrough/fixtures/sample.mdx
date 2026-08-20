@@ -11,19 +11,19 @@ flowchart TD
 
 ## Solution
 
-`pnpm walkthrough` compiles the MDX and serves a Maui page. Close stops the server.
+`pnpm walkthrough` compiles the MDX and serves a Maui page. Done stops the server.
 
 ```mermaid
 flowchart TD
   A[CLI] --> B[Vite server]
   B --> C[MDX page]
-  C --> D[Close]
+  C --> D[Done]
 ```
 
 ## Goals
 
 - A local page renders mermaid, diffs, call stacks, and excerpts.
-- Close in the top right stops the server.
+- Done in the top right stops the server.
 
 Out of scope:
 
@@ -56,6 +56,6 @@ Out of scope:
 
 ```html
 <aside>
-  <strong>Note.</strong> Close in the top right stops the local server.
+  <strong>Note.</strong> Done in the top right stops the local server.
 </aside>
 ```
