@@ -7,5 +7,5 @@ export class EmptyPromptError extends errore.createTaggedError({
 
 export class PromptFailedError extends errore.createTaggedError({
   name: "PromptFailedError",
-  message: "Prompt failed",
+  message: "$reason",
 }) {}

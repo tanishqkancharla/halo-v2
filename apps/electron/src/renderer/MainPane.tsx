@@ -1,14 +1,15 @@
 import { PluginRuntimeProvider } from "@halo/plugin-sdk/view";
 import type { RpcStub, RpcTarget } from "capnweb";
-import * as errore from "errore";
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Route, Switch, useLocation } from "wouter";
 import {
   Button,
+  Icons,
   backgroundColor,
   colors,
   flex,
   flexItem,
+  icon,
   radius,
   shadowVars,
   spacing,
@@ -31,11 +32,6 @@ import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView } from "../shared/plugin.js";
 import { UiKitPage } from "./UiKitPage.tsx";
-
-class PromptSubmitError extends errore.createTaggedError({
-  name: "PromptSubmitError",
-  message: "Failed to send prompt: $reason",
-}) {}
 
 export function MainPane({
   sessions,
@@ -110,9 +106,8 @@ function SavedPane({
   sessionId: string;
   sessions: SessionSummary[];
 }) {
-  const content = useStyles(styles.content);
-  const composer = useStyles(styles.composer);
   const pane = useStyles(styles.pane);
+  const content = useStyles(styles.content);
   const { state, isWorking, prompt } = useAgentSession(sessionId);
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
@@ -124,17 +119,7 @@ function SavedPane({
       <div className={content}>
         <SessionTitleSlot title={title} />
         <SessionView state={state} isWorking={isWorking} />
-        <div className={composer}>
-          <PromptEditor
-            key={sessionId}
-            onSubmit={async (promptText) => {
-              const result = await prompt(promptText);
-              if (result instanceof Error) {
-                return new PromptSubmitError({ reason: result.message });
-              }
-            }}
-          />
-        </div>
+        <Composer key={sessionId} error={state.error} onSubmit={prompt} />
       </div>
     </main>
   );
@@ -147,7 +132,6 @@ function DraftPane({ draftId }: { draftId: string }) {
   });
   const pane = useStyles(styles.pane);
   const content = useStyles(styles.content);
-  const composer = useStyles(styles.composer);
   const hasMessages = sessionViewItems(state).length > 0;
 
   return (
@@ -157,78 +141,64 @@ function DraftPane({ draftId }: { draftId: string }) {
         {hasMessages ? (
           <SessionView state={state} isWorking={isWorking} />
         ) : undefined}
-        <div className={composer}>
-          <PromptEditor
-            key={draftId}
-            onSubmit={async (promptText) => {
-              const result = await prompt(promptText);
-              if (result instanceof Error) {
-                return new PromptSubmitError({ reason: result.message });
-              }
-            }}
-          />
-        </div>
+        <Composer key={draftId} error={state.error} onSubmit={prompt} />
       </div>
     </main>
   );
 }
 
-type PromptDraft = { text: string; error?: string };
-
-function PromptEditor({
+function Composer({
+  error,
   onSubmit,
 }: {
-  onSubmit: (prompt: string) => Promise<void | PromptSubmitError>;
+  error: string | undefined;
+  onSubmit: (prompt: string) => Promise<void | Error>;
 }) {
-  const [draft, setDraft] = useState<PromptDraft>({ text: "" });
-  const errorId = useId();
-  const editor = useStyles(styles.promptEditor);
-  const editorSurface = useStyles(styles.editorSurface);
-  const error = useStyles(styles.promptError);
-  const trimmedText = draft.text.trim();
+  const [draft, setDraft] = useState("");
+  const composer = useStyles(styles.composer);
+  const liveStatus = useStyles(styles.liveStatus);
+  const sendButton = useStyles(styles.sendButton);
+  const sendIcon = useStyles(icon("sm"));
+  const trimmedText = draft.trim();
   const sendDisabled = trimmedText.length === 0;
 
   async function submit() {
     if (!trimmedText) return;
 
-    setDraft({ text: "" });
-    const result = await onSubmit(trimmedText).catch(
-      (e) =>
-        new PromptSubmitError({
-          reason: e instanceof Error ? e.message : String(e),
-          cause: e,
-        }),
-    );
+    setDraft("");
+    const result = await onSubmit(trimmedText);
     if (result instanceof Error) {
-      setDraft((current) => ({
-        text: current.text,
-        error: result.message,
-      }));
+      setDraft(trimmedText);
     }
   }
 
   return (
-    <div className={editor}>
-      <Editor
-        content={draft.text}
-        onChange={(markdown) => setDraft({ text: markdown })}
-        onSubmit={submit}
-        placeholder="Message Halo"
-        aria-label="Message"
-        size="sm"
-        className={editorSurface}
-        actions={
-          <Button aria-label="Send" disabled={sendDisabled} onClick={submit}>
-            Send
-          </Button>
-        }
-      />
-      {draft.error && (
-        <div className={error} id={errorId} role="alert">
-          {draft.error}
-        </div>
-      )}
-    </div>
+    <Editor
+      content={draft}
+      onChange={setDraft}
+      onSubmit={submit}
+      placeholder="Message Halo"
+      aria-label="Message"
+      size="sm"
+      className={composer}
+      error={
+        error === undefined ? undefined : (
+          <div className={liveStatus} role="alert">
+            {error}
+          </div>
+        )
+      }
+      actions={
+        <Button
+          aria-label="Send"
+          className={sendButton}
+          disabled={sendDisabled}
+          onClick={submit}
+        >
+          <Icons.ArrowUp className={sendIcon} aria-hidden="true" />
+        </Button>
+      }
+    />
   );
 }
 
@@ -241,7 +211,6 @@ function SessionView({
 }) {
   const viewRef = useRef<HTMLDivElement>(null);
   const view = useStyles(styles.view);
-  const liveStatus = useStyles(styles.liveStatus);
   const thinking = useStyles(styles.thinking);
   const items = sessionViewItems(state);
 
@@ -267,11 +236,6 @@ function SessionView({
           <Loader size="0.75em" variant="muted" aria-label="Thinking" />
           Thinking
         </span>
-      ) : undefined}
-      {state.error !== undefined ? (
-        <div className={liveStatus} role="alert">
-          {state.error}
-        </div>
       ) : undefined}
     </div>
   );
@@ -369,11 +333,17 @@ const styles = {
   ),
   composer: style(flexItem({ size: "hug" }), {
     width: "100%",
+    maxWidth: "none",
     minWidth: 0,
     position: "relative",
     zIndex: 1,
     overflow: "visible",
     paddingTop: "2px",
+    "&:focus-within": {
+      outline: "none",
+      boxShadow: shadowVars.subtle,
+      zIndex: "auto",
+    },
     "&::before": {
       position: "absolute",
       right: 0,
@@ -425,24 +395,14 @@ const styles = {
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
   }),
-  promptEditor: style(flex({ direction: "column", gap: 2 }), {
-    width: "100%",
-    minWidth: 0,
-  }),
-  editorSurface: style({
-    maxWidth: "none",
-    width: "100%",
-    "&:focus-within": {
-      outline: "none",
-      boxShadow: shadowVars.subtle,
-      zIndex: "auto",
+  sendButton: style(radius.circle, {
+    boxShadow: "none",
+    backgroundColor: colors.grayAlpha[4],
+    "&:hover": {
+      backgroundColor: colors.grayAlpha[5],
+    },
+    "&:active": {
+      backgroundColor: colors.grayAlpha[6],
     },
   }),
-  promptError: style(
-    text("xs", 500, "highContrast"),
-    spacing.padding({ x: 4, y: 2 }),
-    {
-      color: "light-dark(#b42318, #ff9592)",
-    },
-  ),
 };

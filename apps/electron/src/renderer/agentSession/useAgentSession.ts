@@ -13,7 +13,7 @@ export type AgentSessionStub = RpcStub<AgentSessionApi>;
 
 class PromptFailedError extends errore.createTaggedError({
   name: "PromptFailedError",
-  message: "Failed to send prompt: $reason",
+  message: "$reason",
 }) {}
 
 export type UseAgentSessionResult = {
@@ -78,7 +78,9 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
 
   async function prompt(text: string) {
     if (session === undefined) {
-      return new PromptFailedError({ reason: "Session is not ready." });
+      const error = new PromptFailedError({ reason: "Session is not ready." });
+      setState((current) => ({ ...current, error: error.message }));
+      return error;
     }
     setState((current) => ({ ...current, error: undefined }));
     const result = await session.prompt(text).catch(
@@ -120,6 +122,8 @@ export function useDraftAgentSession(
   const sessionRef = useRef<AgentSessionStub | undefined>(undefined);
   const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
   const [isWorking, setIsWorking] = useState(false);
+  const isWorkingRef = useRef(false);
+  const openedRef = useRef(false);
   const onCreatedRef = useRef(onCreated);
 
   useEffect(() => {
@@ -150,8 +154,14 @@ export function useDraftAgentSession(
       session = created;
       sessionRef.current = created;
       await created.subscribe((event) => {
-        if (event.type === "agent_start") setIsWorking(true);
-        if (event.type === "agent_end") setIsWorking(false);
+        if (event.type === "agent_start") {
+          isWorkingRef.current = true;
+          setIsWorking(true);
+        }
+        if (event.type === "agent_end") {
+          isWorkingRef.current = false;
+          setIsWorking(false);
+        }
         setState((current) => applyAgentSessionEvent(current, event));
       });
     }
@@ -166,14 +176,18 @@ export function useDraftAgentSession(
     );
     if (result instanceof Error) {
       setIsWorking(false);
+      isWorkingRef.current = false;
       setState((current) => ({ ...current, error: result.message }));
       return result;
     }
-    const sessionId = await session.getSessionId();
     await queryClient.invalidateQueries({
       queryKey: ["sessions"],
       refetchType: "all",
     });
+    if (openedRef.current) return;
+    if (isWorkingRef.current) return;
+    openedRef.current = true;
+    const sessionId = await session.getSessionId();
     onCreatedRef.current(sessionId);
   }
 
