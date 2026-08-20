@@ -13,8 +13,13 @@ export type AgentSessionStub = RpcStub<AgentSessionApi>;
 
 class PromptFailedError extends errore.createTaggedError({
   name: "PromptFailedError",
-  message: "Failed to send prompt: $reason",
+  message: "$reason",
 }) {}
+
+function failureReason(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 export type UseAgentSessionResult = {
   session: AgentSessionStub | undefined;
@@ -78,13 +83,15 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
 
   async function prompt(text: string) {
     if (session === undefined) {
-      return new PromptFailedError({ reason: "Session is not ready." });
+      const error = new PromptFailedError({ reason: "Session is not ready." });
+      setState((current) => ({ ...current, error: error.message }));
+      return error;
     }
     setState((current) => ({ ...current, error: undefined }));
     const result = await session.prompt(text).catch(
       (e) =>
         new PromptFailedError({
-          reason: e instanceof Error ? e.message : String(e),
+          reason: failureReason(e),
           cause: e,
         }),
     );
@@ -139,7 +146,7 @@ export function useDraftAgentSession(
       const created = await api.newAgentSession().catch(
         (e) =>
           new PromptFailedError({
-            reason: e instanceof Error ? e.message : String(e),
+            reason: failureReason(e),
             cause: e,
           }),
       );
@@ -160,7 +167,7 @@ export function useDraftAgentSession(
     const result = await session.prompt(text).catch(
       (e) =>
         new PromptFailedError({
-          reason: e instanceof Error ? e.message : String(e),
+          reason: failureReason(e),
           cause: e,
         }),
     );

@@ -163,8 +163,14 @@ export class AgentSessionRpc extends AgentSessionApi {
     this.logger.info({ event: "prompt", textLength: text.length });
     if (text.trim().length === 0) throw new EmptyPromptError();
     const prompted = await this.session
-      .prompt(text)
-      .catch((e) => new PromptFailedError({ cause: e }));
+      .prompt(text, { streamingBehavior: "steer" })
+      .catch(
+        (e) =>
+          new PromptFailedError({
+            reason: e instanceof Error ? e.message : String(e),
+            cause: e,
+          }),
+      );
     if (prompted instanceof Error) throw prompted;
     await this.deliveries;
   }
