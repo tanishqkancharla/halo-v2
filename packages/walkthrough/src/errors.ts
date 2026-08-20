@@ -9,3 +9,8 @@ export class WalkthroughFileError extends errore.createTaggedError({
   name: "WalkthroughFileError",
   message: "Walkthrough could not read $path: $reason",
 }) {}
+
+export class WalkthroughMermaidError extends errore.createTaggedError({
+  name: "WalkthroughMermaidError",
+  message: "Walkthrough could not render mermaid",
+}) {}

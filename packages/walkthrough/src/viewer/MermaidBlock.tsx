@@ -1,33 +1,38 @@
-import { useEffect, useId, useState } from "react";
-import mermaid from "mermaid";
-import { useTheme } from "maui";
-import { radius, shadow, spacing } from "maui";
+import { useMemo } from "react";
+import {
+  backgroundColor,
+  colors,
+  fontFamily,
+  radius,
+  shadow,
+  spacing,
+} from "maui";
 import { style, useStyles } from "purse-styles";
+import { mermaidSvg } from "../mermaid.js";
 
 export function MermaidBlock(props: { source: string }) {
-  const { resolvedTheme } = useTheme();
   const shell = useStyles(styles.shell);
-  const reactId = useId().replaceAll(":", "");
-  const [svg, setSvg] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: resolvedTheme === "dark" ? "dark" : "neutral",
-      securityLevel: "strict",
-    });
-    void mermaid
-      .render(`walkthrough-mermaid-${reactId}`, props.source)
-      .then((result) => {
-        if (cancelled) return;
-        setSvg(result.svg);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [props.source, reactId, resolvedTheme]);
-
+  const svg = useMemo(
+    () =>
+      mermaidSvg({
+        source: props.source,
+        bg: backgroundColor.app,
+        fg: colors.gray[12],
+        accent: colors.accent[9],
+        muted: colors.gray[11],
+        surface: backgroundColor.element,
+        border: colors.gray[6],
+        font: fontFamily,
+      }),
+    [props.source],
+  );
+  if (svg instanceof Error) {
+    return (
+      <div className={shell} data-walkthrough-kind="mermaid">
+        {svg.message}
+      </div>
+    );
+  }
   return (
     <div
       className={shell}
