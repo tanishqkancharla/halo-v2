@@ -9,6 +9,8 @@ description: >
 
 Plugins live in `{workspace}/.halo/plugins/<id>/`. The folder name is the plugin id. `halo.name` is the label in the UI.
 
+Write plugin code only in that folder. Do not edit Halo app source.
+
 ## Layout
 
 Required:
@@ -22,9 +24,17 @@ Optional:
 - `view.tsx` (or `view/index.tsx`, `view.ts`, `view/index.ts`) with named exports `Sidebar` and `Routes`
 - `server.ts` (or `server/index.ts`) with a default `RpcTarget` class
 
-Do not add extra npm dependencies. Import UI from `@halo/plugin-sdk/view`. Import `RpcTarget` from `@halo/plugin-sdk/server`. Parse JSON with `parseVersioned` from `@halo/plugin-sdk/schema`.
-
 Halo loads plugins when the workspace is ready. Reload (View → Reload, or Cmd-R / Ctrl-R) to pick up plugin edits.
+
+## View bundle
+
+Halo compiles the plugin view with esbuild on load. Read `apps/electron/src/main/plugins/compilePluginView.ts` for the config it runs. Do not edit that file.
+
+Packages in `external` are Halo's copies. Import UI from `@halo/plugin-sdk/view`. That module is Maui, purse-styles (`style`, `useStyles`), and wouter. Read the `maui` skill for tokens, shadows, focus, and Flex spacing. Import those names from `@halo/plugin-sdk/view`, not `"maui"`. Do not wrap `MauiProvider`. Do not `npm install` `react`, `maui`, `purse-styles`, or `wouter`.
+
+Other packages are allowed. Add them to that plugin's `package.json`, run `npm install` in the plugin folder, then reload. esbuild inlines them. A missing package fails compile.
+
+Import `RpcTarget` from `@halo/plugin-sdk/server`. Parse JSON with `parseVersioned` from `@halo/plugin-sdk/schema`.
 
 ## package.json
 
@@ -46,6 +56,8 @@ Halo loads plugins when the workspace is ready. Reload (View → Reload, or Cmd-
 
 ```tsx
 import {
+  Flex,
+  H1,
   Route,
   SidebarItem,
   SidebarSection,
@@ -69,7 +81,11 @@ export function Routes() {
 }
 
 function Home() {
-  return <div>Notes</div>;
+  return (
+    <Flex column gap={4}>
+      <H1>Notes</H1>
+    </Flex>
+  );
 }
 ```
 
