@@ -10,7 +10,10 @@ const shouldNotarize =
   appleApiIssuer !== undefined;
 
 const packagerConfig: NonNullable<ForgeConfig["packagerConfig"]> = {
-  asar: true,
+  asar: {
+    // esbuild's native binary cannot execute from inside the asar.
+    unpack: "**/node_modules/{esbuild,@esbuild}/**/*",
+  },
   appBundleId: "com.saffronhealth.halo",
   appCategoryType: "public.app-category.medical",
   icon: "icons/icon",
