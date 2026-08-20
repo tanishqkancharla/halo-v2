@@ -1,4 +1,5 @@
-import * as esbuild from "esbuild";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import * as errore from "errore";
 import type { CompiledPluginView } from "../../shared/plugin.js";
 
@@ -23,18 +24,21 @@ export async function compilePluginView(args: {
   directory: string;
   viewPath: string;
 }): Promise<PluginViewCompileError | CompiledPluginView> {
-  const built = await esbuild
-    .build({
-      absWorkingDir: args.directory,
-      entryPoints: [args.viewPath],
-      bundle: true,
-      write: false,
-      format: "cjs",
-      platform: "browser",
-      jsx: "automatic",
-      logLevel: "silent",
-      external: [...viewExternals],
-    })
+  const esbuild = await loadEsbuild();
+  const built = await Promise.resolve()
+    .then(() =>
+      esbuild.build({
+        absWorkingDir: args.directory,
+        entryPoints: [args.viewPath],
+        bundle: true,
+        write: false,
+        format: "cjs",
+        platform: "browser",
+        jsx: "automatic",
+        logLevel: "silent",
+        external: [...viewExternals],
+      }),
+    )
     .catch(
       (e) =>
         new PluginViewCompileError({
@@ -55,4 +59,36 @@ export async function compilePluginView(args: {
   }
 
   return { id: args.id, source: output.text };
+}
+
+let esbuildModule: Promise<typeof import("esbuild")> | undefined;
+
+function loadEsbuild() {
+  if (esbuildModule !== undefined) return esbuildModule;
+  // esbuild reads ESBUILD_BINARY_PATH when the module loads. spawn() cannot
+  // run the copy stored inside the asar (ENOTDIR).
+  const binaryPath = packagedEsbuildBinary();
+  if (binaryPath !== undefined) {
+    process.env.ESBUILD_BINARY_PATH = binaryPath;
+  }
+  esbuildModule = import("esbuild");
+  return esbuildModule;
+}
+
+function packagedEsbuildBinary() {
+  const binaryName = process.platform === "win32" ? "esbuild.exe" : "esbuild";
+  const resourcesDir =
+    process.platform === "darwin"
+      ? join(dirname(process.execPath), "..", "Resources")
+      : join(dirname(process.execPath), "resources");
+  const binaryPath = join(
+    resourcesDir,
+    "app.asar.unpacked",
+    "node_modules",
+    "esbuild",
+    "bin",
+    binaryName,
+  );
+  if (!existsSync(binaryPath)) return undefined;
+  return binaryPath;
 }
