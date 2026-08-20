@@ -13,6 +13,7 @@ import {
 import { style, useStyles } from "purse-styles";
 import Content from "virtual:walkthrough";
 import { DoneButton } from "./DoneButton.tsx";
+import { HeaderOptionsGallery } from "./HeaderOptionsGallery.tsx";
 import { walkthroughComponents } from "./mdxComponents.tsx";
 
 type WalkthroughMeta = {
@@ -29,6 +30,12 @@ export function WalkthroughApp() {
   const article = useStyles(styles.article);
   const prose = useStyles(styles.prose, proseHtml("md"));
   const closed = useStyles(styles.closed);
+
+  if (
+    new URLSearchParams(window.location.search).get("gallery") === "headers"
+  ) {
+    return <HeaderOptionsGallery />;
+  }
 
   if (shutDown) {
     return <main className={closed}>Walkthrough done.</main>;
