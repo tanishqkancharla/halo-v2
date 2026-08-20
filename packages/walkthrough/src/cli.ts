@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import path from "node:path";
 import { Cli, z } from "incur";
+import { resolveFromInvokeCwd } from "./invokeCwd.js";
 import { startWalkthroughServer } from "./serve.js";
 
 Cli.create("walkthrough", {
@@ -20,11 +20,11 @@ Cli.create("walkthrough", {
   }),
   async *run(c) {
     const started = await startWalkthroughServer({
-      mdxPath: path.resolve(c.args.file),
+      mdxPath: resolveFromInvokeCwd(c.args.file),
       workspaceRoot:
         c.options.root === undefined
-          ? process.cwd()
-          : path.resolve(c.options.root),
+          ? resolveFromInvokeCwd(".")
+          : resolveFromInvokeCwd(c.options.root),
       port: c.options.port === undefined ? 4177 : c.options.port,
     });
     if (started instanceof Error) {
