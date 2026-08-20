@@ -157,7 +157,9 @@ async function handleWalkthroughRequest(input: {
     input.res.statusCode = 200;
     input.res.setHeader("content-type", "text/plain; charset=utf-8");
     input.res.end("ok");
-    void input.shutdown();
+    setTimeout(() => {
+      void input.shutdown();
+    }, 250);
     return;
   }
   if (parsed.pathname === "/__walkthrough/meta" && input.method === "GET") {

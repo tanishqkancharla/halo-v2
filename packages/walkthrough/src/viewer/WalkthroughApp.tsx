@@ -54,9 +54,8 @@ export function WalkthroughApp() {
           variant="quiet"
           aria-label="Close"
           onClick={() => {
-            void closeWalkthrough().then(() => {
-              setShutDown(true);
-            });
+            setShutDown(true);
+            void closeWalkthrough();
           }}
         >
           <Icons.CircleX className={closeIcon} />

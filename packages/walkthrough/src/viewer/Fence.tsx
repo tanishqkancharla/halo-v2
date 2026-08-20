@@ -54,12 +54,16 @@ function findCodeElement(node: ReactNode): ReactElement<CodeProps> | undefined {
     return undefined;
   }
   if (!isValidElement(node)) return undefined;
-  if (isCodeElement(node)) return node;
+  if (isFencedCode(node)) return node;
   return findCodeElement(elementChildren(node));
 }
 
-function isCodeElement(node: ReactElement): node is ReactElement<CodeProps> {
-  return node.type === "code";
+function isFencedCode(node: ReactElement): node is ReactElement<CodeProps> {
+  // SAFETY: MDX puts language-* on the fenced code component's props.
+  const props = node.props as { className?: string; children?: ReactNode };
+  return (
+    props.className !== undefined && props.className.startsWith("language-")
+  );
 }
 
 function extractText(node: ReactNode): string {
