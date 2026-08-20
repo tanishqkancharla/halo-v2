@@ -34,17 +34,7 @@ export function FileExcerpt(props: {
           contents: excerpt === undefined ? props.fallback : excerpt.contents,
         }}
         disableWorkerPool
-        options={{
-          theme: pierre.theme,
-          themeType: pierre.themeType,
-          overflow: pierre.overflow,
-          unsafeCSS: pierre.unsafeCSS,
-          renderHeaderMetadata: () => {
-            const range = document.createElement("span");
-            range.textContent = `${props.start}–${props.end}`;
-            return range;
-          },
-        }}
+        options={pierre}
       />
     </div>
   );

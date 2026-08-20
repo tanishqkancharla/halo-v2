@@ -1,10 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  extractFences,
-  extractTitle,
-  filesFromFences,
-  mergeWalkthroughFiles,
-} from "./extractWalkthrough.js";
+import { extractFences, extractTitle } from "./extractWalkthrough.js";
 
 const sample = `# Input validation
 
@@ -26,11 +21,6 @@ async function requestHandler() {}
 -old
 +new
 \`\`\`
-
-\`\`\`tree
-src/handler.ts
-src/new.ts
-\`\`\`
 `;
 
 describe("extractWalkthrough", () => {
@@ -41,30 +31,6 @@ describe("extractWalkthrough", () => {
       "mermaid",
       "file",
       "diff",
-      "tree",
-    ]);
-  });
-
-  test("collects file paths from file, diff, and tree fences", () => {
-    expect(filesFromFences(extractFences(sample))).toEqual([
-      { path: "src/handler.ts", status: "modified" },
-      { path: "src/service.ts", status: "modified" },
-      { path: "src/new.ts", status: "modified" },
-    ]);
-  });
-
-  test("keeps git status when merging fence paths", () => {
-    expect(
-      mergeWalkthroughFiles(
-        [{ path: "src/handler.ts", status: "added" }],
-        [
-          { path: "src/handler.ts", status: "modified" },
-          { path: "src/new.ts", status: "modified" },
-        ],
-      ),
-    ).toEqual([
-      { path: "src/handler.ts", status: "added" },
-      { path: "src/new.ts", status: "modified" },
     ]);
   });
 });

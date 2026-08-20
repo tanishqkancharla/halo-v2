@@ -13,10 +13,6 @@ Cli.create("walkthrough", {
   options: z.object({
     port: z.coerce.number().optional().describe("Port (default 4177)"),
     root: z.string().optional().describe("Workspace root for file excerpts"),
-    base: z
-      .string()
-      .optional()
-      .describe("Git ref to diff against for the file tree"),
   }),
   output: z.object({
     url: z.string(),
@@ -30,7 +26,6 @@ Cli.create("walkthrough", {
           ? process.cwd()
           : path.resolve(c.options.root),
       port: c.options.port === undefined ? 4177 : c.options.port,
-      gitBase: c.options.base,
     });
     if (started instanceof Error) {
       return c.error({

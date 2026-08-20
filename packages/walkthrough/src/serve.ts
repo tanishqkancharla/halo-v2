@@ -3,13 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer, type ViteDevServer } from "vite";
 import { WalkthroughFileError, WalkthroughServeError } from "./errors.js";
-import {
-  extractFences,
-  extractTitle,
-  filesFromFences,
-  mergeWalkthroughFiles,
-} from "./extractWalkthrough.js";
-import { readGitFiles } from "./gitFiles.js";
+import { extractTitle } from "./extractWalkthrough.js";
 
 export type WalkthroughServer = {
   url: string;
@@ -22,7 +16,6 @@ export type StartWalkthroughServerInput = {
   mdxPath: string;
   workspaceRoot: string;
   port: number;
-  gitBase?: string;
 };
 
 const packageRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -61,9 +54,6 @@ export async function startWalkthroughServer(
   process.env.WALKTHROUGH_ROOT = workspaceRoot;
 
   const title = extractTitle(mdx);
-  const fenceFiles = filesFromFences(extractFences(mdx));
-  const gitFiles = await readGitFiles(workspaceRoot, input.gitBase);
-  const files = mergeWalkthroughFiles(gitFiles, fenceFiles);
 
   let vite: ViteDevServer | undefined;
   const closedBarrier = createClosedBarrier();
@@ -102,7 +92,6 @@ export async function startWalkthroughServer(
               method: req.method === undefined ? "GET" : req.method,
               workspaceRoot,
               title,
-              files,
               shutdown,
               res,
             });
@@ -145,7 +134,6 @@ async function handleWalkthroughRequest(input: {
   method: string;
   workspaceRoot: string;
   title: string;
-  files: ReturnType<typeof mergeWalkthroughFiles>;
   shutdown: () => Promise<void>;
   res: WalkthroughResponse;
 }) {
@@ -165,7 +153,7 @@ async function handleWalkthroughRequest(input: {
   if (parsed.pathname === "/__walkthrough/meta" && input.method === "GET") {
     input.res.statusCode = 200;
     input.res.setHeader("content-type", "application/json; charset=utf-8");
-    input.res.end(JSON.stringify({ title: input.title, files: input.files }));
+    input.res.end(JSON.stringify({ title: input.title }));
     return;
   }
   if (parsed.pathname === "/__walkthrough/file" && input.method === "GET") {

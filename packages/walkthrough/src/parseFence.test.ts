@@ -6,7 +6,7 @@ import {
 } from "./parseFence.js";
 
 describe("parseFence", () => {
-  test("reads mermaid, html, callstack, and tree fences", () => {
+  test("reads mermaid, html, and callstack fences", () => {
     expect(parseFence("mermaid", "flowchart TD\n  A --> B\n")).toEqual({
       kind: "mermaid",
       source: "flowchart TD\n  A --> B",
@@ -18,10 +18,6 @@ describe("parseFence", () => {
     expect(parseFence("callstack", " main\n+└── next\n")).toEqual({
       kind: "callstack",
       source: " main\n+└── next",
-    });
-    expect(parseFence("tree", "src/a.ts\nsrc/b.ts\n")).toEqual({
-      kind: "tree",
-      paths: ["src/a.ts", "src/b.ts"],
     });
   });
 

@@ -12,7 +12,6 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import Content from "virtual:walkthrough";
-import { DiffHeaderGallery } from "./DiffHeaderGallery.tsx";
 import { DoneButton } from "./DoneButton.tsx";
 import { walkthroughComponents } from "./mdxComponents.tsx";
 
@@ -30,12 +29,6 @@ export function WalkthroughApp() {
   const article = useStyles(styles.article);
   const prose = useStyles(styles.prose, proseHtml("md"));
   const closed = useStyles(styles.closed);
-
-  if (
-    new URLSearchParams(window.location.search).get("gallery") === "headers"
-  ) {
-    return <DiffHeaderGallery />;
-  }
 
   if (shutDown) {
     return <main className={closed}>Walkthrough done.</main>;

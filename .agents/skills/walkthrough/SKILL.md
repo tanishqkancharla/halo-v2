@@ -131,8 +131,6 @@ Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter whe
 
 Fenced code is not JSX. `{` inside fences is safe. In prose, write `\{` if you need a literal brace.
 
-Do not write a `tree` fence. The file sidebar is off.
-
 ## Serve it
 
 This skill's CLI is `pnpm walkthrough`. After the MDX file exists:
@@ -145,7 +143,6 @@ Options:
 
 - `--port <n>` — listen port (default `4177`)
 - `--root <dir>` — workspace root for file excerpts (default cwd)
-- `--base <ref>` — Git ref unused while the file sidebar is off
 
 The command prints a local URL and keeps running. Open that URL. The page uses Maui and Pierre Diffs. **Done** in the top right posts `/__walkthrough/shutdown` and stops the server.
 

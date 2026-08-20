@@ -29,12 +29,8 @@ describe("walkthrough server", () => {
     // SAFETY: the meta route returns WalkthroughMeta JSON.
     const meta = (await metaResponse.json()) as {
       title: string;
-      files: { path: string }[];
     };
     expect(meta.title).toBe("Walkthrough fixture");
-    expect(meta.files.some((file) => file.path.endsWith("parseFence.ts"))).toBe(
-      true,
-    );
 
     const excerptResponse = await fetch(
       `${server.url}/__walkthrough/file?path=src/parseFence.ts&start=1&end=4`,

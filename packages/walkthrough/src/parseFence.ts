@@ -2,7 +2,6 @@ export type Fence =
   | { kind: "mermaid"; source: string }
   | { kind: "html"; source: string }
   | { kind: "callstack"; source: string }
-  | { kind: "tree"; paths: string[] }
   | { kind: "file"; path: string; start: number; end: number; source: string }
   | { kind: "diff"; path: string | undefined; source: string }
   | { kind: "code"; lang: string; source: string };
@@ -29,12 +28,6 @@ export function parseFence(lang: string, source: string): Fence {
   if (lang === "mermaid") return { kind: "mermaid", source: trimmed };
   if (lang === "html") return { kind: "html", source: trimmed };
   if (lang === "callstack") return { kind: "callstack", source: trimmed };
-  if (lang === "tree") {
-    return {
-      kind: "tree",
-      paths: trimmed.split("\n").filter((line) => line.length > 0),
-    };
-  }
 
   const fileRef = fileRefPattern.exec(lang);
   if (fileRef !== null) {

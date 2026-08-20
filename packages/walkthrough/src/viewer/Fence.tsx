@@ -41,7 +41,6 @@ export function Fence(props: { children?: ReactNode }) {
       />
     );
   }
-  if (fence.kind === "tree") return undefined;
   return <CodeBlock lang={fence.lang}>{fence.source}</CodeBlock>;
 }
 
