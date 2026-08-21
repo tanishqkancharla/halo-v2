@@ -23,7 +23,7 @@ const logMessageSchema = Type.Object({
   }),
 });
 
-// Renderer requests a Cap'n Web MessagePort; we forward it into the main world.
+// Renderer requests a MessagePort; we forward it into the main world.
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   const log = parseLogMessage({ data: event.data });
@@ -31,17 +31,19 @@ window.addEventListener("message", (event) => {
     ipcRenderer.send(LOG_CHANNELS.log, log.payload);
     return;
   }
-  if (event.data !== RPC_CHANNELS.requestRpc) return;
+  if (
+    event.data !== RPC_CHANNELS.requestRpc &&
+    event.data !== RPC_CHANNELS.requestExtensionHost
+  ) {
+    return;
+  }
   // Electron IPC payload; the MessagePort is transferred separately.
   // oxlint-disable-next-line unicorn/no-null
-  ipcRenderer.postMessage(RPC_CHANNELS.requestRpc, null);
+  ipcRenderer.postMessage(event.data, null);
 });
 
-ipcRenderer.on(RPC_CHANNELS.provideRpc, (event) => {
-  void windowLoaded.then(() => {
-    window.postMessage(RPC_CHANNELS.provideRpc, "*", event.ports);
-  });
-});
+forwardProvidedPort(RPC_CHANNELS.provideRpc);
+forwardProvidedPort(RPC_CHANNELS.provideExtensionHost);
 
 type LogMessage = {
   channel: typeof LOG_CHANNELS.log;
@@ -51,6 +53,14 @@ type LogMessage = {
     data: LoggerData;
   };
 };
+
+function forwardProvidedPort(channel: string): void {
+  ipcRenderer.on(channel, (event) => {
+    void windowLoaded.then(() => {
+      window.postMessage(channel, "*", event.ports);
+    });
+  });
+}
 
 function parseLogMessage(args: { data: unknown }): LogMessage | undefined {
   if (!Value.Check(logMessageSchema, args.data)) return undefined;
