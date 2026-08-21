@@ -200,11 +200,11 @@ export const RPC_CHANNELS = {
 +});
 ```
 
-- [ ] Add `extensionHostMain.ts` and a Vite/Forge entry that emits `extensionHost.cjs`. Fork it from `main.ts` after `app.whenReady`.
-- [ ] Add channels, preload forward, and `connectExtensionHostRpc`. Call `ping` once from `ApiProvider` when the workspace is ready.
-- [ ] In Vitest, spawn the same entry with `new Worker(...)`. Do not use `utilityProcess` in Vitest.
-- [ ] Smoke: Halo still opens and Calendar still mounts on the old path. Do not commit this check.
-- [ ] Run `pnpm --filter @halo/desktop test src/main/plugins/extensionHostRouter.test.ts`.
+- [x] Add `extensionHostMain.ts` and a Vite/Forge entry that emits `extensionHost.cjs`. Fork it from `main.ts` after `app.whenReady`.
+- [x] Add channels, preload forward, and `connectExtensionHostRpc`. Call `ping` once from `ApiProvider` when the workspace is ready.
+- [x] In Vitest, spawn the same entry with `new Worker(...)`. Do not use `utilityProcess` in Vitest.
+- [x] Smoke: Halo still opens and Calendar still mounts on the old path. Do not commit this check.
+- [x] Run `pnpm --filter @halo/desktop test src/main/plugins/extensionHostRouter.test.ts`.
 
 ### Phase 3: Host loads servers over oRPC, drop jiti
 

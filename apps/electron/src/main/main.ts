@@ -5,7 +5,9 @@ import {
   ipcMain,
   Menu,
   MessageChannelMain,
+  utilityProcess,
   type IpcMainEvent,
+  type UtilityProcess,
 } from "electron";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -68,11 +70,14 @@ const userService = new UserService(applicationConfig.dataDir);
 const piService = new PiService(workspaceService, userService);
 const pluginService = new PluginService(workspaceService);
 let mainWindow: BrowserWindow | undefined;
+let extensionHost!: UtilityProcess;
 
 app.whenReady().then(async () => {
   await workspaceService.restore();
   registerLogBridge();
   registerRpcBridge();
+  startExtensionHost();
+  registerExtensionHostBridge();
   installMenu();
   openMainWindow();
   startAppUpdates(isDevelopment);
@@ -176,6 +181,29 @@ function registerRpcBridge(): void {
     // Electron's postMessage payload; the ports carry the RPC transport.
     // oxlint-disable-next-line unicorn/no-null
     frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);
+  });
+}
+
+function startExtensionHost(): void {
+  extensionHost = utilityProcess.fork(
+    join(currentDirectory, "extensionHost.cjs"),
+  );
+}
+
+function registerExtensionHostBridge(): void {
+  ipcMain.on(RPC_CHANNELS.requestExtensionHost, (event) => {
+    assertTrustedSender(event);
+    const frame = event.senderFrame;
+    if (frame === null) {
+      throw new Error(
+        "Halo rejected extension host RPC without a sender frame.",
+      );
+    }
+    const { port1, port2 } = new MessageChannelMain();
+    extensionHost.postMessage("orpc", [port1]);
+    // Electron's postMessage payload; the ports carry the RPC transport.
+    // oxlint-disable-next-line unicorn/no-null
+    frame.postMessage(RPC_CHANNELS.provideExtensionHost, null, [port2]);
   });
 }
 

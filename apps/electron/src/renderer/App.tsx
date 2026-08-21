@@ -16,6 +16,7 @@ import {
   useWorkspaceQuery,
   useAppInfoQuery,
   usePluginsQuery,
+  useExtensionHostPing,
 } from "./api/ApiProvider.tsx";
 
 export function App() {
@@ -25,6 +26,7 @@ export function App() {
   const sessionsQuery = useSessionsQuery(workspace);
   const appInfoQuery = useAppInfoQuery();
   const pluginsQuery = usePluginsQuery(workspace);
+  useExtensionHostPing(workspace);
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
   const pluginViews =
     pluginsQuery.data === undefined ? [] : pluginsQuery.data.views;

@@ -15,6 +15,7 @@ import {
   type LoadedPluginList,
 } from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
+import { connectExtensionHostRpc } from "./ExtensionHostClient.js";
 import type { HaloApiStub } from "./HaloRpcClient.js";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
@@ -149,6 +150,22 @@ export function useAppInfoQuery() {
     queryKey: ["app-info"],
     queryFn: () => api.getAppInfo(),
     refetchInterval: 5_000,
+  });
+}
+
+export function useExtensionHostPing(workspace: WorkspaceState | undefined) {
+  const workspaceRoot =
+    workspace?.status === "ready"
+      ? workspace.workspace.workspaceRoot
+      : undefined;
+
+  return useQuery({
+    queryKey: ["extension-host-ping", workspaceRoot],
+    queryFn: async () => {
+      const host = await connectExtensionHostRpc();
+      return host.ping();
+    },
+    enabled: workspaceRoot !== undefined,
   });
 }
 
