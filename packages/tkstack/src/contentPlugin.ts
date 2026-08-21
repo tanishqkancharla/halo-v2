@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import type { Plugin } from "vite";
-import { compileFormatForPath, compileViewerSource } from "./compileViewer.js";
+import { parseViewerDocument } from "./parseViewer.js";
 
 export function tkstackContentPlugin(input: {
   filePath: string;
@@ -15,11 +15,9 @@ export function tkstackContentPlugin(input: {
     async load(id) {
       if (id !== virtualId) return;
       const source = await fs.readFile(input.filePath, "utf8");
-      const compiled = await compileViewerSource({
-        source,
-        format: compileFormatForPath(input.filePath),
-      });
-      return compiled.toString();
+      const document = parseViewerDocument(source);
+      if (document instanceof Error) throw document;
+      return `export const viewerDocument = ${JSON.stringify(document)};`;
     },
     transformIndexHtml(html) {
       return html.replaceAll(

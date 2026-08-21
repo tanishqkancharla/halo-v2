@@ -18,10 +18,10 @@ Options:
 ## Library
 
 ```ts
-import { startServer, parseFence, compileViewerSource } from "tkstack";
+import { startServer, parseFence, parseViewerDocument } from "tkstack";
 ```
 
-`compileViewerSource` turns markdown or MDX into the page module. `startServer` listens. Halo skills own spec vs walkthrough section order; tkstack does not.
+`parseViewerDocument` turns markdown into the page document with [md4x](https://github.com/unjs/md4x). `startServer` listens. Halo skills own spec vs walkthrough section order; tkstack does not.
 
 ## Fences
 
@@ -35,4 +35,34 @@ import { startServer, parseFence, compileViewerSource } from "tkstack";
 | `html`                                         | Trusted HTML from this file. tkstack does not sanitize it. Only use it for local files you wrote. |
 | other langs                                    | Maui `CodeBlock`                                                                                  |
 
-`.md` compiles as markdown. `.mdx` compiles as MDX.
+Fences keep whitespace. Use them for mermaid, call stacks, and diffs.
+
+## MDC
+
+md4x Comark components map to the same views:
+
+```md
+::mermaid
+flowchart TD
+A --> B
+::
+
+::callstack
+startServer
++└── createViteServer
+::
+
+::diff{path="src/cli.ts"}
+--- a/src/cli.ts
++++ b/src/cli.ts
+::
+
+::file{path="src/cli.ts" start="1" end="20"}
+::
+
+::html
+<aside>Note.</aside>
+::
+```
+
+`.md` and `.mdx` are both markdown. Curly braces in prose are plain text.

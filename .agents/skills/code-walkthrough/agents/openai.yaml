@@ -1,4 +1,4 @@
 interface:
   display_name: "Code Walkthrough"
-  short_description: "Walk through landed code with MDX, diffs, and tkstack"
+  short_description: "Walk through landed code with markdown, diffs, and tkstack"
   default_prompt: "Use $code-walkthrough to explain the changes already made."

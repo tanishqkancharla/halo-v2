@@ -5,10 +5,10 @@ import { resolveFromInvokeCwd } from "./invokeCwd.js";
 import { startServer } from "./serve.js";
 
 Cli.create("tkstack", {
-  description: "Serve a spec or code walkthrough markdown file as a local page",
+  description: "Serve a spec or code walkthrough as a local page",
   version: "0.1.0",
   args: z.object({
-    file: z.string().describe("Path to the markdown or MDX file"),
+    file: z.string().describe("Path to the markdown file"),
   }),
   options: z.object({
     port: z.coerce.number().optional().describe("Port (default 4177)"),

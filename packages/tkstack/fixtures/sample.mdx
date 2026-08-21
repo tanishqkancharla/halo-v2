@@ -11,7 +11,7 @@ flowchart TD
 
 ## Solution
 
-`pnpm exec tkstack` compiles the MDX and serves a Maui page. Done stops the server.
+`pnpm exec tkstack` parses the markdown with md4x and serves a Maui page. Done stops the server.
 
 ```mermaid
 flowchart TD
@@ -61,3 +61,6 @@ flowchart TD
   fence is trusted local content. tkstack does not sanitize it.
 </aside>
 ```
+
+::file{path="src/cli.ts" start="1" end="8"}
+::

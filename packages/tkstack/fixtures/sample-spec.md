@@ -33,7 +33,7 @@ Specs lived as markdown files with no local page, so mermaid, call stacks, and d
 
 ### Phase 1: Serve the spec file
 
-The CLI already compiles markdown. Point it at a spec path.
+The CLI already parses markdown. Point it at a spec path.
 
 #### Important types
 
@@ -67,4 +67,4 @@ type StartServerInput = {
 - [ ] Add a `pnpm spec` alias that runs the same CLI.
 - [ ] Teach generate-spec-v2 to serve `specs/<name>.md` after writing it.
 - [ ] Smoke that mermaid and diffs render. Do not commit this check until the feature is package-level end-to-end testable.
-- [ ] Run `pnpm --filter tkstack test`.
+- [ ] Run `pnpm --filter tkstack typecheck`.

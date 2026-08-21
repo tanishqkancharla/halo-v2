@@ -1,6 +1,6 @@
 ---
 name: code-walkthrough
-description: Write an MDX walkthrough of code that already landed, store it in a temp directory, and serve it with tkstack. Use when the user asks for a walkthrough, explanation, tour, or review of existing changes rather than a plan for new work.
+description: Write a markdown walkthrough of code that already landed, store it in a temp directory, and serve it with tkstack. Use when the user asks for a walkthrough, explanation, tour, or review of existing changes rather than a plan for new work.
 ---
 
 # Walk through landed code
@@ -18,17 +18,17 @@ Do not plan, spec, or phase future work. Read the diff and the current code, the
 
 Use the amount of research the change needs. Do not impose a fixed research process.
 
-## Write the MDX file
+## Write the markdown file
 
-Choose a short kebab-case name. Create a temp directory and write one MDX file there. Do not write walkthroughs into `specs/`.
+Choose a short kebab-case name. Create a temp directory and write one markdown file there. Do not write walkthroughs into `specs/`.
 
 ```sh
 mkdir -p /tmp/code-walkthrough-<name>
 ```
 
-Write `/tmp/code-walkthrough-<name>/walkthrough.mdx`. Use this structure. Interleave chapter prose with Mermaid, call-stack diffs, code diffs, file excerpts, and HTML. Do not dump every artifact into one section at the bottom.
+Write `/tmp/code-walkthrough-<name>/walkthrough.md`. Use this structure. Interleave chapter prose with Mermaid, call-stack diffs, code diffs, file excerpts, and HTML. Do not dump every artifact into one section at the bottom.
 
-````mdx
+````md
 # <Name of the landed change>
 
 ## Problem
@@ -107,7 +107,7 @@ You may also tag the path in the fence info string: `diff:path/to/handler.ts`.
 
 ### HTML
 
-Use JSX HTML in the MDX, or an `html` fence, for callouts, tables, and small diagrams that are not Mermaid. `html` fences are trusted local content. tkstack does not sanitize them. Only use them for files you wrote.
+Use an `html` fence, or write HTML in the markdown, for callouts, tables, and small diagrams that are not Mermaid. HTML from this file is trusted local content. tkstack does not sanitize it. Only use it for files you wrote.
 
 ```html
 <aside>
@@ -132,20 +132,20 @@ See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md). Short c
 | `html` | Trusted HTML from this file. tkstack does not sanitize it. |
 | other langs | Maui `CodeBlock` |
 
-Fenced code is not JSX. `{` inside fences is safe. In prose, write `\{` if you need a literal brace.
+Walkthroughs are markdown. Curly braces in prose are plain text. See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for MDC `::file` / `::html` / `::diff` forms.
 
 ## Serve it
 
-This skill’s CLI is tkstack. After the MDX file exists, run it from the repo root:
+This skill’s CLI is tkstack. After the markdown file exists, run it from the repo root:
 
 ```sh
-pnpm exec tkstack /tmp/code-walkthrough-<name>/walkthrough.mdx
+pnpm exec tkstack /tmp/code-walkthrough-<name>/walkthrough.md
 ```
 
 Halo alias:
 
 ```sh
-pnpm walkthrough /tmp/code-walkthrough-<name>/walkthrough.mdx
+pnpm walkthrough /tmp/code-walkthrough-<name>/walkthrough.md
 ```
 
 Options:
@@ -155,7 +155,7 @@ Options:
 
 The command prints a local URL and keeps running. Open that URL. **Done** in the top right posts `/__tkstack/shutdown` and stops the server.
 
-Tell the user the MDX path and the URL.
+Tell the user the markdown path and the URL.
 
 ## Chapter rules
 
@@ -169,4 +169,4 @@ Tell the user the MDX path and the URL.
 
 ## Final check
 
-Confirm that the MDX lives in a temp directory; Problem and Solution match the landed change; Mermaid appears only where it helps; each code chapter has the types, call stack, and diff that belong to it; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.
+Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; Mermaid appears only where it helps; each code chapter has the types, call stack, and diff that belong to it; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.

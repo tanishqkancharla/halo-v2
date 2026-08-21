@@ -111,7 +111,7 @@ Show a short unified diff of the main edit. Use real file and symbol names, enou
 - [ ] Run the exact command that proves the phase works.
 ````
 
-Specs are markdown, not MDX. Curly braces in prose are plain text. Put angle brackets in inline code or fences so markdown does not treat them as HTML. Fenced code uses the table below.
+Specs are markdown. Curly braces in prose are plain text. Put angle brackets in inline code or fences so markdown does not treat them as HTML. Fenced code uses the table below.
 
 | Fence info string | Viewer |
 | --- | --- |
@@ -123,7 +123,7 @@ Specs are markdown, not MDX. Curly braces in prose are plain text. Put angle bra
 | `ts`, `rust`, and other langs | Maui `CodeBlock` for proposed types and sketches |
 | `html` | Trusted HTML from this spec. tkstack does not sanitize it. Only use it for local files you wrote. |
 
-See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for the fence contract.
+See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for the fence contract and optional MDC `::file` / `::diff` forms.
 
 ## Serve it
 

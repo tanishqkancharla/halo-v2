@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { MDXProvider } from "@mdx-js/react";
 import {
   backgroundColor,
   colors,
@@ -11,9 +10,9 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import Content from "virtual:tkstack";
+import { viewerDocument } from "virtual:tkstack";
+import { ComarkView } from "./ComarkView.tsx";
 import { DoneButton } from "./DoneButton.tsx";
-import { viewerComponents } from "./mdxComponents.tsx";
 
 type ViewerMeta = {
   title: string;
@@ -52,9 +51,7 @@ export function ViewerApp() {
       </header>
       <article className={article}>
         <div className={prose}>
-          <MDXProvider components={viewerComponents}>
-            <Content />
-          </MDXProvider>
+          <ComarkView document={viewerDocument} />
         </div>
       </article>
     </div>

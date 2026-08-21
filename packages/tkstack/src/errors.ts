@@ -14,3 +14,8 @@ export class TkstackMermaidError extends errore.createTaggedError({
   name: "TkstackMermaidError",
   message: "tkstack could not render mermaid",
 }) {}
+
+export class TkstackParseError extends errore.createTaggedError({
+  name: "TkstackParseError",
+  message: "tkstack could not parse markdown",
+}) {}
