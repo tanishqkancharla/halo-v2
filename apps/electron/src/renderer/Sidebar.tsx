@@ -20,7 +20,6 @@ import { style, useStyles } from "purse-styles";
 import { Router, useLocation } from "wouter";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
-import { HaloLogo } from "./HaloLogo.tsx";
 import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
 
 type SidebarProps = {
@@ -28,8 +27,6 @@ type SidebarProps = {
   pluginViews: LoadedPluginView[];
   pluginErrors: PluginLoadError[];
   pluginServers: Record<string, RpcStub<RpcTarget>>;
-  onToggleTheme: () => void;
-  themeLabel: string;
   appInfo?: AppInfo;
 };
 
@@ -38,13 +35,10 @@ export function Sidebar({
   pluginViews,
   pluginErrors,
   pluginServers,
-  onToggleTheme,
-  themeLabel,
   appInfo,
 }: SidebarProps) {
   const sidebar = useStyles(styles.sidebar);
-  const header = useStyles(styles.header);
-  const logo = useStyles(styles.logo);
+  const titleBar = useStyles(styles.titleBar);
   const newButton = useStyles(styles.newButton);
   const newIcon = useStyles(icon("sm"));
   const filesSection = useStyles(styles.filesSection);
@@ -58,12 +52,7 @@ export function Sidebar({
 
   return (
     <nav className={sidebar} aria-label="Sessions">
-      <div className={header}>
-        <HaloLogo className={logo} />
-        <Button variant="quiet" onClick={onToggleTheme}>
-          {themeLabel}
-        </Button>
-      </div>
+      <div className={titleBar} aria-hidden="true" />
       <div className={newSessionPad}>
         <NewSessionButton className={newButton} iconClassName={newIcon} />
       </div>
@@ -183,16 +172,9 @@ const styles = {
     zIndex: 1,
     backgroundColor: `light-dark(${colors.gray[1]}, ${colors.gray[2]})`,
   }),
-  header: style(flex({ align: "center", justify: "between" }), sidebarPadding, {
-    minWidth: 0,
+  titleBar: style({
     minHeight: "42px",
-    paddingLeft: "67px",
-  }),
-  logo: style({
-    display: "block",
-    width: "20px",
-    height: "20px",
-    transform: "translateX(-1px) translateY(-3px)",
+    flexShrink: 0,
   }),
   newButton: style(flex({ align: "center", gap: 3 }), {
     alignSelf: "stretch",
