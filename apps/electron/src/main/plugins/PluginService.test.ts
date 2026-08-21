@@ -900,6 +900,45 @@ describe("PluginService", () => {
   );
 
   pluginTest(
+    "compiles a view that imports maui utils from @tanishqkancharla/maui/src",
+    async ({ workspace, writePlugin }) => {
+      await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "version": 1, "name": "Notes" }
+            }
+          `,
+          "view.tsx": src`
+            import { memoize } from "@tanishqkancharla/maui/src/utils/memoize"
+            import { H1 } from "@halo/plugin-sdk/view"
+
+            const title = memoize(() => "Notes")
+
+            export function Sidebar() {
+              return <H1>{title()}</H1>
+            }
+          `,
+        },
+      });
+
+      const listed = await listPlugins(workspace);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
+        "calendar",
+        "notes",
+      ]);
+      expect(listed.errors).toEqual([]);
+
+      const loaded = loadPluginViews(listed);
+      expect(
+        loaded.views.find((view) => view.id === "notes")?.Sidebar,
+      ).toBeTypeOf("function");
+      expect(loaded.errors).toEqual([]);
+    },
+  );
+
+  pluginTest(
     "keeps a valid plugin when another view fails to compile",
     async ({ workspace, writePlugin }) => {
       await writePlugin({

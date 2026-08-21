@@ -24,6 +24,10 @@ class PackageJsonReadError extends errore.createTaggedError({
   message: "Failed to read package.json for $packageName",
 }) {}
 
+// Plugin view compiles from Halo's maui source (deep `maui/src/*` imports).
+// Copy the package only — not its npm closure — so the compiler can read .ts.
+const pluginCompilerPackages = ["maui"] as const;
+
 /**
  * Copy Vite-external main-process packages (and their runtime closure) into
  * the packaged app so require() resolves after Forge Vite's `.vite`-only pack.
@@ -35,15 +39,13 @@ export async function copyMainProcessExternals(
   for (const packageName of mainProcessExternals) {
     await copyPackageClosure(buildPath, packageName, copied);
   }
+  for (const packageName of pluginCompilerPackages) {
+    if (copied.has(packageName)) continue;
+    await copyPackage(buildPath, packageName);
+  }
 }
 
-async function copyPackageClosure(
-  buildPath: string,
-  packageName: string,
-  copied: Set<string>,
-): Promise<void> {
-  if (copied.has(packageName)) return;
-
+async function copyPackage(buildPath: string, packageName: string) {
   const packageJsonPath = requireFromElectron.resolve(
     `${packageName}/package.json`,
   );
@@ -55,8 +57,20 @@ async function copyPackageClosure(
   );
   await mkdir(path.dirname(destDir), { recursive: true });
   await cp(sourceDir, destDir, { recursive: true, dereference: true });
+}
+
+async function copyPackageClosure(
+  buildPath: string,
+  packageName: string,
+  copied: Set<string>,
+): Promise<void> {
+  if (copied.has(packageName)) return;
+  await copyPackage(buildPath, packageName);
   copied.add(packageName);
 
+  const packageJsonPath = requireFromElectron.resolve(
+    `${packageName}/package.json`,
+  );
   const packageJsonRaw = await readFile(packageJsonPath, "utf8");
   const packageJson = errore.try({
     try: () => {
