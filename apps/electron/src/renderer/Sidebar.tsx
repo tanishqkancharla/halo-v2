@@ -20,6 +20,7 @@ import { style, useStyles } from "purse-styles";
 import { Router, useLocation } from "wouter";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
+import { useInstallAppUpdateMutation } from "./api/ApiProvider.tsx";
 import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
 
 type SidebarProps = {
@@ -106,9 +107,7 @@ export function Sidebar({
       {appInfo !== undefined && (
         <div className={footer} data-testid="app-update-status">
           <div className={versionLabel}>Halo {appInfo.version}</div>
-          <div className={updateLabel}>
-            {formatUpdateStatus(appInfo.update)}
-          </div>
+          <UpdateFooter appInfo={appInfo} labelClassName={updateLabel} />
         </div>
       )}
     </nav>
@@ -131,6 +130,31 @@ function NewSessionButton({
       <Icons.Plus className={iconClassName} aria-hidden="true" />
       New session
     </Button>
+  );
+}
+
+function UpdateFooter({
+  appInfo,
+  labelClassName,
+}: {
+  appInfo: AppInfo;
+  labelClassName: string;
+}) {
+  const install = useInstallAppUpdateMutation();
+  const restartButton = useStyles(styles.restartButton);
+  if (appInfo.update.state === "downloaded") {
+    return (
+      <Button
+        className={restartButton}
+        data-testid="app-update-restart"
+        onClick={() => install.mutate()}
+      >
+        Restart to update
+      </Button>
+    );
+  }
+  return (
+    <div className={labelClassName}>{formatUpdateStatus(appInfo.update)}</div>
   );
 }
 
@@ -177,6 +201,10 @@ const styles = {
     flexShrink: 0,
   }),
   newButton: style(flex({ align: "center", gap: 3 }), {
+    alignSelf: "stretch",
+    width: "100%",
+  }),
+  restartButton: style({
     alignSelf: "stretch",
     width: "100%",
   }),

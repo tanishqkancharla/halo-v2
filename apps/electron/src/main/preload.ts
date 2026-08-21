@@ -2,7 +2,11 @@ import type { LogLevel, LoggerData, LoggerScope } from "@repo/logger";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { ipcRenderer } from "electron";
-import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
+import {
+  LOG_CHANNELS,
+  RPC_CHANNELS,
+  UPDATE_CHANNELS,
+} from "../shared/channels.js";
 
 const windowLoaded = new Promise<void>((resolve) => {
   window.addEventListener("load", () => resolve());
@@ -40,6 +44,12 @@ window.addEventListener("message", (event) => {
 ipcRenderer.on(RPC_CHANNELS.provideRpc, (event) => {
   void windowLoaded.then(() => {
     window.postMessage(RPC_CHANNELS.provideRpc, "*", event.ports);
+  });
+});
+
+ipcRenderer.on(UPDATE_CHANNELS.prompt, () => {
+  void windowLoaded.then(() => {
+    window.postMessage(UPDATE_CHANNELS.prompt, "*");
   });
 });
 

@@ -143,12 +143,21 @@ export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
   });
 }
 
+export const appInfoQueryKey = ["app-info"] as const;
+
 export function useAppInfoQuery() {
   const api = useApi();
   return useQuery({
-    queryKey: ["app-info"],
+    queryKey: appInfoQueryKey,
     queryFn: () => api.getAppInfo(),
     refetchInterval: 5_000,
+  });
+}
+
+export function useInstallAppUpdateMutation() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: () => api.installAppUpdate(),
   });
 }
 

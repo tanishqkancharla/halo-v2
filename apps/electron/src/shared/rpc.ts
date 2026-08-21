@@ -70,6 +70,7 @@ export type WorkspaceTreeEventHandler = (events: WorkspaceTreeEvent[]) => void;
 
 export abstract class HaloApi extends RpcTarget {
   abstract getAppInfo(): AppInfo;
+  abstract installAppUpdate(): void;
   abstract getWorkspace(): WorkspaceInfo | undefined;
   abstract chooseWorkspace(): Promise<WorkspaceInfo | undefined>;
   abstract listSessions(): Promise<SessionSummary[]>;

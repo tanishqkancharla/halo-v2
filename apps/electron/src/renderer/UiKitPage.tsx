@@ -1,4 +1,6 @@
+import { useState } from "react";
 import {
+  Button,
   H2,
   H3,
   P,
@@ -13,6 +15,7 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Filesystem, mockWorkspacePaths } from "./patterns/Filesystem.tsx";
+import { UpdateReadyDialog } from "./UpdateReadyDialog.tsx";
 
 export function UiKitPage() {
   const pane = useStyles(styles.pane);
@@ -20,6 +23,7 @@ export function UiKitPage() {
   const header = useStyles(styles.header);
   const title = useStyles(styles.title);
   const preview = useStyles(styles.preview);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
 
   return (
     <main className={pane} aria-label="UI kit">
@@ -28,6 +32,25 @@ export function UiKitPage() {
           <div className={title}>UI kit</div>
         </header>
         <Prose>
+          <H2>Update prompt</H2>
+          <P>
+            After an update downloads, Halo asks to restart. Later dismisses the
+            prompt; Restart to update in the sidebar installs it.
+          </P>
+          <H3>Example</H3>
+          <Button
+            data-testid="uikit-show-update-prompt"
+            onClick={() => setUpdateDialogOpen(true)}
+          >
+            Show update prompt
+          </Button>
+          {updateDialogOpen ? (
+            <UpdateReadyDialog
+              version="0.1.17"
+              onLater={() => setUpdateDialogOpen(false)}
+              onUpdate={() => setUpdateDialogOpen(false)}
+            />
+          ) : undefined}
           <H2>Filesystem</H2>
           <P>
             Workspace tree styled like sidebar session rows. The gallery uses
