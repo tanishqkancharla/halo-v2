@@ -80,10 +80,13 @@ export function MainPane({
 
 function MissingPlugin({ pluginId }: { pluginId: string }) {
   const pane = useStyles(styles.pane);
-  const content = useStyles(styles.content);
+  const body = useStyles(styles.body, styles.bodyTop);
+  const column = useStyles(styles.column);
   return (
     <main className={pane} aria-label={pluginId}>
-      <div className={content}>Plugin '{pluginId}' has no Routes</div>
+      <div className={body}>
+        <div className={column}>Plugin '{pluginId}' has no Routes</div>
+      </div>
     </main>
   );
 }
@@ -96,7 +99,8 @@ function SavedPane({
   sessions: SessionSummary[];
 }) {
   const pane = useStyles(styles.pane);
-  const content = useStyles(styles.content);
+  const body = useStyles(styles.body);
+  const column = useStyles(styles.column);
   const { state, isWorking, prompt } = useAgentSession(sessionId);
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
@@ -106,9 +110,11 @@ function SavedPane({
   return (
     <main className={pane} aria-label={title}>
       <ThreadHeader title={title} />
-      <div className={content}>
-        <SessionView state={state} isWorking={isWorking} />
-        <Composer key={sessionId} error={state.error} onSubmit={prompt} />
+      <div className={body}>
+        <div className={column}>
+          <SessionView state={state} isWorking={isWorking} />
+          <Composer key={sessionId} error={state.error} onSubmit={prompt} />
+        </div>
       </div>
     </main>
   );
@@ -120,17 +126,20 @@ function DraftPane({ draftId }: { draftId: string }) {
     navigate(`/sessions/${sessionId}`);
   });
   const pane = useStyles(styles.pane);
-  const content = useStyles(styles.content);
+  const body = useStyles(styles.body, styles.bodyTop);
+  const column = useStyles(styles.column);
   const hasMessages = sessionViewItems(state).length > 0;
 
   return (
     <main className={pane} aria-label="New session" data-draft-id={draftId}>
       <ThreadHeader />
-      <div className={content}>
-        {hasMessages ? (
-          <SessionView state={state} isWorking={isWorking} />
-        ) : undefined}
-        <Composer key={draftId} error={state.error} onSubmit={prompt} />
+      <div className={body}>
+        <div className={column}>
+          {hasMessages ? (
+            <SessionView state={state} isWorking={isWorking} />
+          ) : undefined}
+          <Composer key={draftId} error={state.error} onSubmit={prompt} />
+        </div>
       </div>
     </main>
   );
@@ -275,19 +284,26 @@ function SessionViewRow({ item }: { item: SessionViewItem }) {
 }
 
 const styles = {
-  pane: style(
+  pane: style(flex({ direction: "column" }), {
+    width: "100%",
+    marginInline: "auto",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
+    backgroundColor: backgroundColor.app,
+  }),
+  body: style(
     flex({ direction: "column" }),
-    spacing.padding({ x: 12, y: 12 }),
+    spacing.padding({ x: 12, bottom: 12 }),
     {
+      flex: "1 1 auto",
       width: "100%",
-      marginInline: "auto",
       minWidth: 0,
       minHeight: 0,
-      overflow: "hidden",
-      backgroundColor: backgroundColor.app,
     },
   ),
-  content: style(flex({ direction: "column" }), {
+  bodyTop: style(spacing.padding({ top: 12 })),
+  column: style(flex({ direction: "column" }), {
     flex: "1 1 auto",
     width: "100%",
     maxWidth: "72ch",
@@ -308,6 +324,7 @@ const styles = {
       scrollbarWidth: "none",
       // overflow-y: auto clips child box-shadows; padding keeps the 1px ring inside the scrollport.
       paddingInline: spacing.value(2),
+      paddingTop: spacing.value(12),
       paddingBottom: spacing.value(6),
       "&::-webkit-scrollbar": { display: "none" },
     },

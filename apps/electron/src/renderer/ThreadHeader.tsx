@@ -15,7 +15,7 @@ export function ThreadHeader({ title }: { title?: string }) {
 const headerClass = style(
   flexItem({ size: "hug" }),
   border(["bottom"], "border"),
-  spacing.padding({ bottom: 3 }),
+  spacing.padding({ x: 12, top: 6, bottom: 12 }),
   {
     minWidth: 0,
     alignSelf: "stretch",
