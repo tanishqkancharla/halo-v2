@@ -45,10 +45,17 @@ function useFileExcerpt(input: { path: string; start: number; end: number }) {
       end: String(input.end),
     });
     void fetch(`/__tkstack/file?${params.toString()}`)
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) return undefined;
+        return response.json();
+      })
       .then((value) => {
+        if (value === undefined) return;
         // SAFETY: the tkstack CLI serves FileExcerpt JSON for this route.
         setExcerpt(value as FileExcerptPayload);
+      })
+      .catch((cause) => {
+        console.warn("tkstack file excerpt failed", cause);
       });
   }, [input.path, input.start, input.end]);
   return excerpt;
