@@ -81,7 +81,7 @@ jiti goes away. The host compiles the server the same way it already compiles th
 - A plugin server default-exports a class. It does not extend `RpcTarget`. The constructor takes `{ pluginId, workspaceRoot }`.
 - `usePluginServer` is a proxy: `server.monthLabel()` becomes `call({ pluginId, method: "monthLabel", args: [] })`.
 - If a server method returns an `Error`, the host fails the oRPC call. The renderer sees a rejected promise.
-- Electron production uses `utilityProcess.fork`. Vitest uses `node:worker_threads` `Worker`. Both upgrade a MessagePort with `@orpc/server/message-port`.
+- Electron uses `utilityProcess.fork`. The child upgrades a MessagePort with `@orpc/server/message-port`.
 - Plugin code is trusted workspace code.
 
 ## Important files, docs, and websites
@@ -103,7 +103,6 @@ jiti goes away. The host compiles the server the same way it already compiles th
 - [`specs/plugin-system.md`](plugin-system.md) — shipped plugin format.
 - [oRPC Message Port adapter](https://orpc.dev/docs/adapters/message-port)
 - [oRPC Electron adapter](https://orpc.dev/docs/adapters/electron)
-- [oRPC worker threads](https://orpc.dev/docs/adapters/worker-threads)
 - [Electron `utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process)
 
 ## Implementation
@@ -202,7 +201,6 @@ export const RPC_CHANNELS = {
 
 - [x] Add `extensionHostMain.ts` and a Vite/Forge entry that emits `extensionHost.cjs`. Fork it from `main.ts` after `app.whenReady`.
 - [x] Add channels, preload forward, and `connectExtensionHostRpc`. Call `ping` once from `ApiProvider` when the workspace is ready.
-- [x] In Vitest, spawn the same entry with `new Worker(...)`. Do not use `utilityProcess` in Vitest.
 - [x] Smoke: Halo still opens and Calendar still mounts on the old path. Do not commit this check.
 - [x] Run `pnpm --filter @halo/desktop test src/main/plugins/extensionHostRouter.test.ts`.
 
