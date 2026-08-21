@@ -146,10 +146,10 @@ export function createExtensionHostRouter(): ExtensionHostRouter;
 +}
 ```
 
-- [ ] Add `@orpc/server` and `@orpc/client`. Export `createExtensionHostRouter` with `ping`.
-- [ ] Add `extensionHostRouter.test.ts`: `MessageChannel`, `RPCHandler` on one port, `RPCLink.ping` on the other.
-- [ ] Smoke: existing Cap'n Web calendar ping still passes. Do not commit that as a new test.
-- [ ] Run `pnpm --filter @halo/desktop test src/main/plugins/extensionHostRouter.test.ts`.
+- [x] Add `@orpc/server` and `@orpc/client`. Export `createExtensionHostRouter` with `ping`.
+- [x] Add `extensionHostRouter.test.ts`: `MessageChannel`, `RPCHandler` on one port, `RPCLink.ping` on the other.
+- [x] Smoke: existing Cap'n Web calendar ping still passes. Do not commit that as a new test.
+- [x] Run `pnpm --filter @halo/desktop test src/main/plugins/extensionHostRouter.test.ts`.
 
 ### Phase 2: Extension Host process and renderer port
 
@@ -275,7 +275,7 @@ type ExtensionHostRouter = {
 
  // packages/plugin-sdk/src/view.ts
 -export function usePluginServer<S extends RpcTarget>(): RpcStub<S> {
-+export function usePluginServer<S extends object>(): S {
++export function usePluginServer<S>(): S {
 ```
 
 - [ ] Host `reload` compiles each `serverPath` with esbuild (`platform: "node"`) and instantiates the default export. Reflect methods the way `wrapPluginRpc` does. No `RpcTarget`.
