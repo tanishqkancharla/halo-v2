@@ -5,11 +5,11 @@
 ```mermaid
 flowchart TD
   subgraph today [Today]
-    Disk1[".halo/plugins/id"] --> Main1["Electron main PluginService"]
-    Main1 --> Jiti1["jiti RpcTarget in main"]
-    Main1 --> Esbuild1["esbuild view"]
-    Esbuild1 --> Rend1["Renderer evaluate Sidebar/Routes"]
-    Jiti1 --> Capn["HaloApi.getPlugin Cap'n Web"]
+    Disk1[".halo/plugins/id"] --> Main1["Electron main"]
+    Main1 --> Jiti["jiti server.ts"]
+    Main1 --> Esbuild1["esbuild view.tsx"]
+    Esbuild1 --> Rend1["Renderer eval"]
+    Jiti --> Capn["HaloApi.getPlugin"]
     Rend1 --> Capn
   end
 ```
@@ -17,15 +17,14 @@ flowchart TD
 ```mermaid
 flowchart TD
   subgraph next [This spec]
-    Disk2[".halo/plugins/id"] --> Main2["Electron main: scan + compile view"]
-    Main2 --> Host["Extension Host process"]
-    Host --> Jiti2["jiti server class"]
-    Host --> Store["JSON collection files"]
-    Main2 --> Rend2["Renderer: one React tree"]
-    Rend2 -->|"oRPC MessagePort"| Host
-    Rend2 --> Maui["Host widgets + useQuery"]
-    Store --> Files["workspace .halo/plugins/id/state"]
-    Agent["Pi agent"] --> Files
+    Disk2[".halo/plugins/id"] --> Host["Extension Host process"]
+    Host --> EsbuildS["esbuild server.ts Node"]
+    Host --> EsbuildV["esbuild view.tsx browser"]
+    EsbuildS --> Server["plugin class"]
+    Main2["Electron main"] -->|"spawn + MessagePort"| Host
+    Rend2["Renderer: one React tree"] -->|"oRPC"| Server
+    EsbuildV --> Rend2
+    Rend2 --> Maui["Halo Maui slots"]
   end
 ```
 
@@ -34,94 +33,89 @@ sequenceDiagram
   participant UI as Renderer
   participant Main as Electron main
   participant Host as Extension Host
-  participant Disk as Plugin state files
 
-  UI->>Main: listPlugins
-  Main->>Main: compile views
-  Main->>Host: reload plugins
-  Host->>Host: jiti server.ts
-  UI->>Host: subscribe query events
-  Host->>Disk: read events.json
-  Host-->>UI: rows
-  UI->>Host: call calendar.createEvent
-  Host->>Disk: write events.json
-  Host-->>UI: query patch
+  Main->>Host: fork utilityProcess
+  UI->>Host: reload workspaceRoot
+  Host->>Host: esbuild server + view
+  Host-->>UI: manifests + view source
+  UI->>UI: eval Sidebar / Routes in Halo React
+  UI->>Host: call calendar.monthLabel
+  Host-->>UI: "August 2026"
 ```
 
 ## Problem overview
 
-Plugin servers load inside Electron main and speak Cap'n Web on the same port as `HaloApi`. A bad plugin can take down the app. Plugin state is whatever the server keeps in memory. The seeded calendar has no events, no store, and no way for the agent and the UI to share a list. The next plugins are meant to be small apps: a server, workspace state, and a view that stays on Halo's widgets.
+Plugin servers run inside Electron main and share Cap'n Web with `HaloApi`. A bad plugin can take down the app. Views compile in main and evaluate in the renderer as a second pipeline, with jiti for TypeScript servers. That split is accidental, not a design. The next step is a VS Code-style host: the plugin is one program, the window is slots.
 
 ## Solution overview
 
-Spawn one Extension Host process, independent of the renderer and of Electron main, the way VS Code isolates its extension host. Load every plugin server there. Talk to that process with oRPC over a MessagePort. Keep Cap'n Web on `HaloApi` for sessions and workspace. Give each plugin a file-backed collection store in its folder so the UI can `useQuery` and the agent can read the same JSON. Prove it with calendar: create an event, see it in the sidebar, keep the month route.
+Spawn one Extension Host process. That process owns the plugin: it esbuilds `server.ts` for Node and `view.tsx` for the browser, instantiates the server class, and speaks oRPC. The renderer still paints `Sidebar` / `Routes` in Halo's React tree (shared Maui, no webview). Electron main only forks the host and hands over a MessagePort. Cap'n Web stays on `HaloApi`. No schema, store, or Tandem in this work.
+
+The VS Code move we copy is **ownership**: the workbench does not load plugin JS except to eval a host-compiled view bundle into existing slots. The move we do not copy is **webviews**. A Halo sidebar is Maui in the app shell, not an iframe the server fills with HTML.
+
+jiti goes away. The host compiles the server the same way it already compiles the view.
 
 ## Goals
 
-- Plugin JavaScript for servers does not run in Electron main or in the renderer.
-- One Extension Host child process loads all plugin servers. If it crashes, the Halo window stays up.
+- Plugin server JS does not run in Electron main.
+- One Extension Host child process loads every plugin. If it crashes, the window stays up.
 - Plugin RPC is oRPC. `usePluginServer` is an oRPC client, not a Cap'n Web stub.
-- Each plugin may declare collections. Rows live as JSON under `{workspace}/.halo/plugins/<id>/state/`. Queries subscribe. Writes are visible to the agent as files.
-- Plugin views still evaluate in Halo's React tree and may only use `@halo/plugin-sdk/view` widgets plus `useQuery` / `usePluginServer`.
-- Seeded calendar has `schema.ts`, `server.ts` with `createEvent`, and a sidebar that lists events from the store.
+- The host compiles both `server.ts` and `view.tsx`. Main does not jiti and does not esbuild plugin views.
+- Seeded calendar keeps its month view and gains a `server.ts` that the view calls (for example `monthLabel`).
 
 ## Non-goals
 
 - No migrations or backfills.
-- No replacing Cap'n Web on `HaloApi` or `AgentSessionApi`. That is a later spec.
-- No one-process-per-plugin. One host, like VS Code's local extension host.
-- No React Server Components, no custom reconciler, no native/mobile map.
-- No Google Calendar, OAuth, or other network calendars.
-- No Tandem/InstantDB dependency. The store API is small enough to sit on Tandem later.
-- No plugin file watch for source edits. Reload the window to pick up `view.tsx` / `server.ts` changes. State file watches are for live queries only.
-- No HTTP listener and no extra oRPC port on localhost.
-- No rewrite of [`specs/plugin-host-runtime.md`](plugin-host-runtime.md). View compile stays in the workbench. If that spec lands first, the host runs `npm install` before jiti, not Electron main.
+- No replacing Cap'n Web on `HaloApi` or `AgentSessionApi`.
+- No one-process-per-plugin.
+- No React Server Components, webviews, custom reconciler, or native/mobile map.
+- No Tandem, InstantDB, `collection()`, `useQuery`, or plugin state files.
+- No Google Calendar or OAuth.
+- No plugin source file watch. Reload the window to pick up edits.
+- No HTTP listener.
+- No rewrite of [`specs/plugin-host-runtime.md`](plugin-host-runtime.md). If that spec lands first, the host runs `npm install` before esbuild.
 
 ## Assumptions
 
-- Plugin id stays the folder name.
-- A plugin server default-exports a class. It does not extend `RpcTarget`. The constructor still takes `PluginServerContext`.
-- `usePluginServer` is a proxy: `server.createEvent(args)` becomes oRPC `call({ pluginId, method: "createEvent", args: [args] })`.
-- If a server method returns an `Error`, the host turns it into an oRPC failure. The renderer sees a rejected promise, same as today's Cap'n Web edge.
-- Collection `where` supports equality and `{ gte, lt }` on numbers. No joins in v1.
-- Electron production uses `utilityProcess.fork`. Vitest uses `node:worker_threads` `Worker` with the same host entry. Both upgrade a MessagePort with `@orpc/server/message-port`.
+- Plugin id stays the folder name. Layout stays `view.tsx` + `server.ts`. They stay two files because one targets the browser and one targets Node. Both load in the host.
+- A plugin server default-exports a class. It does not extend `RpcTarget`. The constructor takes `{ pluginId, workspaceRoot }`.
+- `usePluginServer` is a proxy: `server.monthLabel()` becomes `call({ pluginId, method: "monthLabel", args: [] })`.
+- If a server method returns an `Error`, the host fails the oRPC call. The renderer sees a rejected promise.
+- Electron production uses `utilityProcess.fork`. Vitest uses `node:worker_threads` `Worker`. Both upgrade a MessagePort with `@orpc/server/message-port`.
 - Plugin code is trusted workspace code.
 
 ## Important files, docs, and websites
 
-- [`apps/electron/src/main/plugins/PluginService.ts`](../apps/electron/src/main/plugins/PluginService.ts) — today's list/compile/jiti in main. Stops loading servers.
-- [`apps/electron/src/main/plugins/loadPluginServer.ts`](../apps/electron/src/main/plugins/loadPluginServer.ts) — moves into the host.
-- [`apps/electron/src/main/plugins/PluginService.test.ts`](../apps/electron/src/main/plugins/PluginService.test.ts) — package-level tests; replace the Cap'n Web ping case.
-- [`apps/electron/src/main/rpc.ts`](../apps/electron/src/main/rpc.ts) — drop `getPlugin`.
+- [`apps/electron/src/main/plugins/PluginService.ts`](../apps/electron/src/main/plugins/PluginService.ts) — today's list/compile/jiti in main. Becomes a thin scan or a pass-through to the host.
+- [`apps/electron/src/main/plugins/loadPluginServer.ts`](../apps/electron/src/main/plugins/loadPluginServer.ts) — delete with jiti.
+- [`apps/electron/src/main/plugins/compilePluginView.ts`](../apps/electron/src/main/plugins/compilePluginView.ts) — moves into the host; add a Node compile for `server.ts`.
+- [`apps/electron/src/main/plugins/PluginService.test.ts`](../apps/electron/src/main/plugins/PluginService.test.ts) — replace the Cap'n Web ping case with oRPC.
+- [`apps/electron/src/main/rpc.ts`](../apps/electron/src/main/rpc.ts) — drop `getPlugin`. `listPlugins` may proxy the host.
 - [`apps/electron/src/shared/rpc.ts`](../apps/electron/src/shared/rpc.ts) — `HaloApi.getPlugin` goes away.
-- [`apps/electron/src/shared/channels.ts`](../apps/electron/src/shared/channels.ts) — add host port channels next to `halo:request-rpc`.
-- [`apps/electron/src/main/main.ts`](../apps/electron/src/main/main.ts) — spawn the host, broker the renderer MessagePort.
-- [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — forward the host port, same pattern as HaloApi.
-- [`apps/electron/src/renderer/api/ApiProvider.tsx`](../apps/electron/src/renderer/api/ApiProvider.tsx) — stop `api.getPlugin`; hold an oRPC client.
+- [`apps/electron/src/shared/channels.ts`](../apps/electron/src/shared/channels.ts) — host port channels.
+- [`apps/electron/src/main/main.ts`](../apps/electron/src/main/main.ts) — spawn the host, broker the renderer port.
+- [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — forward the host port.
+- [`apps/electron/src/renderer/api/ApiProvider.tsx`](../apps/electron/src/renderer/api/ApiProvider.tsx) — oRPC client instead of `api.getPlugin`.
 - [`packages/plugin-sdk/src/server.ts`](../packages/plugin-sdk/src/server.ts) — drop `RpcTarget`.
-- [`packages/plugin-sdk/src/view.ts`](../packages/plugin-sdk/src/view.ts) — `usePluginServer` + `useQuery`.
-- [`packages/plugin-sdk/src/schema.ts`](../packages/plugin-sdk/src/schema.ts) — add `collection`.
-- [`apps/electron/src/main/bundled/calendar/`](../apps/electron/src/main/bundled/calendar/) — seed schema, server, live sidebar.
+- [`packages/plugin-sdk/src/view.ts`](../packages/plugin-sdk/src/view.ts) — `usePluginServer` over oRPC.
+- [`apps/electron/src/main/bundled/calendar/`](../apps/electron/src/main/bundled/calendar/) — add `server.ts`; view calls it.
 - [`apps/electron/src/main/plugins/haloPluginSkill.md`](../apps/electron/src/main/plugins/haloPluginSkill.md) — author contract.
-- [`specs/plugin-system.md`](plugin-system.md) — shipped plugin format this spec extends.
-- [oRPC Message Port adapter](https://orpc.dev/docs/adapters/message-port) — `RPCHandler.upgrade(port)` / `RPCLink({ port })`.
-- [oRPC Electron adapter](https://orpc.dev/docs/adapters/electron) — preload forwards a transferred port.
-- [oRPC event iterator](https://orpc.dev/docs/event-iterator) — live query stream.
-- [oRPC worker threads](https://orpc.dev/docs/adapters/worker-threads) — same MessagePort pattern Vitest will use.
-- [Electron `utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process) — child process with MessagePort, not `worker_threads` in production.
+- [`specs/plugin-system.md`](plugin-system.md) — shipped plugin format.
+- [oRPC Message Port adapter](https://orpc.dev/docs/adapters/message-port)
+- [oRPC Electron adapter](https://orpc.dev/docs/adapters/electron)
+- [oRPC worker threads](https://orpc.dev/docs/adapters/worker-threads)
+- [Electron `utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process)
 
 ## Implementation
 
 ### Phase 1: oRPC host router with ping
 
-Add `@orpc/server` and `@orpc/client` to `@halo/desktop`. Put `createExtensionHostRouter` in main-process code. A MessagePort client can call `ping`. No Electron spawn yet. Calendar and Cap'n Web plugins stay as they are.
+Add `@orpc/server` and `@orpc/client` to `@halo/desktop`. `createExtensionHostRouter` answers `ping`. No Electron spawn. Calendar still uses Cap'n Web.
 
 #### Important types
 
 ```ts
 // apps/electron/src/main/plugins/extensionHostRouter.ts
-import { os } from "@orpc/server";
-
 export type ExtensionHostRouter = {
   ping: { output: { ok: true } };
 };
@@ -134,7 +128,7 @@ export function createExtensionHostRouter(): ExtensionHostRouter;
 ```diff
  (none — new module)
 +createExtensionHostRouter
-+└── os.handler ping → { ok: true }
++└── ping → { ok: true }
 +RPCHandler.upgrade(MessagePort)
 +RPCLink({ port }).ping()
 ```
@@ -152,14 +146,14 @@ export function createExtensionHostRouter(): ExtensionHostRouter;
 +}
 ```
 
-- [ ] Add `@orpc/server` and `@orpc/client` to `@halo/desktop`. Export `createExtensionHostRouter` with `ping`.
-- [ ] Add `apps/electron/src/main/plugins/extensionHostRouter.test.ts` that opens a `MessageChannel`, upgrades one port with `RPCHandler`, and calls `ping` through `RPCLink`.
-- [ ] Smoke: the existing Cap'n Web calendar ping test still passes. Do not commit this check as a new assertion on Cap'n Web.
+- [ ] Add `@orpc/server` and `@orpc/client`. Export `createExtensionHostRouter` with `ping`.
+- [ ] Add `extensionHostRouter.test.ts`: `MessageChannel`, `RPCHandler` on one port, `RPCLink.ping` on the other.
+- [ ] Smoke: existing Cap'n Web calendar ping still passes. Do not commit that as a new test.
 - [ ] Run `pnpm --filter @halo/desktop test src/main/plugins/extensionHostRouter.test.ts`.
 
-### Phase 2: Extension Host process and renderer oRPC port
+### Phase 2: Extension Host process and renderer port
 
-Run the router in a child process. Electron main forks it with `utilityProcess`. The renderer asks preload for a host port, same as `halo:request-rpc`. Add a Forge/Vite entry so the host file ships next to `main.cjs`. Do not move plugin servers yet. `ping` from the renderer is enough.
+Run the router in a child process. Main forks `utilityProcess`. The renderer asks preload for a host port, same pattern as `halo:request-rpc`. Forge/Vite emits `extensionHost.cjs`. Do not load plugins yet. `ping` from the renderer is enough.
 
 #### Important types
 
@@ -171,9 +165,6 @@ export const RPC_CHANNELS = {
   requestExtensionHost: "halo:request-extension-host",
   provideExtensionHost: "halo:provide-extension-host",
 } as const;
-
-// apps/electron/src/main/plugins/extensionHostMain.ts
-// listens on parent port, RPCHandler.upgrade(received MessagePort)
 ```
 
 #### Call stack diff
@@ -183,38 +174,41 @@ export const RPC_CHANNELS = {
  └── halo:request-rpc → HaloRpc Cap'n Web
 +main.ts startExtensionHost
 +└── utilityProcess.fork(extensionHost.cjs)
-+registerExtensionHostBridge
-+└── halo:request-extension-host
-+    └── transfer MessagePort to the child
-+preload
-+└── forward provideExtensionHost to window
-+renderer connectExtensionHostRpc
-+└── RPCLink ping
++halo:request-extension-host
++└── transfer MessagePort to the child
++preload → window provideExtensionHost
++renderer connectExtensionHostRpc → ping
 ```
 
 #### Code diff preview
 
 ```diff
  // apps/electron/src/main/main.ts
-+const extensionHost = utilityProcess.fork(join(currentDirectory, "extensionHost.cjs"));
++const extensionHost = utilityProcess.fork(
++  join(currentDirectory, "extensionHost.cjs"),
++);
 +
 +ipcMain.on(RPC_CHANNELS.requestExtensionHost, (event) => {
 +  assertTrustedSender(event);
 +  const { port1, port2 } = new MessageChannelMain();
 +  extensionHost.postMessage("orpc", [port1]);
-+  event.senderFrame.postMessage(RPC_CHANNELS.provideExtensionHost, null, [port2]);
++  event.senderFrame.postMessage(
++    RPC_CHANNELS.provideExtensionHost,
++    null,
++    [port2],
++  );
 +});
 ```
 
 - [ ] Add `extensionHostMain.ts` and a Vite/Forge entry that emits `extensionHost.cjs`. Fork it from `main.ts` after `app.whenReady`.
-- [ ] Add channels, preload forward, and `connectExtensionHostRpc` in the renderer. Call `ping` once from `ApiProvider` when the workspace is ready so a missing host fails early.
-- [ ] In Vitest, spawn the same entry with `new Worker(...)` and the worker-threads adapter. Do not use `utilityProcess` in Vitest.
-- [ ] Smoke: Halo still opens and Calendar still mounts (old Cap'n Web path). Do not commit this check.
+- [ ] Add channels, preload forward, and `connectExtensionHostRpc`. Call `ping` once from `ApiProvider` when the workspace is ready.
+- [ ] In Vitest, spawn the same entry with `new Worker(...)`. Do not use `utilityProcess` in Vitest.
+- [ ] Smoke: Halo still opens and Calendar still mounts on the old path. Do not commit this check.
 - [ ] Run `pnpm --filter @halo/desktop test src/main/plugins/extensionHostRouter.test.ts`.
 
-### Phase 3: Load plugin servers in the host
+### Phase 3: Host loads servers over oRPC, drop jiti
 
-Move `loadPluginServer` into the host. `PluginService.list` still scans and compiles views. It no longer jiti-imports servers. `HaloApi.getPlugin` goes away. The renderer calls oRPC `call`. `usePluginServer` is a proxy over that. Drop `RpcTarget` from `@halo/plugin-sdk/server`.
+The host esbuilds `server.ts` to Node CJS and instantiates the class. `HaloApi.getPlugin` goes away. `usePluginServer` is a proxy over `call`. Delete `loadPluginServer.ts` and the jiti dependency if nothing else imports it.
 
 #### Important types
 
@@ -250,188 +244,120 @@ type ExtensionHostRouter = {
  PluginService.list
  ├── readPluginManifest
  ├── compilePluginView
--└── loadPluginServer → wrapPluginRpc → this.servers[id]
-+└── (views only)
+-└── loadPluginServer jiti → wrapPluginRpc
++└── (views still in main this phase)
 
- HaloRpc
--└── getPlugin(id) → RpcTarget
-+└── listPlugins → compiled views
-+    └── extensionHost.reload({ workspaceRoot, plugins })
+ HaloRpc.getPlugin
+-└── RpcTarget on Cap'n Web
++extensionHost.reload
++└── esbuild server.ts (platform node)
++    └── instantiate class
++extensionHost.call({ pluginId, method, args })
 
  usePluginsQuery
--└── api.getPlugin(id) Cap'n Web stub
-+└── extensionHost client (one RPCLink)
-     └── usePluginServer → call({ pluginId, method, args })
+-└── api.getPlugin(id)
++└── oRPC client.usePluginServer → call
 ```
 
 #### Code diff preview
 
 ```diff
- // apps/electron/src/main/plugins/PluginService.ts
--      if (manifest.serverPath !== undefined) {
--        const server = await loadPluginServer({ ... });
--        this.servers[id] = wrapPluginRpc(server);
--      }
+ // apps/electron/src/main/plugins/compilePluginServer.ts
++await esbuild.build({
++  absWorkingDir: directory,
++  entryPoints: [serverPath],
++  bundle: true,
++  write: false,
++  format: "cjs",
++  platform: "node",
++  external: ["@halo/plugin-sdk/server", "@halo/plugin-sdk/schema"],
++});
 
  // packages/plugin-sdk/src/view.ts
 -export function usePluginServer<S extends RpcTarget>(): RpcStub<S> {
--  return runtime.server as RpcStub<S>;
 +export function usePluginServer<S extends object>(): S {
-+  return runtime.call as S;
- }
 ```
 
-- [ ] Host `reload` loads each `serverPath` with the existing jiti helper. Reflect prototype methods the way `wrapPluginRpc` does. No `RpcTarget` `instanceof`.
-- [ ] `call` runs `server[method](...args)`. If the result is `instanceof Error`, throw at this oRPC edge.
-- [ ] `PluginService.list` returns manifests and compiled views only. `HaloRpc.getPlugin` and `HaloApi.getPlugin` are deleted. `usePluginsQuery` does not fetch per-plugin Cap'n Web stubs.
-- [ ] Rewrite the Cap'n Web ping test to oRPC `call` for `ping` / `fail` and a missing plugin id. Keep listing tests on `PluginService.list`.
+- [ ] Host `reload` compiles each `serverPath` with esbuild (`platform: "node"`) and instantiates the default export. Reflect methods the way `wrapPluginRpc` does. No `RpcTarget`.
+- [ ] `call` runs `server[method](...args)`. If the result is `instanceof Error`, fail the oRPC call.
+- [ ] Delete `getPlugin` from `HaloApi` / `HaloRpc`. Delete `loadPluginServer.ts`. Remove `jiti` from `@halo/desktop` if unused.
+- [ ] Rewrite the Cap'n Web ping test to oRPC `call` for `ping` / `fail` and a missing plugin id.
 - [ ] Run `pnpm --filter @halo/desktop test src/main/plugins/PluginService.test.ts src/main/plugins/extensionHostRouter.test.ts`.
 
-### Phase 4: File-backed collections
+### Phase 4: Host compiles views
 
-Add `collection` to `@halo/plugin-sdk/schema`. The host opens `{pluginDir}/state/<collection>.json` as an array of rows. `insert` / `query` / `subscribe` are oRPC procedures. `PluginServerContext` includes a `db` the server uses. No extra database package.
+Move `compilePluginView` into the host. `reload` returns manifests, compiled view sources, and load errors. Main no longer esbuilds plugin views. The renderer still evaluates CJS in Halo's React tree.
 
 #### Important types
 
 ```ts
-// packages/plugin-sdk/src/schema.ts
-export type Collection<N extends string, Row> = {
-  name: N;
-  fields: TSchema;
+type ExtensionHostReloadResult = {
+  plugins: PluginManifest[];
+  compiledViews: CompiledPluginView[];
+  errors: PluginLoadError[];
 };
 
-export function collection<N extends string, S extends TSchema>(args: {
-  name: N;
-  fields: S;
-}): Collection<N, Static<S>>;
-
-// query input
-type CollectionQuery = {
-  pluginId: string;
-  collection: string;
-  where?: Record<string, unknown | { gte?: number; lt?: number }>;
-  orderBy?: { field: string; direction: "asc" | "desc" };
+type ExtensionHostRouter = {
+  ping: { output: { ok: true } };
+  reload: {
+    input: { workspaceRoot: string };
+    output: ExtensionHostReloadResult;
+  };
+  call: { input: PluginCallInput; output: unknown };
 };
 ```
 
 #### Call stack diff
 
 ```diff
- extensionHostRouter.call
-+extensionHostRouter.query
-+extensionHostRouter.insert
-+extensionHostRouter.subscribe  // async generator, event iterator
-     └── PluginStore
-         ├── read pluginDir/state/<name>.json
-         ├── filter where / orderBy
-         └── write + notify subscribers
- plugin server method
-+└── ctx.db.insert({ collection, row })
+ PluginService.list
+-├── readdir .halo/plugins
+-├── compilePluginView
+-└── (servers already on host)
++HaloRpc.listPlugins
++└── extensionHost.reload({ workspaceRoot })
++    ├── readdir .halo/plugins
++    ├── esbuild view.tsx (browser)
++    └── esbuild server.ts (node)
+ renderer loadPluginViews
+ └── evaluatePluginView (unchanged)
 ```
 
 #### Code diff preview
 
 ```diff
- // apps/electron/src/main/plugins/PluginStore.ts
-+export class PluginStore {
-+  async query(input: CollectionQuery): Promise<unknown[]> { ... }
-+  async insert(input: { pluginId: string; collection: string; row: unknown }) { ... }
-+  subscribe(input: CollectionQuery, signal: AbortSignal): AsyncIterable<unknown[]> { ... }
-+}
+ // apps/electron/src/main/rpc.ts
+   async listPlugins() {
+-    const listed = await this.plugins.list();
++    const listed = await this.extensionHost.reload({
++      workspaceRoot: this.workspace.getLayout().root,
++    });
+     if (listed instanceof Error) throw listed;
+     return listed;
+   }
 ```
 
-- [ ] Implement `collection()` and a `PluginStore` that writes pretty-printed JSON arrays. Missing file is `[]`. `insert` assigns no id; the caller passes `id`.
-- [ ] `subscribe` yields the full row list on start and after each write. Watch the JSON file so an agent rewrite also yields.
-- [ ] Give `PluginServerContext` a `db` with `insert` and `query` for that plugin id only. A server cannot write another plugin's collections.
-- [ ] Add a `PluginService` / host test: insert two rows, `query` with `gte`/`lt`, subscribe, insert a third, observe the next yield. Use `writePlugin` for the folder.
+- [ ] Host `reload` takes `workspaceRoot`, scans `.halo/plugins`, compiles views and servers, returns the same `PluginList` shape the renderer already consumes.
+- [ ] `PluginService.list` in main either calls the host or goes away. Seed still runs from `WorkspaceService.select` in main (writes files, does not load JS).
+- [ ] Keep `evaluatePluginView` in the renderer. Do not add a webview.
+- [ ] Listing tests go through the host `reload` + `loadPluginViews`, not in-process `new PluginService().list()` compile. Use the existing `writePlugin` fixture.
 - [ ] Run `pnpm --filter @halo/desktop test src/main/plugins/PluginService.test.ts`.
 
-### Phase 5: `useQuery` in the view SDK
+### Phase 5: Calendar server + skill
 
-Views subscribe through the host client. `useQuery(collection, { where, orderBy })` returns rows and re-renders on each yield. Keep `usePluginServer` for mutations that are not a raw insert.
-
-#### Important types
-
-```ts
-// packages/plugin-sdk/src/view.ts
-export function useQuery<N extends string, Row>(
-  collection: Collection<N, Row>,
-  options?: {
-    where?: Record<string, unknown | { gte?: number; lt?: number }>;
-    orderBy?: { field: string; direction: "asc" | "desc" };
-  },
-): Row[];
-```
-
-#### Call stack diff
-
-```diff
- PluginRuntimeProvider
--├── pluginId
--└── server RpcStub
-+├── pluginId
-+└── extensionHost oRPC client
-     ├── usePluginServer → call
-     └── useQuery → subscribe → setState(rows)
- Sidebar / Routes
-+└── useQuery(events, { where, orderBy })
-```
-
-#### Code diff preview
-
-```diff
- // packages/plugin-sdk/src/view.ts
-+export function useQuery(collection, options) {
-+  const runtime = useContext(PluginRuntimeContext);
-+  const [rows, setRows] = useState([]);
-+  useEffect(() => {
-+    const iterator = runtime.client.subscribe({
-+      pluginId: runtime.pluginId,
-+      collection: collection.name,
-+      where: options?.where,
-+      orderBy: options?.orderBy,
-+    });
-+    void (async () => {
-+      for await (const next of iterator) setRows(next);
-+    })();
-+    return () => iterator.return?.();
-+  }, [runtime.pluginId, collection.name]);
-+  return rows;
-+}
-```
-
-- [ ] Implement `useQuery` on the host client. Abort the iterator on unmount.
-- [ ] Thread the oRPC client through `PluginRuntimeProvider` from `usePluginsQuery`. Views do not import `@orpc/client`.
-- [ ] Add `schema` to the view compile host slots if `view.tsx` imports `collection` objects from `./schema.ts` (inlined) — do not add `@halo/plugin-sdk/schema` as a slot unless a test needs the live module. Prefer the plugin bundling `./schema.ts`.
-- [ ] Smoke: a fixture view that calls `useQuery` without a provider still throws `PluginRuntimeMissingError`. Do not commit this check.
-- [ ] Run `pnpm --filter @halo/plugin-sdk test` and `pnpm --filter @halo/desktop test src/main/plugins/PluginService.test.ts`.
-
-### Phase 6: Seeded calendar as a plugin app
-
-Replace the month-only seed with schema, server, and a live list. `createEvent` writes a row. The sidebar lists events. The month route still shows the heading and an Add control. No Google.
+Seed `server.ts` next to the existing month view. The view calls `monthLabel`. Update the skill: host-owned view and server, no `RpcTarget`, no schema.
 
 #### Important types
 
 ```ts
-// apps/electron/src/main/bundled/calendar/schema.ts
-export const events = collection({
-  name: "events",
-  fields: Type.Object({
-    id: Type.String(),
-    title: Type.String(),
-    startsAt: Type.Number(),
-    endsAt: Type.Number(),
-  }),
-});
-
 // apps/electron/src/main/bundled/calendar/server.ts
 export default class CalendarServer {
   constructor(private readonly ctx: PluginServerContext) {}
-  createEvent(args: { title: string; startsAt: number; endsAt: number }) {
-    return this.ctx.db.insert({
-      collection: "events",
-      row: { id: crypto.randomUUID(), ...args },
-    });
+  monthLabel() {
+    return new Intl.DateTimeFormat("en", {
+      month: "long",
+      year: "numeric",
+    }).format(new Date());
   }
 }
 ```
@@ -442,66 +368,36 @@ export default class CalendarServer {
  seedPluginWorkspace
  ├── calendar/package.json
  ├── calendar/view.tsx
-+├── calendar/schema.ts
 +└── calendar/server.ts
- Calendar Sidebar
--└── static SidebarItem Month
-+└── useQuery(events) → SidebarItem per row
- Calendar Month view
- └── H1 month label
-+└── Button Add event → usePluginServer().createEvent
+ Calendar MonthView
+-└── Intl in the view
++└── usePluginServer().monthLabel()
 ```
 
 #### Code diff preview
 
 ```diff
  // apps/electron/src/main/bundled/calendar/view.tsx
- export function Sidebar() {
-+  const rows = useQuery(events, { orderBy: { field: "startsAt", direction: "asc" } });
+ function MonthView() {
+-  const label = new Intl.DateTimeFormat("en", {
+-    month: "long",
+-    year: "numeric",
+-  }).format(new Date());
++  const server = usePluginServer<CalendarServer>();
++  const [label, setLabel] = useState("");
++  useEffect(() => {
++    void server.monthLabel().then(setLabel);
++  }, [server]);
    return (
-     <SidebarSection label="Calendar">
-       <SidebarItem href="/">Month</SidebarItem>
-+      {rows.map((event) => (
-+        <SidebarItem key={event.id} href="/">
-+          {event.title}
-+        </SidebarItem>
-+      ))}
-     </SidebarSection>
-   );
- }
+     <div data-testid="calendar-month">
+       <Flex column gap={4}>
+         <H1>{label}</H1>
 ```
 
-- [ ] Seed `schema.ts` and `server.ts` only when missing, same as today's view seed. Existing workspaces that already have calendar keep the old files (no migration).
-- [ ] Month view keeps `data-testid="calendar-month"`. Add a button named "Add event" that inserts a titled row with `startsAt` now.
-- [ ] Extend `PluginService` tests: after seed, `call` `createEvent`, then `query` `events` returns the row.
+- [ ] Seed `server.ts` only when missing. Existing workspaces that already have calendar keep the old view-only files.
+- [ ] Month view keeps `data-testid="calendar-month"` and reads the label from the server.
+- [ ] Host test: seeded calendar `call` `monthLabel` returns a non-empty string. Renderer listing still evaluates `Sidebar` / `Routes`.
+- [ ] Edit `haloPluginSkill.md`: drop `RpcTarget`; say the host compiles view and server; view uses `usePluginServer`.
 - [ ] Run `pnpm --filter @halo/desktop test src/main/plugins/PluginService.test.ts`.
-- [ ] Prove with `pnpm halo-web`: open Calendar, click Add event, the new title shows in the sidebar. Record a short demo for the UI change.
-
-### Phase 7: Skill and author contract
-
-Update the seeded skill so an agent writes schema, a class server (no `RpcTarget`), `useQuery`, and host widgets. Mention reload for code, and that state files are the source of truth for humans and the agent.
-
-#### Important types
-
-Not applicable — no code path changes.
-
-#### Call stack diff
-
-Not applicable — no code path changes.
-
-#### Code diff preview
-
-```diff
- // apps/electron/src/main/plugins/haloPluginSkill.md
-- `server.ts` with a default `RpcTarget` class
-+ `schema.ts` with `collection(...)`
-+ `server.ts` with a default class. Constructor `{ pluginId, workspaceRoot, db }`.
-+ View: import UI from `@halo/plugin-sdk/view`. Use `useQuery` for rows and
-+ `usePluginServer` for methods. Do not import `react-dom`. State lives in
-+ `.halo/plugins/<id>/state/<collection>.json`.
-```
-
-- [ ] Edit `haloPluginSkill.md` and the example in it. Drop Cap'n Web / `RpcTarget`.
-- [ ] Assert the seeded skill contains `useQuery` and `collection` in the existing seed test.
-- [ ] Run `pnpm --filter @halo/desktop test src/main/plugins/PluginService.test.ts`.
+- [ ] Prove with `pnpm halo-web` that Calendar still opens from the sidebar and shows a month heading. Record a short demo.
 - [ ] Run `pnpm run check-affected`.
