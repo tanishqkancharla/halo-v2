@@ -327,6 +327,8 @@ const styles = {
       overflowY: "auto",
       overscrollBehavior: "contain",
       scrollbarWidth: "none",
+      // overflow-y: auto clips child box-shadows; padding keeps the 1px ring inside the scrollport.
+      paddingInline: spacing.value(2),
       paddingBottom: spacing.value(6),
       "&::-webkit-scrollbar": { display: "none" },
     },
@@ -338,7 +340,7 @@ const styles = {
     position: "relative",
     zIndex: 1,
     overflow: "visible",
-    paddingTop: "2px",
+    marginTop: spacing.value(2),
     "&:focus-within": {
       outline: "none",
       boxShadow: shadowVars.subtle,
@@ -347,7 +349,7 @@ const styles = {
     "&::before": {
       position: "absolute",
       right: 0,
-      bottom: "100%",
+      bottom: "calc(100% + 1px)",
       left: 0,
       height: spacing.value(6),
       content: "''",
