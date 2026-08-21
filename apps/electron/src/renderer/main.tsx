@@ -12,7 +12,7 @@ createRoot(document.getElementById("root")!).render(
     <MauiProvider>
       <ApiProvider createApi={createElectronApi}>
         <App />
-        {import.meta.env.DEV && <Agentation />}
+        {import.meta.env.DEV && <Agentation endpoint="http://127.0.0.1:4747" />}
       </ApiProvider>
     </MauiProvider>
   </StrictMode>,

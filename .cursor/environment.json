@@ -6,6 +6,11 @@
       "name": "halo-dev",
       "command": "export HALO_USE_SWIFTSHADER=1 && pnpm --filter @halo/desktop dev",
       "description": "Halo Electron app; HALO_USE_SWIFTSHADER is always on in this environment"
+    },
+    {
+      "name": "agentation-mcp",
+      "command": "AGENTATION_STORE=memory npx -y agentation-mcp server --port 4747",
+      "description": "Agentation HTTP server so the dev toolbar can sync annotation notes"
     }
   ]
 }

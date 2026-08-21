@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "agentation": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "agentation-mcp",
+        "server",
+        "--mcp-only",
+        "--http-url",
+        "http://127.0.0.1:4747"
+      ],
+      "env": {
+        "AGENTATION_STORE": "memory"
+      }
+    }
+  }
+}

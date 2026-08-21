@@ -9,7 +9,7 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 
-export const sidebarPadding = style(spacing.padding({ x: 3 }));
+export const sidebarPadding = style(spacing.padding({ x: 4 }));
 
 export const sidebarSection = style(
   flex({ direction: "column", gap: 4 }),

@@ -31,6 +31,7 @@ import { Loader } from "./patterns/Loader.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView } from "../shared/plugin.js";
+import { ThreadHeader } from "./ThreadHeader.tsx";
 import { UiKitPage } from "./UiKitPage.tsx";
 
 export function MainPane({
@@ -79,23 +80,14 @@ export function MainPane({
 
 function MissingPlugin({ pluginId }: { pluginId: string }) {
   const pane = useStyles(styles.pane);
-  const content = useStyles(styles.content);
+  const body = useStyles(styles.body, styles.bodyTop);
+  const column = useStyles(styles.column);
   return (
     <main className={pane} aria-label={pluginId}>
-      <div className={content}>Plugin '{pluginId}' has no Routes</div>
+      <div className={body}>
+        <div className={column}>Plugin '{pluginId}' has no Routes</div>
+      </div>
     </main>
-  );
-}
-
-function SessionTitleSlot({ title }: { title?: string }) {
-  const header = useStyles(styles.header);
-  const titleClassName = useStyles(styles.title);
-  return (
-    <header className={header} aria-label={title}>
-      {title === undefined ? undefined : (
-        <div className={titleClassName}>{title}</div>
-      )}
-    </header>
   );
 }
 
@@ -107,7 +99,8 @@ function SavedPane({
   sessions: SessionSummary[];
 }) {
   const pane = useStyles(styles.pane);
-  const content = useStyles(styles.content);
+  const body = useStyles(styles.body);
+  const column = useStyles(styles.column);
   const { state, isWorking, prompt } = useAgentSession(sessionId);
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
@@ -116,10 +109,12 @@ function SavedPane({
 
   return (
     <main className={pane} aria-label={title}>
-      <div className={content}>
-        <SessionTitleSlot title={title} />
-        <SessionView state={state} isWorking={isWorking} />
-        <Composer key={sessionId} error={state.error} onSubmit={prompt} />
+      <ThreadHeader title={title} />
+      <div className={body}>
+        <div className={column}>
+          <SessionView state={state} isWorking={isWorking} />
+          <Composer key={sessionId} error={state.error} onSubmit={prompt} />
+        </div>
       </div>
     </main>
   );
@@ -131,17 +126,20 @@ function DraftPane({ draftId }: { draftId: string }) {
     navigate(`/sessions/${sessionId}`);
   });
   const pane = useStyles(styles.pane);
-  const content = useStyles(styles.content);
+  const body = useStyles(styles.body, styles.bodyTop);
+  const column = useStyles(styles.column);
   const hasMessages = sessionViewItems(state).length > 0;
 
   return (
     <main className={pane} aria-label="New session" data-draft-id={draftId}>
-      <div className={content}>
-        <SessionTitleSlot />
-        {hasMessages ? (
-          <SessionView state={state} isWorking={isWorking} />
-        ) : undefined}
-        <Composer key={draftId} error={state.error} onSubmit={prompt} />
+      <ThreadHeader />
+      <div className={body}>
+        <div className={column}>
+          {hasMessages ? (
+            <SessionView state={state} isWorking={isWorking} />
+          ) : undefined}
+          <Composer key={draftId} error={state.error} onSubmit={prompt} />
+        </div>
       </div>
     </main>
   );
@@ -286,35 +284,32 @@ function SessionViewRow({ item }: { item: SessionViewItem }) {
 }
 
 const styles = {
-  pane: style(
+  pane: style(flex({ direction: "column" }), {
+    width: "100%",
+    marginInline: "auto",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
+    backgroundColor: backgroundColor.app,
+  }),
+  body: style(
     flex({ direction: "column" }),
-    spacing.padding({ x: 12, y: 12 }),
+    spacing.padding({ x: 12, bottom: 12 }),
     {
+      flex: "1 1 auto",
       width: "100%",
-      marginInline: "auto",
       minWidth: 0,
       minHeight: 0,
-      overflow: "hidden",
-      backgroundColor: backgroundColor.app,
     },
   ),
-  content: style(flex({ direction: "column" }), {
+  bodyTop: style(spacing.padding({ top: 12 })),
+  column: style(flex({ direction: "column" }), {
     flex: "1 1 auto",
     width: "100%",
     maxWidth: "72ch",
     minWidth: 0,
     minHeight: 0,
     marginInline: "auto",
-  }),
-  header: style(flexItem({ size: "hug" }), text("md", 600, "highContrast"), {
-    minWidth: 0,
-    height: "1lh",
-    overflow: "hidden",
-  }),
-  title: style({
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
   }),
   view: style(
     flex({ direction: "column", gap: 6 }),
@@ -327,6 +322,9 @@ const styles = {
       overflowY: "auto",
       overscrollBehavior: "contain",
       scrollbarWidth: "none",
+      // overflow-y: auto clips child box-shadows; padding keeps the 1px ring inside the scrollport.
+      paddingInline: spacing.value(2),
+      paddingTop: spacing.value(12),
       paddingBottom: spacing.value(6),
       "&::-webkit-scrollbar": { display: "none" },
     },
@@ -338,7 +336,7 @@ const styles = {
     position: "relative",
     zIndex: 1,
     overflow: "visible",
-    paddingTop: "2px",
+    marginTop: spacing.value(2),
     "&:focus-within": {
       outline: "none",
       boxShadow: shadowVars.subtle,
@@ -347,7 +345,7 @@ const styles = {
     "&::before": {
       position: "absolute",
       right: 0,
-      bottom: "100%",
+      bottom: "calc(100% + 1px)",
       left: 0,
       height: spacing.value(6),
       content: "''",

@@ -66,6 +66,8 @@ The one service is the Halo Electron app. Start it from the repo root with `pnpm
 
 When adding or changing any UI, always record a short demo video of the change and attach it to the PR (and show it in the walkthrough). Use screen recording against the running Halo app; do not skip this for “small” UI tweaks.
 
+Dev Agentation notes sync through the `agentation-mcp` terminal (`127.0.0.1:4747`). Query pending notes with `GET http://127.0.0.1:4747/pending`. Cursor loads the same server from `.cursor/mcp.json`.
+
 Cloudflare infrastructure lives in `infra/` (Alchemy). Use `pnpm infra:login`, `pnpm infra:plan`, and `pnpm infra:deploy`.
 
 Headless hosts (Xvfb/VNC) need `HALO_USE_SWIFTSHADER=1`, which the `halo-dev` terminal exports. Without it the renderer cannot start WebGL.

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { RpcStub, RpcTarget } from "capnweb";
-import { colors, spacing, text, useTheme } from "maui";
+import { colors, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -84,7 +84,6 @@ function WorkspaceShell({
   alertMessage?: string;
   appInfo?: AppInfo;
 }) {
-  const { resolvedTheme, setPreference } = useTheme();
   const [{ hook }] = useState(() =>
     memoryLocation({ path: initialHostPath(sessions) }),
   );
@@ -106,10 +105,6 @@ function WorkspaceShell({
             pluginViews={pluginViews}
             pluginErrors={pluginErrors}
             pluginServers={pluginServers}
-            onToggleTheme={() =>
-              setPreference(resolvedTheme === "dark" ? "light" : "dark")
-            }
-            themeLabel={resolvedTheme === "dark" ? "Light" : "Dark"}
             appInfo={appInfo}
           />
           <MainPane

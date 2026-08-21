@@ -53,7 +53,7 @@ export const sidebarEntryTreeStyles = {
   "--trees-border-color-override": "transparent",
   "--trees-border-radius-override": "0px",
   "--trees-padding-inline-override": "0px",
-  "--trees-item-padding-x-override": spacing.value(3),
+  "--trees-item-padding-x-override": spacing.value(4),
   "--trees-item-margin-x-override": "0px",
   "--trees-indent-guide-bg-override": colors.gray[6],
   "--trees-scrollbar-thumb-override": colors.gray[7],

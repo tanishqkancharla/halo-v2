@@ -37,7 +37,6 @@
     "@tiptap/markdown": "^3.29.2",
     "@tiptap/react": "^3.29.2",
     "@tiptap/starter-kit": "^3.29.2",
-    "@types/three": "^0.185.1",
     "capnweb": "^0.10.0",
     "electron-squirrel-startup": "^1.0.1",
     "errore": "^0.14.1",
@@ -48,7 +47,6 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "streamdown": "^2.5.0",
-    "three": "^0.185.1",
     "update-electron-app": "^3.3.0",
     "wouter": "^3.10.0"
   },
@@ -70,6 +68,7 @@
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "^4.7.0",
     "agentation": "^3.0.2",
+    "agentation-mcp": "^1.2.0",
     "electron": "^43.2.0",
     "outdent": "^0.8.0",
     "typescript": "7.0.2",
