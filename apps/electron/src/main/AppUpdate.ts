@@ -1,9 +1,15 @@
-import { app, autoUpdater, dialog } from "electron";
+import { app, autoUpdater, dialog, type BrowserWindow } from "electron";
+import * as errore from "errore";
 import { updateElectronApp } from "update-electron-app";
 import type { AppInfo, AppUpdateStatus } from "../shared/rpc.js";
 
 /** How often packaged macOS/Windows builds poll update.electronjs.org. */
 export const UPDATE_POLL_INTERVAL = "10 minutes";
+
+class UpdateNotReadyError extends errore.createTaggedError({
+  name: "UpdateNotReadyError",
+  message: "No downloaded update to install",
+}) {}
 
 let updateStatus: AppUpdateStatus = {
   state: "disabled",
@@ -11,6 +17,7 @@ let updateStatus: AppUpdateStatus = {
 };
 let updatesEnabled = false;
 let manualCheckPending = false;
+let getWindow: () => BrowserWindow | undefined = () => undefined;
 
 export function getAppInfo(): AppInfo {
   return {
@@ -19,8 +26,12 @@ export function getAppInfo(): AppInfo {
   };
 }
 
-export function startAppUpdates(isDevelopment: boolean): void {
-  if (isDevelopment) {
+export function startAppUpdates(args: {
+  isDevelopment: boolean;
+  getWindow: () => BrowserWindow | undefined;
+}): void {
+  getWindow = args.getWindow;
+  if (args.isDevelopment) {
     updateStatus = {
       state: "disabled",
       reason: "Dev builds do not auto-update",
@@ -80,6 +91,9 @@ export function startAppUpdates(isDevelopment: boolean): void {
 
   updateElectronApp({
     updateInterval: UPDATE_POLL_INTERVAL,
+    onNotifyUser: (info) => {
+      showUpdateReadyDialog(info.releaseName);
+    },
   });
 }
 
@@ -99,19 +113,7 @@ export function checkForUpdates(): void {
   }
 
   if (updateStatus.state === "downloaded") {
-    void dialog
-      .showMessageBox({
-        type: "info",
-        title: "Check for Updates",
-        message: `Update ${updateStatus.version} is ready`,
-        detail: "Restart Halo to install it.",
-        buttons: ["Restart", "Later"],
-        defaultId: 0,
-        cancelId: 1,
-      })
-      .then(({ response }) => {
-        if (response === 0) autoUpdater.quitAndInstall();
-      });
+    showUpdateReadyDialog(updateStatus.version);
     return;
   }
 
@@ -130,4 +132,48 @@ export function checkForUpdates(): void {
   manualCheckPending = true;
   updateStatus = { state: "checking" };
   autoUpdater.checkForUpdates();
+}
+
+export function installAppUpdate() {
+  if (updateStatus.state !== "downloaded") return new UpdateNotReadyError();
+  autoUpdater.quitAndInstall();
+}
+
+function showUpdateReadyDialog(version: string): void {
+  const layout = updateReadyButtonLayout(process.platform);
+  const window = getWindow();
+  const options: Electron.MessageBoxOptions = {
+    type: "info",
+    title: "Update Halo",
+    message: `Halo ${version} is ready`,
+    detail: "Restart to install the update.",
+    buttons: [...layout.buttons],
+    defaultId: layout.updateIndex,
+    cancelId: layout.laterIndex,
+    noLink: true,
+  };
+  const shown =
+    window === undefined
+      ? dialog.showMessageBox(options)
+      : dialog.showMessageBox(window, options);
+  void shown.then(({ response }) => {
+    if (response !== layout.updateIndex) return;
+    autoUpdater.quitAndInstall();
+  });
+}
+
+function updateReadyButtonLayout(platform: NodeJS.Platform) {
+  // macOS draws the first button on the right as the default action.
+  if (platform === "darwin") {
+    return {
+      buttons: ["Update", "Later"] as const,
+      updateIndex: 0,
+      laterIndex: 1,
+    };
+  }
+  return {
+    buttons: ["Later", "Update"] as const,
+    updateIndex: 1,
+    laterIndex: 0,
+  };
 }

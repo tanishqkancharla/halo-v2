@@ -75,7 +75,10 @@ app.whenReady().then(async () => {
   registerRpcBridge();
   installMenu();
   openMainWindow();
-  startAppUpdates(isDevelopment);
+  startAppUpdates({
+    isDevelopment,
+    getWindow: () => mainWindow,
+  });
   logger.info({ event: "app-ready" });
 
   app.on("activate", () => {

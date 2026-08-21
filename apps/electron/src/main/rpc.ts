@@ -15,7 +15,7 @@ import {
   type WorkspaceTreeEventHandler,
 } from "../shared/rpc.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
-import { getAppInfo } from "./AppUpdate.js";
+import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
 import type { PiService } from "./pi-service.js";
 import type { PluginService } from "./plugins/PluginService.js";
 import type { WorkspaceService } from "./workspace-service.js";
@@ -39,6 +39,11 @@ export class HaloRpc extends HaloApi {
 
   getAppInfo(): AppInfo {
     return getAppInfo();
+  }
+
+  installAppUpdate() {
+    const result = installAppUpdate();
+    if (result instanceof Error) throw result;
   }
 
   getWorkspace(): WorkspaceInfo | undefined {

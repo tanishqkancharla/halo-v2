@@ -152,6 +152,13 @@ export function useAppInfoQuery() {
   });
 }
 
+export function useInstallAppUpdateMutation() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: () => api.installAppUpdate(),
+  });
+}
+
 type PluginServers = Record<string, RpcStub<RpcTarget>>;
 
 type PluginsQueryData = LoadedPluginList & {
