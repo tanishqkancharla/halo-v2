@@ -1,6 +1,6 @@
 ---
 name: generate-spec-v2
-description: Create a code-based implementation spec in the specs/ directory for a significant feature, fix, or refactor. Use when the user asks to plan, spec, scope, or phase work before implementation and the plan should cover top-level Mermaid flows, important types, per-phase call-stack and code diffs, commit-sized phases, and checks. After writing the spec, serve it with `pnpm spec`.
+description: Create a code-based implementation spec in the specs/ directory for a significant feature, fix, or refactor. Use when the user asks to plan, spec, scope, or phase work before implementation and the plan should cover top-level Mermaid flows, important types, per-phase call-stack and code diffs, commit-sized phases, and checks. After writing the spec, serve it with tkstack (`pnpm spec` or `pnpm exec tkstack`).
 ---
 
 # Generate an implementation spec
@@ -116,15 +116,24 @@ Specs are markdown, not MDX. Curly braces in prose are plain text. Put angle bra
 | Fence info string | Viewer |
 | --- | --- |
 | `mermaid` | Beautiful Mermaid |
-| `callstack` or `diff` containing `└──` / `├──` | Pierre Diffs patch |
-| `diff` or `diff:path` | Pierre Diffs patch |
-| `start:end:path` | Pierre Diffs file excerpt of current code |
+| `callstack` or `diff` containing `└──` / `├──` | Pierre patch, no file header |
+| `diff` or `diff:path` with a file path | Pierre patch with Pierre’s file header |
+| `diff` with no path | Pierre patch, no file header |
+| `start:end:path` | Pierre file excerpt of current code |
 | `ts`, `rust`, and other langs | Maui `CodeBlock` for proposed types and sketches |
-| `html` | Trusted HTML |
+| `html` | Trusted HTML from this spec. tkstack does not sanitize it. Only use it for local files you wrote. |
+
+See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for the fence contract.
 
 ## Serve it
 
-This skill's CLI is `pnpm spec`. It is the same local page as `pnpm walkthrough`. After the spec file exists, run it from the repo root:
+This skill’s CLI is tkstack. It is the same local page as a code walkthrough. After the spec file exists, run it from the repo root:
+
+```sh
+pnpm exec tkstack specs/<name>.md
+```
+
+Halo alias:
 
 ```sh
 pnpm spec specs/<name>.md
@@ -135,7 +144,7 @@ Options:
 - `--port <n>` — listen port (default `4177`)
 - `--root <dir>` — workspace root for file excerpts (default cwd)
 
-The command prints a local URL and keeps running. Open that URL. The page uses Maui and Pierre Diffs. **Done** in the top right posts `/__walkthrough/shutdown` and stops the server.
+The command prints a local URL and keeps running. Open that URL. **Done** in the top right posts `/__tkstack/shutdown` and stops the server.
 
 Tell the user the spec path and the URL. Do not write specs into a temp directory.
 
@@ -175,4 +184,4 @@ Once the feature is end-to-end testable, add the fixtures needed for those high-
 
 ## Final check
 
-Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has key types, an accurate call-stack diff, a code-diff preview, and four or five steps; links and commands are real; committed tests are package-level end-to-end and earlier phases use uncommitted smoke checks; the CLI is serving the page; and the full plan covers every goal without pulling in a non-goal.
+Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has key types, an accurate call-stack diff, a code-diff preview, and four or five steps; links and commands are real; committed tests are package-level end-to-end and earlier phases use uncommitted smoke checks; tkstack is serving the page; and the full plan covers every goal without pulling in a non-goal.

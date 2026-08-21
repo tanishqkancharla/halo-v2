@@ -22,6 +22,9 @@ importers:
       oxlint:
         specifier: ^1.79.0
         version: 1.79.0
+      tkstack:
+        specifier: workspace:*
+        version: link:packages/tkstack
       turbo:
         specifier: ^2.10.7
         version: 2.10.7
@@ -282,9 +285,7 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
-  packages/typescript-config: {}
-
-  packages/walkthrough:
+  packages/tkstack:
     dependencies:
       '@mdx-js/mdx':
         specifier: ^3.1.1
@@ -347,6 +348,8 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@22.15.3)(jsdom@30.0.1)(vite@8.2.1(@types/node@22.15.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
+  packages/typescript-config: {}
 
 packages:
 

@@ -5,8 +5,9 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "halo-web": "pnpm --silent --filter @halo/web-cli cli",
-    "spec": "pnpm --silent --filter @halo/walkthrough cli",
-    "walkthrough": "pnpm --silent --filter @halo/walkthrough cli",
+    "tkstack": "pnpm --silent exec tkstack",
+    "spec": "pnpm --silent exec tkstack",
+    "walkthrough": "pnpm --silent exec tkstack",
     "infra:deploy": "pnpm --filter @halo/infra run deploy",
     "infra:dev": "pnpm --filter @halo/infra run dev",
     "infra:login": "pnpm --filter @halo/infra run login",
@@ -24,7 +25,8 @@
     "oxfmt": "^0.60.0",
     "oxlint": "^1.79.0",
     "turbo": "^2.10.7",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "tkstack": "workspace:*"
   },
   "engines": {
     "node": ">=22"

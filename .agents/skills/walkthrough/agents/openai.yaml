@@ -1,4 +1,0 @@
-interface:
-  display_name: "Walkthrough"
-  short_description: "Walk through landed code with MDX, diffs, and a local server"
-  default_prompt: "Use $walkthrough to explain the changes already made."

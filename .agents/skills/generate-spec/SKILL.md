@@ -173,10 +173,10 @@ async function searchProviders(input: SearchProvidersInput) {
 
 ## Serve it
 
-After the spec file exists, serve it from the repo root with the same local page as walkthroughs:
+After the spec file exists, serve it from the repo root with tkstack:
 
 ```sh
 pnpm spec specs/<name>.md
 ```
 
-Tell the user the spec path and the printed URL.
+Or `pnpm exec tkstack specs/<name>.md`. Tell the user the spec path and the printed URL.
