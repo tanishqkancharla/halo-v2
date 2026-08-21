@@ -143,12 +143,10 @@ export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
   });
 }
 
-export const appInfoQueryKey = ["app-info"] as const;
-
 export function useAppInfoQuery() {
   const api = useApi();
   return useQuery({
-    queryKey: appInfoQueryKey,
+    queryKey: ["app-info"],
     queryFn: () => api.getAppInfo(),
     refetchInterval: 5_000,
   });

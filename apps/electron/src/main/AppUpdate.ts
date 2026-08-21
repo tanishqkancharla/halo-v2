@@ -1,8 +1,8 @@
 import { app, autoUpdater, dialog, type BrowserWindow } from "electron";
 import * as errore from "errore";
 import { updateElectronApp } from "update-electron-app";
-import { UPDATE_CHANNELS } from "../shared/channels.js";
 import type { AppInfo, AppUpdateStatus } from "../shared/rpc.js";
+import { updateReadyButtonLayout } from "./updateReadyButtons.js";
 
 /** How often packaged macOS/Windows builds poll update.electronjs.org. */
 export const UPDATE_POLL_INTERVAL = "10 minutes";
@@ -92,7 +92,9 @@ export function startAppUpdates(args: {
 
   updateElectronApp({
     updateInterval: UPDATE_POLL_INTERVAL,
-    onNotifyUser: promptRendererToInstall,
+    onNotifyUser: (info) => {
+      showUpdateReadyDialog(info.releaseName);
+    },
   });
 }
 
@@ -112,7 +114,7 @@ export function checkForUpdates(): void {
   }
 
   if (updateStatus.state === "downloaded") {
-    promptRendererToInstall();
+    showUpdateReadyDialog(updateStatus.version);
     return;
   }
 
@@ -138,8 +140,25 @@ export function installAppUpdate() {
   autoUpdater.quitAndInstall();
 }
 
-function promptRendererToInstall(): void {
+function showUpdateReadyDialog(version: string): void {
+  const layout = updateReadyButtonLayout(process.platform);
   const window = getWindow();
-  if (window === undefined) return;
-  window.webContents.send(UPDATE_CHANNELS.prompt);
+  const options: Electron.MessageBoxOptions = {
+    type: "info",
+    title: "Update Halo",
+    message: `Halo ${version} is ready`,
+    detail: "Restart to install the update.",
+    buttons: [...layout.buttons],
+    defaultId: layout.updateIndex,
+    cancelId: layout.laterIndex,
+    noLink: true,
+  };
+  const shown =
+    window === undefined
+      ? dialog.showMessageBox(options)
+      : dialog.showMessageBox(window, options);
+  void shown.then(({ response }) => {
+    if (response !== layout.updateIndex) return;
+    autoUpdater.quitAndInstall();
+  });
 }

@@ -10,7 +10,6 @@ import { LoadingPage } from "./LoadingPage.tsx";
 import { MainPane } from "./MainPane.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { Sidebar } from "./Sidebar.tsx";
-import { UpdateReadyPrompt } from "./UpdateReadyDialog.tsx";
 import {
   useSessionsQuery,
   useChooseWorkspaceMutation,
@@ -115,7 +114,6 @@ function WorkspaceShell({
           />
         </div>
       </Router>
-      <UpdateReadyPrompt appInfo={appInfo} />
     </div>
   );
 }
