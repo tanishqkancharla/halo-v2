@@ -2,7 +2,6 @@ import { app, autoUpdater, dialog, type BrowserWindow } from "electron";
 import * as errore from "errore";
 import { updateElectronApp } from "update-electron-app";
 import type { AppInfo, AppUpdateStatus } from "../shared/rpc.js";
-import { updateReadyButtonLayout } from "./updateReadyButtons.js";
 
 /** How often packaged macOS/Windows builds poll update.electronjs.org. */
 export const UPDATE_POLL_INTERVAL = "10 minutes";
@@ -161,4 +160,20 @@ function showUpdateReadyDialog(version: string): void {
     if (response !== layout.updateIndex) return;
     autoUpdater.quitAndInstall();
   });
+}
+
+function updateReadyButtonLayout(platform: NodeJS.Platform) {
+  // macOS draws the first button on the right as the default action.
+  if (platform === "darwin") {
+    return {
+      buttons: ["Update", "Later"] as const,
+      updateIndex: 0,
+      laterIndex: 1,
+    };
+  }
+  return {
+    buttons: ["Later", "Update"] as const,
+    updateIndex: 1,
+    laterIndex: 0,
+  };
 }
