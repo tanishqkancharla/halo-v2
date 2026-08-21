@@ -31,6 +31,7 @@ import { Loader } from "./patterns/Loader.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView } from "../shared/plugin.js";
+import { ThreadHeader } from "./ThreadHeader.tsx";
 import { UiKitPage } from "./UiKitPage.tsx";
 
 export function MainPane({
@@ -87,18 +88,6 @@ function MissingPlugin({ pluginId }: { pluginId: string }) {
   );
 }
 
-function SessionTitleSlot({ title }: { title?: string }) {
-  const header = useStyles(styles.header);
-  const titleClassName = useStyles(styles.title);
-  return (
-    <header className={header} aria-label={title}>
-      {title === undefined ? undefined : (
-        <div className={titleClassName}>{title}</div>
-      )}
-    </header>
-  );
-}
-
 function SavedPane({
   sessionId,
   sessions,
@@ -116,8 +105,8 @@ function SavedPane({
 
   return (
     <main className={pane} aria-label={title}>
+      <ThreadHeader title={title} />
       <div className={content}>
-        <SessionTitleSlot title={title} />
         <SessionView state={state} isWorking={isWorking} />
         <Composer key={sessionId} error={state.error} onSubmit={prompt} />
       </div>
@@ -136,8 +125,8 @@ function DraftPane({ draftId }: { draftId: string }) {
 
   return (
     <main className={pane} aria-label="New session" data-draft-id={draftId}>
+      <ThreadHeader />
       <div className={content}>
-        <SessionTitleSlot />
         {hasMessages ? (
           <SessionView state={state} isWorking={isWorking} />
         ) : undefined}
@@ -305,16 +294,6 @@ const styles = {
     minWidth: 0,
     minHeight: 0,
     marginInline: "auto",
-  }),
-  header: style(flexItem({ size: "hug" }), text("md", 600, "highContrast"), {
-    minWidth: 0,
-    height: "1lh",
-    overflow: "hidden",
-  }),
-  title: style({
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
   }),
   view: style(
     flex({ direction: "column", gap: 6 }),
