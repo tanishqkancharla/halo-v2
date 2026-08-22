@@ -1,5 +1,7 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { dialog, type BrowserWindow } from "electron";
-import { implement } from "@orpc/server";
+import { implement, os as orpc } from "@orpc/server";
+import type { StandardHandlerRoutingInterceptor } from "@orpc/server/standard";
 import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
@@ -23,6 +25,12 @@ export type HaloContext = {
 };
 
 const os = implement(contract).$context<HaloContext>();
+const haloContextStorage = new AsyncLocalStorage<HaloContext>();
+
+export const bindHaloContext: StandardHandlerRoutingInterceptor<HaloContext> = ({
+  context,
+  next,
+}) => haloContextStorage.run(context, next);
 
 export const router = {
   getAppInfo: os.getAppInfo.handler(({ context }) => {
@@ -172,4 +180,13 @@ export const router = {
       if (closed instanceof Error) return orpcErrors.badRequest(closed);
     }),
   },
+  // oRPC lazy loaders do not receive context. bindHaloContext stores it so
+  // the first /plugins call can index context.plugins.router.
+  plugins: orpc.$context<HaloContext>().lazy(async () => {
+    const halo = haloContextStorage.getStore();
+    if (halo === undefined) {
+      throw new Error("HaloContext is missing while loading plugin routers.");
+    }
+    return { default: halo.plugins.router };
+  }),
 };

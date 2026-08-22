@@ -20,10 +20,7 @@ export class PluginIoError extends errore.createTaggedError({
 }) {}
 
 export class PluginService {
-  private readonly mounted: Record<string, AnyRouter> = {};
-  readonly orpcRouter = orpc.$context<HaloContext>().lazy(async () => ({
-    default: this.mounted,
-  }));
+  readonly router: Record<string, AnyRouter> = {};
 
   constructor(private readonly workspace: WorkspaceService) {}
 
@@ -84,7 +81,7 @@ export class PluginService {
           errors.push({ id, message: server.message });
           continue;
         }
-        this.mounted[id] = mountPluginRouter({ pluginId: id, router: server });
+        this.router[id] = mountPluginRouter({ pluginId: id, router: server });
       }
 
       plugins.push(manifest);
@@ -94,8 +91,8 @@ export class PluginService {
   }
 
   private clearMounted() {
-    for (const id of Object.keys(this.mounted)) {
-      delete this.mounted[id];
+    for (const id of Object.keys(this.router)) {
+      delete this.router[id];
     }
   }
 }

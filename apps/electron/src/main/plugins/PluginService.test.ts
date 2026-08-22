@@ -17,7 +17,7 @@ import { loadPluginViews } from "../../renderer/evaluatePluginView.js";
 import { AgentSessionRegistry } from "../AgentSessionRegistry.js";
 import { PiService } from "../pi-service.js";
 import { UserService } from "../UserService.js";
-import { router, type HaloContext } from "../router.js";
+import { bindHaloContext, router, type HaloContext } from "../router.js";
 import { PluginService } from "./PluginService.js";
 
 type PluginFiles = Record<string, string>;
@@ -86,9 +86,8 @@ async function withHaloClient(
     },
     logger: new Logger(),
   };
-  const handler = new RPCHandler({
-    ...router,
-    plugins: plugins.orpcRouter,
+  const handler = new RPCHandler(router, {
+    routingInterceptors: [bindHaloContext],
   });
   const { port1, port2 } = new MessageChannel();
   handler.upgrade(port1, { context });
