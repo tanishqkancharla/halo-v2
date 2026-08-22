@@ -254,11 +254,11 @@ For this phase, agent-session and tree procedures may `return new ORPCError("NOT
 
 `chooseWorkspace` keeps `dialog.showOpenDialog(context.getWindow(), ...)`. Convert a returned tagged error to `ORPCError` the same way `HaloRpc` throws today. Do not add retries or extra guards.
 
-- [ ] Add `HaloContext` and a module-level `router` in `apps/electron/src/main/router.ts`. Put `AgentSessionRegistry` in as an empty class with `get` / `add` / `close` / `closeAll` no-ops if the session procedures are stubs.
-- [ ] Move the bodies of `HaloRpc` data methods into the matching handlers. Keep `HaloRpc` working for the live app.
-- [ ] Add `apps/electron/src/main/router.test.ts` with a Vitest fixture that builds a real `WorkspaceService` (same temp-dir pattern as `PluginService.test.ts`) and a `HaloContext`. Use `call` from `@orpc/server`.
-- [ ] Commit a test that `call(getWorkspace, undefined, { context })` returns `undefined` before `select`, then the workspace info after `select`. Also assert `listPlugins` before a workspace is chosen returns an `ORPCError` whose cause is `WorkspaceNotReadyError`.
-- [ ] Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/desktop typecheck`.
+- [x] Add `HaloContext` and a module-level `router` in `apps/electron/src/main/router.ts`. Put `AgentSessionRegistry` in as an empty class with `get` / `add` / `close` / `closeAll` no-ops if the session procedures are stubs.
+- [x] Move the bodies of `HaloRpc` data methods into the matching handlers. Keep `HaloRpc` working for the live app.
+- [x] Add `apps/electron/src/main/router.test.ts` with a Vitest fixture that builds a real `WorkspaceService` (same temp-dir pattern as `PluginService.test.ts`) and a `HaloContext`. Use `call` from `@orpc/server`.
+- [x] Commit a test that `call(getWorkspace, undefined, { context })` returns `undefined` before `select`, then the workspace info after `select`. Also assert `listPlugins` before a workspace is chosen returns an `ORPCError` whose cause is `WorkspaceNotReadyError`.
+- [x] Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/desktop typecheck`.
 
 ### Phase 3: Agent sessions and workspace tree as iterators
 
