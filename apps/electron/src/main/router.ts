@@ -72,7 +72,9 @@ export const router = os.router({
   subscribeWorkspaceTree: os.subscribeWorkspaceTree.handler(() =>
     orpcErrors.notImplemented(),
   ),
-  newAgentSession: os.newAgentSession.handler(() => orpcErrors.notImplemented()),
+  newAgentSession: os.newAgentSession.handler(() =>
+    orpcErrors.notImplemented(),
+  ),
   openAgentSession: os.openAgentSession.handler(() =>
     orpcErrors.notImplemented(),
   ),
