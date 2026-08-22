@@ -26,13 +26,26 @@ flowchart LR
   end
 ```
 
+```mermaid
+flowchart LR
+  subgraph live [Live session across routes]
+    O[openAgentSession] -->|"miss"| C[pi.open + add]
+    O -->|"hit"| M[registry.get]
+    C --> S[snapshot isStreaming]
+    M --> S
+    S --> E[events iterator]
+    E -->|"unmount"| U[iterator.return unsubscribe]
+    U -->|"open same id"| O
+  end
+```
+
 ## Problem overview
 
 Halo talks between the Electron renderer and main process with Cap'n Web. The API is a tree of `RpcTarget` objects: `HaloRpc` on the port, live `AgentSessionRpc` objects returned from `newAgentSession` / `openAgentSession`, plugin classes nested under `getPlugin`, and renderer callbacks passed into `subscribe`. That model needs a custom `MessagePortMain` transport, `dup()` on callback stubs, and a prototype-copy wrapper so jiti-loaded plugin `RpcTarget` classes match the bundled Cap'n Web copy.
 
 ## Solution overview
 
-Replace Cap'n Web with oRPC v2 over the same Electron MessagePort handshake. Main services live in oRPC initial context (`HaloContext`), provided at `RPCHandler.upgrade`. Procedures are a contract in `src/shared` and an implementer in main. Live session objects become `sessionId` plus procedures. Callbacks become `AsyncIteratorObject` streams. Plugin servers export an oRPC router; `listPlugins` writes those routers onto a mutable `plugins` map on the host router and middleware injects `PluginServerContext`.
+Replace Cap'n Web with oRPC v2 over the same Electron MessagePort handshake. Main services live in oRPC initial context (`HaloContext`), provided at `RPCHandler.upgrade`. Procedures are a contract in `src/shared` and an implementer in main. Live session objects become `sessionId` plus procedures. The registry keeps one Pi session per id for the life of the RPC connection; route changes attach and detach the events iterator. Callbacks become `AsyncIteratorObject` streams. Plugin servers export an oRPC router; `listPlugins` writes those routers onto a mutable `plugins` map on the host router and middleware injects `PluginServerContext`.
 
 Cap'n Web object capabilities do not carry over. Plugin classes, instances, and parent-class method walking go away. oRPC v2 is the `@beta` line on [v2.orpc.dev](https://v2.orpc.dev).
 
@@ -40,13 +53,16 @@ Assumption: `RPCHandler` looks up `router.plugins[id]` at call time, so filling 
 
 Assumption: the default `RPCSerializer` is enough for Pi `AgentSessionEvent` values and plugin results. Do not turn on `experimental_transfer` unless a payload fails a round-trip.
 
+Assumption: while `AgentSession.isStreaming` is true, `session.messages` holds the in-progress assistant as its last assistant message. Snapshot peels that message into `streamingMessage`. If the turn has started but no assistant message exists yet, `streamingMessage` is undefined and `isWorking` is still true.
+
 ## Goals
 
 - Renderer and main keep the same MessagePort request/provide channels. Only the session on the port changes.
 - Workspace, sessions list, app update, plugin list, agent prompt, and plugin views keep working through the new client.
 - Main handlers read `WorkspaceService`, `PiService`, `PluginService`, `AgentSessionRegistry`, `getWindow`, and `logger` from `HaloContext`.
 - Plugin servers are oRPC routers. `usePluginServer` returns a typed `RouterClient`. `PluginServerContext` is injected context.
-- Agent session events and workspace tree events stream with `AsyncIteratorObject`. `agentSession.close` and MessagePort close drop the live Pi session. Cancelling the events iterator only unsubscribes.
+- Agent session events and workspace tree events stream with `AsyncIteratorObject`. Cancelling the events iterator only unsubscribes. MessagePort close calls `sessions.closeAll()` and drops live Pi sessions. The renderer does not call `close` on route change.
+- Opening a session that is already live in the registry reuses that Pi session and snapshots `isWorking` / `streamingMessage` from `session.isStreaming`. Navigating away and back mid-prompt still shows the stream.
 - `capnweb` leaves `@halo/desktop` and `@halo/plugin-sdk`. `MessagePortMainTransport` and `HaloRpc` / `AgentSessionRpc` classes go away.
 
 ## Non-goals
@@ -56,6 +72,7 @@ Assumption: the default `RPCSerializer` is enough for Pi `AgentSessionEvent` val
 - No OpenAPI handler, no TanStack Query oRPC adapter, no `@orpc/publisher`.
 - No dual Cap'n Web / oRPC session. No plugin `RpcTarget` class, instance, or superclass-method support.
 - No change to Pi, workspace files, or the preload log bridge.
+- Do not write in-flight streaming tokens to the session file. Pi already owns durable writes.
 
 ## Important files, docs, and websites
 
@@ -66,7 +83,8 @@ Assumption: the default `RPCSerializer` is enough for Pi `AgentSessionEvent` val
 - [`apps/electron/src/main/preload.ts`](../apps/electron/src/main/preload.ts) — forwards `RPC_CHANNELS`; keep the handshake.
 - [`apps/electron/src/renderer/api/HaloRpcClient.ts`](../apps/electron/src/renderer/api/HaloRpcClient.ts) — `newMessagePortRpcSession`.
 - [`apps/electron/src/renderer/api/ApiProvider.tsx`](../apps/electron/src/renderer/api/ApiProvider.tsx) — queries call `HaloApi` methods and `getPlugin`.
-- [`apps/electron/src/renderer/agentSession/useAgentSession.ts`](../apps/electron/src/renderer/agentSession/useAgentSession.ts) — live stub, `subscribe`, `Symbol.dispose`.
+- [`apps/electron/src/shared/AgentSessionState.ts`](../apps/electron/src/shared/AgentSessionState.ts) — feed projection; today `streamingMessage` is always undefined on open and `isWorking` lives only in React.
+- [`apps/electron/src/renderer/agentSession/useAgentSession.ts`](../apps/electron/src/renderer/agentSession/useAgentSession.ts) — live stub, `subscribe`, `Symbol.dispose`. Draft waits for `agent_end` before navigate because reopen cannot show a live stream.
 - [`apps/electron/src/renderer/patterns/WorkspaceFilesystem.tsx`](../apps/electron/src/renderer/patterns/WorkspaceFilesystem.tsx) — `subscribeWorkspaceTree` callback.
 - [`packages/plugin-sdk/src/server.ts`](../packages/plugin-sdk/src/server.ts) — re-exports `RpcTarget`.
 - [`packages/plugin-sdk/src/view.ts`](../packages/plugin-sdk/src/view.ts) — `usePluginServer<S extends RpcTarget>()`.
@@ -298,13 +316,15 @@ export class AgentSessionRegistry {
 -└── api.openAgentSession(id) -> { session: AgentSessionRpc, state }
 -    └── session.subscribe(callback.dup())
 -    └── session.prompt(text)
--    └── session[Symbol.dispose]()
+-    └── session[Symbol.dispose]()  // aborts the run
 +└── client.openAgentSession({ sessionId }) -> { sessionId, state }
++    └── registry hit: snapshot live Pi session (isStreaming)
++    └── registry miss: pi.open + add, then snapshot
 +    └── client.agentSession.events({ sessionId })
 +        └── for await (event of iterator)
 +    └── client.agentSession.prompt({ sessionId, text })
-+    └── client.agentSession.close({ sessionId })
-+        └── AgentSessionRegistry.close -> session.abort / dispose
++    └── unmount: iterator.return()  // unsubscribe only
++└── port close: sessions.closeAll()  // abort + dispose
 
  renderer WorkspaceFilesystem
 -└── api.subscribeWorkspaceTree(callback)
@@ -359,7 +379,7 @@ export class AgentSessionRegistry {
 
 Keep one tree listener, matching `HaloRpc` today. `AgentSessionRegistry.close` unsubscribes, aborts, and `dispose`s the Pi session the way `AgentSessionRpc[Symbol.dispose]` does. `prompt` still rejects empty text with `EmptyPromptError` converted through `orpcErrors.badRequest`. Await in-flight event deliveries before `prompt` returns, same as `AgentSessionRpc.deliveries`.
 
-`newAgentSession` returns `{ sessionId }` immediately. The draft UI can still wait until the first prompt finishes before navigating; it no longer calls `getSessionId`.
+`newAgentSession` returns `{ sessionId }` immediately. It no longer exposes `getSessionId`. This phase still always `pi.open` / `add` on `openAgentSession`. Reuse of a live registry entry and a streaming snapshot land in phase 4, when the renderer stops disposing on unmount.
 
 - [x] Implement `AgentSessionRegistry` and a small async queue used by both generators. Put cleanup in `finally`.
 - [x] Implement `newAgentSession`, `openAgentSession`, `agentSession.events` / `prompt` / `close`, and `subscribeWorkspaceTree`.
@@ -400,6 +420,19 @@ export function usePluginServer<T extends AnyRouter>(): RouterClient<T>;
 export type HaloClient = RouterContractClient<typeof contract> & {
   plugins: Record<string, RouterClient<AnyRouter>>;
 };
+
+// apps/electron/src/shared/AgentSessionState.ts
+export type AgentSessionState = {
+  messages: AgentMessage[];
+  streamingMessage: AgentMessage | undefined;
+  error: string | undefined;
+  isWorking: boolean;
+};
+
+export function agentSessionStateFromSession(session: {
+  messages: AgentMessage[];
+  isStreaming: boolean;
+}): AgentSessionState;
 ```
 
 #### Call stack diff
@@ -430,6 +463,21 @@ export type HaloClient = RouterContractClient<typeof contract> & {
  useAgentSession / WorkspaceFilesystem / ApiProvider
 -└── HaloApiStub RpcStub methods
 +└── HaloClient procedures and iterators
+
+ openAgentSession
+-└── always PiService.openAgentSession + add
+-└── state.streamingMessage = undefined, isWorking = false
++└── registry.get(id) if live, else pi.open + add
++└── agentSessionStateFromSession({ messages, isStreaming })
+
+ useAgentSession unmount
+-└── session[Symbol.dispose] / close  // aborts Pi
++└── events iterator.return()  // unsubscribe only
+
+ useDraftAgentSession
+-└── wait for agent_end, then getSessionId, then navigate
++└── newAgentSession -> { sessionId }, navigate immediately
++└── SavedPane openAgentSession reuses the live registry entry
 ```
 
 #### Code diff preview
@@ -484,6 +532,56 @@ export type HaloClient = RouterContractClient<typeof contract> & {
 +    pluginId: context.pluginId,
 +  })),
 +};
+
+ // apps/electron/src/main/router.ts
+   openAgentSession: os.openAgentSession.handler(async ({ input, context }) => {
++    const live = context.sessions.get(input.sessionId);
++    if (live instanceof Error) {
+       const session = await context.pi.openAgentSession(input.sessionId);
+       if (session instanceof Error) return orpcErrors.badRequest(session);
+       context.sessions.add(session);
+       return {
+         sessionId: session.sessionId,
+         state: agentSessionStateFromSession({
+           messages: session.messages,
+           isStreaming: session.isStreaming,
+         }),
+       };
++    }
++    return {
++      sessionId: live.sessionId,
++      state: agentSessionStateFromSession({
++        messages: live.messages,
++        isStreaming: live.isStreaming,
++      }),
++    };
+   }),
+
+ // apps/electron/src/shared/AgentSessionState.ts
+   export function applyAgentSessionEvent(state, event) {
++    case "agent_start":
++      return { ...state, isWorking: true };
++    case "agent_end":
++      return { ...state, isWorking: false };
+   }
+
+   export function agentSessionStateFromSession(session) {
++    if (session.isStreaming) {
++      const messages = session.messages.slice();
++      const last = messages.at(-1);
++      if (last !== undefined && last.role === "assistant") {
++        messages.pop();
++        return { messages, streamingMessage: last, error: undefined, isWorking: true };
++      }
++      return { messages, streamingMessage: undefined, error: undefined, isWorking: true };
++    }
+     return {
+       messages: session.messages,
+       streamingMessage: undefined,
+       error: errorFromLastAssistantMessage(session.messages),
++      isWorking: false,
+     };
+   }
 ```
 
 `router` is a module-level const. Export a mutable `plugins` map next to it (`export const plugins: Record<string, AnyRouter> = {}`) and spread it onto `router`. `listPlugins` clears `plugins`, loads routers, and assigns `plugins[id] = mountPluginRouter(...)`. Do not replace the `plugins` object.
@@ -492,16 +590,18 @@ export type HaloClient = RouterContractClient<typeof contract> & {
 
 `mountPluginRouter` wraps with `$context<HaloContext>()`, injects `{ pluginId, workspaceRoot }`, and if `next()` returns an `Error` that is not already an `ORPCError`, returns `new ORPCError("PLUGIN_ERROR", { message, cause })`.
 
-Renderer: `usePluginsQuery` sets `servers[id] = api.plugins[id]` with no await. `useAgentSession` uses `openAgentSession` + `events` + `prompt` + `close`. `useDraftAgentSession` uses `newAgentSession` then the same sessionId. `WorkspaceFilesystem` consumes the tree iterator and calls `return()` on cleanup.
+Renderer: `usePluginsQuery` sets `servers[id] = api.plugins[id]` with no await. `useAgentSession` uses `openAgentSession` + `events` + `prompt`. Effect cleanup calls `iterator.return()`, not `close`. `isWorking` comes from `state.isWorking`; drop the parallel React flag. `useDraftAgentSession` calls `newAgentSession`, starts `events` / `prompt`, and navigates with that `sessionId` without waiting for `agent_end`. `WorkspaceFilesystem` consumes the tree iterator and calls `return()` on cleanup. `agentSession.close` stays on the contract for explicit teardown; the renderer does not call it on route change. Port close still runs `sessions.closeAll()`.
 
 Delete `MessagePortMainTransport.ts`, `HaloRpc`, `AgentSessionRpc`, `RpcTarget` exports, and the `capnweb` dependency. Replace `capnweb` in `pluginSdkJitiDependencies` with `@orpc/server` (copy the package closure). Update `haloPluginSkill.md` and the copy-externals test to load `os` / `pluginOs` instead of `RpcTarget`.
 
 Keep `RPC_CHANNELS` and the main-created `MessageChannelMain`. oRPC's Electron doc sends the port from the renderer; Halo already does the reverse and that stays.
 
 - [ ] Switch main, preload comment, renderer client, `ApiProvider`, agent-session hooks, filesystem subscribe, `App` / `Sidebar` / `MainPane` plugin server types, plugin SDK, loader, `PluginService`, skill, externals, and tests in this commit.
+- [ ] Reuse a live registry session in `openAgentSession`. Snapshot with `agentSessionStateFromSession({ messages, isStreaming })`. Put `isWorking` on `AgentSessionState` and fold `agent_start` / `agent_end` in `applyAgentSessionEvent`.
+- [ ] `useAgentSession` unmount cancels the events iterator only. Draft navigates as soon as it has `sessionId`.
 - [ ] Rewrite `PluginService.test.ts` fixtures to export oRPC routers. Keep the MessagePort round-trip: `RPCHandler.upgrade(port1)` + `RPCLink` on `port2` + `createORPCClient`. Assert `client.plugins.calendar.ping()` returns `{ pluginId: "calendar" }`, `fail()` rejects, and `client.plugins.missing.ping()` rejects.
 - [ ] Rewrite loader tests: named `router` / `Server` object exports succeed; a class or function export records a load error matching `must export an oRPC router`.
-- [ ] Smoke the running app: `pnpm halo-web status`, then `pnpm halo-web exec` that `sessions-shell` is visible and Calendar is in the snapshot. Do not commit this check.
+- [ ] Smoke the running app: `pnpm halo-web status`, then `pnpm halo-web exec` that `sessions-shell` is visible and Calendar is in the snapshot. Prompt, leave the session, return while it is still working, and check the transcript still streams. Do not commit this check.
 - [ ] Run `pnpm run check-affected`.
 
 Plugin ids must not be oRPC reserved router keys (`then`, `bind`, `valueOf`, `toString`, `toJSON`). Folder names in `.halo/plugins` already avoid those.
