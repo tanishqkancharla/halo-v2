@@ -1,18 +1,7 @@
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  call,
-  getRouter,
-  os as orpc,
-  ORPCError,
-  Procedure,
-  unlazy,
-  type AnyRouter,
-  type ErrorMap,
-  type ORPCErrorConstructorMap,
-  type ProcedureHandlerOptions,
-} from "@orpc/server";
+import { os as orpc, ORPCError, type AnyRouter } from "@orpc/server";
 import * as errore from "errore";
 import type { PluginList } from "../../shared/plugin.js";
 import { orpcErrors } from "../orpcErrors.js";
@@ -32,6 +21,7 @@ export class PluginIoError extends errore.createTaggedError({
 
 export class PluginService {
   readonly router: Record<string, AnyRouter> = {};
+  readonly lazyRouter = orpc.lazy(async () => ({ default: this.router }));
 
   constructor(private readonly workspace: WorkspaceService) {}
 
@@ -99,28 +89,6 @@ export class PluginService {
       if (compiled !== undefined) compiledViews.push(compiled);
     }
     return { plugins, compiledViews, errors };
-  }
-
-  async route(
-    request: ProcedureHandlerOptions<
-      HaloContext,
-      unknown,
-      ORPCErrorConstructorMap<ErrorMap>
-    >,
-  ) {
-    const path = request.path.slice(1);
-    const found = getRouter(this.router, path);
-    if (found === undefined) return orpcErrors.notImplemented();
-    const resolved = await unlazy(found);
-    const procedure = resolved.default;
-    if (!(procedure instanceof Procedure)) return orpcErrors.notImplemented();
-    return call(procedure, request.input, request).catch((e) => {
-      if (e instanceof ORPCError) return e;
-      return new ORPCError("PLUGIN_ERROR", {
-        message: e instanceof Error ? e.message : String(e),
-        cause: e,
-      });
-    });
   }
 
   private clearMounted() {

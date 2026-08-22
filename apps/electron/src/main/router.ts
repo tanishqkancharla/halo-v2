@@ -1,9 +1,5 @@
 import { dialog, type BrowserWindow } from "electron";
-import { implement, os as orpc } from "@orpc/server";
-import type {
-  StandardHandlerInterceptor,
-  StandardHandlerRoutingInterceptor,
-} from "@orpc/server/standard";
+import { implement } from "@orpc/server";
 import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
@@ -27,10 +23,6 @@ export type HaloContext = {
 };
 
 const os = implement(contract).$context<HaloContext>();
-
-const plugins = orpc
-  .$context<HaloContext>()
-  .handler((request) => request.context.plugins.route(request));
 
 export const router = {
   getAppInfo: os.getAppInfo.handler(({ context }) => {
@@ -180,42 +172,4 @@ export const router = {
       if (closed instanceof Error) return orpcErrors.badRequest(closed);
     }),
   },
-  plugins,
 };
-
-const nestedPluginPaths = new WeakMap<object, string[]>();
-
-const rewriteNestedPluginPath: StandardHandlerRoutingInterceptor<
-  HaloContext
-> = ({ next, request, ...rest }) => {
-  const path = procedurePath(request.url);
-  if (path[0] !== "plugins" || path.length < 2) {
-    return next();
-  }
-  const rewritten = { ...request, url: "/plugins" as const };
-  nestedPluginPaths.set(rewritten, path);
-  return next({ ...rest, request: rewritten });
-};
-
-const restoreNestedPluginPath: StandardHandlerInterceptor<HaloContext> = ({
-  next,
-  request,
-  ...rest
-}) => {
-  const path = nestedPluginPaths.get(request);
-  if (path === undefined) {
-    return next();
-  }
-  return next({ ...rest, request, path });
-};
-
-export const pluginHandlerOptions = {
-  routingInterceptors: [rewriteNestedPluginPath],
-  interceptors: [restoreNestedPluginPath],
-};
-
-function procedurePath(url: string) {
-  const queryStart = url.indexOf("?");
-  const pathname = queryStart === -1 ? url : url.slice(0, queryStart);
-  return pathname.split("/").filter((segment) => segment.length > 0);
-}

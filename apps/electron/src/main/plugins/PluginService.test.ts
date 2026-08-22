@@ -17,7 +17,7 @@ import { AgentSessionRegistry } from "../AgentSessionRegistry.js";
 import { PiService } from "../pi-service.js";
 import { UserService } from "../UserService.js";
 import { RPCHandler } from "@orpc/server/message-port";
-import { pluginHandlerOptions, router, type HaloContext } from "../router.js";
+import { router, type HaloContext } from "../router.js";
 import { PluginService } from "./PluginService.js";
 
 type PluginFiles = Record<string, string>;
@@ -86,7 +86,10 @@ async function withHaloClient(
     },
     logger: new Logger(),
   };
-  const handler = new RPCHandler(router, pluginHandlerOptions);
+  const handler = new RPCHandler({
+    ...router,
+    plugins: plugins.lazyRouter,
+  });
   const { port1, port2 } = new MessageChannel();
   handler.upgrade(port1, { context });
   const link = new RPCLink({ port: port2 });
