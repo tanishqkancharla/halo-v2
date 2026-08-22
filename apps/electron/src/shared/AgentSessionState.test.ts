@@ -4,6 +4,7 @@ import {
   agentSessionStateFromSession,
   applyAgentSessionEvent,
   emptyAgentSessionState,
+  lastAssistantTurnWasAborted,
 } from "./AgentSessionState.js";
 
 const emptyUsage = {
@@ -125,6 +126,26 @@ describe("applyAgentSessionEvent", () => {
 
     expect(next.error).toBeUndefined();
     expect(next.messages).toEqual([message]);
+    expect(lastAssistantTurnWasAborted(next.messages)).toBe(true);
+  });
+
+  test("clears the abort annotation when the user sends another message", () => {
+    const aborted = assistantMessage({
+      stopReason: "aborted",
+      errorMessage: "Request was aborted",
+      content: [],
+      timestamp: 5,
+    });
+    const state = applyAgentSessionEvent(emptyAgentSessionState(), {
+      type: "message_end",
+      message: aborted,
+    });
+    const next = applyAgentSessionEvent(state, {
+      type: "message_start",
+      message: userMessage("try again", 6),
+    });
+
+    expect(lastAssistantTurnWasAborted(next.messages)).toBe(false);
   });
 
   test("does not invent an alert when stopReason is error without errorMessage", () => {
@@ -199,6 +220,7 @@ describe("agentSessionStateFromSession", () => {
 
     expect(state.error).toBeUndefined();
     expect(state.messages).toEqual([userMessage("hello", 10), aborted]);
+    expect(lastAssistantTurnWasAborted(state.messages)).toBe(true);
   });
 
   test("does not surface an earlier error when the last assistant turn succeeded", () => {

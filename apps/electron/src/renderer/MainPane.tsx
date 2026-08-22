@@ -24,7 +24,10 @@ import {
   sessionViewItems,
   type SessionViewItem,
 } from "./agentSession/sessionView.ts";
-import type { AgentSessionState } from "../shared/AgentSessionState.ts";
+import {
+  lastAssistantTurnWasAborted,
+  type AgentSessionState,
+} from "../shared/AgentSessionState.ts";
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
@@ -256,7 +259,10 @@ function SessionView({
   const viewRef = useRef<HTMLDivElement>(null);
   const view = useStyles(styles.view);
   const thinking = useStyles(styles.thinking);
+  const stopped = useStyles(styles.stopped);
   const items = sessionViewItems(state);
+  const showStopped =
+    !isWorking && lastAssistantTurnWasAborted(state.messages);
 
   useLayoutEffect(() => {
     const element = viewRef.current;
@@ -279,6 +285,11 @@ function SessionView({
         <span className={thinking}>
           <Loader size="0.75em" variant="muted" aria-label="Thinking" />
           Thinking
+        </span>
+      ) : undefined}
+      {showStopped ? (
+        <span className={stopped} role="status">
+          Stopped
         </span>
       ) : undefined}
     </div>
@@ -434,6 +445,9 @@ const styles = {
     text("xs", 400, "lowContrast"),
     flex({ align: "center", gap: 4 }),
   ),
+  stopped: style(text("xs", 400, "lowContrast"), {
+    alignSelf: "flex-end",
+  }),
   messageBody: style(text("md", 400, "highContrast"), {
     minWidth: 0,
     whiteSpace: "pre-wrap",
