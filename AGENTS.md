@@ -5,6 +5,7 @@ Halo is an open-source self-modifiable desktop app built with Electron and Pi. I
 ## Commands
 
 - `pnpm run check-affected` - Lint, typecheck, format-check, and test affected packages. Run this after edits before you treat the work as done.
+- `pnpm spec <file>` / `pnpm walkthrough <file>` / `pnpm exec tkstack <file>` - Serve a spec or code walkthrough as a local tkstack page.
 
 ## Releasing
 
