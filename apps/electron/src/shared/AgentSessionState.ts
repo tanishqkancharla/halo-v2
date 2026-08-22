@@ -104,9 +104,22 @@ function errorFromLastAssistantMessage(
   return undefined;
 }
 
+/** True when the latest user turn ended in a user abort. */
+export function lastAssistantTurnWasAborted(messages: AgentMessage[]): boolean {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message === undefined) continue;
+    if (message.role === "toolResult") continue;
+    if (message.role === "user") return false;
+    if (message.role === "assistant") return message.stopReason === "aborted";
+  }
+  return false;
+}
+
 /** Readable alert text when an assistant turn failed. */
 function assistantTurnError(message: AgentMessage): string | undefined {
   if (message.role !== "assistant") return undefined;
+  if (message.stopReason === "aborted") return undefined;
 
   const errorMessage = message.errorMessage;
   const hasErrorMessage = errorMessage !== undefined && errorMessage.length > 0;

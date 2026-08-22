@@ -24,7 +24,10 @@ import {
   sessionViewItems,
   type SessionViewItem,
 } from "./agentSession/sessionView.ts";
-import type { AgentSessionState } from "../shared/AgentSessionState.ts";
+import {
+  lastAssistantTurnWasAborted,
+  type AgentSessionState,
+} from "../shared/AgentSessionState.ts";
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
@@ -101,7 +104,7 @@ function SavedPane({
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body);
   const column = useStyles(styles.column);
-  const { state, isWorking, prompt } = useAgentSession(sessionId);
+  const { state, isWorking, prompt, abort } = useAgentSession(sessionId);
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
   );
@@ -113,7 +116,13 @@ function SavedPane({
       <div className={body}>
         <div className={column}>
           <SessionView state={state} isWorking={isWorking} />
-          <Composer key={sessionId} error={state.error} onSubmit={prompt} />
+          <Composer
+            key={sessionId}
+            error={state.error}
+            isWorking={isWorking}
+            onSubmit={prompt}
+            onStop={abort}
+          />
         </div>
       </div>
     </main>
@@ -122,9 +131,11 @@ function SavedPane({
 
 function DraftPane({ draftId }: { draftId: string }) {
   const [, navigate] = useLocation();
-  const { state, isWorking, prompt } = useDraftAgentSession((sessionId) => {
-    navigate(`/sessions/${sessionId}`);
-  });
+  const { state, isWorking, prompt, abort } = useDraftAgentSession(
+    (sessionId) => {
+      navigate(`/sessions/${sessionId}`);
+    },
+  );
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body, styles.bodyTop);
   const column = useStyles(styles.column);
@@ -138,7 +149,13 @@ function DraftPane({ draftId }: { draftId: string }) {
           {hasMessages ? (
             <SessionView state={state} isWorking={isWorking} />
           ) : undefined}
-          <Composer key={draftId} error={state.error} onSubmit={prompt} />
+          <Composer
+            key={draftId}
+            error={state.error}
+            isWorking={isWorking}
+            onSubmit={prompt}
+            onStop={abort}
+          />
         </div>
       </div>
     </main>
@@ -147,10 +164,14 @@ function DraftPane({ draftId }: { draftId: string }) {
 
 function Composer({
   error,
+  isWorking,
   onSubmit,
+  onStop,
 }: {
   error: string | undefined;
+  isWorking: boolean;
   onSubmit: (prompt: string) => Promise<void | Error>;
+  onStop: () => Promise<void | Error>;
 }) {
   const [draft, setDraft] = useState("");
   const composer = useStyles(styles.composer);
@@ -158,7 +179,7 @@ function Composer({
   const sendButton = useStyles(styles.sendButton);
   const sendIcon = useStyles(icon("sm"));
   const trimmedText = draft.trim();
-  const sendDisabled = trimmedText.length === 0;
+  const showStop = isWorking && trimmedText.length === 0;
 
   async function submit() {
     if (!trimmedText) return;
@@ -188,15 +209,43 @@ function Composer({
       }
       actions={
         <Button
-          aria-label="Send"
+          aria-label={showStop ? "Stop" : "Send"}
           className={sendButton}
-          disabled={sendDisabled}
-          onClick={submit}
+          disabled={!showStop && trimmedText.length === 0}
+          onClick={showStop ? onStop : submit}
         >
-          <Icons.ArrowUp className={sendIcon} aria-hidden="true" />
+          {showStop ? (
+            <StopIcon className={sendIcon} />
+          ) : (
+            <Icons.ArrowUp className={sendIcon} aria-hidden="true" />
+          )}
         </Button>
       }
     />
+  );
+}
+
+function StopIcon({ className }: { className: string }) {
+  return (
+    <svg
+      className={className}
+      focusable="false"
+      aria-hidden="true"
+      role="img"
+      width={24}
+      height={24}
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <rect
+        width="12.5"
+        height="12.5"
+        x="5.75"
+        y="5.75"
+        rx="1"
+        fill="currentColor"
+      />
+    </svg>
   );
 }
 
@@ -210,7 +259,9 @@ function SessionView({
   const viewRef = useRef<HTMLDivElement>(null);
   const view = useStyles(styles.view);
   const thinking = useStyles(styles.thinking);
+  const stopped = useStyles(styles.stopped);
   const items = sessionViewItems(state);
+  const showStopped = !isWorking && lastAssistantTurnWasAborted(state.messages);
 
   useLayoutEffect(() => {
     const element = viewRef.current;
@@ -233,6 +284,11 @@ function SessionView({
         <span className={thinking}>
           <Loader size="0.75em" variant="muted" aria-label="Thinking" />
           Thinking
+        </span>
+      ) : undefined}
+      {showStopped ? (
+        <span className={stopped} role="status">
+          Stopped
         </span>
       ) : undefined}
     </div>
@@ -388,6 +444,9 @@ const styles = {
     text("xs", 400, "lowContrast"),
     flex({ align: "center", gap: 4 }),
   ),
+  stopped: style(text("md", 500, "highContrast"), {
+    alignSelf: "flex-end",
+  }),
   messageBody: style(text("md", 400, "highContrast"), {
     minWidth: 0,
     whiteSpace: "pre-wrap",
