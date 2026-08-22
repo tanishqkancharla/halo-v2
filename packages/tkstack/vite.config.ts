@@ -1,14 +1,14 @@
+import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-const packageRoot = path.dirname(fileURLToPath(import.meta.url));
-
 export default defineConfig({
   // Browser ESM cannot load CJS packages such as Pierre. Vite writes one
-  // prebundle into this directory and reuses it until dependencies change.
-  cacheDir: path.join(packageRoot, "node_modules/.vite"),
+  // prebundle and reuses it until dependencies change. Use tmpdir because
+  // pnpm's content-addressable store is read-only when this package is
+  // installed from npm.
+  cacheDir: path.join(os.tmpdir(), "tkstack-vite"),
   optimizeDeps: {
     include: [
       "react",

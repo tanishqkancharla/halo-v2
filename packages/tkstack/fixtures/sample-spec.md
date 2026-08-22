@@ -67,4 +67,4 @@ type StartServerInput = {
 - [ ] Add a `pnpm spec` alias that runs the same CLI.
 - [ ] Teach generate-spec-v2 to serve `specs/<name>.md` after writing it.
 - [ ] Smoke that mermaid and diffs render. Do not commit this check until the feature is package-level end-to-end testable.
-- [ ] Run `pnpm --filter tkstack typecheck`.
+- [ ] Run `pnpm --filter @tanishqkancharla/tkstack typecheck`.

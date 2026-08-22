@@ -1,24 +1,43 @@
 {
-  "name": "tkstack",
+  "name": "@tanishqkancharla/tkstack",
   "version": "0.1.0",
-  "private": true,
-  "bin": {
-    "tkstack": "./src/cli.ts"
+  "description": "Serve a spec or code walkthrough as a local page",
+  "license": "MIT",
+  "author": "Tanishq Kancharla",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tanishqkancharla/halo-v2.git",
+    "directory": "packages/tkstack"
   },
+  "bin": {
+    "tkstack": "./bin.js"
+  },
+  "files": [
+    "bin.js",
+    "index.html",
+    "src",
+    "vite.config.ts"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
     "cli": "node --import tsx src/cli.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src vite.config.ts",
-    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src vite.config.ts",
-    "typecheck": "tsc --noEmit"
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src vite.config.ts bin.js",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src vite.config.ts bin.js",
+    "typecheck": "tsc --noEmit",
+    "release": "pnpm publish --access public"
   },
   "dependencies": {
     "@pierre/diffs": "^1.3.5",
+    "@vitejs/plugin-react": "^4.7.0",
     "beautiful-mermaid": "^1.1.3",
     "errore": "^0.14.1",
     "incur": "^0.4.20",
@@ -26,17 +45,16 @@
     "md4x": "^0.0.29",
     "purse-styles": "^0.2.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "tsx": "^4.21.0",
+    "vite": "^8.2.1"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
-    "@vitejs/plugin-react": "^4.7.0",
-    "tsx": "^4.21.0",
-    "typescript": "7.0.2",
-    "vite": "^8.2.1"
+    "typescript": "7.0.2"
   },
   "engines": {
     "node": ">=22"
