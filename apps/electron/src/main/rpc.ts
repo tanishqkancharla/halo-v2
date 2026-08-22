@@ -14,7 +14,11 @@ import {
   type WorkspaceInfo,
   type WorkspaceTreeEventHandler,
 } from "../shared/rpc.js";
-import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
+import {
+  AbortFailedError,
+  EmptyPromptError,
+  PromptFailedError,
+} from "./agent-session-errors.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
 import type { PiService } from "./pi-service.js";
 import type { PluginService } from "./plugins/PluginService.js";
@@ -183,6 +187,19 @@ export class AgentSessionRpc extends AgentSessionApi {
           }),
       );
     if (prompted instanceof Error) throw prompted;
+    await this.deliveries;
+  }
+
+  async abort() {
+    this.logger.info({ event: "abort" });
+    const aborted = await this.session.abort().catch(
+      (e) =>
+        new AbortFailedError({
+          reason: e instanceof Error ? e.message : String(e),
+          cause: e,
+        }),
+    );
+    if (aborted instanceof Error) throw aborted;
     await this.deliveries;
   }
 
