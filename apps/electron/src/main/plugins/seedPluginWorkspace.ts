@@ -3,8 +3,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as errore from "errore";
-import calendarPackageJson from "../bundled/calendar/package.json?raw";
-import calendarView from "../bundled/calendar/view.tsx?raw";
 import haloPluginSkill from "./haloPluginSkill.md?raw";
 import mauiSkill from "../bundled/mauiSkill.md?raw";
 import type { WorkspaceLayout } from "../workspace-service.js";
@@ -19,7 +17,6 @@ const compilePluginViewRel =
   "apps/electron/src/main/plugins/compilePluginView.ts";
 
 export async function seedPluginWorkspace(layout: WorkspaceLayout) {
-  const calendarDir = join(layout.root, ".halo", "plugins", "calendar");
   const pluginSkillPath = join(
     layout.agentDir,
     "skills",
@@ -27,16 +24,6 @@ export async function seedPluginWorkspace(layout: WorkspaceLayout) {
     "SKILL.md",
   );
   const mauiSkillPath = join(layout.agentDir, "skills", "maui", "SKILL.md");
-  const packageJson = await writeIfMissing(
-    join(calendarDir, "package.json"),
-    calendarPackageJson,
-  );
-  if (packageJson instanceof Error) return packageJson;
-  const view = await writeIfMissing(
-    join(calendarDir, "view.tsx"),
-    calendarView,
-  );
-  if (view instanceof Error) return view;
   const pluginSkill = await writeIfMissing(
     pluginSkillPath,
     skillWithHaloSourcePaths(haloPluginSkill),
