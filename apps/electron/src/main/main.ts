@@ -27,7 +27,7 @@ import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
 import { PiService } from "./pi-service.js";
 import { PluginService } from "./plugins/PluginService.js";
-import { router } from "./router.js";
+import { createHaloContext, createRouter } from "./router.js";
 import { UserService } from "./UserService.js";
 import { WorkspaceService } from "./workspace-service.js";
 
@@ -163,7 +163,21 @@ function registerRpcBridge(): void {
       throw new Error("Halo rejected RPC without a sender frame.");
     }
     const { port1, port2 } = new MessageChannelMain();
-    const handler = new RPCHandler(router, {
+    const sessions = new AgentSessionRegistry();
+    const context = createHaloContext({
+      workspace: workspaceService,
+      pi: piService,
+      plugins: pluginService,
+      sessions,
+      getWindow: () => {
+        if (mainWindow === undefined) {
+          throw new Error("Halo main window is not open.");
+        }
+        return mainWindow;
+      },
+      logger: rpcLogger,
+    });
+    const handler = new RPCHandler(createRouter(context), {
       interceptors: [
         onError((error) => {
           if (error instanceof Error) {
@@ -174,22 +188,7 @@ function registerRpcBridge(): void {
         }),
       ],
     });
-    const sessions = new AgentSessionRegistry();
-    handler.upgrade(port1, {
-      context: () => ({
-        workspace: workspaceService,
-        pi: piService,
-        plugins: pluginService,
-        sessions,
-        getWindow: () => {
-          if (mainWindow === undefined) {
-            throw new Error("Halo main window is not open.");
-          }
-          return mainWindow;
-        },
-        logger: rpcLogger,
-      }),
-    });
+    handler.upgrade(port1, { context });
     port1.start();
     port1.on("close", () => {
       sessions.closeAll();

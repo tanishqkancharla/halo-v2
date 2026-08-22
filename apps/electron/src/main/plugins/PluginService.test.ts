@@ -17,7 +17,7 @@ import { loadPluginViews } from "../../renderer/evaluatePluginView.js";
 import { AgentSessionRegistry } from "../AgentSessionRegistry.js";
 import { PiService } from "../pi-service.js";
 import { UserService } from "../UserService.js";
-import { router } from "../router.js";
+import { createHaloContext, createRouter } from "../router.js";
 import { PluginService } from "./PluginService.js";
 
 type PluginFiles = Record<string, string>;
@@ -74,22 +74,20 @@ async function withHaloClient(
   appDataDir: string,
   run: (client: HaloClient) => Promise<void>,
 ) {
-  const pluginService = new PluginService(workspace);
   const sessions = new AgentSessionRegistry();
-  const handler = new RPCHandler(router);
-  const { port1, port2 } = new MessageChannel();
-  handler.upgrade(port1, {
-    context: {
-      workspace,
-      pi: new PiService(workspace, new UserService(appDataDir)),
-      plugins: pluginService,
-      sessions,
-      getWindow: () => {
-        throw new Error("no window");
-      },
-      logger: new Logger(),
+  const context = createHaloContext({
+    workspace,
+    pi: new PiService(workspace, new UserService(appDataDir)),
+    plugins: new PluginService(workspace),
+    sessions,
+    getWindow: () => {
+      throw new Error("no window");
     },
+    logger: new Logger(),
   });
+  const handler = new RPCHandler(createRouter(context));
+  const { port1, port2 } = new MessageChannel();
+  handler.upgrade(port1, { context });
   const link = new RPCLink({ port: port2 });
   port1.start();
   port2.start();

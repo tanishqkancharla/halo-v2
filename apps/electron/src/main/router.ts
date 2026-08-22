@@ -20,6 +20,7 @@ export type HaloContext = {
   workspace: WorkspaceService;
   pi: PiService;
   plugins: PluginService;
+  pluginRouters: Record<string, AnyRouter>;
   sessions: AgentSessionRegistry;
   getWindow: () => BrowserWindow;
   logger: Logger;
@@ -27,14 +28,14 @@ export type HaloContext = {
 
 const os = implement(contract).$context<HaloContext>();
 
-export const plugins: Record<string, AnyRouter> = {};
+export function createHaloContext(
+  rest: Omit<HaloContext, "pluginRouters">,
+): HaloContext {
+  return { ...rest, pluginRouters: {} };
+}
 
-// oRPC indexes procedures when RPCHandler is constructed. implement(contract)
-// hides extra keys behind the contract, which has no plugins field. Lazy
-// records /plugins as pending and indexes this map on the first plugin call,
-// after listPlugins has filled it.
-export const router = {
-  ...os.router({
+export function createRouter(halo: HaloContext) {
+  return {
     getAppInfo: os.getAppInfo.handler(({ context }) => {
       context.logger.info({ event: "getAppInfo" });
       return getAppInfo();
@@ -75,11 +76,14 @@ export const router = {
       context.logger.info({ event: "listPlugins" });
       const listed = await context.plugins.list();
       if (listed instanceof Error) return orpcErrors.badRequest(listed);
-      for (const id of Object.keys(plugins)) {
-        delete plugins[id];
+      for (const id of Object.keys(context.pluginRouters)) {
+        delete context.pluginRouters[id];
       }
       for (const [id, loaded] of Object.entries(listed.routers)) {
-        plugins[id] = mountPluginRouter({ pluginId: id, router: loaded });
+        context.pluginRouters[id] = mountPluginRouter({
+          pluginId: id,
+          router: loaded,
+        });
       }
       context.logger.info({
         event: "listPluginsResult",
@@ -194,11 +198,14 @@ export const router = {
         if (closed instanceof Error) return orpcErrors.badRequest(closed);
       }),
     },
-  }),
-  plugins: orpc
-    .$context<HaloContext>()
-    .lazy(async () => ({ default: plugins })),
-};
+    // oRPC indexes procedures when RPCHandler is constructed, before
+    // listPlugins fills context.pluginRouters. Lazy records /plugins as
+    // pending and indexes that map on the first plugin call.
+    plugins: orpc
+      .$context<HaloContext>()
+      .lazy(async () => ({ default: halo.pluginRouters })),
+  };
+}
 
 function mountPluginRouter(args: { pluginId: string; router: AnyRouter }) {
   return orpc

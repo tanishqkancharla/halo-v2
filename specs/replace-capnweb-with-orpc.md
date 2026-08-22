@@ -49,7 +49,7 @@ Replace Cap'n Web with oRPC v2 over the same Electron MessagePort handshake. Mai
 
 Cap'n Web object capabilities do not carry over. Plugin classes, instances, and parent-class method walking go away. oRPC v2 is the `@beta` line on [v2.orpc.dev](https://v2.orpc.dev).
 
-Assumption: oRPC's RPCMatcher indexes procedures when `RPCHandler` is constructed. `implement(contract).router(...)` hides extra keys behind the contract, which has no `plugins` field. Expose plugins as `os.lazy(() => ({ default: plugins }))` on a plain object copied off that hidden contract, so the matcher records `/plugins` as pending and indexes the map on the first `/plugins/...` call. Halo calls `listPlugins` before plugin RPCs, so that load sees the filled map. Lazy loads once per handler; a new MessagePort (window reload) builds a new handler. Do not snapshot an empty map at upgrade. If a call lands before `listPlugins`, the procedure is missing and oRPC returns its normal not-found error.
+Assumption: oRPC's RPCMatcher indexes procedures when `RPCHandler` is constructed. Plugin routers live on `HaloContext.pluginRouters` (one map per MessagePort). `listPlugins` writes that map. The matcher cannot read context, so `createRouter(context)` exposes `plugins: os.lazy(() => ({ default: context.pluginRouters }))` and indexes it on the first `/plugins/...` call. Halo calls `listPlugins` before plugin RPCs, so that load sees the filled map. Lazy loads once per handler; a new MessagePort (window reload) builds a new context and handler. If a call lands before `listPlugins`, the procedure is missing and oRPC returns its normal not-found error.
 
 Assumption: the default `RPCSerializer` is enough for Pi `AgentSessionEvent` values and plugin results. Do not turn on `experimental_transfer` unless a payload fails a round-trip.
 
@@ -584,7 +584,7 @@ export function agentSessionStateFromSession(session: {
    }
 ```
 
-`router` is a module-level const. Export a mutable `plugins` map next to it (`export const plugins: Record<string, AnyRouter> = {}`). Spread the implemented contract router into a new object (so the hidden contract does not hide extra keys) and set `plugins: orpc.lazy(async () => ({ default: plugins }))`. `listPlugins` clears `plugins`, loads routers, and assigns `plugins[id] = mountPluginRouter(...)`. Do not replace the `plugins` object.
+`createHaloContext` allocates `pluginRouters: {}` on the per-port `HaloContext`. `createRouter(context)` is a plain object of `os.<procedure>.handler(...)` plus `plugins: orpc.lazy(() => ({ default: context.pluginRouters }))`. Do not wrap that object in `os.router()`; that hides extra keys behind the contract. `listPlugins` clears `context.pluginRouters` and assigns `context.pluginRouters[id] = mountPluginRouter(...)`. Do not replace the `pluginRouters` object. Pass the same context object to `createRouter` and `RPCHandler.upgrade`.
 
 `loadPluginServer` accepts `default` or named `router` / `Server` if the value is a plain router object (nested objects of procedures). A function or class is a load error: `server must export an oRPC router`. Drop instance exports and `instanceof RpcTarget`. Detect procedures with oRPC `isProcedure` (or the equivalent public helper in `@orpc/server`).
 
