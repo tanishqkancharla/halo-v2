@@ -183,6 +183,19 @@ describe("applyAgentSessionEvent", () => {
 
     expect(next.error).toBe("previous failure");
   });
+
+  test("sets isWorking on agent_start and clears it on agent_end", () => {
+    const started = applyAgentSessionEvent(emptyAgentSessionState(), {
+      type: "agent_start",
+    });
+    expect(started.isWorking).toBe(true);
+
+    const ended = applyAgentSessionEvent(started, {
+      type: "agent_end",
+      messages: [],
+    });
+    expect(ended.isWorking).toBe(false);
+  });
 });
 
 describe("agentSessionStateFromSession", () => {
@@ -200,11 +213,13 @@ describe("agentSessionStateFromSession", () => {
     });
     const state = agentSessionStateFromSession({
       messages: [userMessage("hello", 10), failed],
+      isStreaming: false,
     });
 
     expect(state.error).toBe("API keys are not supported by this API.");
     expect(state.messages).toEqual([userMessage("hello", 10), failed]);
     expect(state.streamingMessage).toBeUndefined();
+    expect(state.isWorking).toBe(false);
   });
 
   test("does not surface an aborted durable assistant turn as an error", () => {
@@ -216,6 +231,7 @@ describe("agentSessionStateFromSession", () => {
     });
     const state = agentSessionStateFromSession({
       messages: [userMessage("hello", 10), aborted],
+      isStreaming: false,
     });
 
     expect(state.error).toBeUndefined();
@@ -237,6 +253,7 @@ describe("agentSessionStateFromSession", () => {
     });
     const state = agentSessionStateFromSession({
       messages: [userMessage("one", 10), failed, userMessage("two", 30), ok],
+      isStreaming: false,
     });
 
     expect(state.error).toBeUndefined();
@@ -245,7 +262,37 @@ describe("agentSessionStateFromSession", () => {
   test("returns no error when the session has no assistant messages", () => {
     const state = agentSessionStateFromSession({
       messages: [userMessage("hello", 1)],
+      isStreaming: false,
     });
     expect(state.error).toBeUndefined();
+    expect(state.isWorking).toBe(false);
+  });
+
+  test("peels the last assistant into streamingMessage when isStreaming", () => {
+    const assistant = assistantMessage({
+      stopReason: "stop",
+      content: [{ type: "text", text: "hi" }],
+      timestamp: 2,
+    });
+    const state = agentSessionStateFromSession({
+      messages: [userMessage("hello", 1), assistant],
+      isStreaming: true,
+    });
+
+    expect(state.messages).toEqual([userMessage("hello", 1)]);
+    expect(state.streamingMessage).toEqual(assistant);
+    expect(state.isWorking).toBe(true);
+    expect(state.error).toBeUndefined();
+  });
+
+  test("keeps isWorking when streaming with no assistant yet", () => {
+    const state = agentSessionStateFromSession({
+      messages: [userMessage("hello", 1)],
+      isStreaming: true,
+    });
+
+    expect(state.messages).toEqual([userMessage("hello", 1)]);
+    expect(state.streamingMessage).toBeUndefined();
+    expect(state.isWorking).toBe(true);
   });
 });

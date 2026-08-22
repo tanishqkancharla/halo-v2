@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RpcStub, RpcTarget } from "capnweb";
+import type { AnyRouter, RouterClient } from "@orpc/server";
 import { colors, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router } from "wouter";
@@ -80,7 +80,7 @@ function WorkspaceShell({
   sessions: SessionSummary[];
   pluginViews: LoadedPluginView[];
   pluginErrors: PluginLoadError[];
-  pluginServers: Record<string, RpcStub<RpcTarget>>;
+  pluginServers: Record<string, RouterClient<AnyRouter>>;
   alertMessage?: string;
   appInfo?: AppInfo;
 }) {

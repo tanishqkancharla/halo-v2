@@ -11,6 +11,7 @@ export type AgentSessionState = {
   messages: AgentMessage[];
   streamingMessage: AgentMessage | undefined;
   error: string | undefined;
+  isWorking: boolean;
 };
 
 export function emptyAgentSessionState(): AgentSessionState {
@@ -18,17 +19,39 @@ export function emptyAgentSessionState(): AgentSessionState {
     messages: [],
     streamingMessage: undefined,
     error: undefined,
+    isWorking: false,
   };
 }
 
 /** Build feed state from a live Pi session's loaded messages. */
 export function agentSessionStateFromSession(session: {
   messages: AgentMessage[];
+  isStreaming: boolean;
 }): AgentSessionState {
+  if (session.isStreaming) {
+    const messages = session.messages.slice();
+    const last = messages.at(-1);
+    if (last !== undefined && last.role === "assistant") {
+      messages.pop();
+      return {
+        messages,
+        streamingMessage: last,
+        error: undefined,
+        isWorking: true,
+      };
+    }
+    return {
+      messages,
+      streamingMessage: undefined,
+      error: undefined,
+      isWorking: true,
+    };
+  }
   return {
     messages: session.messages,
     streamingMessage: undefined,
     error: errorFromLastAssistantMessage(session.messages),
+    isWorking: false,
   };
 }
 
@@ -86,6 +109,12 @@ export function applyAgentSessionEvent(
         };
       }
       return state;
+
+    case "agent_start":
+      return { ...state, isWorking: true };
+
+    case "agent_end":
+      return { ...state, isWorking: false };
 
     default:
       return state;

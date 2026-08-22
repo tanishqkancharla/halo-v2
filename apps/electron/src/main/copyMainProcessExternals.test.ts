@@ -35,11 +35,13 @@ describe("copyMainProcessExternals", () => {
           "@halo/plugin-sdk/view": view,
         },
       });
-      // SAFETY: jiti loads this alias from disk; the SDK module exports RpcTarget.
+      // SAFETY: jiti loads this alias from disk; the SDK module exports os and pluginOs.
       const loaded = (await jiti.import("@halo/plugin-sdk/server")) as {
-        RpcTarget: unknown;
+        os: unknown;
+        pluginOs: { handler: unknown };
       };
-      expect(isCallable({ value: loaded.RpcTarget })).toBe(true);
+      expect(loaded.os).toBeDefined();
+      expect(isCallable({ value: loaded.pluginOs.handler })).toBe(true);
     },
   );
 });

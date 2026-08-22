@@ -3,6 +3,7 @@ import type { FileTree as FileTreeModel } from "@pierre/trees";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import type { WorkspaceTreeEvent } from "../../shared/rpc.js";
+import type { HaloClient } from "../../shared/contract.js";
 import {
   useApi,
   useWorkspacePathsQuery,
@@ -34,7 +35,7 @@ export function WorkspaceFilesystem({
   useEffect(() => {
     if (workspaceRoot === undefined) return;
 
-    api.subscribeWorkspaceTree((events) => {
+    const stop = listenWorkspaceTree(api, (events) => {
       applyTreeEvents(modelRef.current, events);
       queryClient.setQueryData(
         workspacePathsQueryKey(workspaceRoot),
@@ -50,7 +51,7 @@ export function WorkspaceFilesystem({
     });
 
     return () => {
-      api.subscribeWorkspaceTree(() => {});
+      stop();
       modelRef.current = undefined;
     };
   }, [api, queryClient, workspaceRoot]);
@@ -71,6 +72,30 @@ export function WorkspaceFilesystem({
       />
     </SidebarSection>
   );
+}
+
+function listenWorkspaceTree(
+  api: HaloClient,
+  onEvents: (events: WorkspaceTreeEvent[]) => void,
+) {
+  let cancelled = false;
+  let iterator:
+    | Awaited<ReturnType<HaloClient["subscribeWorkspaceTree"]>>
+    | undefined;
+
+  void (async () => {
+    iterator = await api.subscribeWorkspaceTree();
+    for await (const events of iterator) {
+      if (cancelled) return;
+      onEvents(events);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+    if (iterator === undefined) return;
+    void iterator.return();
+  };
 }
 
 function applyPathEvents(paths: string[], events: WorkspaceTreeEvent[]) {

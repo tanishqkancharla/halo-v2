@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import type { RpcStub } from "capnweb";
 import * as errore from "errore";
 import { useQueryClient } from "@tanstack/react-query";
-import type { AgentSessionApi, AgentSessionState } from "../../shared/rpc.js";
+import type { AgentSessionState } from "../../shared/AgentSessionState.js";
 import {
   applyAgentSessionEvent,
   emptyAgentSessionState,
 } from "../../shared/AgentSessionState.js";
 import { useApi } from "../api/ApiProvider.tsx";
-
-export type AgentSessionStub = RpcStub<AgentSessionApi>;
+import type { HaloClient } from "../../shared/contract.js";
 
 class PromptFailedError extends errore.createTaggedError({
   name: "PromptFailedError",
@@ -22,215 +20,195 @@ class AbortFailedError extends errore.createTaggedError({
 }) {}
 
 export type UseAgentSessionResult = {
-  session: AgentSessionStub | undefined;
   state: AgentSessionState;
-  isWorking: boolean;
   prompt: (text: string) => Promise<void | PromptFailedError>;
   abort: () => Promise<void | AbortFailedError>;
 };
 
 /**
- * Opens a saved Pi session, subscribes to raw AgentSessionEvents, and folds
- * them into AgentSessionState for the feed.
+ * Opens a saved Pi session and folds AgentSessionEvents into AgentSessionState.
  */
 export function useAgentSession(sessionId: string): UseAgentSessionResult {
   const api = useApi();
   const queryClient = useQueryClient();
-  const [session, setSession] = useState<AgentSessionStub | undefined>(
+  const [readySessionId, setReadySessionId] = useState<string | undefined>(
     undefined,
   );
   const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
-  const [isWorking, setIsWorking] = useState(false);
   const [openedFor, setOpenedFor] = useState(sessionId);
 
   if (openedFor !== sessionId) {
     setOpenedFor(sessionId);
-    setSession(undefined);
+    setReadySessionId(undefined);
     setState(emptyAgentSessionState);
-    setIsWorking(false);
   }
 
   useEffect(() => {
     let cancelled = false;
-    let stub: AgentSessionStub | undefined;
+    let iterator:
+      | Awaited<ReturnType<HaloClient["agentSession"]["events"]>>
+      | undefined;
 
-    // If cleanup runs before this resolves, `stub` is still unset — dispose the
-    // late result here. Effect cleanup only covers stubs already assigned.
-    void api
-      .openAgentSession(sessionId)
-      .then((opened) => {
-        if (cancelled) {
-          opened.session[Symbol.dispose]();
-          return;
-        }
-        stub = opened.session;
-        setState(opened.state);
-        void opened.session.subscribe((event) => {
-          if (event.type === "agent_start") setIsWorking(true);
-          if (event.type === "agent_end") setIsWorking(false);
-          setState((current) => applyAgentSessionEvent(current, event));
-        });
-        setSession(() => opened.session);
-      })
-      .catch((e) => {
-        console.warn("Failed to open agent session:", e);
-      });
-
-    return () => {
-      cancelled = true;
-      stub?.[Symbol.dispose]();
-    };
-  }, [api, sessionId]);
-
-  async function prompt(text: string) {
-    if (session === undefined) {
-      const error = new PromptFailedError({ reason: "Session is not ready." });
-      setState((current) => ({ ...current, error: error.message }));
-      return error;
-    }
-    setState((current) => ({ ...current, error: undefined }));
-    setIsWorking(true);
-    const result = await session.prompt(text).catch(
-      (e) =>
-        new PromptFailedError({
-          reason: e instanceof Error ? e.message : String(e),
-          cause: e,
-        }),
-    );
-    if (result instanceof Error) {
-      setIsWorking(false);
-      setState((current) => ({ ...current, error: result.message }));
-      return result;
-    }
-    await queryClient.invalidateQueries({
-      queryKey: ["sessions"],
-      refetchType: "all",
-    });
-  }
-
-  async function abort() {
-    if (session === undefined) return;
-    const result = await session.abort().catch(
-      (e) =>
-        new AbortFailedError({
-          reason: e instanceof Error ? e.message : String(e),
-          cause: e,
-        }),
-    );
-    if (result instanceof Error) {
-      console.warn("Failed to stop session:", result);
-      return result;
-    }
-  }
-
-  return { session, state, isWorking, prompt, abort };
-}
-
-export type UseDraftAgentSessionResult = {
-  state: AgentSessionState;
-  isWorking: boolean;
-  prompt: (text: string) => Promise<void | PromptFailedError>;
-  abort: () => Promise<void | AbortFailedError>;
-};
-
-/**
- * Draft chat: creates a Pi session on first prompt, then behaves like
- * useAgentSession for that live session.
- */
-export function useDraftAgentSession(
-  onCreated: (sessionId: string) => void,
-): UseDraftAgentSessionResult {
-  const api = useApi();
-  const queryClient = useQueryClient();
-  const sessionRef = useRef<AgentSessionStub | undefined>(undefined);
-  const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
-  const [isWorking, setIsWorking] = useState(false);
-  const isWorkingRef = useRef(false);
-  const openedRef = useRef(false);
-  const onCreatedRef = useRef(onCreated);
-
-  useEffect(() => {
-    onCreatedRef.current = onCreated;
-  }, [onCreated]);
-
-  useEffect(() => {
-    return () => {
-      sessionRef.current?.[Symbol.dispose]();
-      sessionRef.current = undefined;
-    };
-  }, []);
-
-  async function prompt(text: string) {
-    let session = sessionRef.current;
-    if (session === undefined) {
-      const created = await api.newAgentSession().catch(
+    void (async () => {
+      const opened = await api.openAgentSession({ sessionId }).catch(
         (e) =>
           new PromptFailedError({
             reason: e instanceof Error ? e.message : String(e),
             cause: e,
           }),
       );
-      if (created instanceof Error) {
-        setState((current) => ({ ...current, error: created.message }));
-        return created;
+      if (opened instanceof Error) {
+        console.warn("Failed to open agent session:", opened);
+        return;
       }
-      session = created;
-      sessionRef.current = created;
-      await created.subscribe((event) => {
-        if (event.type === "agent_start") {
-          isWorkingRef.current = true;
-          setIsWorking(true);
-        }
-        if (event.type === "agent_end") {
-          isWorkingRef.current = false;
-          setIsWorking(false);
-        }
+      if (cancelled) return;
+      setState(opened.state);
+      setReadySessionId(opened.sessionId);
+      iterator = await api.agentSession.events({ sessionId: opened.sessionId });
+      for await (const event of iterator) {
         setState((current) => applyAgentSessionEvent(current, event));
-      });
-    }
+      }
+    })();
 
+    return () => {
+      cancelled = true;
+      if (iterator === undefined) return;
+      void iterator.return();
+    };
+  }, [api, sessionId]);
+
+  async function prompt(text: string) {
+    if (readySessionId === undefined) {
+      const error = new PromptFailedError({ reason: "Session is not ready." });
+      setState((current) => ({ ...current, error: error.message }));
+      return error;
+    }
     setState((current) => ({ ...current, error: undefined }));
-    isWorkingRef.current = true;
-    setIsWorking(true);
-    const result = await session.prompt(text).catch(
-      (e) =>
-        new PromptFailedError({
-          reason: e instanceof Error ? e.message : String(e),
-          cause: e,
-        }),
-    );
-    if (result instanceof Error) {
-      setIsWorking(false);
-      isWorkingRef.current = false;
-      setState((current) => ({ ...current, error: result.message }));
+    const result = await api.agentSession
+      .prompt({ sessionId: readySessionId, text })
+      .then(() => undefined)
+      .catch(
+        (e) =>
+          new PromptFailedError({
+            reason: e instanceof Error ? e.message : String(e),
+            cause: e,
+          }),
+      );
+    if (result instanceof PromptFailedError) {
+      setState((current) => ({
+        ...current,
+        isWorking: false,
+        error: result.message,
+      }));
       return result;
     }
     await queryClient.invalidateQueries({
       queryKey: ["sessions"],
       refetchType: "all",
     });
-    if (openedRef.current) return;
-    if (isWorkingRef.current) return;
-    openedRef.current = true;
-    const sessionId = await session.getSessionId();
-    onCreatedRef.current(sessionId);
   }
 
   async function abort() {
-    const session = sessionRef.current;
-    if (session === undefined) return;
-    const result = await session.abort().catch(
-      (e) =>
-        new AbortFailedError({
-          reason: e instanceof Error ? e.message : String(e),
-          cause: e,
-        }),
-    );
-    if (result instanceof Error) {
+    if (readySessionId === undefined) return;
+    const result = await api.agentSession
+      .abort({ sessionId: readySessionId })
+      .then(() => undefined)
+      .catch(
+        (e) =>
+          new AbortFailedError({
+            reason: e instanceof Error ? e.message : String(e),
+            cause: e,
+          }),
+      );
+    if (result instanceof AbortFailedError) {
       console.warn("Failed to stop session:", result);
       return result;
     }
   }
 
-  return { state, isWorking, prompt, abort };
+  return { state, prompt, abort };
+}
+
+export type UseDraftAgentSessionResult = {
+  state: AgentSessionState;
+  prompt: (text: string) => Promise<void | PromptFailedError>;
+  abort: () => Promise<void | AbortFailedError>;
+};
+
+/**
+ * Draft chat: creates a Pi session on first prompt, then navigates to that id.
+ */
+export function useDraftAgentSession(
+  onCreated: (sessionId: string) => void,
+): UseDraftAgentSessionResult {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
+  const sessionIdRef = useRef<string | undefined>(undefined);
+  const onCreatedRef = useRef(onCreated);
+
+  useEffect(() => {
+    onCreatedRef.current = onCreated;
+  }, [onCreated]);
+
+  async function prompt(text: string) {
+    const created = await api.newAgentSession().catch(
+      (e) =>
+        new PromptFailedError({
+          reason: e instanceof Error ? e.message : String(e),
+          cause: e,
+        }),
+    );
+    if (created instanceof Error) {
+      setState((current) => ({ ...current, error: created.message }));
+      return created;
+    }
+    sessionIdRef.current = created.sessionId;
+    onCreatedRef.current(created.sessionId);
+
+    setState((current) => ({ ...current, error: undefined }));
+    const result = await api.agentSession
+      .prompt({ sessionId: created.sessionId, text })
+      .then(() => undefined)
+      .catch(
+        (e) =>
+          new PromptFailedError({
+            reason: e instanceof Error ? e.message : String(e),
+            cause: e,
+          }),
+      );
+    if (result instanceof PromptFailedError) {
+      setState((current) => ({
+        ...current,
+        isWorking: false,
+        error: result.message,
+      }));
+      return result;
+    }
+    await queryClient.invalidateQueries({
+      queryKey: ["sessions"],
+      refetchType: "all",
+    });
+  }
+
+  async function abort() {
+    const sessionId = sessionIdRef.current;
+    if (sessionId === undefined) return;
+    const result = await api.agentSession
+      .abort({ sessionId })
+      .then(() => undefined)
+      .catch(
+        (e) =>
+          new AbortFailedError({
+            reason: e instanceof Error ? e.message : String(e),
+            cause: e,
+          }),
+      );
+    if (result instanceof AbortFailedError) {
+      console.warn("Failed to stop session:", result);
+      return result;
+    }
+  }
+
+  return { state, prompt, abort };
 }

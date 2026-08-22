@@ -14,7 +14,7 @@ export const mainProcessDiskPackages = ["@halo/plugin-sdk"] as const;
 // schema.ts and server.ts imports. Skip view-only deps (maui, wouter, react).
 export const pluginSdkJitiDependencies = [
   "@sinclair/typebox",
-  "capnweb",
+  "@orpc/server",
   "errore",
 ] as const;
 
