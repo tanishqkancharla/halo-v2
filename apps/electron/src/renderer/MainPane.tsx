@@ -261,8 +261,7 @@ function SessionView({
   const thinking = useStyles(styles.thinking);
   const stopped = useStyles(styles.stopped);
   const items = sessionViewItems(state);
-  const showStopped =
-    !isWorking && lastAssistantTurnWasAborted(state.messages);
+  const showStopped = !isWorking && lastAssistantTurnWasAborted(state.messages);
 
   useLayoutEffect(() => {
     const element = viewRef.current;
