@@ -1,9 +1,13 @@
 import { dialog, type BrowserWindow } from "electron";
 import { implement } from "@orpc/server";
 import type { Logger } from "@repo/logger";
+import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
-import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
+import type { WorkspaceTreeEvent } from "../shared/rpc.js";
+import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
 import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
+import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
+import { AsyncEventQueue } from "./AsyncEventQueue.js";
 import { orpcErrors } from "./orpcErrors.js";
 import type { PiService } from "./pi-service.js";
 import type { PluginService } from "./plugins/PluginService.js";
@@ -69,18 +73,87 @@ export const router = os.router({
     });
     return listed;
   }),
-  subscribeWorkspaceTree: os.subscribeWorkspaceTree.handler(() =>
-    orpcErrors.notImplemented(),
+  subscribeWorkspaceTree: os.subscribeWorkspaceTree.handler(
+    ({ context, signal }) => {
+      context.logger.info({ event: "subscribeWorkspaceTree" });
+      const queue = new AsyncEventQueue<WorkspaceTreeEvent[]>();
+      context.workspace.setTreeListener((events) => {
+        void queue.push(events);
+      });
+      return (async function* () {
+        try {
+          yield* queue.values(signal);
+        } finally {
+          context.workspace.setTreeListener(undefined);
+        }
+      })();
+    },
   ),
-  newAgentSession: os.newAgentSession.handler(() =>
-    orpcErrors.notImplemented(),
-  ),
-  openAgentSession: os.openAgentSession.handler(() =>
-    orpcErrors.notImplemented(),
-  ),
+  newAgentSession: os.newAgentSession.handler(async ({ context }) => {
+    context.logger.info({ event: "newAgentSession" });
+    const session = await context.pi.newAgentSession();
+    if (session instanceof Error) return orpcErrors.badRequest(session);
+    context.sessions.add(session);
+    return { sessionId: session.sessionId };
+  }),
+  openAgentSession: os.openAgentSession.handler(async ({ input, context }) => {
+    context.logger.info({
+      event: "openAgentSession",
+      sessionId: input.sessionId,
+    });
+    const session = await context.pi.openAgentSession(input.sessionId);
+    if (session instanceof Error) return orpcErrors.badRequest(session);
+    context.sessions.add(session);
+    return {
+      sessionId: session.sessionId,
+      state: agentSessionStateFromSession({ messages: session.messages }),
+    };
+  }),
   agentSession: {
-    events: os.agentSession.events.handler(() => orpcErrors.notImplemented()),
-    prompt: os.agentSession.prompt.handler(() => orpcErrors.notImplemented()),
-    close: os.agentSession.close.handler(() => orpcErrors.notImplemented()),
+    events: os.agentSession.events.handler(({ input, context, signal }) => {
+      context.logger.info({
+        event: "agentSession.events",
+        sessionId: input.sessionId,
+      });
+      const queue = context.sessions.listen(input.sessionId);
+      if (queue instanceof Error) return orpcErrors.badRequest(queue);
+      return (async function* () {
+        try {
+          yield* queue.values(signal);
+        } finally {
+          context.sessions.unlisten(input.sessionId);
+        }
+      })();
+    }),
+    prompt: os.agentSession.prompt.handler(async ({ input, context }) => {
+      context.logger.info({
+        event: "prompt",
+        sessionId: input.sessionId,
+        textLength: input.text.length,
+      });
+      const session = context.sessions.get(input.sessionId);
+      if (session instanceof Error) return orpcErrors.badRequest(session);
+      if (input.text.trim().length === 0)
+        return orpcErrors.badRequest(new EmptyPromptError());
+      const prompted = await session
+        .prompt(input.text, { streamingBehavior: "steer" })
+        .catch(
+          (e) =>
+            new PromptFailedError({
+              reason: e instanceof Error ? e.message : String(e),
+              cause: e,
+            }),
+        );
+      if (prompted instanceof Error) return orpcErrors.badRequest(prompted);
+      await context.sessions.waitForDeliveries(input.sessionId);
+    }),
+    close: os.agentSession.close.handler(({ input, context }) => {
+      context.logger.info({
+        event: "agentSession.close",
+        sessionId: input.sessionId,
+      });
+      const closed = context.sessions.close(input.sessionId);
+      if (closed instanceof Error) return orpcErrors.badRequest(closed);
+    }),
   },
 });

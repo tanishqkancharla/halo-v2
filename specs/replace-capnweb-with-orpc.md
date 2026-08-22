@@ -361,9 +361,9 @@ Keep one tree listener, matching `HaloRpc` today. `AgentSessionRegistry.close` u
 
 `newAgentSession` returns `{ sessionId }` immediately. The draft UI can still wait until the first prompt finishes before navigating; it no longer calls `getSessionId`.
 
-- [ ] Implement `AgentSessionRegistry` and a small async queue used by both generators. Put cleanup in `finally`.
-- [ ] Implement `newAgentSession`, `openAgentSession`, `agentSession.events` / `prompt` / `close`, and `subscribeWorkspaceTree`.
-- [ ] Run `pnpm --filter @halo/desktop typecheck`.
+- [x] Implement `AgentSessionRegistry` and a small async queue used by both generators. Put cleanup in `finally`.
+- [x] Implement `newAgentSession`, `openAgentSession`, `agentSession.events` / `prompt` / `close`, and `subscribeWorkspaceTree`.
+- [x] Run `pnpm --filter @halo/desktop typecheck`.
 
 ### Phase 4: Cut over MessagePort, plugins, and the renderer
 
