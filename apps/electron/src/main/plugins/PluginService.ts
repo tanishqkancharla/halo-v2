@@ -1,7 +1,15 @@
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { os as orpc, ORPCError, type AnyRouter } from "@orpc/server";
+import {
+  call,
+  getRouter,
+  os as orpc,
+  ORPCError,
+  Procedure,
+  unlazy,
+  type AnyRouter,
+} from "@orpc/server";
 import * as errore from "errore";
 import type { PluginList } from "../../shared/plugin.js";
 import { orpcErrors } from "../orpcErrors.js";
@@ -88,6 +96,29 @@ export class PluginService {
       if (compiled !== undefined) compiledViews.push(compiled);
     }
     return { plugins, compiledViews, errors };
+  }
+
+  async route(args: {
+    path: readonly string[];
+    input: unknown;
+    signal: AbortSignal | undefined;
+    context: HaloContext;
+  }) {
+    const found = getRouter(this.router, args.path);
+    if (found === undefined) return orpcErrors.notImplemented();
+    const resolved = await unlazy(found);
+    const procedure = resolved.default;
+    if (!(procedure instanceof Procedure)) return orpcErrors.notImplemented();
+    return call(procedure, args.input, {
+      context: args.context,
+      signal: args.signal,
+    }).catch((e) => {
+      if (e instanceof ORPCError) return e;
+      return new ORPCError("PLUGIN_ERROR", {
+        message: e instanceof Error ? e.message : String(e),
+        cause: e,
+      });
+    });
   }
 
   private clearMounted() {

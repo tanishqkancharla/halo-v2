@@ -1,7 +1,10 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import { dialog, type BrowserWindow } from "electron";
-import { implement, os as orpc } from "@orpc/server";
-import type { StandardHandlerRoutingInterceptor } from "@orpc/server/standard";
+import { implement, os as orpc, RPCSerializer } from "@orpc/server";
+import {
+  MessagePortHandler,
+  type RPCHandlerOptions,
+} from "@orpc/server/message-port";
+import { RPCHandlerCodec, StandardHandler } from "@orpc/server/standard";
 import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
@@ -25,11 +28,18 @@ export type HaloContext = {
 };
 
 const os = implement(contract).$context<HaloContext>();
-const haloContextStorage = new AsyncLocalStorage<HaloContext>();
+const pluginSerializer = new RPCSerializer();
 
-export const bindHaloContext: StandardHandlerRoutingInterceptor<
-  HaloContext
-> = ({ context, next }) => haloContextStorage.run(context, next);
+const plugins = orpc
+  .$context<HaloContext>()
+  .handler(async ({ context, path, input, signal }) => {
+    return context.plugins.route({
+      path: path.slice(1),
+      input,
+      signal,
+      context,
+    });
+  });
 
 export const router = {
   getAppInfo: os.getAppInfo.handler(({ context }) => {
@@ -179,13 +189,42 @@ export const router = {
       if (closed instanceof Error) return orpcErrors.badRequest(closed);
     }),
   },
-  // oRPC lazy loaders do not receive context. bindHaloContext stores it so
-  // the first /plugins call can index context.plugins.router.
-  plugins: orpc.$context<HaloContext>().lazy(async () => {
-    const halo = haloContextStorage.getStore();
-    if (halo === undefined) {
-      throw new Error("HaloContext is missing while loading plugin routers.");
-    }
-    return { default: halo.plugins.router };
-  }),
+  plugins,
 };
+
+class PluginRPCHandlerCodec extends RPCHandlerCodec<HaloContext> {
+  async resolveProcedure(
+    request: Parameters<RPCHandlerCodec<HaloContext>["resolveProcedure"]>[0],
+    options: Parameters<RPCHandlerCodec<HaloContext>["resolveProcedure"]>[1],
+  ) {
+    const path = rpcPathSegments(request.url);
+    if (path[0] === "plugins" && path.length > 1) {
+      return {
+        procedure: plugins,
+        path,
+        decodeInput: async () => {
+          const body = await request.resolveBody();
+          return pluginSerializer.deserialize(body);
+        },
+      };
+    }
+    return super.resolveProcedure(request, options);
+  }
+}
+
+export class HaloRPCHandler extends MessagePortHandler<HaloContext> {
+  constructor(options: RPCHandlerOptions<HaloContext> = {}) {
+    super(
+      new StandardHandler(new PluginRPCHandlerCodec(router, options), options),
+      options,
+    );
+  }
+}
+
+function rpcPathSegments(url: string) {
+  const pathStart = url.indexOf("/");
+  const pathname = pathStart === -1 ? url : url.slice(pathStart);
+  const queryStart = pathname.indexOf("?");
+  const path = queryStart === -1 ? pathname : pathname.slice(0, queryStart);
+  return path.split("/").filter((segment) => segment.length > 0);
+}

@@ -4,7 +4,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/message-port";
-import { RPCHandler } from "@orpc/server/message-port";
 import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../../shared/contract.js";
@@ -17,7 +16,7 @@ import { loadPluginViews } from "../../renderer/evaluatePluginView.js";
 import { AgentSessionRegistry } from "../AgentSessionRegistry.js";
 import { PiService } from "../pi-service.js";
 import { UserService } from "../UserService.js";
-import { bindHaloContext, router, type HaloContext } from "../router.js";
+import { HaloRPCHandler, type HaloContext } from "../router.js";
 import { PluginService } from "./PluginService.js";
 
 type PluginFiles = Record<string, string>;
@@ -86,9 +85,7 @@ async function withHaloClient(
     },
     logger: new Logger(),
   };
-  const handler = new RPCHandler(router, {
-    routingInterceptors: [bindHaloContext],
-  });
+  const handler = new HaloRPCHandler();
   const { port1, port2 } = new MessageChannel();
   handler.upgrade(port1, { context });
   const link = new RPCLink({ port: port2 });
