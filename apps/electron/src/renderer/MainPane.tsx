@@ -5,7 +5,6 @@ import { Route, Switch, useLocation } from "wouter";
 import {
   Button,
   Icons,
-  P,
   backgroundColor,
   colors,
   flex,
@@ -288,9 +287,9 @@ function SessionView({
         </span>
       ) : undefined}
       {showStopped ? (
-        <div className={stopped} role="status">
-          <P>Stopped</P>
-        </div>
+        <span className={stopped} role="status">
+          Stopped
+        </span>
       ) : undefined}
     </div>
   );
@@ -445,7 +444,7 @@ const styles = {
     text("xs", 400, "lowContrast"),
     flex({ align: "center", gap: 4 }),
   ),
-  stopped: style({
+  stopped: style(text("md", 500, "highContrast"), {
     alignSelf: "flex-end",
   }),
   messageBody: style(text("md", 400, "highContrast"), {
