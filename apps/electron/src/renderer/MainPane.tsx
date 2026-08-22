@@ -101,7 +101,7 @@ function SavedPane({
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body);
   const column = useStyles(styles.column);
-  const { state, isWorking, prompt } = useAgentSession(sessionId);
+  const { state, isWorking, prompt, abort } = useAgentSession(sessionId);
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
   );
@@ -113,7 +113,13 @@ function SavedPane({
       <div className={body}>
         <div className={column}>
           <SessionView state={state} isWorking={isWorking} />
-          <Composer key={sessionId} error={state.error} onSubmit={prompt} />
+          <Composer
+            key={sessionId}
+            error={state.error}
+            isWorking={isWorking}
+            onSubmit={prompt}
+            onStop={abort}
+          />
         </div>
       </div>
     </main>
@@ -122,9 +128,11 @@ function SavedPane({
 
 function DraftPane({ draftId }: { draftId: string }) {
   const [, navigate] = useLocation();
-  const { state, isWorking, prompt } = useDraftAgentSession((sessionId) => {
-    navigate(`/sessions/${sessionId}`);
-  });
+  const { state, isWorking, prompt, abort } = useDraftAgentSession(
+    (sessionId) => {
+      navigate(`/sessions/${sessionId}`);
+    },
+  );
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body, styles.bodyTop);
   const column = useStyles(styles.column);
@@ -138,7 +146,13 @@ function DraftPane({ draftId }: { draftId: string }) {
           {hasMessages ? (
             <SessionView state={state} isWorking={isWorking} />
           ) : undefined}
-          <Composer key={draftId} error={state.error} onSubmit={prompt} />
+          <Composer
+            key={draftId}
+            error={state.error}
+            isWorking={isWorking}
+            onSubmit={prompt}
+            onStop={abort}
+          />
         </div>
       </div>
     </main>
@@ -147,10 +161,14 @@ function DraftPane({ draftId }: { draftId: string }) {
 
 function Composer({
   error,
+  isWorking,
   onSubmit,
+  onStop,
 }: {
   error: string | undefined;
+  isWorking: boolean;
   onSubmit: (prompt: string) => Promise<void | Error>;
+  onStop: () => Promise<void | Error>;
 }) {
   const [draft, setDraft] = useState("");
   const composer = useStyles(styles.composer);
@@ -158,7 +176,7 @@ function Composer({
   const sendButton = useStyles(styles.sendButton);
   const sendIcon = useStyles(icon("sm"));
   const trimmedText = draft.trim();
-  const sendDisabled = trimmedText.length === 0;
+  const showStop = isWorking && trimmedText.length === 0;
 
   async function submit() {
     if (!trimmedText) return;
@@ -188,15 +206,36 @@ function Composer({
       }
       actions={
         <Button
-          aria-label="Send"
+          aria-label={showStop ? "Stop" : "Send"}
           className={sendButton}
-          disabled={sendDisabled}
-          onClick={submit}
+          disabled={!showStop && trimmedText.length === 0}
+          onClick={showStop ? onStop : submit}
         >
-          <Icons.ArrowUp className={sendIcon} aria-hidden="true" />
+          {showStop ? (
+            <StopIcon className={sendIcon} />
+          ) : (
+            <Icons.ArrowUp className={sendIcon} aria-hidden="true" />
+          )}
         </Button>
       }
     />
+  );
+}
+
+function StopIcon({ className }: { className: string }) {
+  return (
+    <svg
+      className={className}
+      focusable="false"
+      aria-hidden="true"
+      role="img"
+      width={24}
+      height={24}
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <rect x="7.5" y="7.5" width="9" height="9" rx="1.5" fill="currentColor" />
+    </svg>
   );
 }
 

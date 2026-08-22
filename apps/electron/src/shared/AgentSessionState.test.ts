@@ -109,7 +109,7 @@ describe("applyAgentSessionEvent", () => {
     expect(next.error).toBe("{not-json");
   });
 
-  test("sets state.error from non-empty errorMessage even without stopReason error", () => {
+  test("does not treat a user abort as a composer error", () => {
     const state = emptyAgentSessionState();
     const message = assistantMessage({
       stopReason: "aborted",
@@ -123,7 +123,8 @@ describe("applyAgentSessionEvent", () => {
       message,
     });
 
-    expect(next.error).toBe("Request was aborted");
+    expect(next.error).toBeUndefined();
+    expect(next.messages).toEqual([message]);
   });
 
   test("does not invent an alert when stopReason is error without errorMessage", () => {
@@ -183,6 +184,21 @@ describe("agentSessionStateFromSession", () => {
     expect(state.error).toBe("API keys are not supported by this API.");
     expect(state.messages).toEqual([userMessage("hello", 10), failed]);
     expect(state.streamingMessage).toBeUndefined();
+  });
+
+  test("does not surface an aborted durable assistant turn as an error", () => {
+    const aborted = assistantMessage({
+      stopReason: "aborted",
+      errorMessage: "Request was aborted",
+      content: [{ type: "text", text: "partial" }],
+      timestamp: 20,
+    });
+    const state = agentSessionStateFromSession({
+      messages: [userMessage("hello", 10), aborted],
+    });
+
+    expect(state.error).toBeUndefined();
+    expect(state.messages).toEqual([userMessage("hello", 10), aborted]);
   });
 
   test("does not surface an earlier error when the last assistant turn succeeded", () => {

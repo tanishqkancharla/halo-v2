@@ -107,6 +107,7 @@ function errorFromLastAssistantMessage(
 /** Readable alert text when an assistant turn failed. */
 function assistantTurnError(message: AgentMessage): string | undefined {
   if (message.role !== "assistant") return undefined;
+  if (message.stopReason === "aborted") return undefined;
 
   const errorMessage = message.errorMessage;
   const hasErrorMessage = errorMessage !== undefined && errorMessage.length > 0;

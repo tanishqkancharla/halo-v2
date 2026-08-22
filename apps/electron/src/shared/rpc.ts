@@ -41,6 +41,7 @@ export abstract class AgentSessionApi extends RpcTarget {
   abstract getSessionId(): string;
   abstract subscribe(callback: AgentSessionEventHandler): void;
   abstract prompt(text: string): Promise<void>;
+  abstract abort(): Promise<void>;
 }
 
 /** Live session stub plus the durable messages already loaded into it. */
