@@ -27,10 +27,9 @@ export type HaloContext = {
 const os = implement(contract).$context<HaloContext>();
 const haloContextStorage = new AsyncLocalStorage<HaloContext>();
 
-export const bindHaloContext: StandardHandlerRoutingInterceptor<HaloContext> = ({
-  context,
-  next,
-}) => haloContextStorage.run(context, next);
+export const bindHaloContext: StandardHandlerRoutingInterceptor<
+  HaloContext
+> = ({ context, next }) => haloContextStorage.run(context, next);
 
 export const router = {
   getAppInfo: os.getAppInfo.handler(({ context }) => {
