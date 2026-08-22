@@ -377,7 +377,7 @@ export class AgentSessionRegistry {
    );
 ```
 
-Keep one tree listener, matching `HaloRpc` today. `AgentSessionRegistry.close` unsubscribes, aborts, and `dispose`s the Pi session the way `AgentSessionRpc[Symbol.dispose]` does. `prompt` still rejects empty text with `EmptyPromptError` converted through `orpcErrors.badRequest`. Await in-flight event deliveries before `prompt` returns, same as `AgentSessionRpc.deliveries`.
+Keep one tree listener, matching `HaloRpc` today. The events handler subscribes locally and unsubscribes in `finally`. `AgentSessionRegistry.close` aborts and `dispose`s the Pi session. `prompt` awaits Pi's `prompt()` and rejects empty text with `EmptyPromptError` converted through `orpcErrors.badRequest`.
 
 `newAgentSession` returns `{ sessionId }` immediately. It no longer exposes `getSessionId`. This phase still always `pi.open` / `add` on `openAgentSession`. Reuse of a live registry entry and a streaming snapshot land in phase 4, when the renderer stops disposing on unmount.
 

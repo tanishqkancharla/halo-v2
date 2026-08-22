@@ -3,7 +3,7 @@ import { implement } from "@orpc/server";
 import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
-import type { WorkspaceTreeEvent } from "../shared/rpc.js";
+import type { AgentSessionEvent, WorkspaceTreeEvent } from "../shared/rpc.js";
 import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
 import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
@@ -115,13 +115,17 @@ export const router = os.router({
         event: "agentSession.events",
         sessionId: input.sessionId,
       });
-      const queue = context.sessions.listen(input.sessionId);
-      if (queue instanceof Error) return orpcErrors.badRequest(queue);
+      const session = context.sessions.get(input.sessionId);
+      if (session instanceof Error) return orpcErrors.badRequest(session);
+      const queue = new AsyncEventQueue<AgentSessionEvent>();
+      const unsubscribe = session.subscribe((event) => {
+        void queue.push(event);
+      });
       return (async function* () {
         try {
           yield* queue.values(signal);
         } finally {
-          context.sessions.unlisten(input.sessionId);
+          unsubscribe();
         }
       })();
     }),
@@ -145,7 +149,6 @@ export const router = os.router({
             }),
         );
       if (prompted instanceof Error) return orpcErrors.badRequest(prompted);
-      await context.sessions.waitForDeliveries(input.sessionId);
     }),
     close: os.agentSession.close.handler(({ input, context }) => {
       context.logger.info({
