@@ -62,14 +62,14 @@ export async function loadPluginServer(args: {
 }
 
 function routerFromExport(exported: PluginModule) {
-  if (exported.default !== undefined && isPluginRouter(exported.default)) {
-    return exported.default;
-  }
   if (exported.router !== undefined && isPluginRouter(exported.router)) {
     return exported.router;
   }
   if (exported.Server !== undefined && isPluginRouter(exported.Server)) {
     return exported.Server;
+  }
+  if (exported.default !== undefined && isPluginRouter(exported.default)) {
+    return exported.default;
   }
   if (isPluginRouter(exported)) return exported;
   return undefined;

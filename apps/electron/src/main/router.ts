@@ -1,5 +1,5 @@
 import { dialog, type BrowserWindow } from "electron";
-import { implement, os as orpc, type AnyRouter } from "@orpc/server";
+import { implement, os as orpc, ORPCError, type AnyRouter } from "@orpc/server";
 import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
@@ -208,12 +208,20 @@ function mountPluginRouter(args: { pluginId: string; router: AnyRouter }) {
       if (workspace === undefined) {
         throw orpcErrors.badRequest(new WorkspaceNotReadyError());
       }
-      return next({
+      const result = await next({
         context: {
           pluginId: args.pluginId,
           workspaceRoot: workspace.workspaceRoot,
         },
       });
+      if (result.output instanceof ORPCError) return result;
+      if (result.output instanceof Error) {
+        throw new ORPCError("PLUGIN_ERROR", {
+          message: result.output.message,
+          cause: result.output,
+        });
+      }
+      return result;
     })
     .router(args.router);
 }
