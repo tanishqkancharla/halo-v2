@@ -4,7 +4,11 @@ import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
 import type { AgentSessionEvent, WorkspaceTreeEvent } from "../shared/rpc.js";
-import { EmptyPromptError, PromptFailedError } from "./agent-session-errors.js";
+import {
+  AbortFailedError,
+  EmptyPromptError,
+  PromptFailedError,
+} from "./agent-session-errors.js";
 import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
 import { AsyncEventQueue } from "./AsyncEventQueue.js";
@@ -162,6 +166,22 @@ export const router = {
             }),
         );
       if (prompted instanceof Error) return orpcErrors.badRequest(prompted);
+    }),
+    abort: os.agentSession.abort.handler(async ({ input, context }) => {
+      context.logger.info({
+        event: "abort",
+        sessionId: input.sessionId,
+      });
+      const session = context.sessions.get(input.sessionId);
+      if (session instanceof Error) return orpcErrors.badRequest(session);
+      const aborted = await session.abort().catch(
+        (e) =>
+          new AbortFailedError({
+            reason: e instanceof Error ? e.message : String(e),
+            cause: e,
+          }),
+      );
+      if (aborted instanceof Error) return orpcErrors.badRequest(aborted);
     }),
     close: os.agentSession.close.handler(({ input, context }) => {
       context.logger.info({

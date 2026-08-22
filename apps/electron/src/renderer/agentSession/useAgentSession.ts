@@ -14,9 +14,15 @@ class PromptFailedError extends errore.createTaggedError({
   message: "$reason",
 }) {}
 
+class AbortFailedError extends errore.createTaggedError({
+  name: "AbortFailedError",
+  message: "$reason",
+}) {}
+
 export type UseAgentSessionResult = {
   state: AgentSessionState;
   prompt: (text: string) => Promise<void | PromptFailedError>;
+  abort: () => Promise<void | AbortFailedError>;
 };
 
 /**
@@ -102,12 +108,31 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
     });
   }
 
-  return { state, prompt };
+  async function abort() {
+    if (readySessionId === undefined) return;
+    const result = await api.agentSession
+      .abort({ sessionId: readySessionId })
+      .then(() => undefined)
+      .catch(
+        (e) =>
+          new AbortFailedError({
+            reason: e instanceof Error ? e.message : String(e),
+            cause: e,
+          }),
+      );
+    if (result instanceof AbortFailedError) {
+      console.warn("Failed to stop session:", result);
+      return result;
+    }
+  }
+
+  return { state, prompt, abort };
 }
 
 export type UseDraftAgentSessionResult = {
   state: AgentSessionState;
   prompt: (text: string) => Promise<void | PromptFailedError>;
+  abort: () => Promise<void | AbortFailedError>;
 };
 
 /**
@@ -119,6 +144,7 @@ export function useDraftAgentSession(
   const api = useApi();
   const queryClient = useQueryClient();
   const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
+  const sessionIdRef = useRef<string | undefined>(undefined);
   const onCreatedRef = useRef(onCreated);
 
   useEffect(() => {
@@ -137,6 +163,7 @@ export function useDraftAgentSession(
       setState((current) => ({ ...current, error: created.message }));
       return created;
     }
+    sessionIdRef.current = created.sessionId;
     onCreatedRef.current(created.sessionId);
 
     setState((current) => ({ ...current, error: undefined }));
@@ -164,5 +191,24 @@ export function useDraftAgentSession(
     });
   }
 
-  return { state, prompt };
+  async function abort() {
+    const sessionId = sessionIdRef.current;
+    if (sessionId === undefined) return;
+    const result = await api.agentSession
+      .abort({ sessionId })
+      .then(() => undefined)
+      .catch(
+        (e) =>
+          new AbortFailedError({
+            reason: e instanceof Error ? e.message : String(e),
+            cause: e,
+          }),
+      );
+    if (result instanceof AbortFailedError) {
+      console.warn("Failed to stop session:", result);
+      return result;
+    }
+  }
+
+  return { state, prompt, abort };
 }

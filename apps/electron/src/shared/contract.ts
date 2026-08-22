@@ -35,6 +35,7 @@ export const contract = {
       .input(type<{ sessionId: string }>())
       .output(asyncIteratorObject(type<AgentSessionEvent>())),
     prompt: oc.input(type<{ sessionId: string; text: string }>()),
+    abort: oc.input(type<{ sessionId: string }>()),
     close: oc.input(type<{ sessionId: string }>()),
   },
 };

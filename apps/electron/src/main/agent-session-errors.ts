@@ -9,3 +9,8 @@ export class PromptFailedError extends errore.createTaggedError({
   name: "PromptFailedError",
   message: "$reason",
 }) {}
+
+export class AbortFailedError extends errore.createTaggedError({
+  name: "AbortFailedError",
+  message: "$reason",
+}) {}
