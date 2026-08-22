@@ -94,21 +94,18 @@ describe("PluginService", () => {
   );
 
   pluginTest(
-    "seeds calendar, the halo-plugin skill, and the maui skill when a workspace is chosen",
+    "seeds the halo-plugin skill and the maui skill when a workspace is chosen",
     async ({ workspace, workspaceRoot }) => {
       const selected = await workspace.select(workspaceRoot);
       if (selected instanceof Error) throw selected;
 
       const listed = await new PluginService(workspace).list();
       if (listed instanceof Error) throw listed;
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
-      expect(listed.plugins[0]?.halo.name).toBe("Calendar");
-      expect(listed.errors).toEqual([]);
-
-      const loaded = loadPluginViews(listed);
-      expect(loaded.views[0]?.Sidebar).toBeTypeOf("function");
-      expect(loaded.views[0]?.Routes).toBeTypeOf("function");
-      expect(loaded.errors).toEqual([]);
+      expect(listed).toEqual({
+        plugins: [],
+        compiledViews: [],
+        errors: [],
+      });
 
       const skillTemplate = await readFile(
         fileURLToPath(new URL("./haloPluginSkill.md", import.meta.url)),
@@ -157,37 +154,6 @@ describe("PluginService", () => {
         "utf8",
       );
       expect(seededMauiSkill).toBe(repoMauiSkill);
-    },
-  );
-
-  pluginTest(
-    "leaves an existing calendar plugin in place",
-    async ({ workspace, workspaceRoot }) => {
-      const packagePath = join(
-        workspaceRoot,
-        ".halo",
-        "plugins",
-        "calendar",
-        "package.json",
-      );
-      await mkdir(dirname(packagePath), { recursive: true });
-      await writeFile(
-        packagePath,
-        src`
-          {
-            "name": "halo-plugin-calendar",
-            "halo": { "version": 1, "name": "Custom" }
-          }
-        `,
-      );
-
-      const selected = await workspace.select(workspaceRoot);
-      if (selected instanceof Error) throw selected;
-
-      const listed = await new PluginService(workspace).list();
-      if (listed instanceof Error) throw listed;
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
-      expect(listed.plugins[0]?.halo.name).toBe("Custom");
     },
   );
 
@@ -475,7 +441,6 @@ describe("PluginService", () => {
       const listed = await listPlugins(workspace);
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
         "alpha",
-        "calendar",
         "zeta",
       ]);
     },
@@ -497,10 +462,7 @@ describe("PluginService", () => {
       await mkdir(join(workspaceRoot, ".halo", "plugins", "empty"));
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
-        "calendar",
-        "notes",
-      ]);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["notes"]);
       expect(listed.errors.map((error) => error.id)).toEqual(["empty"]);
       expect(listed.errors[0]?.message).toMatch(/missing package.json/);
     },
@@ -521,7 +483,7 @@ describe("PluginService", () => {
       });
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.plugins).toEqual([]);
       expect(listed.errors.map((error) => error.id)).toEqual(["notes"]);
     },
   );
@@ -541,7 +503,7 @@ describe("PluginService", () => {
       });
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.plugins).toEqual([]);
       expect(listed.errors.map((error) => error.id)).toEqual(["notes"]);
     },
   );
@@ -560,7 +522,7 @@ describe("PluginService", () => {
       });
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.plugins).toEqual([]);
       expect(listed.errors.map((error) => error.id)).toEqual(["notes"]);
       expect(listed.errors[0]?.message).toMatch(/name/);
     },
@@ -589,19 +551,13 @@ describe("PluginService", () => {
       });
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
-        "calendar",
-        "notes",
-      ]);
-      expect(listed.plugins[1]?.halo.name).toBe("Notes");
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["notes"]);
+      expect(listed.plugins[0]?.halo.name).toBe("Notes");
       expect(listed.errors).toEqual([]);
 
       const loaded = loadPluginViews(listed);
-      expect(loaded.views.map((view) => view.id)).toEqual([
-        "calendar",
-        "notes",
-      ]);
-      expect(loaded.views[1]?.Sidebar).toBeTypeOf("function");
+      expect(loaded.views.map((view) => view.id)).toEqual(["notes"]);
+      expect(loaded.views[0]?.Sidebar).toBeTypeOf("function");
     },
   );
 
@@ -620,7 +576,7 @@ describe("PluginService", () => {
       });
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.plugins).toEqual([]);
       expect(listed.errors.map((error) => error.id)).toEqual(["notes"]);
       expect(listed.errors[0]?.message).toMatch(/missing view file/);
     },
@@ -644,10 +600,7 @@ describe("PluginService", () => {
       });
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
-        "calendar",
-        "notes",
-      ]);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["notes"]);
       expect(listed.errors).toEqual([]);
 
       const loaded = loadPluginViews(listed);
@@ -702,14 +655,10 @@ describe("PluginService", () => {
 
       const listed = await listPlugins(workspace);
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
-        "calendar",
         "notes",
         "ping",
       ]);
-      expect(listed.compiledViews.map((view) => view.id)).toEqual([
-        "calendar",
-        "notes",
-      ]);
+      expect(listed.compiledViews.map((view) => view.id)).toEqual(["notes"]);
       expect(listed.errors).toEqual([]);
 
       const loaded = loadPluginViews(listed);
@@ -733,7 +682,6 @@ describe("PluginService", () => {
 
       const service = new PluginService(workspace);
       await service.list();
-      expect(service.getPlugin("calendar")).toBeInstanceOf(PluginNotFoundError);
       expect(service.getPlugin("notes")).toBeInstanceOf(PluginNotFoundError);
     },
   );
@@ -784,7 +732,6 @@ describe("PluginService", () => {
 
       const listed = await listPlugins(workspace);
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
-        "calendar",
         "instance",
         "named",
       ]);
@@ -858,7 +805,7 @@ describe("PluginService", () => {
       });
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.plugins).toEqual([]);
       expect(listed.errors.map((error) => error.id)).toEqual(["boom"]);
       expect(listed.errors[0]?.message).toMatch(/must extend RpcTarget/);
 
@@ -893,7 +840,7 @@ describe("PluginService", () => {
       });
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.plugins).toEqual([]);
       expect(listed.errors.map((error) => error.id)).toEqual(["boom"]);
       expect(listed.errors[0]?.message).toMatch(/failed to load/);
     },
@@ -903,6 +850,17 @@ describe("PluginService", () => {
     "keeps a valid plugin when another view fails to compile",
     async ({ workspace, writePlugin }) => {
       await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "version": 1, "name": "Notes" }
+            }
+          `,
+          "view.tsx": src`
+            export const Sidebar = () => undefined
+          `,
+        },
         boom: {
           "package.json": src`
             {
@@ -917,12 +875,12 @@ describe("PluginService", () => {
       });
 
       const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["notes"]);
       expect(listed.errors.map((error) => error.id)).toEqual(["boom"]);
       expect(listed.errors[0]?.message).toMatch(/failed to compile/);
 
       const loaded = loadPluginViews(listed);
-      expect(loaded.views.map((view) => view.id)).toEqual(["calendar"]);
+      expect(loaded.views.map((view) => view.id)).toEqual(["notes"]);
       expect(loaded.views[0]?.Sidebar).toBeTypeOf("function");
     },
   );
@@ -931,6 +889,17 @@ describe("PluginService", () => {
     "keeps a valid plugin when another view throws while evaluating",
     async ({ workspace, writePlugin }) => {
       await writePlugin({
+        notes: {
+          "package.json": src`
+            {
+              "name": "halo-plugin-notes",
+              "halo": { "version": 1, "name": "Notes" }
+            }
+          `,
+          "view.tsx": src`
+            export const Sidebar = () => undefined
+          `,
+        },
         boom: {
           "package.json": src`
             {
@@ -950,12 +919,12 @@ describe("PluginService", () => {
       const listed = await listPlugins(workspace);
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
         "boom",
-        "calendar",
+        "notes",
       ]);
       expect(listed.errors).toEqual([]);
 
       const loaded = loadPluginViews(listed);
-      expect(loaded.views.map((view) => view.id)).toEqual(["calendar"]);
+      expect(loaded.views.map((view) => view.id)).toEqual(["notes"]);
       expect(loaded.errors.map((error) => error.id)).toEqual(["boom"]);
       expect(loaded.errors[0]?.message).toMatch(/failed to evaluate/);
     },
