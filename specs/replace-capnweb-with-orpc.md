@@ -18,7 +18,7 @@ flowchart LR
   subgraph proposed [Proposed]
     R2[Renderer] -->|"RPCLink + createORPCClient"| P2[MessagePort]
     P2 --> T2["RPCHandler.upgrade"]
-    T2 -->|"context: HaloContext"| H2[haloRouter]
+    T2 -->|"context: HaloContext"| H2[router]
     H2 --> A2[agentSession.events iterator]
     H2 --> W2[subscribeWorkspaceTree iterator]
     H2 -->|"router.plugins id"| G2[plugin router]
@@ -94,8 +94,13 @@ Install the v2 beta packages and write the renderer/main shared contract. The ap
 #### Important types
 
 ```ts
-// apps/electron/src/shared/haloContract.ts
-import { asyncIteratorObject, oc, type } from "@orpc/contract";
+// apps/electron/src/shared/contract.ts
+import {
+  asyncIteratorObject,
+  oc,
+  type,
+  type RouterContractClient,
+} from "@orpc/contract";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import type { AgentSessionState } from "./AgentSessionState.js";
 import type {
@@ -106,7 +111,7 @@ import type {
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const haloContract = {
+export const contract = {
   getAppInfo: oc.output(type<AppInfo>()),
   installAppUpdate: oc,
   getWorkspace: oc.output(type<WorkspaceInfo | undefined>()),
@@ -130,7 +135,7 @@ export const haloContract = {
   },
 };
 
-export type HaloContract = typeof haloContract;
+export type HaloClient = RouterContractClient<typeof contract>;
 ```
 
 #### Call stack diff
@@ -140,7 +145,7 @@ export type HaloContract = typeof haloContract;
  shared/rpc.ts
 -└── HaloApi / AgentSessionApi extends RpcTarget
 +└── DTO types only
-+└── shared/haloContract.ts
++└── shared/contract.ts
 +    └── oc procedure contracts
 ```
 
@@ -164,10 +169,10 @@ export type HaloContract = typeof haloContract;
 
 Leave `capnweb` installed until the cutover so the running app still links.
 
-- [ ] Add `@orpc/server@beta`, `@orpc/client@beta`, and `@orpc/contract@beta` to `@halo/desktop`. Add `@orpc/server@beta` and `@orpc/client@beta` to `@halo/plugin-sdk`.
-- [ ] Add `apps/electron/src/shared/haloContract.ts` with the contract above. Keep DTO types in `rpc.ts`.
-- [ ] Export `HaloClient` as `RouterContractClient<typeof haloContract>` from `haloContract.ts`.
-- [ ] Run `pnpm --filter @halo/desktop typecheck` and confirm the new file typechecks. Cap'n Web code still compiles.
+- [x] Add `@orpc/server@beta`, `@orpc/client@beta`, and `@orpc/contract@beta` to `@halo/desktop`. Add `@orpc/server@beta` and `@orpc/client@beta` to `@halo/plugin-sdk`.
+- [x] Add `apps/electron/src/shared/contract.ts` with the contract above. Keep DTO types in `rpc.ts`.
+- [x] Export `HaloClient` as `RouterContractClient<typeof contract>` from `contract.ts`.
+- [x] Run `pnpm --filter @halo/desktop typecheck` and confirm the new file typechecks. Cap'n Web code still compiles.
 
 ### Phase 2: HaloContext and data procedures
 
@@ -176,7 +181,7 @@ Implement the query and mutation procedures on an unused router. Handlers read s
 #### Important types
 
 ```ts
-// apps/electron/src/main/HaloContext.ts
+// apps/electron/src/main/router.ts
 import type { BrowserWindow } from "electron";
 import type { Logger } from "@repo/logger";
 import type { PluginService } from "./plugins/PluginService.js";
@@ -199,7 +204,7 @@ export type HaloContext = {
 ```diff
  HaloRpc.getAppInfo / getWorkspace / listSessions / ...
 -└── this.workspace / this.pi / this.plugins
-+implement(haloContract).$context<HaloContext>()
++implement(contract).$context<HaloContext>()
 +└── procedure.handler({ context })
 +    └── context.workspace / context.pi / context.plugins
 +call(procedure, input, { context })  // tests
@@ -208,19 +213,18 @@ export type HaloContext = {
 #### Code diff preview
 
 ```diff
- // apps/electron/src/main/haloRouter.ts
+ // apps/electron/src/main/router.ts
 +import { ORPCError, implement } from "@orpc/server";
-+import { haloContract } from "../shared/haloContract.js";
-+import type { HaloContext } from "./HaloContext.js";
++import { contract } from "../shared/contract.js";
 +
-+const halo = implement(haloContract).$context<HaloContext>();
++const os = implement(contract).$context<HaloContext>();
 +
-+export const getAppInfo = halo.getAppInfo.handler(({ context }) => {
++export const getAppInfo = os.getAppInfo.handler(({ context }) => {
 +  context.logger.info({ event: "getAppInfo" });
 +  return getAppInfoFromUpdate();
 +});
 +
-+export const listSessions = halo.listSessions.handler(async ({ context }) => {
++export const listSessions = os.listSessions.handler(async ({ context }) => {
 +  const sessions = await context.pi.listSessions();
 +  if (sessions instanceof Error) {
 +    return new ORPCError("BAD_REQUEST", {
@@ -231,30 +235,28 @@ export type HaloContext = {
 +  return sessions;
 +});
 +
-+export function createHaloRouter() {
-+  return halo.router({
-+    getAppInfo,
-+    installAppUpdate,
-+    getWorkspace,
-+    chooseWorkspace,
-+    listSessions,
-+    listWorkspacePaths,
-+    listPlugins,
-+    subscribeWorkspaceTree, // stub throw until phase 3
-+    newAgentSession,
-+    openAgentSession,
-+    agentSession: { events, prompt, close },
-+  });
-+}
++export const router = os.router({
++  getAppInfo,
++  installAppUpdate,
++  getWorkspace,
++  chooseWorkspace,
++  listSessions,
++  listWorkspacePaths,
++  listPlugins,
++  subscribeWorkspaceTree, // stub until phase 3
++  newAgentSession,
++  openAgentSession,
++  agentSession: { events, prompt, close },
++});
 ```
 
 For this phase, agent-session and tree procedures may `return new ORPCError("NOT_IMPLEMENTED")`. `listPlugins` still calls `PluginService.list` and returns the DTO; it does not yet mount plugin routers.
 
 `chooseWorkspace` keeps `dialog.showOpenDialog(context.getWindow(), ...)`. Convert a returned tagged error to `ORPCError` the same way `HaloRpc` throws today. Do not add retries or extra guards.
 
-- [ ] Add `HaloContext` and `createHaloRouter` in main. Put `AgentSessionRegistry` in as an empty class with `get` / `add` / `close` / `closeAll` no-ops if the session procedures are stubs.
+- [ ] Add `HaloContext` and a module-level `router` in `apps/electron/src/main/router.ts`. Put `AgentSessionRegistry` in as an empty class with `get` / `add` / `close` / `closeAll` no-ops if the session procedures are stubs.
 - [ ] Move the bodies of `HaloRpc` data methods into the matching handlers. Keep `HaloRpc` working for the live app.
-- [ ] Add `apps/electron/src/main/haloRouter.test.ts` with a Vitest fixture that builds a real `WorkspaceService` (same temp-dir pattern as `PluginService.test.ts`) and a `HaloContext`. Use `call` from `@orpc/server`.
+- [ ] Add `apps/electron/src/main/router.test.ts` with a Vitest fixture that builds a real `WorkspaceService` (same temp-dir pattern as `PluginService.test.ts`) and a `HaloContext`. Use `call` from `@orpc/server`.
 - [ ] Commit a test that `call(getWorkspace, undefined, { context })` returns `undefined` before `select`, then the workspace info after `select`. Also assert `listPlugins` before a workspace is chosen returns an `ORPCError` whose cause is `WorkspaceNotReadyError`.
 - [ ] Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/desktop typecheck`.
 
@@ -306,8 +308,8 @@ export class AgentSessionRegistry {
 #### Code diff preview
 
 ```diff
- // apps/electron/src/main/haloRouter.ts
-   newAgentSession: halo.newAgentSession.handler(async ({ context }) => {
+ // apps/electron/src/main/router.ts
+   newAgentSession: os.newAgentSession.handler(async ({ context }) => {
      const session = await context.pi.newAgentSession();
      if (session instanceof Error) {
        return new ORPCError("BAD_REQUEST", {
@@ -320,7 +322,7 @@ export class AgentSessionRegistry {
    }),
 
    agentSession: {
-     events: halo.agentSession.events.handler(async function* ({
+     events: os.agentSession.events.handler(async function* ({
        input,
        context,
        signal,
@@ -344,7 +346,7 @@ export class AgentSessionRegistry {
      }),
    }
 
-   subscribeWorkspaceTree: halo.subscribeWorkspaceTree.handler(
+   subscribeWorkspaceTree: os.subscribeWorkspaceTree.handler(
      async function* ({ context, signal }) {
 +      const queue = new AsyncEventQueue<WorkspaceTreeEvent[]>();
 +      context.workspace.setTreeListener((events) => queue.push(events));
@@ -365,7 +367,7 @@ Keep one tree listener, matching `HaloRpc` today. `AgentSessionRegistry.close` u
 
 - [ ] Implement `AgentSessionRegistry` and a small async queue used by both generators. Put cleanup in `finally`.
 - [ ] Implement `newAgentSession`, `openAgentSession`, `agentSession.events` / `prompt` / `close`, and `subscribeWorkspaceTree`.
-- [ ] Extend `haloRouter.test.ts`: open a session via `call`, `prompt` with `""`, and assert an `ORPCError` whose message matches `EmptyPromptError`. `close` then `prompt` must fail with `SessionNotOpenError`.
+- [ ] Extend `router.test.ts`: open a session via `call`, `prompt` with `""`, and assert an `ORPCError` whose message matches `EmptyPromptError`. `close` then `prompt` must fail with `SessionNotOpenError`.
 - [ ] Smoke by hand: `call(subscribeWorkspaceTree)`, push one tree event through `WorkspaceService.setTreeListener` by writing a file in the selected workspace, then `iterator.return()`. Do not commit this filesystem watch unless it stays short and stable in the existing fixture.
 - [ ] Run `pnpm --filter @halo/desktop test`.
 
@@ -400,8 +402,8 @@ export type PluginRuntimeValue = {
 
 export function usePluginServer<T extends AnyRouter>(): RouterClient<T>;
 
-// apps/electron/src/shared/haloContract.ts (client widening)
-export type HaloClient = RouterContractClient<typeof haloContract> & {
+// apps/electron/src/shared/contract.ts (client widening)
+export type HaloClient = RouterContractClient<typeof contract> & {
   plugins: Record<string, RouterClient<AnyRouter>>;
 };
 ```
@@ -414,7 +416,7 @@ export type HaloClient = RouterContractClient<typeof haloContract> & {
 -    └── newMessagePortMainRpcSession(port1, new HaloRpc(...))
 -    └── frame.postMessage(provideRpc, null, [port2])
 +└── new MessageChannelMain
-+    └── RPCHandler(createHaloRouter(pluginMap)).upgrade(port1, { context })
++    └── RPCHandler(router).upgrade(port1, { context })
 +    └── frame.postMessage(provideRpc, null, [port2])
 
  connectHaloRpc
@@ -428,7 +430,7 @@ export type HaloClient = RouterContractClient<typeof haloContract> & {
 -└── HaloRpc.getPlugin returns RpcTarget
 +└── loadPluginServer -> default | router export (plain object)
 +    └── mountPluginRouter injects PluginServerContext
-+    └── pluginMap[id] = mounted router
++    └── plugins[id] = mounted router
 +└── client.plugins[id].ping()
 
  useAgentSession / WorkspaceFilesystem / ApiProvider
@@ -444,8 +446,7 @@ export type HaloClient = RouterContractClient<typeof haloContract> & {
 -      port1,
 -      new HaloRpc(workspaceService, piService, pluginService, getWindow, rpcLogger),
 -    );
-+    const pluginMap: Record<string, AnyRouter> = {};
-+    const handler = new RPCHandler(createHaloRouter(pluginMap), {
++    const handler = new RPCHandler(router, {
 +      interceptors: [onError((error) => rpcLogger.warn({ event: "orpc", error }))],
 +    });
 +    const sessions = new AgentSessionRegistry();
@@ -470,7 +471,7 @@ export type HaloClient = RouterContractClient<typeof haloContract> & {
 -}
 +import { createORPCClient } from "@orpc/client";
 +import { RPCLink } from "@orpc/client/message-port";
-+import type { HaloClient } from "../../shared/haloContract.js";
++import type { HaloClient } from "../../shared/contract.js";
 +export async function connectHaloRpc(): Promise<HaloClient> {
 +  const port = await requestRpcPort();
 +  const link = new RPCLink({ port });
@@ -491,7 +492,7 @@ export type HaloClient = RouterContractClient<typeof haloContract> & {
 +};
 ```
 
-`createHaloRouter(pluginMap)` returns `{ ...implemented, plugins: pluginMap }`. `listPlugins` clears `pluginMap`, loads routers, and assigns `pluginMap[id] = mountPluginRouter(...)`. Do not replace the `pluginMap` object.
+`router` is a module-level const. Export a mutable `plugins` map next to it (`export const plugins: Record<string, AnyRouter> = {}`) and spread it onto `router`. `listPlugins` clears `plugins`, loads routers, and assigns `plugins[id] = mountPluginRouter(...)`. Do not replace the `plugins` object.
 
 `loadPluginServer` accepts `default` or named `router` / `Server` if the value is a plain router object (nested objects of procedures). A function or class is a load error: `server must export an oRPC router`. Drop instance exports and `instanceof RpcTarget`. Detect procedures with oRPC `isProcedure` (or the equivalent public helper in `@orpc/server`).
 
@@ -513,7 +514,7 @@ Plugin ids must not be oRPC reserved router keys (`then`, `bind`, `valueOf`, `to
 
 ## Testing
 
-Until phase 2, checks are typecheck only. Phase 2 commits `haloRouter.test.ts` that calls procedures through `call` with a real `WorkspaceService`. Phase 3 extends that file for empty prompt and closed session. Phase 4 commits the MessagePort plugin round-trip (the package-level stand-in for Cap'n Web's current test) and relies on `pnpm run check-affected`.
+Until phase 2, checks are typecheck only. Phase 2 commits `router.test.ts` that calls procedures through `call` with a real `WorkspaceService`. Phase 3 extends that file for empty prompt and closed session. Phase 4 commits the MessagePort plugin round-trip (the package-level stand-in for Cap'n Web's current test) and relies on `pnpm run check-affected`.
 
 Do not mock `PiService` or `PluginService`. Do not add `vi.fn`. Drive the live Halo window with `pnpm halo-web` as an uncommitted smoke step after the cutover.
 
