@@ -207,58 +207,64 @@ export type HaloContext = {
 +implement(contract).$context<HaloContext>()
 +└── procedure.handler({ context })
 +    └── context.workspace / context.pi / context.plugins
-+call(procedure, input, { context })  // tests
 ```
 
 #### Code diff preview
 
 ```diff
+ // apps/electron/src/main/orpcErrors.ts
++export const orpcErrors = {
++  badRequest(error: Error) {
++    return new ORPCError("BAD_REQUEST", {
++      message: error.message,
++      cause: error,
++    });
++  },
++  notImplemented() {
++    return new ORPCError("NOT_IMPLEMENTED");
++  },
++};
+
  // apps/electron/src/main/router.ts
-+import { ORPCError, implement } from "@orpc/server";
-+import { contract } from "../shared/contract.js";
++import { implement } from "@orpc/server";
++import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
++import { orpcErrors } from "./orpcErrors.js";
 +
 +const os = implement(contract).$context<HaloContext>();
 +
-+export const getAppInfo = os.getAppInfo.handler(({ context }) => {
-+  context.logger.info({ event: "getAppInfo" });
-+  return getAppInfoFromUpdate();
-+});
-+
-+export const listSessions = os.listSessions.handler(async ({ context }) => {
-+  const sessions = await context.pi.listSessions();
-+  if (sessions instanceof Error) {
-+    return new ORPCError("BAD_REQUEST", {
-+      message: sessions.message,
-+      cause: sessions,
-+    });
-+  }
-+  return sessions;
-+});
-+
 +export const router = os.router({
-+  getAppInfo,
-+  installAppUpdate,
-+  getWorkspace,
-+  chooseWorkspace,
-+  listSessions,
-+  listWorkspacePaths,
-+  listPlugins,
-+  subscribeWorkspaceTree, // stub until phase 3
-+  newAgentSession,
-+  openAgentSession,
-+  agentSession: { events, prompt, close },
++  getAppInfo: os.getAppInfo.handler(({ context }) => {
++    context.logger.info({ event: "getAppInfo" });
++    return getAppInfo();
++  }),
++  listSessions: os.listSessions.handler(async ({ context }) => {
++    const sessions = await context.pi.listSessions();
++    if (sessions instanceof Error) return orpcErrors.badRequest(sessions);
++    return sessions;
++  }),
++  subscribeWorkspaceTree: os.subscribeWorkspaceTree.handler(() =>
++    orpcErrors.notImplemented(),
++  ),
++  newAgentSession: os.newAgentSession.handler(() => orpcErrors.notImplemented()),
++  openAgentSession: os.openAgentSession.handler(() =>
++    orpcErrors.notImplemented(),
++  ),
++  agentSession: {
++    events: os.agentSession.events.handler(() => orpcErrors.notImplemented()),
++    prompt: os.agentSession.prompt.handler(() => orpcErrors.notImplemented()),
++    close: os.agentSession.close.handler(() => orpcErrors.notImplemented()),
++  },
 +});
 ```
 
-For this phase, agent-session and tree procedures may `return new ORPCError("NOT_IMPLEMENTED")`. `listPlugins` still calls `PluginService.list` and returns the DTO; it does not yet mount plugin routers.
+For this phase, agent-session and tree procedures return `orpcErrors.notImplemented()`. `listPlugins` still calls `PluginService.list` and returns the DTO; it does not yet mount plugin routers.
 
-`chooseWorkspace` keeps `dialog.showOpenDialog(context.getWindow(), ...)`. Convert a returned tagged error to `ORPCError` the same way `HaloRpc` throws today. Do not add retries or extra guards.
+`chooseWorkspace` keeps `dialog.showOpenDialog(context.getWindow(), ...)`. Convert a returned tagged error with `orpcErrors.badRequest`. Do not add retries or extra guards.
 
 - [x] Add `HaloContext` and a module-level `router` in `apps/electron/src/main/router.ts`. Put `AgentSessionRegistry` in as an empty class with `get` / `add` / `close` / `closeAll` no-ops if the session procedures are stubs.
 - [x] Move the bodies of `HaloRpc` data methods into the matching handlers. Keep `HaloRpc` working for the live app.
-- [x] Add `apps/electron/src/main/router.test.ts` with a Vitest fixture that builds a real `WorkspaceService` (same temp-dir pattern as `PluginService.test.ts`) and a `HaloContext`. Use `call` from `@orpc/server`.
-- [x] Commit a test that `call(getWorkspace, undefined, { context })` returns `undefined` before `select`, then the workspace info after `select`. Also assert `listPlugins` before a workspace is chosen returns an `ORPCError` whose cause is `WorkspaceNotReadyError`.
-- [x] Run `pnpm --filter @halo/desktop test` and `pnpm --filter @halo/desktop typecheck`.
+- [x] Add `apps/electron/src/main/orpcErrors.ts`. Handlers return `orpcErrors.badRequest(error)` or `orpcErrors.notImplemented()`.
+- [x] Run `pnpm --filter @halo/desktop typecheck`.
 
 ### Phase 3: Agent sessions and workspace tree as iterators
 
@@ -311,12 +317,7 @@ export class AgentSessionRegistry {
  // apps/electron/src/main/router.ts
    newAgentSession: os.newAgentSession.handler(async ({ context }) => {
      const session = await context.pi.newAgentSession();
-     if (session instanceof Error) {
-       return new ORPCError("BAD_REQUEST", {
-         message: session.message,
-         cause: session,
-       });
-     }
+     if (session instanceof Error) return orpcErrors.badRequest(session);
 +    context.sessions.add(session);
 +    return { sessionId: session.sessionId };
    }),
@@ -328,12 +329,7 @@ export class AgentSessionRegistry {
        signal,
      }) {
 +      const session = context.sessions.get(input.sessionId);
-+      if (session instanceof Error) {
-+        return new ORPCError("BAD_REQUEST", {
-+          message: session.message,
-+          cause: session,
-+        });
-+      }
++      if (session instanceof Error) return orpcErrors.badRequest(session);
 +      const queue = new AsyncEventQueue<AgentSessionEvent>();
 +      const unsubscribe = session.subscribe((event) => queue.push(event));
 +      try {
@@ -361,15 +357,13 @@ export class AgentSessionRegistry {
    );
 ```
 
-Keep one tree listener, matching `HaloRpc` today. `AgentSessionRegistry.close` unsubscribes, aborts, and `dispose`s the Pi session the way `AgentSessionRpc[Symbol.dispose]` does. `prompt` still rejects empty text with `EmptyPromptError` converted to `ORPCError`. Await in-flight event deliveries before `prompt` returns, same as `AgentSessionRpc.deliveries`.
+Keep one tree listener, matching `HaloRpc` today. `AgentSessionRegistry.close` unsubscribes, aborts, and `dispose`s the Pi session the way `AgentSessionRpc[Symbol.dispose]` does. `prompt` still rejects empty text with `EmptyPromptError` converted through `orpcErrors.badRequest`. Await in-flight event deliveries before `prompt` returns, same as `AgentSessionRpc.deliveries`.
 
 `newAgentSession` returns `{ sessionId }` immediately. The draft UI can still wait until the first prompt finishes before navigating; it no longer calls `getSessionId`.
 
 - [ ] Implement `AgentSessionRegistry` and a small async queue used by both generators. Put cleanup in `finally`.
 - [ ] Implement `newAgentSession`, `openAgentSession`, `agentSession.events` / `prompt` / `close`, and `subscribeWorkspaceTree`.
-- [ ] Extend `router.test.ts`: open a session via `call`, `prompt` with `""`, and assert an `ORPCError` whose message matches `EmptyPromptError`. `close` then `prompt` must fail with `SessionNotOpenError`.
-- [ ] Smoke by hand: `call(subscribeWorkspaceTree)`, push one tree event through `WorkspaceService.setTreeListener` by writing a file in the selected workspace, then `iterator.return()`. Do not commit this filesystem watch unless it stays short and stable in the existing fixture.
-- [ ] Run `pnpm --filter @halo/desktop test`.
+- [ ] Run `pnpm --filter @halo/desktop typecheck`.
 
 ### Phase 4: Cut over MessagePort, plugins, and the renderer
 
@@ -514,7 +508,7 @@ Plugin ids must not be oRPC reserved router keys (`then`, `bind`, `valueOf`, `to
 
 ## Testing
 
-Until phase 2, checks are typecheck only. Phase 2 commits `router.test.ts` that calls procedures through `call` with a real `WorkspaceService`. Phase 3 extends that file for empty prompt and closed session. Phase 4 commits the MessagePort plugin round-trip (the package-level stand-in for Cap'n Web's current test) and relies on `pnpm run check-affected`.
+Until phase 4, checks are typecheck only. Phase 4 commits the MessagePort plugin round-trip (the package-level stand-in for Cap'n Web's current test) and relies on `pnpm run check-affected`.
 
 Do not mock `PiService` or `PluginService`. Do not add `vi.fn`. Drive the live Halo window with `pnpm halo-web` as an uncommitted smoke step after the cutover.
 
