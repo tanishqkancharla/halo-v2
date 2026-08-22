@@ -1,0 +1,231 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createServer, type ViteDevServer } from "vite";
+import { tkstackContentPlugin } from "./contentPlugin.js";
+import { TkstackFileError, TkstackServeError } from "./errors.js";
+import { extractTitle } from "./extractDocument.js";
+
+export type TkstackServer = {
+  url: string;
+  filePath: string;
+  shutdown: () => Promise<void>;
+  closed: Promise<void>;
+};
+
+export type StartServerInput = {
+  filePath: string;
+  workspaceRoot: string;
+  port: number;
+};
+
+const packageRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+
+function noop() {}
+
+function createClosedBarrier() {
+  let resolveFn = noop;
+  const closed = new Promise<void>((resolve) => {
+    resolveFn = resolve;
+  });
+  return {
+    closed,
+    resolve() {
+      resolveFn();
+    },
+  };
+}
+
+export async function startServer(input: StartServerInput) {
+  const filePath = path.resolve(input.filePath);
+  const workspaceRoot = path.resolve(input.workspaceRoot);
+  const source = await fs.readFile(filePath, "utf8").catch(
+    (cause) =>
+      new TkstackFileError({
+        path: filePath,
+        reason: "read",
+        cause,
+      }),
+  );
+  if (source instanceof Error) return source;
+
+  const title = extractTitle(source);
+
+  let vite: ViteDevServer | undefined;
+  const closedBarrier = createClosedBarrier();
+  let shuttingDown = false;
+
+  async function shutdown() {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    if (vite !== undefined) await vite.close();
+    closedBarrier.resolve();
+  }
+
+  vite = await createServer({
+    configFile: path.join(packageRoot, "vite.config.ts"),
+    root: packageRoot,
+    server: {
+      port: input.port,
+      host: "127.0.0.1",
+      strictPort: input.port !== 0,
+      fs: {
+        allow: [packageRoot, workspaceRoot, path.dirname(filePath)],
+      },
+    },
+    plugins: [
+      tkstackContentPlugin({ filePath, title }),
+      {
+        name: "tkstack-api",
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            const url = req.url;
+            if (url === undefined || !url.startsWith("/__tkstack")) {
+              next();
+              return;
+            }
+            void handleTkstackRequest({
+              url,
+              method: req.method === undefined ? "GET" : req.method,
+              workspaceRoot,
+              title,
+              shutdown,
+              res,
+            });
+          });
+        },
+      },
+    ],
+  });
+
+  await vite.listen(input.port);
+  const localUrl = vite.resolvedUrls?.local[0];
+  if (localUrl === undefined) {
+    await shutdown();
+    return new TkstackServeError({ reason: "no listen url" });
+  }
+
+  process.once("SIGINT", () => {
+    void shutdown();
+  });
+  process.once("SIGTERM", () => {
+    void shutdown();
+  });
+
+  return {
+    url: localUrl.replace(/\/$/, ""),
+    filePath,
+    shutdown,
+    closed: closedBarrier.closed,
+  };
+}
+
+type TkstackResponse = {
+  statusCode: number;
+  setHeader: (name: string, value: string) => void;
+  end: (chunk: string) => void;
+};
+
+async function handleTkstackRequest(input: {
+  url: string;
+  method: string;
+  workspaceRoot: string;
+  title: string;
+  shutdown: () => Promise<void>;
+  res: TkstackResponse;
+}) {
+  const parsed = new URL(input.url, "http://127.0.0.1");
+  if (parsed.pathname === "/__tkstack/shutdown" && input.method === "POST") {
+    input.res.statusCode = 200;
+    input.res.setHeader("content-type", "text/plain; charset=utf-8");
+    input.res.end("ok");
+    setTimeout(() => {
+      void input.shutdown();
+    }, 250);
+    return;
+  }
+  if (parsed.pathname === "/__tkstack/meta" && input.method === "GET") {
+    input.res.statusCode = 200;
+    input.res.setHeader("content-type", "application/json; charset=utf-8");
+    input.res.end(JSON.stringify({ title: input.title }));
+    return;
+  }
+  if (parsed.pathname === "/__tkstack/file" && input.method === "GET") {
+    const excerpt = await readWorkspaceExcerpt({
+      workspaceRoot: input.workspaceRoot,
+      requestedPath: parsed.searchParams.get("path"),
+      start: parsed.searchParams.get("start"),
+      end: parsed.searchParams.get("end"),
+    });
+    if (excerpt instanceof Error) {
+      input.res.statusCode = 400;
+      input.res.setHeader("content-type", "application/json; charset=utf-8");
+      input.res.end(JSON.stringify({ error: excerpt.message }));
+      return;
+    }
+    input.res.statusCode = 200;
+    input.res.setHeader("content-type", "application/json; charset=utf-8");
+    input.res.end(JSON.stringify(excerpt));
+    return;
+  }
+  input.res.statusCode = 404;
+  input.res.end("not found");
+}
+
+export type FileExcerpt = {
+  path: string;
+  start: number;
+  end: number;
+  contents: string;
+};
+
+async function readWorkspaceExcerpt(input: {
+  workspaceRoot: string;
+  requestedPath: string | null;
+  start: string | null;
+  end: string | null;
+}) {
+  if (input.requestedPath === null || input.requestedPath.length === 0) {
+    return new TkstackFileError({
+      path: "",
+      reason: "missing path",
+    });
+  }
+  const requestedPath = input.requestedPath;
+  const resolvedRoot = path.resolve(input.workspaceRoot);
+  const resolved = path.resolve(resolvedRoot, requestedPath);
+  const prefix = resolvedRoot.endsWith(path.sep)
+    ? resolvedRoot
+    : resolvedRoot + path.sep;
+  if (resolved !== resolvedRoot && !resolved.startsWith(prefix)) {
+    return new TkstackFileError({
+      path: requestedPath,
+      reason: "path escapes workspace",
+    });
+  }
+  const contents = await fs.readFile(resolved, "utf8").catch(
+    (cause) =>
+      new TkstackFileError({
+        path: requestedPath,
+        reason: "read",
+        cause,
+      }),
+  );
+  if (contents instanceof Error) return contents;
+  const lines = contents.split("\n");
+  const start = parseLine(input.start, 1);
+  const end = parseLine(input.end, lines.length);
+  return {
+    path: requestedPath,
+    start,
+    end,
+    contents: lines.slice(start - 1, end).join("\n"),
+  };
+}
+
+function parseLine(value: string | null, fallback: number) {
+  if (value === null || value.length === 0) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return fallback;
+  return parsed;
+}
