@@ -602,7 +602,7 @@ Keep `RPC_CHANNELS` and the main-created `MessageChannelMain`. oRPC's Electron d
 - [x] Rewrite `PluginService.test.ts` fixtures to export oRPC routers. Keep the MessagePort round-trip: `RPCHandler.upgrade(port1)` + `RPCLink` on `port2` + `createORPCClient`. Assert `client.plugins.calendar.ping()` returns `{ pluginId: "calendar" }`, `fail()` rejects, and `client.plugins.missing.ping()` rejects.
 - [x] Rewrite loader tests: named `router` / `Server` object exports succeed; a class or function export records a load error matching `must export an oRPC router`.
 - [ ] Smoke the running app: `pnpm halo-web status`, then `pnpm halo-web exec` that `sessions-shell` is visible and Calendar is in the snapshot. Prompt, leave the session, return while it is still working, and check the transcript still streams. Do not commit this check.
-- [ ] Run `pnpm run check-affected`.
+- [x] Run `pnpm run check-affected`.
 
 Plugin ids must not be oRPC reserved router keys (`then`, `bind`, `valueOf`, `toString`, `toJSON`). Folder names in `.halo/plugins` already avoid those.
 
