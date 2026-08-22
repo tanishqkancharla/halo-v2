@@ -19,6 +19,7 @@ import {
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import { onError } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
@@ -26,7 +27,7 @@ import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
 import { PiService } from "./pi-service.js";
 import { PluginService } from "./plugins/PluginService.js";
-import { HaloRPCHandler, type HaloContext } from "./router.js";
+import { pluginHandlerOptions, router, type HaloContext } from "./router.js";
 import { UserService } from "./UserService.js";
 import { WorkspaceService } from "./workspace-service.js";
 
@@ -176,8 +177,10 @@ function registerRpcBridge(): void {
       },
       logger: rpcLogger,
     };
-    const handler = new HaloRPCHandler({
+    const handler = new RPCHandler(router, {
+      routingInterceptors: pluginHandlerOptions.routingInterceptors,
       interceptors: [
+        ...pluginHandlerOptions.interceptors,
         onError((error) => {
           if (error instanceof Error) {
             rpcLogger.warn({ event: "orpc", error });

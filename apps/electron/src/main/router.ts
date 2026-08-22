@@ -1,10 +1,9 @@
 import { dialog, type BrowserWindow } from "electron";
-import { implement, os as orpc, RPCSerializer } from "@orpc/server";
-import {
-  MessagePortHandler,
-  type RPCHandlerOptions,
-} from "@orpc/server/message-port";
-import { RPCHandlerCodec, StandardHandler } from "@orpc/server/standard";
+import { implement, os as orpc } from "@orpc/server";
+import type {
+  StandardHandlerInterceptor,
+  StandardHandlerRoutingInterceptor,
+} from "@orpc/server/standard";
 import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
@@ -28,18 +27,10 @@ export type HaloContext = {
 };
 
 const os = implement(contract).$context<HaloContext>();
-const pluginSerializer = new RPCSerializer();
 
 const plugins = orpc
   .$context<HaloContext>()
-  .handler(async ({ context, path, input, signal }) => {
-    return context.plugins.route({
-      path: path.slice(1),
-      input,
-      signal,
-      context,
-    });
-  });
+  .handler((request) => request.context.plugins.route(request));
 
 export const router = {
   getAppInfo: os.getAppInfo.handler(({ context }) => {
@@ -192,39 +183,39 @@ export const router = {
   plugins,
 };
 
-class PluginRPCHandlerCodec extends RPCHandlerCodec<HaloContext> {
-  async resolveProcedure(
-    request: Parameters<RPCHandlerCodec<HaloContext>["resolveProcedure"]>[0],
-    options: Parameters<RPCHandlerCodec<HaloContext>["resolveProcedure"]>[1],
-  ) {
-    const path = rpcPathSegments(request.url);
-    if (path[0] === "plugins" && path.length > 1) {
-      return {
-        procedure: plugins,
-        path,
-        decodeInput: async () => {
-          const body = await request.resolveBody();
-          return pluginSerializer.deserialize(body);
-        },
-      };
-    }
-    return super.resolveProcedure(request, options);
-  }
-}
+const nestedPluginPaths = new WeakMap<object, string[]>();
 
-export class HaloRPCHandler extends MessagePortHandler<HaloContext> {
-  constructor(options: RPCHandlerOptions<HaloContext> = {}) {
-    super(
-      new StandardHandler(new PluginRPCHandlerCodec(router, options), options),
-      options,
-    );
+const rewriteNestedPluginPath: StandardHandlerRoutingInterceptor<
+  HaloContext
+> = ({ next, request, ...rest }) => {
+  const path = procedurePath(request.url);
+  if (path[0] !== "plugins" || path.length < 2) {
+    return next();
   }
-}
+  const rewritten = { ...request, url: "/plugins" as const };
+  nestedPluginPaths.set(rewritten, path);
+  return next({ ...rest, request: rewritten });
+};
 
-function rpcPathSegments(url: string) {
-  const pathStart = url.indexOf("/");
-  const pathname = pathStart === -1 ? url : url.slice(pathStart);
-  const queryStart = pathname.indexOf("?");
-  const path = queryStart === -1 ? pathname : pathname.slice(0, queryStart);
-  return path.split("/").filter((segment) => segment.length > 0);
+const restoreNestedPluginPath: StandardHandlerInterceptor<HaloContext> = ({
+  next,
+  request,
+  ...rest
+}) => {
+  const path = nestedPluginPaths.get(request);
+  if (path === undefined) {
+    return next();
+  }
+  return next({ ...rest, request, path });
+};
+
+export const pluginHandlerOptions = {
+  routingInterceptors: [rewriteNestedPluginPath],
+  interceptors: [restoreNestedPluginPath],
+};
+
+function procedurePath(url: string) {
+  const queryStart = url.indexOf("?");
+  const pathname = queryStart === -1 ? url : url.slice(0, queryStart);
+  return pathname.split("/").filter((segment) => segment.length > 0);
 }
