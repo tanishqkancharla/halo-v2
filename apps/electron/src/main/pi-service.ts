@@ -9,6 +9,7 @@ import type { SessionSummary } from "../shared/rpc.js";
 import { createParallelSearchTools } from "./ParallelSearchTools.js";
 import type { UserService } from "./UserService.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
+import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
   name: "SessionNotFoundError",
@@ -52,12 +53,21 @@ export class PiService {
     const user = await this.user.getUser();
     if (user instanceof Error) return user;
 
+    const resourceLoader = createWorkspaceResourceLoader(
+      layout.root,
+      layout.agentDir,
+    );
+    const reloaded = await resourceLoader
+      .reload()
+      .catch((e) => new CreateAgentSessionError({ cause: e }));
+    if (reloaded instanceof Error) return reloaded;
     const created = await createAgentSession({
       cwd: layout.root,
       agentDir: layout.agentDir,
       sessionManager: manager,
       tools: createCodingTools(layout.root),
       customTools: createParallelSearchTools(user.id),
+      resourceLoader,
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;
     return created.session;
