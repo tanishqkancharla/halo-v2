@@ -3,10 +3,16 @@
 Serve a spec or code walkthrough as a local page.
 
 ```sh
-npx @tanishqkancharla/tkstack path/to/file.md
+npx tkstack path/to/file.md
 ```
 
 Halo aliases: `pnpm spec` and `pnpm walkthrough`. In this repo: `pnpm exec tkstack path/to/file.md`.
+
+Publish from this package directory, not the repo root:
+
+```sh
+pnpm release
+```
 
 Options:
 
@@ -18,11 +24,7 @@ Options:
 ## Library
 
 ```ts
-import {
-  startServer,
-  parseFence,
-  parseViewerDocument,
-} from "@tanishqkancharla/tkstack";
+import { startServer, parseFence, parseViewerDocument } from "tkstack";
 ```
 
 `parseViewerDocument` turns markdown into the page document with [md4x](https://github.com/unjs/md4x). `startServer` listens. Halo skills own spec vs walkthrough section order; tkstack does not.

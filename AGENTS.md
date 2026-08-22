@@ -11,7 +11,7 @@ Halo is an open-source self-modifiable desktop app built with Electron and Pi. I
 
 Bump `apps/electron/package.json` `version`, commit, then create and push a git tag with that exact same version string (no `v` prefix). Example: version `0.1.1` → tag `0.1.1`. That tag push runs `Publish Electron`, which builds installers and uploads them to a non-draft GitHub Release. Packaged apps check for updates via `update.electronjs.org`.
 
-To publish tkstack, bump `packages/tkstack/package.json` `version`, commit, then create and push a git tag `tkstack-<version>` (example: version `0.1.1` → tag `tkstack-0.1.1`). That tag push runs `Publish tkstack`, which publishes `@tanishqkancharla/tkstack` to npm. The workflow needs an `NPM_TOKEN` repository secret.
+To publish tkstack, bump `packages/tkstack/package.json` `version`, commit, then create and push a git tag `tkstack-<version>` (example: version `0.1.1` → tag `tkstack-0.1.1`). That tag push runs `Publish tkstack`, which publishes `tkstack` to npm. The workflow needs an `NPM_TOKEN` repository secret. Publish only from `packages/tkstack`, not the repo root.
 
 ## Code Style
 

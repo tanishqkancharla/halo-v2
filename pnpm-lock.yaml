@@ -16,15 +16,15 @@ importers:
       '@oxlint/plugins':
         specifier: ^1.79.0
         version: 1.79.0
-      '@tanishqkancharla/tkstack':
-        specifier: workspace:*
-        version: link:packages/tkstack
       oxfmt:
         specifier: ^0.60.0
         version: 0.60.0
       oxlint:
         specifier: ^1.79.0
         version: 1.79.0
+      tkstack:
+        specifier: workspace:*
+        version: link:packages/tkstack
       turbo:
         specifier: ^2.10.7
         version: 2.10.7

@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   publish:
-    name: Publish @tanishqkancharla/tkstack
+    name: Publish tkstack
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

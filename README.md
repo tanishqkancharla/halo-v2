@@ -98,7 +98,7 @@ Electron Forge writes packaged apps to `apps/electron/out`.
 
 Packaged macOS and Windows builds check for updates through [update.electronjs.org](https://update.electronjs.org), which reads those GitHub Releases. macOS builds are signed and notarized in CI.
 
-`Publish tkstack` (`.github/workflows/publish-tkstack.yml`) publishes [`@tanishqkancharla/tkstack`](https://www.npmjs.com/package/@tanishqkancharla/tkstack) on a `tkstack-<version>` tag. The tag suffix must equal `packages/tkstack/package.json` `version` (for example version `0.1.1` → tag `tkstack-0.1.1`). Add an `NPM_TOKEN` repository secret that can publish under `@tanishqkancharla`.
+`Publish tkstack` (`.github/workflows/publish-tkstack.yml`) publishes [`tkstack`](https://www.npmjs.com/package/tkstack) on a `tkstack-<version>` tag. The tag suffix must equal `packages/tkstack/package.json` `version` (for example version `0.1.1` → tag `tkstack-0.1.1`). Add an `NPM_TOKEN` repository secret. Publish only from `packages/tkstack`, not the repo root.
 
 ### One-time GitHub setup
 
