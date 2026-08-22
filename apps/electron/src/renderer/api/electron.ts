@@ -1,8 +1,9 @@
-import { connectHaloRpc, type HaloApiStub } from "./HaloRpcClient.js";
+import { connectHaloRpc } from "./HaloRpcClient.js";
+import type { HaloClient } from "../../shared/contract.js";
 
-let electronApiPromise: Promise<HaloApiStub> | undefined;
+let electronApiPromise: Promise<HaloClient> | undefined;
 
-export function createElectronApi(): Promise<HaloApiStub> {
+export function createElectronApi(): Promise<HaloClient> {
   if (electronApiPromise === undefined) {
     electronApiPromise = connectHaloRpc();
   }

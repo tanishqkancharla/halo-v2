@@ -22,7 +22,7 @@ Required:
 Optional:
 
 - `view.tsx` (or `view/index.tsx`, `view.ts`, `view/index.ts`) with named exports `Sidebar` and `Routes`
-- `server.ts` (or `server/index.ts`) with a default `RpcTarget` class
+- `server.ts` (or `server/index.ts`) with a default oRPC router
 
 Halo loads plugins when the workspace is ready. Reload (View → Reload, or Cmd-R / Ctrl-R) to pick up plugin edits.
 
@@ -34,7 +34,7 @@ Packages in `external` are Halo's copies. Import UI from `@halo/plugin-sdk/view`
 
 Other packages are allowed. Add them to that plugin's `package.json`, run `npm install` in the plugin folder, then reload. esbuild inlines them. A missing package fails compile.
 
-Import `RpcTarget` from `@halo/plugin-sdk/server`. Parse JSON with `parseVersioned` from `@halo/plugin-sdk/schema`.
+Import `pluginOs` from `@halo/plugin-sdk/server`. Parse JSON with `parseVersioned` from `@halo/plugin-sdk/schema`.
 
 ## package.json
 
@@ -92,31 +92,31 @@ function Home() {
 A view that exports neither `Sidebar` nor `Routes` is empty, not an error. Import the server as a type only:
 
 ```ts
-import type { NotesServer } from "./server.ts";
+import type router from "./server.ts";
 import { usePluginServer } from "@halo/plugin-sdk/view";
 ```
 
 ## Server
 
-Export a class that extends `RpcTarget`. The host constructs it with `{ pluginId, workspaceRoot }`. Return an `Error` from a method to fail the RPC call.
+Export a default oRPC router. Handlers read `{ pluginId, workspaceRoot }` from context. Return an `Error` from a handler to fail the RPC call.
 
 ```ts
-import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server";
+import { pluginOs } from "@halo/plugin-sdk/server";
 
-export default class NotesServer extends RpcTarget {
-  constructor(private readonly ctx: PluginServerContext) {
-    super();
-  }
+const plugin = pluginOs;
 
-  ping() {
-    return { pluginId: this.ctx.pluginId };
-  }
-}
+export default {
+  ping: plugin.handler(async ({ context }) => ({
+    pluginId: context.pluginId,
+  })),
+};
 ```
+
+You can also export a named `router` or `Server` object. Do not export a class or function.
 
 In the view:
 
 ```ts
-const server = usePluginServer<NotesServer>();
+const server = usePluginServer<typeof router>();
 await server.ping();
 ```

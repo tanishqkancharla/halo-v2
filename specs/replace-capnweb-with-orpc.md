@@ -49,7 +49,7 @@ Replace Cap'n Web with oRPC v2 over the same Electron MessagePort handshake. Mai
 
 Cap'n Web object capabilities do not carry over. Plugin classes, instances, and parent-class method walking go away. oRPC v2 is the `@beta` line on [v2.orpc.dev](https://v2.orpc.dev).
 
-Assumption: `RPCHandler` looks up `router.plugins[id]` at call time, so filling a stable `plugins` object during `listPlugins` is enough. Do not snapshot the plugin map at upgrade. If a call lands before `listPlugins`, the procedure is missing and oRPC returns its normal not-found error.
+Assumption: oRPC's RPCMatcher indexes procedures when `RPCHandler` is constructed. `implement(contract).router(...)` hides extra keys behind the contract, which has no `plugins` field. Expose plugins as `os.lazy(() => ({ default: plugins }))` on a plain object copied off that hidden contract, so the matcher records `/plugins` as pending and indexes the map on the first `/plugins/...` call. Halo calls `listPlugins` before plugin RPCs, so that load sees the filled map. Lazy loads once per handler; a new MessagePort (window reload) builds a new handler. Do not snapshot an empty map at upgrade. If a call lands before `listPlugins`, the procedure is missing and oRPC returns its normal not-found error.
 
 Assumption: the default `RPCSerializer` is enough for Pi `AgentSessionEvent` values and plugin results. Do not turn on `experimental_transfer` unless a payload fails a round-trip.
 
@@ -584,7 +584,7 @@ export function agentSessionStateFromSession(session: {
    }
 ```
 
-`router` is a module-level const. Export a mutable `plugins` map next to it (`export const plugins: Record<string, AnyRouter> = {}`) and spread it onto `router`. `listPlugins` clears `plugins`, loads routers, and assigns `plugins[id] = mountPluginRouter(...)`. Do not replace the `plugins` object.
+`router` is a module-level const. Export a mutable `plugins` map next to it (`export const plugins: Record<string, AnyRouter> = {}`). Spread the implemented contract router into a new object (so the hidden contract does not hide extra keys) and set `plugins: orpc.lazy(async () => ({ default: plugins }))`. `listPlugins` clears `plugins`, loads routers, and assigns `plugins[id] = mountPluginRouter(...)`. Do not replace the `plugins` object.
 
 `loadPluginServer` accepts `default` or named `router` / `Server` if the value is a plain router object (nested objects of procedures). A function or class is a load error: `server must export an oRPC router`. Drop instance exports and `instanceof RpcTarget`. Detect procedures with oRPC `isProcedure` (or the equivalent public helper in `@orpc/server`).
 
@@ -596,11 +596,11 @@ Delete `MessagePortMainTransport.ts`, `HaloRpc`, `AgentSessionRpc`, `RpcTarget` 
 
 Keep `RPC_CHANNELS` and the main-created `MessageChannelMain`. oRPC's Electron doc sends the port from the renderer; Halo already does the reverse and that stays.
 
-- [ ] Switch main, preload comment, renderer client, `ApiProvider`, agent-session hooks, filesystem subscribe, `App` / `Sidebar` / `MainPane` plugin server types, plugin SDK, loader, `PluginService`, skill, externals, and tests in this commit.
-- [ ] Reuse a live registry session in `openAgentSession`. Snapshot with `agentSessionStateFromSession({ messages, isStreaming })`. Put `isWorking` on `AgentSessionState` and fold `agent_start` / `agent_end` in `applyAgentSessionEvent`.
-- [ ] `useAgentSession` unmount cancels the events iterator only. Draft navigates as soon as it has `sessionId`.
-- [ ] Rewrite `PluginService.test.ts` fixtures to export oRPC routers. Keep the MessagePort round-trip: `RPCHandler.upgrade(port1)` + `RPCLink` on `port2` + `createORPCClient`. Assert `client.plugins.calendar.ping()` returns `{ pluginId: "calendar" }`, `fail()` rejects, and `client.plugins.missing.ping()` rejects.
-- [ ] Rewrite loader tests: named `router` / `Server` object exports succeed; a class or function export records a load error matching `must export an oRPC router`.
+- [x] Switch main, preload comment, renderer client, `ApiProvider`, agent-session hooks, filesystem subscribe, `App` / `Sidebar` / `MainPane` plugin server types, plugin SDK, loader, `PluginService`, skill, externals, and tests in this commit.
+- [x] Reuse a live registry session in `openAgentSession`. Snapshot with `agentSessionStateFromSession({ messages, isStreaming })`. Put `isWorking` on `AgentSessionState` and fold `agent_start` / `agent_end` in `applyAgentSessionEvent`.
+- [x] `useAgentSession` unmount cancels the events iterator only. Draft navigates as soon as it has `sessionId`.
+- [x] Rewrite `PluginService.test.ts` fixtures to export oRPC routers. Keep the MessagePort round-trip: `RPCHandler.upgrade(port1)` + `RPCLink` on `port2` + `createORPCClient`. Assert `client.plugins.calendar.ping()` returns `{ pluginId: "calendar" }`, `fail()` rejects, and `client.plugins.missing.ping()` rejects.
+- [x] Rewrite loader tests: named `router` / `Server` object exports succeed; a class or function export records a load error matching `must export an oRPC router`.
 - [ ] Smoke the running app: `pnpm halo-web status`, then `pnpm halo-web exec` that `sessions-shell` is visible and Calendar is in the snapshot. Prompt, leave the session, return while it is still working, and check the transcript still streams. Do not commit this check.
 - [ ] Run `pnpm run check-affected`.
 

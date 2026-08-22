@@ -6,16 +6,16 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import type { RpcStub, RpcTarget } from "capnweb";
+import type { AnyRouter, RouterClient } from "@orpc/server";
 import * as errore from "errore";
 import { createContext, useContext, useState, type ReactNode } from "react";
+import type { HaloClient } from "../../shared/contract.js";
 import type { WorkspaceInfo } from "../../shared/rpc.js";
 import {
   loadPluginViews,
   type LoadedPluginList,
 } from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
-import type { HaloApiStub } from "./HaloRpcClient.js";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
   name: "WorkspaceRestoreError",
@@ -27,7 +27,7 @@ export type WorkspaceState =
   | { status: "ready"; workspace: WorkspaceInfo };
 
 type ApiContextValue = {
-  api: HaloApiStub;
+  api: HaloClient;
   queryClient: QueryClient;
 };
 
@@ -39,7 +39,7 @@ export function ApiProvider({
   createApi,
   children,
 }: {
-  createApi: () => Promise<HaloApiStub>;
+  createApi: () => Promise<HaloClient>;
   children: ReactNode;
 }) {
   const [queryClient] = useState(
@@ -68,7 +68,7 @@ function ResolveApi({
   createApi,
   children,
 }: {
-  createApi: () => Promise<HaloApiStub>;
+  createApi: () => Promise<HaloClient>;
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
@@ -87,7 +87,7 @@ function ResolveApi({
   );
 }
 
-export function useApi(): HaloApiStub {
+export function useApi(): HaloClient {
   return useContext(ApiContext).api;
 }
 
@@ -159,7 +159,7 @@ export function useInstallAppUpdateMutation() {
   });
 }
 
-type PluginServers = Record<string, RpcStub<RpcTarget>>;
+type PluginServers = Record<string, RouterClient<AnyRouter>>;
 
 type PluginsQueryData = LoadedPluginList & {
   servers: PluginServers;
@@ -182,7 +182,9 @@ export function usePluginsQuery(
       const servers: PluginServers = {};
       for (const plugin of list.plugins) {
         if (plugin.serverPath === undefined) continue;
-        servers[plugin.id] = await api.getPlugin(plugin.id);
+        const server = api.plugins[plugin.id];
+        if (server === undefined) continue;
+        servers[plugin.id] = server;
       }
       return { ...loaded, servers };
     },
@@ -190,7 +192,7 @@ export function usePluginsQuery(
   });
 }
 
-async function restoreWorkspace(api: HaloApiStub): Promise<WorkspaceState> {
+async function restoreWorkspace(api: HaloClient): Promise<WorkspaceState> {
   const active = await api
     .getWorkspace()
     .catch((e) => new WorkspaceRestoreError({ cause: e }));

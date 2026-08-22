@@ -2,21 +2,23 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/message-port";
+import { RPCHandler } from "@orpc/server/message-port";
 import { Logger } from "@repo/logger";
-import { newMessagePortRpcSession } from "capnweb";
 import { describe, expect, test } from "vitest";
+import type { HaloClient } from "../../shared/contract.js";
 import { src } from "../test/fixtures.js";
 import {
   WorkspaceNotReadyError,
   WorkspaceService,
 } from "../workspace-service.js";
 import { loadPluginViews } from "../../renderer/evaluatePluginView.js";
-import { HaloRpc } from "../rpc.js";
+import { AgentSessionRegistry } from "../AgentSessionRegistry.js";
 import { PiService } from "../pi-service.js";
 import { UserService } from "../UserService.js";
-import type { HaloApi } from "../../shared/rpc.js";
-import type { RpcTarget } from "@halo/plugin-sdk/server";
-import { PluginNotFoundError, PluginService } from "./PluginService.js";
+import { router } from "../router.js";
+import { PluginService } from "./PluginService.js";
 
 type PluginFiles = Record<string, string>;
 type PluginTree = Record<string, PluginFiles>;
@@ -67,21 +69,55 @@ async function listPlugins(workspace: WorkspaceService) {
   return listed;
 }
 
-async function loadedPluginServer<T extends object>(
+async function withHaloClient(
   workspace: WorkspaceService,
-  id: string,
+  appDataDir: string,
+  run: (client: HaloClient) => Promise<void>,
 ) {
-  const service = new PluginService(workspace);
-  const listed = await service.list();
-  if (listed instanceof Error) throw listed;
-  const server = service.getPlugin(id);
-  if (server instanceof Error) throw server;
-  return pluginCalls<T>(server);
+  const pluginService = new PluginService(workspace);
+  const sessions = new AgentSessionRegistry();
+  const handler = new RPCHandler(router);
+  const { port1, port2 } = new MessageChannel();
+  handler.upgrade(port1, {
+    context: {
+      workspace,
+      pi: new PiService(workspace, new UserService(appDataDir)),
+      plugins: pluginService,
+      sessions,
+      getWindow: () => {
+        throw new Error("no window");
+      },
+      logger: new Logger(),
+    },
+  });
+  const link = new RPCLink({ port: port2 });
+  port1.start();
+  port2.start();
+  // SAFETY: this MessageChannel talks to the Halo router under test.
+  const client = createORPCClient(link) as HaloClient;
+  await run(client);
+  port1.close();
+  port2.close();
 }
 
-function pluginCalls<T extends object>(server: RpcTarget): T {
-  // SAFETY: the test fixture's server methods match T.
-  return server as T;
+type PluginTestClient = {
+  ping: () => Promise<
+    | string
+    | {
+        pluginId: string;
+        workspaceRoot?: string;
+      }
+  >;
+  fail: () => Promise<never>;
+};
+
+function pluginClient(client: HaloClient, id: string) {
+  const nested = client.plugins[id];
+  if (nested === undefined) {
+    throw new Error(`plugin client '${id}' is missing`);
+  }
+  // SAFETY: plugin routers under test expose ping and fail as client methods.
+  return nested as PluginTestClient;
 }
 
 describe("PluginService", () => {
@@ -335,7 +371,7 @@ describe("PluginService", () => {
   );
 
   pluginTest(
-    "round-trips a plugin ping over Cap'n Web and rejects a missing plugin id",
+    "round-trips a plugin ping over oRPC and rejects a missing plugin id",
     async ({ workspace, writePlugin, appDataDir }) => {
       await writePlugin({
         calendar: {
@@ -346,57 +382,35 @@ describe("PluginService", () => {
             }
           `,
           "server.ts": src`
-            import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server"
+            import { pluginOs } from "@halo/plugin-sdk/server"
 
-            export default class CalendarServer extends RpcTarget {
-              constructor(private readonly ctx: PluginServerContext) {
-                super()
-              }
+            const plugin = pluginOs
 
-              ping() {
-                return { pluginId: this.ctx.pluginId }
-              }
-
-              fail() {
-                return new Error("ping failed")
-              }
+            export default {
+              ping: plugin.handler(async ({ context }) => ({
+                pluginId: context.pluginId,
+              })),
+              fail: plugin.handler(() => new Error("ping failed")),
             }
           `,
         },
       });
 
-      const plugins = new PluginService(workspace);
-      const listed = await plugins.list();
-      if (listed instanceof Error) throw listed;
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
-      expect(listed.errors).toEqual([]);
+      await withHaloClient(workspace, appDataDir, async (client) => {
+        const listed = await client.listPlugins();
+        expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
+        expect(listed.errors).toEqual([]);
 
-      const rpc = new HaloRpc(
-        workspace,
-        new PiService(workspace, new UserService(appDataDir)),
-        plugins,
-        () => {
-          throw new Error("no window");
-        },
-        new Logger(),
-      );
-      const { port1, port2 } = new MessageChannel();
-      newMessagePortRpcSession(port1, rpc);
-      const api = newMessagePortRpcSession<HaloApi>(port2);
-      type CalendarCalls = {
-        ping: () => Promise<{ pluginId: string }>;
-        fail: () => Promise<void>;
-      };
-      const calendar = pluginCalls<CalendarCalls>(
-        await api.getPlugin("calendar"),
-      );
-
-      expect(await calendar.ping()).toEqual({ pluginId: "calendar" });
-      await expect(calendar.fail()).rejects.toBeInstanceOf(Error);
-      await expect(api.getPlugin("missing")).rejects.toBeInstanceOf(Error);
-
-      port1.close();
-      port2.close();
+        expect(await pluginClient(client, "calendar").ping()).toEqual({
+          pluginId: "calendar",
+        });
+        await expect(
+          pluginClient(client, "calendar").fail(),
+        ).rejects.toBeInstanceOf(Error);
+        await expect(
+          pluginClient(client, "missing").ping(),
+        ).rejects.toBeInstanceOf(Error);
+      });
     },
   );
 
@@ -446,6 +460,7 @@ describe("PluginService", () => {
         plugins: [],
         compiledViews: [],
         errors: [],
+        routers: {},
       });
     },
   );
@@ -659,7 +674,7 @@ describe("PluginService", () => {
 
   pluginTest(
     "loads a Routes-only view and a server-only plugin",
-    async ({ workspace, writePlugin }) => {
+    async ({ workspace, writePlugin, appDataDir }) => {
       await writePlugin({
         notes: {
           "package.json": src`
@@ -682,19 +697,15 @@ describe("PluginService", () => {
             }
           `,
           "server.ts": src`
-            import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server"
+            import { pluginOs } from "@halo/plugin-sdk/server"
 
-            export default class PingServer extends RpcTarget {
-              constructor(private readonly ctx: PluginServerContext) {
-                super()
-              }
+            const plugin = pluginOs
 
-              ping() {
-                return {
-                  pluginId: this.ctx.pluginId,
-                  workspaceRoot: this.ctx.workspaceRoot,
-                }
-              }
+            export default {
+              ping: plugin.handler(async ({ context }) => ({
+                pluginId: context.pluginId,
+                workspaceRoot: context.workspaceRoot,
+              })),
             }
           `,
         },
@@ -720,27 +731,27 @@ describe("PluginService", () => {
         loaded.views.find((view) => view.id === "notes")?.Routes,
       ).toBeTypeOf("function");
 
-      type PingCalls = {
-        ping: () => Promise<{ pluginId: string; workspaceRoot: string }>;
-      };
-      const ping = await loadedPluginServer<PingCalls>(workspace, "ping");
       const layout = workspace.getLayout();
       if (layout instanceof Error) throw layout;
-      expect(await ping.ping()).toEqual({
-        pluginId: "ping",
-        workspaceRoot: layout.root,
+      await withHaloClient(workspace, appDataDir, async (client) => {
+        await client.listPlugins();
+        expect(await pluginClient(client, "ping").ping()).toEqual({
+          pluginId: "ping",
+          workspaceRoot: layout.root,
+        });
+        await expect(
+          pluginClient(client, "calendar").ping(),
+        ).rejects.toBeInstanceOf(Error);
+        await expect(
+          pluginClient(client, "notes").ping(),
+        ).rejects.toBeInstanceOf(Error);
       });
-
-      const service = new PluginService(workspace);
-      await service.list();
-      expect(service.getPlugin("calendar")).toBeInstanceOf(PluginNotFoundError);
-      expect(service.getPlugin("notes")).toBeInstanceOf(PluginNotFoundError);
     },
   );
 
   pluginTest(
-    "loads a named Server export and a default RpcTarget instance",
-    async ({ workspace, writePlugin }) => {
+    "loads a named router export and a named Server object export",
+    async ({ workspace, writePlugin, appDataDir }) => {
       await writePlugin({
         named: {
           "package.json": src`
@@ -750,34 +761,26 @@ describe("PluginService", () => {
             }
           `,
           "server.ts": src`
-            import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server"
+            import { pluginOs } from "@halo/plugin-sdk/server"
 
-            export class Server extends RpcTarget {
-              constructor(private readonly ctx: PluginServerContext) {
-                super()
-              }
-
-              ping() {
-                return this.ctx.pluginId
-              }
+            export const router = {
+              ping: pluginOs.handler(async ({ context }) => context.pluginId),
             }
           `,
         },
-        instance: {
+        serverExport: {
           "package.json": src`
             {
-              "name": "halo-plugin-instance",
-              "halo": { "version": 1, "name": "Instance" }
+              "name": "halo-plugin-server-export",
+              "halo": { "version": 1, "name": "ServerExport" }
             }
           `,
           "server.ts": src`
-            import { RpcTarget } from "@halo/plugin-sdk/server"
+            import { pluginOs } from "@halo/plugin-sdk/server"
 
-            export default new (class extends RpcTarget {
-              ping() {
-                return "instance"
-              }
-            })()
+            export const Server = {
+              ping: pluginOs.handler(async ({ context }) => context.pluginId),
+            }
           `,
         },
       });
@@ -785,25 +788,24 @@ describe("PluginService", () => {
       const listed = await listPlugins(workspace);
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual([
         "calendar",
-        "instance",
         "named",
+        "serverExport",
       ]);
       expect(listed.errors).toEqual([]);
 
-      type PingCalls = { ping: () => Promise<string> };
-      const named = await loadedPluginServer<PingCalls>(workspace, "named");
-      const instance = await loadedPluginServer<PingCalls>(
-        workspace,
-        "instance",
-      );
-      expect(await named.ping()).toBe("named");
-      expect(await instance.ping()).toBe("instance");
+      await withHaloClient(workspace, appDataDir, async (client) => {
+        await client.listPlugins();
+        expect(await pluginClient(client, "named").ping()).toBe("named");
+        expect(await pluginClient(client, "serverExport").ping()).toBe(
+          "serverExport",
+        );
+      });
     },
   );
 
   pluginTest(
-    "loads server/index.ts and methods inherited from a parent class",
-    async ({ workspace, writePlugin }) => {
+    "loads server/index.ts as a default oRPC router",
+    async ({ workspace, writePlugin, appDataDir }) => {
       await writePlugin({
         ping: {
           "package.json": src`
@@ -813,31 +815,24 @@ describe("PluginService", () => {
             }
           `,
           "server/index.ts": src`
-            import { RpcTarget, type PluginServerContext } from "@halo/plugin-sdk/server"
+            import { pluginOs } from "@halo/plugin-sdk/server"
 
-            class Base extends RpcTarget {
-              ping() {
-                return "pong"
-              }
-            }
-
-            export default class PingServer extends Base {
-              constructor(_ctx: PluginServerContext) {
-                super()
-              }
+            export default {
+              ping: pluginOs.handler(() => "pong"),
             }
           `,
         },
       });
 
-      type PingCalls = { ping: () => Promise<string> };
-      const ping = await loadedPluginServer<PingCalls>(workspace, "ping");
-      expect(await ping.ping()).toBe("pong");
+      await withHaloClient(workspace, appDataDir, async (client) => {
+        await client.listPlugins();
+        expect(await pluginClient(client, "ping").ping()).toBe("pong");
+      });
     },
   );
 
   pluginTest(
-    "records a server that does not extend RpcTarget",
+    "records a class or function server export",
     async ({ workspace, writePlugin }) => {
       await writePlugin({
         boom: {
@@ -855,38 +850,16 @@ describe("PluginService", () => {
             }
           `,
         },
-      });
-
-      const listed = await listPlugins(workspace);
-      expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
-      expect(listed.errors.map((error) => error.id)).toEqual(["boom"]);
-      expect(listed.errors[0]?.message).toMatch(/must extend RpcTarget/);
-
-      const service = new PluginService(workspace);
-      await service.list();
-      expect(service.getPlugin("boom")).toBeInstanceOf(PluginNotFoundError);
-    },
-  );
-
-  pluginTest(
-    "records a server constructor that throws",
-    async ({ workspace, writePlugin }) => {
-      await writePlugin({
-        boom: {
+        fn: {
           "package.json": src`
             {
-              "name": "halo-plugin-boom",
-              "halo": { "version": 1, "name": "Boom" }
+              "name": "halo-plugin-fn",
+              "halo": { "version": 1, "name": "Fn" }
             }
           `,
           "server.ts": src`
-            import { RpcTarget } from "@halo/plugin-sdk/server"
-
-            export default class Boom extends RpcTarget {
-              constructor() {
-                super()
-                throw new Error("boom")
-              }
+            export default function boom() {
+              return 1
             }
           `,
         },
@@ -894,8 +867,9 @@ describe("PluginService", () => {
 
       const listed = await listPlugins(workspace);
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["calendar"]);
-      expect(listed.errors.map((error) => error.id)).toEqual(["boom"]);
-      expect(listed.errors[0]?.message).toMatch(/failed to load/);
+      expect(listed.errors.map((error) => error.id)).toEqual(["boom", "fn"]);
+      expect(listed.errors[0]?.message).toMatch(/must export an oRPC router/);
+      expect(listed.errors[1]?.message).toMatch(/must export an oRPC router/);
     },
   );
 

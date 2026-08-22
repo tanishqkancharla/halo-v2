@@ -1,5 +1,5 @@
 import { PluginRuntimeProvider } from "@halo/plugin-sdk/view";
-import type { RpcStub, RpcTarget } from "capnweb";
+import type { AnyRouter, RouterClient } from "@orpc/server";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Route, Switch, useLocation } from "wouter";
 import {
@@ -41,7 +41,7 @@ export function MainPane({
 }: {
   sessions: SessionSummary[];
   pluginViews: LoadedPluginView[];
-  pluginServers: Record<string, RpcStub<RpcTarget>>;
+  pluginServers: Record<string, RouterClient<AnyRouter>>;
 }) {
   return (
     <Switch>
@@ -101,7 +101,7 @@ function SavedPane({
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body);
   const column = useStyles(styles.column);
-  const { state, isWorking, prompt } = useAgentSession(sessionId);
+  const { state, prompt } = useAgentSession(sessionId);
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
   );
@@ -112,7 +112,7 @@ function SavedPane({
       <ThreadHeader title={title} />
       <div className={body}>
         <div className={column}>
-          <SessionView state={state} isWorking={isWorking} />
+          <SessionView state={state} />
           <Composer key={sessionId} error={state.error} onSubmit={prompt} />
         </div>
       </div>
@@ -122,7 +122,7 @@ function SavedPane({
 
 function DraftPane({ draftId }: { draftId: string }) {
   const [, navigate] = useLocation();
-  const { state, isWorking, prompt } = useDraftAgentSession((sessionId) => {
+  const { state, prompt } = useDraftAgentSession((sessionId) => {
     navigate(`/sessions/${sessionId}`);
   });
   const pane = useStyles(styles.pane);
@@ -135,9 +135,7 @@ function DraftPane({ draftId }: { draftId: string }) {
       <ThreadHeader />
       <div className={body}>
         <div className={column}>
-          {hasMessages ? (
-            <SessionView state={state} isWorking={isWorking} />
-          ) : undefined}
+          {hasMessages ? <SessionView state={state} /> : undefined}
           <Composer key={draftId} error={state.error} onSubmit={prompt} />
         </div>
       </div>
@@ -200,13 +198,7 @@ function Composer({
   );
 }
 
-function SessionView({
-  state,
-  isWorking,
-}: {
-  state: AgentSessionState;
-  isWorking: boolean;
-}) {
+function SessionView({ state }: { state: AgentSessionState }) {
   const viewRef = useRef<HTMLDivElement>(null);
   const view = useStyles(styles.view);
   const thinking = useStyles(styles.thinking);
@@ -229,7 +221,7 @@ function SessionView({
       {items.map((item) => (
         <SessionViewRow key={item.id} item={item} />
       ))}
-      {isWorking ? (
+      {state.isWorking ? (
         <span className={thinking}>
           <Loader size="0.75em" variant="muted" aria-label="Thinking" />
           Thinking

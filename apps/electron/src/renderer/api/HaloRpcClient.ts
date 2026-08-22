@@ -1,12 +1,14 @@
-import { newMessagePortRpcSession, type RpcStub } from "capnweb";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/message-port";
 import { RPC_CHANNELS } from "../../shared/channels.js";
-import type { HaloApi } from "../../shared/rpc.js";
+import type { HaloClient } from "../../shared/contract.js";
 
-export type HaloApiStub = RpcStub<HaloApi>;
-
-export async function connectHaloRpc(): Promise<HaloApiStub> {
+export async function connectHaloRpc(): Promise<HaloClient> {
   const port = await requestRpcPort();
-  return newMessagePortRpcSession<HaloApi>(port);
+  const link = new RPCLink({ port });
+  port.start();
+  // SAFETY: this port is upgraded to the Halo router; HaloClient is that contract plus plugins.
+  return createORPCClient(link) as HaloClient;
 }
 
 function requestRpcPort(): Promise<MessagePort> {

@@ -18,14 +18,16 @@ import {
 } from "@repo/logger";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
+import { onError } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
+import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
-import { newMessagePortMainRpcSession } from "./MessagePortMainTransport.js";
 import { PiService } from "./pi-service.js";
-import { HaloRpc } from "./rpc.js";
 import { PluginService } from "./plugins/PluginService.js";
+import { router } from "./router.js";
 import { UserService } from "./UserService.js";
 import { WorkspaceService } from "./workspace-service.js";
 
@@ -161,21 +163,37 @@ function registerRpcBridge(): void {
       throw new Error("Halo rejected RPC without a sender frame.");
     }
     const { port1, port2 } = new MessageChannelMain();
-    newMessagePortMainRpcSession(
-      port1,
-      new HaloRpc(
-        workspaceService,
-        piService,
-        pluginService,
-        () => {
+    const handler = new RPCHandler(router, {
+      interceptors: [
+        onError((error) => {
+          if (error instanceof Error) {
+            rpcLogger.warn({ event: "orpc", error });
+            return;
+          }
+          rpcLogger.warn({ event: "orpc", error: String(error) });
+        }),
+      ],
+    });
+    const sessions = new AgentSessionRegistry();
+    handler.upgrade(port1, {
+      context: () => ({
+        workspace: workspaceService,
+        pi: piService,
+        plugins: pluginService,
+        sessions,
+        getWindow: () => {
           if (mainWindow === undefined) {
             throw new Error("Halo main window is not open.");
           }
           return mainWindow;
         },
-        rpcLogger,
-      ),
-    );
+        logger: rpcLogger,
+      }),
+    });
+    port1.start();
+    port1.on("close", () => {
+      sessions.closeAll();
+    });
     // Electron's postMessage payload; the ports carry the RPC transport.
     // oxlint-disable-next-line unicorn/no-null
     frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);

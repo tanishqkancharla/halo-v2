@@ -5,6 +5,7 @@ import {
   type,
   type RouterContractClient,
 } from "@orpc/contract";
+import type { AnyRouter, RouterClient } from "@orpc/server";
 import type { AgentSessionState } from "./AgentSessionState.js";
 import type {
   AppInfo,
@@ -38,4 +39,6 @@ export const contract = {
   },
 };
 
-export type HaloClient = RouterContractClient<typeof contract>;
+export type HaloClient = RouterContractClient<typeof contract> & {
+  plugins: Record<string, RouterClient<AnyRouter>>;
+};

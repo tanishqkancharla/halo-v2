@@ -4,7 +4,7 @@ import {
   SidebarSection,
   sidebarPadding,
 } from "@halo/plugin-sdk/view";
-import type { RpcStub, RpcTarget } from "capnweb";
+import type { AnyRouter, RouterClient } from "@orpc/server";
 import {
   Button,
   Icons,
@@ -27,7 +27,7 @@ type SidebarProps = {
   sessions: SessionSummary[];
   pluginViews: LoadedPluginView[];
   pluginErrors: PluginLoadError[];
-  pluginServers: Record<string, RpcStub<RpcTarget>>;
+  pluginServers: Record<string, RouterClient<AnyRouter>>;
   appInfo?: AppInfo;
 };
 

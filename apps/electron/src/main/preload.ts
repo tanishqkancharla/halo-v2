@@ -23,7 +23,7 @@ const logMessageSchema = Type.Object({
   }),
 });
 
-// Renderer requests a Cap'n Web MessagePort; we forward it into the main world.
+// Renderer requests an oRPC MessagePort; we forward it into the main world.
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   const log = parseLogMessage({ data: event.data });
