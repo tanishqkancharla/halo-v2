@@ -27,7 +27,7 @@ import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
 import { PiService } from "./pi-service.js";
 import { PluginService } from "./plugins/PluginService.js";
-import { createHaloContext, createRouter } from "./router.js";
+import { router, type HaloContext } from "./router.js";
 import { UserService } from "./UserService.js";
 import { WorkspaceService } from "./workspace-service.js";
 
@@ -164,7 +164,7 @@ function registerRpcBridge(): void {
     }
     const { port1, port2 } = new MessageChannelMain();
     const sessions = new AgentSessionRegistry();
-    const context = createHaloContext({
+    const context: HaloContext = {
       workspace: workspaceService,
       pi: piService,
       plugins: pluginService,
@@ -176,18 +176,24 @@ function registerRpcBridge(): void {
         return mainWindow;
       },
       logger: rpcLogger,
-    });
-    const handler = new RPCHandler(createRouter(context), {
-      interceptors: [
-        onError((error) => {
-          if (error instanceof Error) {
-            rpcLogger.warn({ event: "orpc", error });
-            return;
-          }
-          rpcLogger.warn({ event: "orpc", error: String(error) });
-        }),
-      ],
-    });
+    };
+    const handler = new RPCHandler(
+      {
+        ...router,
+        plugins: pluginService.orpcRouter,
+      },
+      {
+        interceptors: [
+          onError((error) => {
+            if (error instanceof Error) {
+              rpcLogger.warn({ event: "orpc", error });
+              return;
+            }
+            rpcLogger.warn({ event: "orpc", error: String(error) });
+          }),
+        ],
+      },
+    );
     handler.upgrade(port1, { context });
     port1.start();
     port1.on("close", () => {

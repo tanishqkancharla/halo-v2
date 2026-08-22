@@ -1,10 +1,15 @@
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { AnyRouter } from "@orpc/server";
+import { os as orpc, ORPCError, type AnyRouter } from "@orpc/server";
 import * as errore from "errore";
 import type { PluginList } from "../../shared/plugin.js";
-import type { WorkspaceService } from "../workspace-service.js";
+import { orpcErrors } from "../orpcErrors.js";
+import type { HaloContext } from "../router.js";
+import {
+  WorkspaceNotReadyError,
+  type WorkspaceService,
+} from "../workspace-service.js";
 import { compilePluginView } from "./compilePluginView.js";
 import { loadPluginServer } from "./loadPluginServer.js";
 import { readPluginManifest } from "./readPluginManifest.js";
@@ -15,6 +20,11 @@ export class PluginIoError extends errore.createTaggedError({
 }) {}
 
 export class PluginService {
+  private readonly mounted: Record<string, AnyRouter> = {};
+  readonly orpcRouter = orpc.$context<HaloContext>().lazy(async () => ({
+    default: this.mounted,
+  }));
+
   constructor(private readonly workspace: WorkspaceService) {}
 
   async list() {
@@ -23,7 +33,8 @@ export class PluginService {
 
     const pluginsRoot = join(layout.root, ".halo", "plugins");
     if (!existsSync(pluginsRoot)) {
-      return { plugins: [], compiledViews: [], errors: [], routers: {} };
+      this.clearMounted();
+      return { plugins: [], compiledViews: [], errors: [] };
     }
 
     const entries = await readdir(pluginsRoot, { withFileTypes: true }).catch(
@@ -39,7 +50,7 @@ export class PluginService {
     const plugins: PluginList["plugins"] = [];
     const compiledViews: PluginList["compiledViews"] = [];
     const errors: PluginList["errors"] = [];
-    const routers: Record<string, AnyRouter> = {};
+    this.clearMounted();
     for (const id of ids) {
       const manifest = await readPluginManifest({
         id,
@@ -73,12 +84,44 @@ export class PluginService {
           errors.push({ id, message: server.message });
           continue;
         }
-        routers[id] = server;
+        this.mounted[id] = mountPluginRouter({ pluginId: id, router: server });
       }
 
       plugins.push(manifest);
       if (compiled !== undefined) compiledViews.push(compiled);
     }
-    return { plugins, compiledViews, errors, routers };
+    return { plugins, compiledViews, errors };
   }
+
+  private clearMounted() {
+    for (const id of Object.keys(this.mounted)) {
+      delete this.mounted[id];
+    }
+  }
+}
+
+function mountPluginRouter(args: { pluginId: string; router: AnyRouter }) {
+  return orpc
+    .$context<HaloContext>()
+    .use(async ({ context, next }) => {
+      const workspace = context.workspace.getWorkspace();
+      if (workspace === undefined) {
+        throw orpcErrors.badRequest(new WorkspaceNotReadyError());
+      }
+      const result = await next({
+        context: {
+          pluginId: args.pluginId,
+          workspaceRoot: workspace.workspaceRoot,
+        },
+      });
+      if (result.output instanceof ORPCError) return result;
+      if (result.output instanceof Error) {
+        throw new ORPCError("PLUGIN_ERROR", {
+          message: result.output.message,
+          cause: result.output,
+        });
+      }
+      return result;
+    })
+    .router(args.router);
 }
