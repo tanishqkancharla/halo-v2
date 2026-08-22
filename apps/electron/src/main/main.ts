@@ -5,6 +5,7 @@ import {
   ipcMain,
   Menu,
   MessageChannelMain,
+  shell,
   type IpcMainEvent,
 } from "electron";
 import { existsSync } from "node:fs";
@@ -195,6 +196,12 @@ function installMenu(): void {
     label: "Check for Updates…",
     click: () => checkForUpdates(),
   };
+  const openLogsItem = {
+    label: "Open Logs",
+    click: () => {
+      void openLogs();
+    },
+  };
   const switchWorkspaceItem = {
     label: "Switch Workspace…",
     click: () => {
@@ -229,6 +236,7 @@ function installMenu(): void {
             { role: "about" },
             { type: "separator" },
             checkForUpdatesItem,
+            openLogsItem,
             { type: "separator" },
             { role: "services" },
             { type: "separator" },
@@ -254,9 +262,22 @@ function installMenu(): void {
       { role: "editMenu" },
       { label: "View", submenu: viewSubmenu },
       { role: "windowMenu" },
-      { label: "Help", submenu: [checkForUpdatesItem] },
+      { label: "Help", submenu: [checkForUpdatesItem, openLogsItem] },
     ]),
   );
+}
+
+async function openLogs(): Promise<void> {
+  const errorMessage = await shell.openPath(applicationConfig.logsDir);
+  if (errorMessage === "") return;
+  logger.error({ event: "open-logs-failed", error: errorMessage });
+  if (mainWindow === undefined) return;
+  void dialog.showMessageBox(mainWindow, {
+    type: "error",
+    title: "Open Logs",
+    message: "Could not open the logs folder",
+    detail: `${errorMessage}\n\n${applicationConfig.logsDir}`,
+  });
 }
 
 async function switchWorkspace(): Promise<void> {
