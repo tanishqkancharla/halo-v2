@@ -46,6 +46,10 @@ describe.skipIf(skipReason !== undefined)("todo plugin agent", () => {
         recursive: true,
         force: true,
       });
+      await rm(join(workspaceRoot, ".halo", "plugin-data", "todos"), {
+        recursive: true,
+        force: true,
+      });
 
       await haloWebExec(`
         await page.getByRole('button', { name: 'New session' }).click();
@@ -59,14 +63,14 @@ describe.skipIf(skipReason !== undefined)("todo plugin agent", () => {
         await page.getByTestId('plugin-sidebar-todos').getByRole('link', { name: 'List' }).click();
         await page.getByLabel('New todo').fill('Buy milk');
         await page.getByRole('button', { name: 'Add' }).click();
-        await page.getByText('Buy milk').waitFor();
+        await page.getByRole('checkbox', { name: 'Buy milk' }).waitFor();
       `);
       await haloWebExec(`await page.reload()`);
       await haloWebExec(`
         await page.getByTestId('plugin-sidebar-todos').getByRole('link', { name: 'List' }).click();
       `);
       const visible = await haloWebExec(
-        `return await page.getByText('Buy milk').isVisible()`,
+        `return await page.getByRole('checkbox', { name: 'Buy milk' }).isVisible()`,
       );
       expect(visible).toBe(true);
     },
