@@ -64,5 +64,5 @@ The CLI description covers both specs and walkthroughs.
 
 - [ ] Add a `pnpm spec` alias that runs the same CLI.
 - [ ] Teach generate-spec-v2 to serve `specs/<name>.md` after writing it.
-- [ ] Smoke that mermaid and diffs render. Do not commit this check until the feature is package-level end-to-end testable.
+- [ ] Smoke that mermaid and diffs render. Delete any harness. Do not commit this check.
 - [ ] Run `pnpm --filter tkstack typecheck`.
