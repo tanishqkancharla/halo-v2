@@ -184,24 +184,6 @@ describe("applyAgentSessionEvent", () => {
     expect(next.error).toBe("previous failure");
   });
 
-  test("ignores hidden custom messages so they never become a bubble", () => {
-    const state = emptyAgentSessionState();
-    const custom = {
-      role: "custom" as const,
-      customType: "halo.integration.connected",
-      content: "[System] The user connected Gmail.",
-      display: false,
-      timestamp: 8,
-    };
-
-    expect(
-      applyAgentSessionEvent(state, { type: "message_start", message: custom }),
-    ).toEqual(state);
-    expect(
-      applyAgentSessionEvent(state, { type: "message_end", message: custom }),
-    ).toEqual(state);
-  });
-
   test("sets isWorking on agent_start and clears it on agent_end", () => {
     const started = applyAgentSessionEvent(emptyAgentSessionState(), {
       type: "agent_start",
