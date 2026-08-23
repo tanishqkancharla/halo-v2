@@ -2,7 +2,7 @@ import { os, type } from "@orpc/server";
 import { RemoteServer } from "@tandem/server";
 import type { RuntimeSchemaDefinition } from "@tandem/core";
 import type { AnySchema, ClientId, RemoteApi } from "@tandem/types";
-import { AsyncEventQueue } from "../../../apps/electron/src/shared/AsyncEventQueue.js";
+import { AsyncEventQueue } from "./AsyncEventQueue.js";
 import { FileRemoteStore, PluginStorageStoreError } from "./FileRemoteStore.js";
 
 export type PluginServerContext = {

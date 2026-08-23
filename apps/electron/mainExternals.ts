@@ -15,6 +15,7 @@ export const mainProcessDiskPackages = ["@halo/plugin-sdk"] as const;
 export const pluginSdkJitiDependencies = [
   "@sinclair/typebox",
   "@orpc/server",
+  "@tandem/server",
   "errore",
 ] as const;
 
