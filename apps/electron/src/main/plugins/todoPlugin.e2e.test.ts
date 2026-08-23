@@ -50,6 +50,7 @@ describe.skipIf(skipReason !== undefined)("todo plugin agent", () => {
         recursive: true,
         force: true,
       });
+      await haloWebExec(`await page.reload()`);
 
       await haloWebExec(`
         await page.getByRole('button', { name: 'New session' }).click();
@@ -70,7 +71,7 @@ describe.skipIf(skipReason !== undefined)("todo plugin agent", () => {
         await page.getByTestId('plugin-sidebar-todos').getByRole('link', { name: 'List' }).click();
       `);
       const visible = await haloWebExec(
-        `return await page.getByRole('checkbox', { name: 'Buy milk' }).isVisible()`,
+        `return await page.getByRole('checkbox', { name: 'Buy milk' }).first().isVisible()`,
       );
       expect(visible).toBe(true);
     },
