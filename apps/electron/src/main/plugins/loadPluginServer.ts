@@ -1,7 +1,6 @@
 import { createRequire } from "node:module";
 import { createJiti } from "jiti";
 import { Lazy, Procedure, type AnyRouter } from "@orpc/server";
-import type { PluginServerContext } from "@halo/plugin-sdk/server";
 import * as errore from "errore";
 import { isCallable } from "../../shared/isCallable.js";
 
@@ -43,7 +42,10 @@ export async function loadPluginServer(args: {
   // SAFETY: jiti loads the SDK from disk; bind must run on that module instance.
   (
     sdk as {
-      bindPluginServerContext: (context: PluginServerContext) => void;
+      bindPluginServerContext: (context: {
+        pluginId: string;
+        workspaceRoot: string;
+      }) => void;
     }
   ).bindPluginServerContext({
     pluginId: args.id,
