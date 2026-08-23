@@ -203,8 +203,16 @@ async function exchangeCode(input: {
   );
   if (response instanceof Error) return response;
   if (!response.ok) {
+    const detail = await response.text().catch(
+      (e) =>
+        new GoogleOAuthError({
+          reason: `Token exchange failed (${response.status})`,
+          cause: e,
+        }),
+    );
+    if (detail instanceof Error) return detail;
     return new GoogleOAuthError({
-      reason: `Token exchange failed (${response.status})`,
+      reason: `Token exchange failed (${response.status}): ${detail}`,
     });
   }
 
