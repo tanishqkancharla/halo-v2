@@ -1,6 +1,6 @@
 ---
 name: generate-spec-v2
-description: Create a code-based implementation spec in the specs/ directory for a significant feature, fix, or refactor. Use when the user asks to plan, spec, scope, or phase work before implementation and the plan should cover top-level Mermaid flows, important types, per-phase call-stack and code diffs, commit-sized phases, and checks. After writing the spec, serve it with tkstack (`pnpm spec` or `pnpm exec tkstack`).
+description: Create a code-based implementation spec in the specs/ directory for a significant feature, fix, or refactor. Use when the user asks to plan, spec, scope, or phase work before implementation and the plan should cover top-level Mermaid flows, per-phase call-stack diffs above code diffs, important types, commit-sized phases, and checks. After writing the spec, serve it with tkstack (`pnpm spec` or `pnpm exec tkstack`).
 ---
 
 # Generate an implementation spec
@@ -69,19 +69,9 @@ List only sources that help implement the change.
 
 Explain the intent and what becomes true after this phase lands in one or two sentences.
 
-#### Important types
-
-```ts
-// path/to/types.ts
-type ImportantInput = { id: string };
-type ImportantResult =
-  | { status: "ok"; value: Value }
-  | { status: "error"; reason: FailureReason };
-```
-
 #### Call stack diff
 
-Show how this phase changes the current call path. Keep the entry point and enough parents to make ownership clear.
+Show how this phase changes the current call path. Keep the entry point and enough parents to make ownership clear. Put this fence above the code diff.
 
 ```callstack
  requestHandler
@@ -90,6 +80,16 @@ Show how this phase changes the current call path. Keep the entry point and enou
 +└── validateInput
 +    └── existingService
         └── dataStore
+```
+
+#### Important types
+
+```ts
+// path/to/types.ts
+type ImportantInput = { id: string };
+type ImportantResult =
+  | { status: "ok"; value: Value }
+  | { status: "error"; reason: FailureReason };
 ```
 
 #### Code diff preview
@@ -154,7 +154,7 @@ Tell the user the spec path and the URL. Do not write specs into a temp director
 - Keep every phase small enough for one clear commit and leave the codebase working.
 - Make each phase produce visible or testable progress.
 - Name exact files, symbols, behavior, and commands when the codebase provides them.
-- Include `Important types`, `Call stack diff`, and `Code diff preview` in every code phase. Keep them inside that phase; do not collect call stacks or code diffs in a global section.
+- Include `Call stack diff`, `Important types`, and `Code diff preview` in every code phase, in that order. Put the call stack above the code diff. Keep them inside that phase; do not collect call stacks or code diffs in a global section.
 - Show inputs, outputs, state, events, errors, or unions that set the phase contract under `Important types`. Use the project language.
 - Make the call-stack diff start from the current path and mark the proposed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
 - Make the code diff a short preview of the main edit, not a full patch. Include a file path comment and preserve useful surrounding control flow.
@@ -184,4 +184,4 @@ Once the feature is end-to-end testable, add the fixtures needed for those high-
 
 ## Final check
 
-Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has key types, an accurate call-stack diff, a code-diff preview, and four or five steps; links and commands are real; committed tests are package-level end-to-end and earlier phases use uncommitted smoke checks; tkstack is serving the page; and the full plan covers every goal without pulling in a non-goal.
+Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has an accurate call-stack diff above the code-diff preview, key types between them, and four or five steps; links and commands are real; committed tests are package-level end-to-end and earlier phases use uncommitted smoke checks; tkstack is serving the page; and the full plan covers every goal without pulling in a non-goal.

@@ -35,6 +35,15 @@ Specs lived as markdown files with no local page, so mermaid, call stacks, and d
 
 The CLI already parses markdown. Point it at a spec path.
 
+#### Call stack diff
+
+```callstack
+ startServer
+-└── readWalkthroughOnly
++└── createViteServer
+    └── handleTkstackRequest
+```
+
 #### Important types
 
 ```ts
@@ -44,15 +53,6 @@ type StartServerInput = {
   workspaceRoot: string;
   port: number;
 };
-```
-
-#### Call stack diff
-
-```callstack
- startServer
--└── readWalkthroughOnly
-+└── createViteServer
-    └── handleTkstackRequest
 ```
 
 #### Code diff preview

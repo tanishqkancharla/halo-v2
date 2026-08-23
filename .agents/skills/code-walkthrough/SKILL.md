@@ -64,20 +64,11 @@ Out of scope:
 
 No `Chapter:` prefix. The heading is the outcome name only.
 
-Explain this slice in one or two sentences. Then show the evidence, in any order the reader needs:
-
-### Important types
-
-Current types, not proposed types. Prefer a file excerpt so the viewer reads the file from disk:
-
-```12:20:path/to/types.ts
-```
-
-The fence info string is `start:end:repo-relative-path`. Line numbers are 1-based and inclusive. Leave the body empty to load the current file. Put the excerpt in the body only when the walkthrough must show text that is not on disk.
+Explain this slice in one or two sentences. Then show the evidence in this order: call stack, types, code diff.
 
 ### Call stack diff
 
-Show how this slice changed the call path. Keep the entry point and enough parents to make ownership clear. Use a `callstack` fence, or a `diff` fence that contains `└──` / `├──`. Call stacks render without a Pierre file header.
+Show how this slice changed the call path. Keep the entry point and enough parents to make ownership clear. Use a `callstack` fence, or a `diff` fence that contains `└──` / `├──`. Call stacks render without a Pierre file header. Put this fence above the code diff.
 
 ```callstack
  requestHandler
@@ -87,6 +78,15 @@ Show how this slice changed the call path. Keep the entry point and enough paren
 +    └── existingService
         └── dataStore
 ```
+
+### Important types
+
+Current types, not proposed types. Prefer a file excerpt so the viewer reads the file from disk:
+
+```12:20:path/to/types.ts
+```
+
+The fence info string is `start:end:repo-relative-path`. Line numbers are 1-based and inclusive. Leave the body empty to load the current file. Put the excerpt in the body only when the walkthrough must show text that is not on disk.
 
 ### Code diff
 
@@ -160,6 +160,7 @@ Tell the user the markdown path and the URL.
 ## Chapter rules
 
 - Name exact files, symbols, behavior, and commands that exist in the tree.
+- Put `Call stack diff` above `Code diff`. Do not reverse them. Put `Important types` between them when the slice has types to show.
 - Show inputs, outputs, state, events, errors, or unions that the slice actually uses under `Important types`.
 - Make the call-stack diff start from the previous path and mark the landed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
 - Make the code diff a real excerpt of the landed edit. Include a file path and enough surrounding control flow to place it.
@@ -169,4 +170,4 @@ Tell the user the markdown path and the URL.
 
 ## Final check
 
-Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; Mermaid appears only where it helps; each code chapter has the types, call stack, and diff that belong to it; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.
+Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; Mermaid appears only where it helps; each code chapter has the call stack above the code diff, with types between them when they belong; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.
