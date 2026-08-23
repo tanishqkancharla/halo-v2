@@ -115,12 +115,15 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
       if (emittedTools.has(part.id)) continue;
       emittedTools.add(part.id);
       const resultText = toolResults.get(part.id);
-      const connectPart = integrationConnectPart(
-        part.id,
-        part.name,
-        part.arguments,
+      const connectArgs = Value.Check(connectArgsSchema, part.arguments)
+        ? part.arguments
+        : undefined;
+      const connectPart = integrationConnectPart({
+        id: part.id,
+        toolName: part.name,
+        args: connectArgs,
         resultText,
-      );
+      });
       if (connectPart !== undefined) {
         assistantParts.push(connectPart);
         continue;
@@ -235,15 +238,20 @@ function toPosixPath(value: string): string {
   return value.replaceAll("\\", "/");
 }
 
-function integrationConnectPart(
-  id: string,
-  toolName: string,
-  args: unknown,
-  resultText: string | undefined,
-): Extract<SessionViewPart, { kind: "integrationConnect" }> | undefined {
-  if (toolName !== "integrations_connect") return undefined;
-  const parsedArgs = Value.Check(connectArgsSchema, args) ? args : undefined;
-  const parsedResult = parseConnectResult(resultText);
+type ConnectArgs = {
+  service: string;
+  scopes?: string[];
+};
+
+function integrationConnectPart(input: {
+  id: string;
+  toolName: string;
+  args: ConnectArgs | undefined;
+  resultText: string | undefined;
+}): Extract<SessionViewPart, { kind: "integrationConnect" }> | undefined {
+  if (input.toolName !== "integrations_connect") return undefined;
+  const parsedArgs = input.args;
+  const parsedResult = parseConnectResult(input.resultText);
   if (parsedResult !== undefined && parsedResult.error !== undefined) {
     return undefined;
   }
@@ -276,7 +284,7 @@ function integrationConnectPart(
 
   return {
     kind: "integrationConnect",
-    id,
+    id: input.id,
     connectionId:
       parsedResult === undefined ? undefined : parsedResult.connectionId,
     service,
@@ -288,8 +296,12 @@ function integrationConnectPart(
 function parseConnectResult(resultText: string | undefined) {
   if (resultText === undefined || resultText.length === 0) return undefined;
   const parsed = errore.try({
-    try: () => JSON.parse(resultText) as unknown,
-    catch: (e) => new Error("Invalid integrations_connect result", { cause: e }),
+    try: () => {
+      // SAFETY: JSON.parse is untyped; connectResultSchema is the tool result contract.
+      return JSON.parse(resultText) as unknown;
+    },
+    catch: (e) =>
+      new Error("Invalid integrations_connect result", { cause: e }),
   });
   if (parsed instanceof Error) return undefined;
   if (!Value.Check(connectResultSchema, parsed)) return undefined;

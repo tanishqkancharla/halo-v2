@@ -31,10 +31,8 @@ export function IntegrationCard({
   const query = useQuery({
     queryKey: ["integrations", "get", connectionId],
     queryFn: () => {
-      if (connectionId === undefined) {
-        return Promise.resolve(undefined);
-      }
-      return api.integrations.get({ connectionId });
+      // SAFETY: enabled is false until connectionId is a string.
+      return api.integrations.get({ connectionId: connectionId as string });
     },
     enabled: connectionId !== undefined,
   });

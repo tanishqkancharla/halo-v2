@@ -334,11 +334,7 @@ function SessionViewRow({
         }
         if (part.kind === "integrationConnect") {
           return (
-            <IntegrationCard
-              key={part.id}
-              sessionId={sessionId}
-              part={part}
-            />
+            <IntegrationCard key={part.id} sessionId={sessionId} part={part} />
           );
         }
         return (

@@ -195,10 +195,10 @@ export function useDraftAgentSession(
   }
 
   async function abort() {
-    const sessionId = sessionIdRef.current;
-    if (sessionId === undefined) return;
+    const createdSessionId = sessionIdRef.current;
+    if (createdSessionId === undefined) return;
     const result = await api.agentSession
-      .abort({ sessionId })
+      .abort({ sessionId: createdSessionId })
       .then(() => undefined)
       .catch(
         (e) =>
