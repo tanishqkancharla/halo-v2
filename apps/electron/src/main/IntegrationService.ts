@@ -5,23 +5,20 @@ import { join } from "node:path";
 import { type Static, Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
-import type { GoogleServiceId } from "./GoogleCatalog.js";
+import type { GoogleServiceId } from "../shared/GoogleCatalog.js";
+import type {
+  ConnectionIntent,
+  ConnectionStatus,
+  IntegrationConnection,
+} from "../shared/integrations.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
-export type ConnectionStatus = "pending" | "connected";
-
-export type ConnectionIntent = "connect" | "upgrade" | "disconnect";
-
-export const defaultIntegrationProfile = "default";
-
-export type IntegrationConnection = {
-  id: string;
-  service: GoogleServiceId;
-  profile: string;
-  scopes: string[];
-  status: ConnectionStatus;
-  intent: ConnectionIntent | undefined;
-};
+export type {
+  ConnectionIntent,
+  ConnectionStatus,
+  IntegrationConnection,
+} from "../shared/integrations.js";
+export { defaultIntegrationProfile } from "../shared/integrations.js";
 
 export type StoredTokens = {
   accessToken: string;

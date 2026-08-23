@@ -82,3 +82,12 @@ export function googleService(id: string): GoogleService | undefined {
   }
   return undefined;
 }
+
+export function googleScopeLabel(scopeId: string): string {
+  for (const service of services) {
+    for (const scope of service.scopes) {
+      if (scope.id === scopeId) return scope.label;
+    }
+  }
+  return scopeId;
+}

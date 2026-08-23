@@ -31,6 +31,7 @@ import {
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
 import { Loader } from "./patterns/Loader.tsx";
+import { IntegrationCard } from "./patterns/IntegrationCard.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView } from "../shared/plugin.js";
@@ -115,7 +116,7 @@ function SavedPane({
       <ThreadHeader title={title} />
       <div className={body}>
         <div className={column}>
-          <SessionView state={state} />
+          <SessionView state={state} sessionId={sessionId} />
           <Composer
             key={sessionId}
             error={state.error}
@@ -131,9 +132,11 @@ function SavedPane({
 
 function DraftPane({ draftId }: { draftId: string }) {
   const [, navigate] = useLocation();
-  const { state, prompt, abort } = useDraftAgentSession((sessionId) => {
-    navigate(`/sessions/${sessionId}`);
-  });
+  const { state, sessionId, prompt, abort } = useDraftAgentSession(
+    (createdSessionId) => {
+      navigate(`/sessions/${createdSessionId}`);
+    },
+  );
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body, styles.bodyTop);
   const column = useStyles(styles.column);
@@ -144,7 +147,9 @@ function DraftPane({ draftId }: { draftId: string }) {
       <ThreadHeader />
       <div className={body}>
         <div className={column}>
-          {hasMessages ? <SessionView state={state} /> : undefined}
+          {hasMessages ? (
+            <SessionView state={state} sessionId={sessionId} />
+          ) : undefined}
           <Composer
             key={draftId}
             error={state.error}
@@ -245,7 +250,13 @@ function StopIcon({ className }: { className: string }) {
   );
 }
 
-function SessionView({ state }: { state: AgentSessionState }) {
+function SessionView({
+  state,
+  sessionId,
+}: {
+  state: AgentSessionState;
+  sessionId: string | undefined;
+}) {
   const viewRef = useRef<HTMLDivElement>(null);
   const view = useStyles(styles.view);
   const thinking = useStyles(styles.thinking);
@@ -269,7 +280,7 @@ function SessionView({ state }: { state: AgentSessionState }) {
       ref={viewRef}
     >
       {items.map((item) => (
-        <SessionViewRow key={item.id} item={item} />
+        <SessionViewRow key={item.id} item={item} sessionId={sessionId} />
       ))}
       {state.isWorking ? (
         <span className={thinking}>
@@ -286,7 +297,13 @@ function SessionView({ state }: { state: AgentSessionState }) {
   );
 }
 
-function SessionViewRow({ item }: { item: SessionViewItem }) {
+function SessionViewRow({
+  item,
+  sessionId,
+}: {
+  item: SessionViewItem;
+  sessionId: string | undefined;
+}) {
   const userMessage = useStyles(styles.userMessage);
   const body = useStyles(styles.messageBody);
   const assistantRow = useStyles(styles.assistantRow);
@@ -313,6 +330,15 @@ function SessionViewRow({ item }: { item: SessionViewItem }) {
             >
               <ToolCall part={part} />
             </div>
+          );
+        }
+        if (part.kind === "integrationConnect") {
+          return (
+            <IntegrationCard
+              key={part.id}
+              sessionId={sessionId}
+              part={part}
+            />
           );
         }
         return (

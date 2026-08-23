@@ -7,6 +7,7 @@ import {
 } from "@orpc/contract";
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import type { AgentSessionState } from "./AgentSessionState.js";
+import type { IntegrationConnection } from "./integrations.js";
 import type {
   AppInfo,
   PluginList,
@@ -37,6 +38,11 @@ export const contract = {
     prompt: oc.input(type<{ sessionId: string; text: string }>()),
     abort: oc.input(type<{ sessionId: string }>()),
     close: oc.input(type<{ sessionId: string }>()),
+  },
+  integrations: {
+    get: oc
+      .input(type<{ connectionId: string }>())
+      .output(type<IntegrationConnection | undefined>()),
   },
 };
 

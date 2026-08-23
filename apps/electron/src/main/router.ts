@@ -194,4 +194,15 @@ export const router = {
       if (closed instanceof Error) return orpcErrors.badRequest(closed);
     }),
   },
+  integrations: {
+    get: os.integrations.get.handler(async ({ input, context }) => {
+      context.logger.info({
+        event: "integrations.get",
+        connectionId: input.connectionId,
+      });
+      const connection = await context.integrations.get(input.connectionId);
+      if (connection instanceof Error) return orpcErrors.badRequest(connection);
+      return connection;
+    }),
+  },
 };

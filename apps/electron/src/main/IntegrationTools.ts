@@ -5,7 +5,7 @@ import {
   googleCatalog,
   googleService,
   type GoogleService,
-} from "./GoogleCatalog.js";
+} from "../shared/GoogleCatalog.js";
 import {
   defaultIntegrationProfile,
   type ConnectionIntent,
