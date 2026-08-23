@@ -278,14 +278,31 @@ export const router = {
         });
         if (connected instanceof Error) return orpcErrors.badRequest(connected);
 
-        const session = context.sessions.get(input.sessionId);
-        if (session instanceof Error) return orpcErrors.badRequest(session);
-        const notified = await notifyIntegrationEvent({
+        // Reloading the renderer closes the RPC port and clears the session map.
+        const session = await (async () => {
+          const live = context.sessions.get(input.sessionId);
+          if (!(live instanceof Error)) return live;
+          const opened = await context.pi.openAgentSession(input.sessionId);
+          if (opened instanceof Error) return opened;
+          context.sessions.add(opened);
+          return opened;
+        })();
+        if (session instanceof Error) {
+          console.warn(
+            "Connected but could not notify the agent:",
+            session.message,
+          );
+          return connected;
+        }
+        void notifyIntegrationEvent({
           session,
           customType: "halo.integration.connected",
           content: integrationConnectedEventText(connected),
+        }).then((notified) => {
+          if (notified instanceof Error) {
+            console.warn("Failed to notify the agent after connect:", notified);
+          }
         });
-        if (notified instanceof Error) return orpcErrors.badRequest(notified);
 
         return connected;
       },
