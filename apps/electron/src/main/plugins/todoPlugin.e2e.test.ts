@@ -102,34 +102,39 @@ async function readWorkspaceRoot() {
 
 async function haloWebStatus() {
   const output = await runHaloWeb(["status"]);
-  // SAFETY: incur --json status is { value?: { ready, message }, error?: { message } }.
+  // SAFETY: incur --json status is { ready, message } or { code, message }.
   const parsed = JSON.parse(output) as {
-    ok?: boolean;
-    value?: { ready: boolean; message: string };
-    error?: { message: string };
+    ready?: boolean;
+    message?: string;
+    code?: string;
   };
-  if (parsed.value !== undefined) return parsed.value;
+  if (parsed.ready === true) {
+    return {
+      ready: true,
+      message: parsed.message === undefined ? "ready" : parsed.message,
+    };
+  }
   return {
     ready: false,
     message:
-      parsed.error === undefined
-        ? "halo-web status failed"
-        : parsed.error.message,
+      parsed.message === undefined ? "halo-web status failed" : parsed.message,
   };
 }
 
 async function haloWebExec(source: string) {
   const output = await runHaloWeb(["exec", "--stdin"], source);
-  // SAFETY: incur --json exec is { value?: { result }, error?: { message } }.
+  // SAFETY: incur --json exec is { result } or { code, message }.
   const parsed = JSON.parse(output) as {
-    ok?: boolean;
-    value?: { result: unknown };
-    error?: { message: string };
+    result?: unknown;
+    code?: string;
+    message?: string;
   };
-  if (parsed.error !== undefined) throw new Error(parsed.error.message);
-  if (parsed.value === undefined)
-    throw new Error("halo-web exec returned no value");
-  return parsed.value.result;
+  if (parsed.code !== undefined) {
+    throw new Error(
+      parsed.message === undefined ? parsed.code : parsed.message,
+    );
+  }
+  return parsed.result;
 }
 
 function runHaloWeb(args: string[], stdin?: string) {
