@@ -26,6 +26,7 @@ import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
+import { IntegrationService } from "./IntegrationService.js";
 import { PiService } from "./pi-service.js";
 import { PluginService } from "./plugins/PluginService.js";
 import { router, type HaloContext } from "./router.js";
@@ -68,6 +69,7 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 
 const workspaceService = new WorkspaceService(applicationConfig.dataDir);
 const userService = new UserService(applicationConfig.dataDir);
+const integrationService = new IntegrationService(workspaceService);
 const piService = new PiService(workspaceService, userService);
 const pluginService = new PluginService(workspaceService);
 let mainWindow: BrowserWindow | undefined;
@@ -167,6 +169,7 @@ function registerRpcBridge(): void {
     const sessions = new AgentSessionRegistry();
     const context: HaloContext = {
       workspace: workspaceService,
+      integrations: integrationService,
       pi: piService,
       plugins: pluginService,
       sessions,

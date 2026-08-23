@@ -13,12 +13,14 @@ import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
 import { AsyncEventQueue } from "./AsyncEventQueue.js";
 import { orpcErrors } from "./orpcErrors.js";
+import type { IntegrationService } from "./IntegrationService.js";
 import type { PiService } from "./pi-service.js";
 import type { PluginService } from "./plugins/PluginService.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
 export type HaloContext = {
   workspace: WorkspaceService;
+  integrations: IntegrationService;
   pi: PiService;
   plugins: PluginService;
   sessions: AgentSessionRegistry;
