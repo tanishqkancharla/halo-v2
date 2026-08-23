@@ -10,8 +10,10 @@ flowchart TD
   syncRoutesFn --> remote["RemoteServer per plugin"]
   remote --> disk["workspace .halo/plugin-data/id"]
   tables --> viewTsx["plugin view.tsx"]
-  viewTsx --> hooks["usePluginQuery / usePluginTransaction"]
-  hooks --> client["TandemClient no storage"]
+  viewTsx --> provider["PluginStorageProvider"]
+  provider --> client["TandemClient no storage"]
+  provider --> hooks["usePluginQuery / usePluginTransaction"]
+  hooks --> client
   client --> orpcSync["plugin.sync push pull connect"]
   orpcSync --> remote
 ```
@@ -39,7 +41,7 @@ Plugins persist with ad hoc files and oRPC methods. There is no typed store, no 
 
 ## Solution overview
 
-Give each plugin its own Tandem remote. The author defines collections in `storage.ts`, mounts `syncRoutes(tables)` on the plugin oRPC router, and reads and writes through `usePluginQuery` and `usePluginTransaction`. Halo embeds Tandem `RemoteServer` in the plugin server (self-serve, same process). The renderer uses a `TandemClient` with no storage adapter: it syncs over existing plugin oRPC and keeps only an in-memory cache. Durable state is the remote on the workspace filesystem. Plugins stay separate Tandem instances. A later change can nest those collections under plugin ids in one engine so plugins can share access and run distributed transactions.
+Give each plugin its own Tandem remote. The author defines collections in `storage.ts`, mounts `syncRoutes(tables)` on the plugin oRPC router, and wraps the view in `PluginStorageProvider`. Hooks read that client from context. Halo embeds Tandem `RemoteServer` in the plugin server (self-serve, same process). The renderer uses a `TandemClient` with no storage adapter: it syncs over existing plugin oRPC and keeps only an in-memory cache. Durable state is the remote on the workspace filesystem. The host does not mount the client. A plugin may omit `syncRoutes` or replace `sync`; only the plugin knows whether to wrap. Plugins stay separate Tandem instances. A later change can nest those collections under plugin ids in one engine so plugins can share access and run distributed transactions.
 
 Halo depends on Tandem with git path deps. Tandem is public and unpublished to npm.
 
@@ -47,7 +49,7 @@ Halo depends on Tandem with git path deps. Tandem is public and unpublished to n
 
 - A plugin may export collections from `storage.ts` using Tandem `collection` / `defineSchema` / `t` re-exported by `@halo/plugin-sdk/storage`.
 - `server.ts` mounts `syncRoutes(tables)` from `@halo/plugin-sdk/server`. That nested router exposes Tandem `push`, `pull`, and `connect`.
-- The SDK view exports `usePluginQuery` and `usePluginTransaction`. They talk to a renderer `TandemClient` that has a `remote` and no `storage`.
+- The SDK view exports `PluginStorageProvider`, `usePluginQuery`, and `usePluginTransaction`. The provider builds a renderer `TandemClient` that has a `remote` and no `storage`. Hooks read that client from context.
 - Each plugin has its own Tandem remote. Durable state lives under `{workspace}/.halo/plugin-data/<pluginId>/`.
 - Agents and humans see the same durable records on the workspace filesystem.
 - Plugins without `storage.ts` keep working. A plugin that omits `syncRoutes` still loads; storage hooks fail with a tagged error.
@@ -72,7 +74,9 @@ Halo depends on Tandem with git path deps. Tandem is public and unpublished to n
 - Remote durability is a JSON snapshot of the in-memory `RemoteStore`, not SQLite.
 - The renderer `TandemClient` omits `storage`. Reload refetches from the remote.
 - `syncRoutes(tables)` returns `{ sync: { push, pull, connect } }` so authors spread it into the default router.
-- Hooks take `tables` as the first argument so the view types and the server schema stay the same object.
+- The host cannot tell if `server.sync` exists. `RouterClient<AnyRouter>` is a proxy, so `server.sync` always looks callable. The host also never loads `storage.ts`, so it cannot construct a `TandemClient`.
+- The plugin wraps `PluginStorageProvider` with `tables`. Optional `sync` overrides `server.sync` when the author moved or wrapped the routes.
+- `Sidebar` and `Routes` each get their own `PluginRuntimeProvider`. Cache one `TandemClient` per `pluginId` so those trees share a client.
 
 ## Important files, docs, and websites
 
@@ -212,33 +216,36 @@ function pluginRemote(args: {
 - [ ] Map `connect` to an async iterator using the same `AsyncEventQueue` pattern as `agentSession.events` in `apps/electron/src/main/router.ts`.
 - [ ] Smoke a plugin `server.ts` that spreads `syncRoutes(tables)` and still exports `ping`. Do not commit this check.
 
-### Phase 3: Renderer Tandem client and storage hooks
+### Phase 3: PluginStorageProvider holds the Tandem client
 
-Give the view a Tandem client that talks only to the plugin remote. First hook call for a plugin creates a `TandemClient` with `remote` set to `usePluginServer().sync` and no `storage`. `usePluginQuery` subscribes. `usePluginTransaction` commits through that client.
+The plugin wraps its view with `PluginStorageProvider`. That provider builds a `TandemClient` with `remote` set to `server.sync` (or an optional `sync` override) and no `storage`. Hooks read the client from context. The host `PluginRuntimeProvider` does not mount it: it has no tables, and `RouterClient<AnyRouter>` cannot tell whether `syncRoutes` is present.
 
 #### Important types
 
 ```ts
 // packages/plugin-sdk/src/view.ts
+export function PluginStorageProvider<Schema extends AnySchema>(args: {
+  tables: RuntimeSchemaDefinition<Schema>;
+  sync?: RemoteApi<Schema>;
+  children: ReactNode;
+}): ReactNode;
+
 export function usePluginQuery<
   Schema extends AnySchema,
   Query extends RelationalQuery<Schema, Relations>,
   Relations extends RuntimeRelationsDefinition<Schema> = RuntimeRelationsDefinition<Schema>,
 >(
-  tables: RuntimeSchemaDefinition<Schema> & { relations?: Relations },
   query: Query,
 ): RelationalQueryResult<Schema, Relations, Query>;
 
-export function usePluginTransaction<Schema extends AnySchema>(
-  tables: RuntimeSchemaDefinition<Schema>,
-): {
+export function usePluginTransaction<Schema extends AnySchema>(): {
   transact: () => Transaction<Schema>;
   commit: (tx: Transaction<Schema>) => Promise<void>;
 };
 
 export class PluginStorageMissingError extends errore.createTaggedError({
   name: "PluginStorageMissingError",
-  message: "plugin server has no sync routes",
+  message: "usePluginQuery must run inside PluginStorageProvider",
 }) {}
 ```
 
@@ -247,45 +254,41 @@ export class PluginStorageMissingError extends errore.createTaggedError({
 ```callstack
  plugin.Routes
  └── PluginRuntimeProvider
-     └── usePluginQuery(calendarTables, query)
--        (no storage)
-+        └── getPluginClient(pluginId, tables, server.sync)
+-    └── usePluginQuery
++    └── PluginStorageProvider({ tables: calendarTables })
++        └── getPluginClient(pluginId, tables, sync ?? server.sync)
 +            └── TandemClient({ remote, schema })
-+                └── remote.pull / remote.connect
-+                    └── server.sync.pull / server.sync.connect
-     └── usePluginTransaction(calendarTables)
-+        └── client.transact / client.commit
-+            └── server.sync.push
++                └── usePluginQuery(query)
++                    └── client.subscribe
++                        └── server.sync.pull / server.sync.connect
++                └── usePluginTransaction
++                    └── client.transact / client.commit
++                        └── server.sync.push
 ```
 
 #### Code diff preview
 
 ```diff
- // packages/plugin-sdk/src/view.ts
- export function usePluginServer<T extends AnyRouter>(): RouterClient<T> {
+ // {workspace}/.halo/plugins/calendar/view.tsx
+ export function Routes() {
+-  return <Home />
++  return (
++    <PluginStorageProvider tables={calendarTables}>
++      <Home />
++    </PluginStorageProvider>
++  )
+ }
+
+ function Home() {
++  const events = usePluginQuery({ collection: "events" })
++  const { transact, commit } = usePluginTransaction()
    ...
  }
-+
-+export function usePluginQuery(tables, query) {
-+  const server = usePluginServer();
-+  const client = getPluginClient({ pluginId, tables, sync: server.sync });
-+  return useSyncExternalStore(
-+    (onStoreChange) => client.subscribe(query, onStoreChange).destroy,
-+    () => client.query(query),
-+  );
-+}
-+
-+function getPluginClient(args) {
-+  return new TandemClient({
-+    schema: args.tables,
-+    remote: orpcRemote(args.sync),
-+  });
-+}
 ```
 
-- [ ] Create one `TandemClient` per `pluginId` in the renderer. Pass `remote` only. Do not pass `storage`. `autoConnect: true`.
-- [ ] Implement `RemoteApi` on `server.sync` (`push`, `pull`, `connect` iterator → `poke`).
-- [ ] Export `usePluginQuery` and `usePluginTransaction`. Throw `PluginStorageMissingError` when `server.sync` is missing.
+- [ ] Export `PluginStorageProvider`. It reads `pluginId` and `server` from `PluginRuntimeProvider`, builds one `TandemClient` per `pluginId` (shared by Sidebar and Routes), and puts it on context. Pass `remote` only. Do not pass `storage`. `autoConnect: true`.
+- [ ] Default `remote` to `server.sync`. Accept optional `sync` when the plugin moved or wrapped those procedures.
+- [ ] Export `usePluginQuery` and `usePluginTransaction` with no `tables` argument. Throw `PluginStorageMissingError` outside the provider.
 - [ ] Smoke a commit then query after pull: the row comes from the remote. Do not commit this check.
 
 ### Phase 4: Host slots, jiti aliases, and author skill
@@ -345,7 +348,9 @@ const viewExternals = [
 +```
 +
 +In server.ts: `export default { ...syncRoutes(calendarTables) }`
-+In view: `usePluginQuery(calendarTables, { collection: "events" })`
++In view: wrap Routes (and Sidebar if it queries) with
++`PluginStorageProvider tables={calendarTables}`. Then
++`usePluginQuery({ collection: "events" })`.
 ```
 
 - [ ] Add `@halo/plugin-sdk/storage` to `viewExternals`, `requireHost`, and jiti aliases. Alias Tandem packages for jiti. Add them to `pluginSdkJitiDependencies`.
