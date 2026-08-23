@@ -1,5 +1,6 @@
 ---
 name: halo-plugin
+version: 1
 description: >
   Create or edit a Halo plugin in the current workspace. Use when the user
   asks to add a sidebar view, a main-pane page, or a plugin server.
