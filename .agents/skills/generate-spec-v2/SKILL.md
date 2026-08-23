@@ -101,7 +101,7 @@ The handler calls `validateInput`, then `existingService`. Keep the preview shor
 
 - [ ] Make one concrete implementation change, with file and symbol names.
 - [ ] Wire the change into its nearest caller or consumer.
-- [ ] Smoke the main failure case or boundary by hand. Do not commit this check until the feature is package-level end-to-end testable.
+- [ ] Smoke the main failure case or boundary by hand. Use a throwaway harness if you need one. Delete it. Do not commit this check.
 - [ ] Run the exact command that proves the phase works.
 ````
 
@@ -155,28 +155,30 @@ Tell the user the spec path and the URL. Do not write specs into a temp director
 - Make the code a short preview of the main edit, not a full patch. Include a file path and preserve useful surrounding control flow.
 - Use `Not applicable — no code path changes` only for a true docs, data, or config phase. Do not invent types or call paths.
 - Follow [Testing](#testing) for what to check and when to commit tests.
-- Avoid setup-only or refactor-only phases unless later work cannot land safely without them. Fixture setup for package-level tests is allowed once the feature is end-to-end testable.
+- Avoid setup-only or refactor-only phases unless later work cannot land safely without them. Fixture setup for package-export or end-user tests is allowed once that surface exists.
 
 ## Testing
 
-Specs commit only package-level end-to-end tests. Act and observe the way a user of that package would:
+Commit tests only for package-level exports and end-user apps. Act and observe the way a user of that package or app would:
 
 - Electron / web UI: start the app separately when needed, drive the live renderer with Playwright through `pnpm halo-web`, and assert visible elements, roles, labels, and text.
-- Services and other APIs: call the public methods, then read results through the same public API or another real collaborator a user of that package would use.
+- Package exports: call the public methods, then read results through the same public API or another real collaborator a user of that package would use.
 
-Do not use mocks such as `vi.fn`, `vi.mock`, or hand-rolled fake collaborators. Do not spec internal unit tests, or assert implementation details such as internal file layouts or exact formatting of private outputs. If a package-level end-to-end test is hard to build and none already exist for the area, do not add a lower-level test instead.
+Do not write unit tests for internal helpers, private modules, or other package internals unless the user asked for them. Check those yourself with temporary harness code. Delete the harness after you have tested by hand. Do not commit it.
+
+Do not use mocks such as `vi.fn`, `vi.mock`, or hand-rolled fake collaborators. Do not assert implementation details such as internal file layouts or exact formatting of private outputs. If a package-export or end-user test is hard to build and none already exist for the area, do not add a lower-level test instead.
 
 Committed tests must read like end-user code or interactions: short, easy to follow, and free of setup noise. Put shared setup and teardown in Vitest fixtures (`test.extend`), not ad-hoc helpers or manual cleanup. See the [Vitest fixtures documentation](https://vitest.dev/guide/test-context.html#test-extend).
 
-Until the feature is end-to-end testable at the package, each phase still includes a check. Write that check as a smoke step the implementer runs by hand and does not commit:
+Until the feature is testable through a package export or the live app, each phase still includes a check. Write that check as a smoke step the implementer runs by hand. Use a throwaway harness if you need one. Do not commit the check or the harness:
 
-- [ ] Smoke the main failure case or boundary by hand. Do not commit this check.
+- [ ] Smoke the main failure case or boundary by hand. Delete any harness. Do not commit this check.
 
-Once the feature is end-to-end testable, add the fixtures needed for those high-level tests, then commit the tests. Make fixture setup its own phase when it is more than a small add-on; fold it into the phase that first makes the feature testable when it is small:
+Once the feature is testable through a package export or the live app, add the fixtures needed for those tests, then commit them. Make fixture setup its own phase when it is more than a small add-on; fold it into the phase that first makes that surface testable when it is small:
 
-- [ ] Add Vitest fixtures that set up the package the way a user would.
-- [ ] Commit a short high-level test that acts and observes through the public API or live UI.
+- [ ] Add Vitest fixtures that set up the package or app the way a user would.
+- [ ] Commit a short high-level test that acts and observes through the public export or live UI.
 
 ## Final check
 
-Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has a call stack and then the code, with prose between the fences, no titles on those blocks, and four or five steps; links and commands are real; committed tests are package-level end-to-end and earlier phases use uncommitted smoke checks; tkstack is serving the page; and the full plan covers every goal without pulling in a non-goal.
+Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has a call stack and then the code, with prose between the fences, no titles on those blocks, and four or five steps; links and commands are real; committed tests cover only package exports or the end-user app and earlier phases use uncommitted smoke checks; tkstack is serving the page; and the full plan covers every goal without pulling in a non-goal.
