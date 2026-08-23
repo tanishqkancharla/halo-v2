@@ -101,9 +101,9 @@ export function createIntegrationTools(
     description:
       "Ask the user to connect a Google service, add scopes, or disconnect. Returns immediately. Empty scopes asks the user to disconnect. Already granted scopes return connected.",
     promptSnippet:
-      "integrations_connect: pending means stop and let the user click the card",
+      "integrations_connect: pending means the user must click the card",
     promptGuidelines: [
-      "When integrations_connect returns pending, ask the user to click the card and end the turn. Do not call integrations_run until a later turn reports the user connected.",
+      "When integrations_connect returns pending, ask the user to click the card. Do not call integrations_run until they are connected.",
     ],
     parameters: connectParameters,
     execute: async (_toolCallId, params) => {
