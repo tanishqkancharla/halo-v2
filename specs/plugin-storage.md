@@ -11,7 +11,7 @@ flowchart TD
   remote --> disk["workspace .halo/plugin-data/id"]
   tables --> viewTsx["plugin view.tsx"]
   viewTsx --> hooks["usePluginQuery / usePluginTransaction"]
-  hooks --> client["TandemClient IndexedDB"]
+  hooks --> client["TandemClient no storage"]
   client --> orpcSync["plugin.sync push pull connect"]
   orpcSync --> remote
 ```
@@ -25,7 +25,6 @@ sequenceDiagram
   participant Disk as plugin-data
 
   View->>Client: usePluginQuery / transact
-  Client->>Client: IndexedDB local write
   Client->>Rpc: push
   Rpc->>Main: applyMutations
   Main->>Disk: persist
@@ -36,25 +35,26 @@ sequenceDiagram
 
 ## Problem overview
 
-Plugins persist with ad hoc files and oRPC methods. There is no shared local-first store, no typed queries, and no way for a view to read the same records the server holds. The plugin-system spec left a database out on purpose. Calendar-shaped plugins cannot keep events across reloads without each author inventing a store.
+Plugins persist with ad hoc files and oRPC methods. There is no typed store, no query API, and no way for a view to read the same records the server holds. The plugin-system spec left a database out on purpose. Calendar-shaped plugins cannot keep events across reloads without each author inventing a store.
 
 ## Solution overview
 
-Give each plugin its own Tandem engine. The author defines collections in `storage.ts`, mounts `syncRoutes(tables)` on the plugin oRPC router, and reads and writes through `usePluginQuery` and `usePluginTransaction`. Halo embeds Tandem `RemoteServer` in the plugin server (self-serve, same process). The renderer holds a `TandemClient` that syncs over existing plugin oRPC. Plugins stay separate Tandem instances. A later change can nest those collections under plugin ids in one engine so plugins can share access and run distributed transactions.
+Give each plugin its own Tandem remote. The author defines collections in `storage.ts`, mounts `syncRoutes(tables)` on the plugin oRPC router, and reads and writes through `usePluginQuery` and `usePluginTransaction`. Halo embeds Tandem `RemoteServer` in the plugin server (self-serve, same process). The renderer uses a `TandemClient` with no storage adapter: it syncs over existing plugin oRPC and keeps only an in-memory cache. Durable state is the remote on the workspace filesystem. Plugins stay separate Tandem instances. A later change can nest those collections under plugin ids in one engine so plugins can share access and run distributed transactions.
 
-Tandem is private and unpublished. Halo depends on it with git path deps in `package.json`, not npm.
+Halo depends on Tandem with git path deps. Tandem is public and unpublished to npm.
 
 ## Goals
 
 - A plugin may export collections from `storage.ts` using Tandem `collection` / `defineSchema` / `t` re-exported by `@halo/plugin-sdk/storage`.
 - `server.ts` mounts `syncRoutes(tables)` from `@halo/plugin-sdk/server`. That nested router exposes Tandem `push`, `pull`, and `connect`.
-- The SDK view exports `usePluginQuery` and `usePluginTransaction`. They talk to a renderer `TandemClient` that syncs through `plugin.sync`.
-- Each plugin has its own Tandem client and remote. Durable remote state lives under `{workspace}/.halo/plugin-data/<pluginId>/`.
+- The SDK view exports `usePluginQuery` and `usePluginTransaction`. They talk to a renderer `TandemClient` that has a `remote` and no `storage`.
+- Each plugin has its own Tandem remote. Durable state lives under `{workspace}/.halo/plugin-data/<pluginId>/`.
 - Agents and humans see the same durable records on the workspace filesystem.
 - Plugins without `storage.ts` keep working. A plugin that omits `syncRoutes` still loads; storage hooks fail with a tagged error.
 
 ## Non-goals
 
+- No renderer persistence. No IndexedDB. No `IndexedDbTupleStorage`.
 - No merging of plugin schemas. No cross-plugin reads. No distributed transactions.
 - No HTTP listener. Sync rides the existing oRPC MessagePort.
 - No Tandem drizzle / SQL adapters. Halo sets `allowBuilds.better-sqlite3` to false.
@@ -70,10 +70,9 @@ Tandem is private and unpublished. Halo depends on it with git path deps in `pac
 - Tandem packages are `@tandem/core`, `@tandem/server`, and `@tandem/types` at `github.com/tanishqkancharla/tandem`. Dist is gitignored, so Halo points `main` / `types` at `src` through `packageExtensions`.
 - "Tandem tables" means `defineSchema` collections. "Nested dynamically" means each plugin load creates that plugin's collections and nests `sync` on its router. It does not mean one host-wide SQL schema.
 - Remote durability is a JSON snapshot of the in-memory `RemoteStore`, not SQLite.
-- Renderer local store is Tandem `IndexedDbTupleStorage` named `halo-plugin-<pluginId>`.
+- The renderer `TandemClient` omits `storage`. Reload refetches from the remote.
 - `syncRoutes(tables)` returns `{ sync: { push, pull, connect } }` so authors spread it into the default router.
 - Hooks take `tables` as the first argument so the view types and the server schema stay the same object.
-- `.cursor/environment.json` lists `github.com/tanishqkancharla/tandem` in `repositoryDependencies` so Cloud Agent tokens can fetch the private git deps.
 
 ## Important files, docs, and websites
 
@@ -97,7 +96,7 @@ Tandem is private and unpublished. Halo depends on it with git path deps in `pac
 
 ### Phase 1: Git-depend on Tandem and export storage helpers
 
-Add private git deps so plugin-sdk can import Tandem. Point package entry at `src` because Tandem does not commit `dist`. Widen the Cloud Agent token. Re-export schema helpers on a subpath that both view and server can import.
+Add public git deps so plugin-sdk can import Tandem. Point package entry at `src` because Tandem does not commit `dist`. Re-export schema helpers on a subpath that both view and server can import.
 
 #### Important types
 
@@ -135,10 +134,10 @@ export type { RelationalQuery, RelationalQueryResult } from "@tandem/core";
     "@orpc/server": "2.0.0-beta.29",
 ```
 
-- [ ] Add `repositoryDependencies: ["github.com/tanishqkancharla/tandem"]` to `.cursor/environment.json`.
 - [ ] Add the three git path deps to `@halo/plugin-sdk`. Override `@tandem/types` in `pnpm-workspace.yaml` so Tandem's `workspace:*` resolves. Set `packageExtensions` `main` / `types` to `./src/index.ts` for the three packages.
 - [ ] Add `packages/plugin-sdk/src/storage.ts` re-exports and the `./storage` export.
-- [ ] Run `pnpm install` and `pnpm --filter @halo/plugin-sdk typecheck`. Smoke that `@tandem/core` resolves to source. Do not commit this check.
+- [ ] Run `pnpm install` and `pnpm --filter @halo/plugin-sdk typecheck`.
+- [ ] Smoke that `@tandem/core` resolves to source. Do not commit this check.
 
 ### Phase 2: `syncRoutes(tables)` embeds Tandem remote in the plugin server
 
@@ -215,7 +214,7 @@ function pluginRemote(args: {
 
 ### Phase 3: Renderer Tandem client and storage hooks
 
-Give the view a local-first client. First hook call for a plugin creates a `TandemClient` with IndexedDB storage and a `RemoteApi` that calls `usePluginServer().sync`. `usePluginQuery` subscribes. `usePluginTransaction` commits through that client.
+Give the view a Tandem client that talks only to the plugin remote. First hook call for a plugin creates a `TandemClient` with `remote` set to `usePluginServer().sync` and no `storage`. `usePluginQuery` subscribes. `usePluginTransaction` commits through that client.
 
 #### Important types
 
@@ -251,7 +250,7 @@ export class PluginStorageMissingError extends errore.createTaggedError({
      └── usePluginQuery(calendarTables, query)
 -        (no storage)
 +        └── getPluginClient(pluginId, tables, server.sync)
-+            └── TandemClient.subscribe
++            └── TandemClient({ remote, schema })
 +                └── remote.pull / remote.connect
 +                    └── server.sync.pull / server.sync.connect
      └── usePluginTransaction(calendarTables)
@@ -275,12 +274,19 @@ export class PluginStorageMissingError extends errore.createTaggedError({
 +    () => client.query(query),
 +  );
 +}
++
++function getPluginClient(args) {
++  return new TandemClient({
++    schema: args.tables,
++    remote: orpcRemote(args.sync),
++  });
++}
 ```
 
-- [ ] Create one `TandemClient` per `pluginId` in the renderer. IndexedDB name `halo-plugin-<pluginId>`. `autoConnect: true`.
+- [ ] Create one `TandemClient` per `pluginId` in the renderer. Pass `remote` only. Do not pass `storage`. `autoConnect: true`.
 - [ ] Implement `RemoteApi` on `server.sync` (`push`, `pull`, `connect` iterator → `poke`).
 - [ ] Export `usePluginQuery` and `usePluginTransaction`. Throw `PluginStorageMissingError` when `server.sync` is missing.
-- [ ] Smoke a hook that writes a row and reads it back from `query` before pull completes (optimistic local write). Do not commit this check.
+- [ ] Smoke a commit then query after pull: the row comes from the remote. Do not commit this check.
 
 ### Phase 4: Host slots, jiti aliases, and author skill
 
@@ -344,12 +350,12 @@ const viewExternals = [
 
 - [ ] Add `@halo/plugin-sdk/storage` to `viewExternals`, `requireHost`, and jiti aliases. Alias Tandem packages for jiti. Add them to `pluginSdkJitiDependencies`.
 - [ ] Teach `vite.renderer.config.ts` to compile `@tandem/*` TypeScript (include in `optimizeDeps` / allow `node_modules/@tandem`).
-- [ ] Update `haloPluginSkill.md` with `storage.ts`, `syncRoutes`, and the two hooks. Keep `usePluginServer` for non-storage RPC.
+- [ ] Update `haloPluginSkill.md` with `storage.ts`, `syncRoutes`, and the two hooks. Keep `usePluginServer` for non-storage RPC. Do not mention IndexedDB.
 - [ ] Run `pnpm --filter @halo/desktop typecheck`. Smoke that a plugin view importing `@halo/plugin-sdk/storage` compiles. Do not commit this check.
 
 ### Phase 5: Package tests for author-facing storage
 
-Prove a plugin author can define tables, mount `syncRoutes`, push a record from a client, and read it back through query. Use real Tandem and real oRPC handlers. No mocks.
+Prove a plugin author can define tables, mount `syncRoutes`, push a record from a client with no storage adapter, and read it back through query after pull. Use real Tandem and real oRPC handlers. No mocks.
 
 #### Important types
 
@@ -368,8 +374,9 @@ const notesTables = defineSchema({
 ```callstack
  vitest plugin-sdk
  └── defineSchema + syncRoutes
-+    └── TandemClient remote = syncRoutes handlers
++    └── TandemClient({ schema, remote })
 +        └── commit set notes
++        └── pullFromRemote
 +        └── query collection notes
 ```
 
@@ -402,6 +409,6 @@ const notesTables = defineSchema({
 ```
 
 - [ ] Add a Vitest fixture that makes a temp workspace root.
-- [ ] Commit a plugin-sdk test that acts like author code: `defineSchema`, `syncRoutes`, `TandemClient` commit, then `query` sees the row.
-- [ ] Commit a test that a second client with the same `pluginId` and root pulls the first client's row.
+- [ ] Commit a plugin-sdk test that acts like author code: `defineSchema`, `syncRoutes`, `TandemClient` with `remote` only, commit, pull, then `query` sees the row.
+- [ ] Commit a test that a second client with the same `pluginId` and root, also with no storage, pulls the first client's row.
 - [ ] Run `pnpm --filter @halo/plugin-sdk test` and `pnpm run check-affected`.
