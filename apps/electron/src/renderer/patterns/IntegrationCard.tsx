@@ -116,9 +116,10 @@ export function IntegrationCard({
             ))}
           </Flex>
         )}
-        {view.button === undefined ? (
+        {view.statusText === undefined ? undefined : (
           <div className={statusLabel}>{view.statusText}</div>
-        ) : (
+        )}
+        {view.button === undefined ? undefined : (
           <Button
             disabled={
               startOAuth.isPending ||
@@ -153,11 +154,11 @@ function cardView(input: {
   if (input.disconnected) {
     return { scopes: [], button: undefined, statusText: "Disconnected" };
   }
-  if (input.status === "connected") {
-    return { scopes: [], button: undefined, statusText: "Connected" };
-  }
   if (input.intent === "disconnect") {
     return { scopes: [], button: "Disconnect", statusText: undefined };
+  }
+  if (input.status === "connected") {
+    return { scopes: [], button: "Disconnect", statusText: "Connected" };
   }
   if (input.intent === "upgrade") {
     return { scopes: input.scopes, button: "Manage", statusText: undefined };
