@@ -10,7 +10,7 @@ import { Value } from "@sinclair/typebox/value";
 import type { StoredTokens } from "./IntegrationService.js";
 
 export const HALO_GOOGLE_OAUTH_CLIENT_ID =
-  "912701444316-a1g3vp32kk40po12bemmdf8gqpr32gne.apps.googleusercontent.com";
+  "912701444316-r6tced61mtv8jmjt31kf1did42f71f7b.apps.googleusercontent.com";
 
 const googleAuthorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth";
 const googleTokenUrl = "https://oauth2.googleapis.com/token";
