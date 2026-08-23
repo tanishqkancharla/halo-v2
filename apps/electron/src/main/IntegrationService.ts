@@ -12,9 +12,12 @@ export type ConnectionStatus = "pending" | "connected";
 
 export type ConnectionIntent = "connect" | "upgrade" | "disconnect";
 
+export const defaultIntegrationProfile = "default";
+
 export type IntegrationConnection = {
   id: string;
   service: GoogleServiceId;
+  profile: string;
   scopes: string[];
   status: ConnectionStatus;
   intent: ConnectionIntent | undefined;
@@ -51,6 +54,7 @@ const storedConnectionSchema = Type.Object({
     Type.Literal("calendar"),
     Type.Literal("drive"),
   ]),
+  profile: Type.String({ minLength: 1 }),
   scopes: Type.Array(Type.String()),
   status: Type.Union([Type.Literal("pending"), Type.Literal("connected")]),
   intent: Type.Optional(
@@ -70,6 +74,7 @@ const storeSchema = Type.Object({
 type StoredConnection = {
   id: string;
   service: GoogleServiceId;
+  profile: string;
   scopes: string[];
   status: ConnectionStatus;
   intent: ConnectionIntent | undefined;
@@ -100,11 +105,11 @@ export class IntegrationService {
     return publicConnection(row);
   }
 
-  async findByService(service: GoogleServiceId) {
+  async findByService(input: { service: GoogleServiceId; profile: string }) {
     const store = await this.readStore();
     if (store instanceof Error) return store;
-    const row = store.connections.find(
-      (connection) => connection.service === service,
+    const row = store.connections.find((connection) =>
+      sameServiceProfile(connection, input),
     );
     if (row === undefined) return undefined;
     return publicConnection(row);
@@ -112,18 +117,20 @@ export class IntegrationService {
 
   async createPending(input: {
     service: GoogleServiceId;
+    profile: string;
     scopes: string[];
     intent: ConnectionIntent;
   }) {
     const store = await this.readStore();
     if (store instanceof Error) return store;
 
-    const existing = store.connections.find(
-      (connection) => connection.service === input.service,
+    const existing = store.connections.find((connection) =>
+      sameServiceProfile(connection, input),
     );
     const row: StoredConnection = {
       id: existing === undefined ? randomUUID() : existing.id,
       service: input.service,
+      profile: input.profile,
       scopes: input.scopes,
       status: "pending",
       intent: input.intent,
@@ -133,7 +140,7 @@ export class IntegrationService {
       existing === undefined
         ? [...store.connections, row]
         : store.connections.map((connection) =>
-            connection.service === input.service ? row : connection,
+            sameServiceProfile(connection, input) ? row : connection,
           );
     const written = await this.writeStore({ connections });
     if (written instanceof Error) return written;
@@ -157,6 +164,7 @@ export class IntegrationService {
     const row: StoredConnection = {
       id: existing.id,
       service: existing.service,
+      profile: existing.profile,
       scopes: input.scopes,
       status: "connected",
       intent: undefined,
@@ -239,10 +247,20 @@ export class IntegrationService {
   }
 }
 
+function sameServiceProfile(
+  connection: { service: GoogleServiceId; profile: string },
+  input: { service: GoogleServiceId; profile: string },
+) {
+  return (
+    connection.service === input.service && connection.profile === input.profile
+  );
+}
+
 function publicConnection(row: StoredConnection): IntegrationConnection {
   return {
     id: row.id,
     service: row.service,
+    profile: row.profile,
     scopes: row.scopes,
     status: row.status,
     intent: row.intent,
@@ -255,6 +273,7 @@ function storedConnection(
   return {
     id: row.id,
     service: row.service,
+    profile: row.profile,
     scopes: row.scopes,
     status: row.status,
     intent: row.intent,
