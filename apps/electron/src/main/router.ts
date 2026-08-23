@@ -18,6 +18,10 @@ import {
   ConnectionNotFoundError,
   type IntegrationService,
 } from "./IntegrationService.js";
+import {
+  integrationConnectedEventText,
+  notifyIntegrationEvent,
+} from "./notifyIntegrationConnected.js";
 import type { PiService } from "./pi-service.js";
 import type { PluginService } from "./plugins/PluginService.js";
 import type { WorkspaceService } from "./workspace-service.js";
@@ -273,6 +277,16 @@ export const router = {
           },
         });
         if (connected instanceof Error) return orpcErrors.badRequest(connected);
+
+        const session = context.sessions.get(input.sessionId);
+        if (session instanceof Error) return orpcErrors.badRequest(session);
+        const notified = await notifyIntegrationEvent({
+          session,
+          customType: "halo.integration.connected",
+          content: integrationConnectedEventText(connected),
+        });
+        if (notified instanceof Error) return orpcErrors.badRequest(notified);
+
         return connected;
       },
     ),
