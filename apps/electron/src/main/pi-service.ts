@@ -6,6 +6,8 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
 import type { SessionSummary } from "../shared/rpc.js";
+import type { IntegrationService } from "./IntegrationService.js";
+import { createIntegrationTools } from "./IntegrationTools.js";
 import { createParallelSearchTools } from "./ParallelSearchTools.js";
 import type { UserService } from "./UserService.js";
 import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
@@ -29,6 +31,7 @@ export class PiService {
   constructor(
     private readonly workspace: WorkspaceService,
     private readonly user: UserService,
+    private readonly integrations: IntegrationService,
   ) {}
 
   async newAgentSession() {
@@ -66,7 +69,10 @@ export class PiService {
       agentDir: layout.agentDir,
       sessionManager: manager,
       tools: createCodingTools(layout.root),
-      customTools: createParallelSearchTools(user.id),
+      customTools: [
+        ...createParallelSearchTools(user.id),
+        ...createIntegrationTools(this.integrations),
+      ],
       resourceLoader,
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;

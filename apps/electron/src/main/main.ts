@@ -70,7 +70,11 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 const workspaceService = new WorkspaceService(applicationConfig.dataDir);
 const userService = new UserService(applicationConfig.dataDir);
 const integrationService = new IntegrationService(workspaceService);
-const piService = new PiService(workspaceService, userService);
+const piService = new PiService(
+  workspaceService,
+  userService,
+  integrationService,
+);
 const pluginService = new PluginService(workspaceService);
 let mainWindow: BrowserWindow | undefined;
 
