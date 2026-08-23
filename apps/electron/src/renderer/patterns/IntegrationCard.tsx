@@ -31,9 +31,13 @@ export function IntegrationCard({
   const connectionId = part.connectionId;
   const query = useQuery({
     queryKey: ["integrations", "get", connectionId],
-    queryFn: () => {
+    queryFn: async () => {
       // SAFETY: enabled is false until connectionId is a string.
-      return api.integrations.get({ connectionId: connectionId as string });
+      const connection = await api.integrations.get({
+        connectionId: connectionId as string,
+      });
+      // React Query keeps the last value when queryFn returns undefined.
+      return { connection };
     },
     enabled: connectionId !== undefined,
   });
@@ -46,10 +50,9 @@ export function IntegrationCard({
       });
     },
     onSuccess: (connection) => {
-      queryClient.setQueryData(
-        ["integrations", "get", connectionId],
+      queryClient.setQueryData(["integrations", "get", connectionId], {
         connection,
-      );
+      });
     },
     onError: (error) => {
       console.warn("Google OAuth failed:", error);
@@ -64,18 +67,17 @@ export function IntegrationCard({
       });
     },
     onSuccess: () => {
-      queryClient.setQueryData(
-        ["integrations", "get", connectionId],
-        undefined,
-      );
+      queryClient.setQueryData(["integrations", "get", connectionId], {
+        connection: undefined,
+      });
     },
     onError: (error) => {
       console.warn("Google disconnect failed:", error);
     },
   });
 
-  const disconnected = query.isSuccess && query.data === undefined;
-  const live = query.data;
+  const disconnected = query.isSuccess && query.data.connection === undefined;
+  const live = query.data?.connection;
   const serviceId = live === undefined ? part.service : live.service;
   const catalog = googleService(serviceId);
   const serviceLabel = catalog === undefined ? serviceId : catalog.label;
