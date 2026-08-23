@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { createJiti } from "jiti";
 import { Lazy, Procedure, type AnyRouter } from "@orpc/server";
+import type { PluginServerContext } from "@halo/plugin-sdk/server";
 import * as errore from "errore";
 import { isCallable } from "../../shared/isCallable.js";
 
@@ -20,6 +21,7 @@ const jiti = createJiti(import.meta.url, {
   alias: {
     "@halo/plugin-sdk/schema": sdkEntry("schema"),
     "@halo/plugin-sdk/server": sdkEntry("server"),
+    "@halo/plugin-sdk/storage": sdkEntry("storage"),
     "@halo/plugin-sdk/view": sdkEntry("view"),
   },
 });
@@ -27,7 +29,26 @@ const jiti = createJiti(import.meta.url, {
 export async function loadPluginServer(args: {
   id: string;
   serverPath: string;
+  workspaceRoot: string;
 }): Promise<PluginServerLoadError | AnyRouter> {
+  const sdk = await jiti.import("@halo/plugin-sdk/server").catch(
+    (e) =>
+      new PluginServerLoadError({
+        id: args.id,
+        detail: String(e),
+        cause: e,
+      }),
+  );
+  if (sdk instanceof PluginServerLoadError) return sdk;
+  // SAFETY: jiti loads the SDK from disk; bind must run on that module instance.
+  (
+    sdk as {
+      bindPluginServerContext: (context: PluginServerContext) => void;
+    }
+  ).bindPluginServerContext({
+    pluginId: args.id,
+    workspaceRoot: args.workspaceRoot,
+  });
   const imported = await jiti.import(args.serverPath).catch(
     (e) =>
       new PluginServerLoadError({
@@ -90,6 +111,6 @@ function isPluginRouter(value: AnyRouter | Lazy<AnyRouter>) {
   return true;
 }
 
-function sdkEntry(subpath: "schema" | "server" | "view") {
+function sdkEntry(subpath: "schema" | "server" | "storage" | "view") {
   return requireFromThisFile.resolve(`@halo/plugin-sdk/${subpath}`);
 }
