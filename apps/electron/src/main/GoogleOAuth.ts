@@ -10,7 +10,11 @@ import { Value } from "@sinclair/typebox/value";
 import type { StoredTokens } from "./IntegrationService.js";
 
 export const HALO_GOOGLE_OAUTH_CLIENT_ID =
-  "536106843012-sv59p9tffjo6uhdbv0ipu5ccldvd6pkh.apps.googleusercontent.com";
+  "536106843012-1gteqlblqk8pkr1ov4dgd6m867otjrdo.apps.googleusercontent.com";
+
+// Desktop clients still mint a secret. Google does not treat it as confidential.
+export const HALO_GOOGLE_OAUTH_CLIENT_SECRET =
+  "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";
 
 const googleAuthorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth";
 const googleTokenUrl = "https://oauth2.googleapis.com/token";
@@ -190,6 +194,7 @@ async function exchangeCode(input: {
   const body = new URLSearchParams({
     code: input.code,
     client_id: HALO_GOOGLE_OAUTH_CLIENT_ID,
+    client_secret: HALO_GOOGLE_OAUTH_CLIENT_SECRET,
     redirect_uri: input.redirectUri,
     grant_type: "authorization_code",
     code_verifier: input.verifier,
