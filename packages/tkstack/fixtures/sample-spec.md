@@ -33,9 +33,7 @@ Specs lived as markdown files with no local page, so mermaid, call stacks, and d
 
 ### Phase 1: Serve the spec file
 
-The CLI already parses markdown. Point it at a spec path.
-
-#### Call stack diff
+The CLI already parses markdown. Point it at a spec path. `startServer` now builds the Vite page instead of writing walkthrough HTML:
 
 ```callstack
  startServer
@@ -44,7 +42,7 @@ The CLI already parses markdown. Point it at a spec path.
     └── handleTkstackRequest
 ```
 
-#### Important types
+`StartServerInput` is the listen contract: file, workspace root, and port.
 
 ```ts
 // src/serve.ts
@@ -55,7 +53,7 @@ type StartServerInput = {
 };
 ```
 
-#### Code diff preview
+The CLI description covers both specs and walkthroughs.
 
 ```diff
  // src/cli.ts

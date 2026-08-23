@@ -1,6 +1,6 @@
 ---
 name: generate-spec-v2
-description: Create a code-based implementation spec in the specs/ directory for a significant feature, fix, or refactor. Use when the user asks to plan, spec, scope, or phase work before implementation and the plan should cover top-level Mermaid flows, per-phase call-stack diffs above code diffs, important types, commit-sized phases, and checks. After writing the spec, serve it with tkstack (`pnpm spec` or `pnpm exec tkstack`).
+description: Create a code-based implementation spec in the specs/ directory for a significant feature, fix, or refactor. Use when the user asks to plan, spec, scope, or phase work before implementation and the plan should cover top-level Mermaid flows, per-phase call-stack diffs then code, commit-sized phases, and checks. After writing the spec, serve it with tkstack (`pnpm spec` or `pnpm exec tkstack`).
 ---
 
 # Generate an implementation spec
@@ -26,7 +26,7 @@ Use the amount of research the task needs. Do not impose a fixed research proces
 
 ## Write the file
 
-Choose a short kebab-case name and create `specs/<name>.md`. Use this structure:
+Choose a short kebab-case name and create `specs/<name>.md`. Use this structure. In each code phase, put the call-stack fence first, then the code (diffs, types, excerpts). Do not title those blocks. Walk through them in prose.
 
 ````markdown
 # <Feature or fix name>
@@ -67,11 +67,7 @@ List only sources that help implement the change.
 
 ### Phase 1: <Commit-sized outcome>
 
-Explain the intent and what becomes true after this phase lands in one or two sentences.
-
-#### Call stack diff
-
-Show how this phase changes the current call path. Keep the entry point and enough parents to make ownership clear. Put this fence above the code diff.
+The handler validates before it stores. The call path gains `validateInput`:
 
 ```callstack
  requestHandler
@@ -82,7 +78,7 @@ Show how this phase changes the current call path. Keep the entry point and enou
         └── dataStore
 ```
 
-#### Important types
+`ImportantInput` is the contract. `validateInput` returns a tagged error. The handler returns that error.
 
 ```ts
 // path/to/types.ts
@@ -92,9 +88,7 @@ type ImportantResult =
   | { status: "error"; reason: FailureReason };
 ```
 
-#### Code diff preview
-
-Show a short unified diff of the main edit. Use real file and symbol names, enough surrounding code to place the change, and `...` for parts the implementer will fill in. Do not try to write the full patch.
+The handler calls `validateInput`, then `existingService`. Keep the preview short. Use `...` for parts the implementer will fill in.
 
 ```diff
  // path/to/handler.ts
@@ -154,10 +148,11 @@ Tell the user the spec path and the URL. Do not write specs into a temp director
 - Keep every phase small enough for one clear commit and leave the codebase working.
 - Make each phase produce visible or testable progress.
 - Name exact files, symbols, behavior, and commands when the codebase provides them.
-- Include `Call stack diff`, `Important types`, and `Code diff preview` in every code phase, in that order. Put the call stack above the code diff. Keep them inside that phase; do not collect call stacks or code diffs in a global section.
-- Show inputs, outputs, state, events, errors, or unions that set the phase contract under `Important types`. Use the project language.
+- In every code phase, include a call-stack fence, then the code (diff, types, excerpts). Put the call stack first. Do not title those blocks. Do not add a fixed set of subheadings. Keep them inside that phase.
+- Walk through the fences in prose. Put a sentence or two next to each one.
+- Show the inputs, outputs, state, events, errors, or unions that set the phase contract in the code that follows the call stack. Use the project language.
 - Make the call-stack diff start from the current path and mark the proposed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
-- Make the code diff a short preview of the main edit, not a full patch. Include a file path comment and preserve useful surrounding control flow.
+- Make the code a short preview of the main edit, not a full patch. Include a file path and preserve useful surrounding control flow.
 - Use `Not applicable — no code path changes` only for a true docs, data, or config phase. Do not invent types or call paths.
 - Follow [Testing](#testing) for what to check and when to commit tests.
 - Avoid setup-only or refactor-only phases unless later work cannot land safely without them. Fixture setup for package-level tests is allowed once the feature is end-to-end testable.
@@ -184,4 +179,4 @@ Once the feature is end-to-end testable, add the fixtures needed for those high-
 
 ## Final check
 
-Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has an accurate call-stack diff above the code-diff preview, key types between them, and four or five steps; links and commands are real; committed tests are package-level end-to-end and earlier phases use uncommitted smoke checks; tkstack is serving the page; and the full plan covers every goal without pulling in a non-goal.
+Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has a call stack and then the code, with prose between the fences, no titles on those blocks, and four or five steps; links and commands are real; committed tests are package-level end-to-end and earlier phases use uncommitted smoke checks; tkstack is serving the page; and the full plan covers every goal without pulling in a non-goal.
