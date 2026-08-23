@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart TD
-  storageTs["plugin storage.ts"] --> tables["calendarTables"]
+  storageTs["plugin storage.ts"] --> tables["todoTables"]
   tables --> serverTs["plugin server.ts"]
   serverTs --> syncRoutesFn["syncRoutes tables"]
   syncRoutesFn --> remote["RemoteServer per plugin"]
@@ -37,7 +37,7 @@ sequenceDiagram
 
 ## Problem overview
 
-Plugins persist with ad hoc files and oRPC methods. There is no typed store, no query API, and no way for a view to read the same records the server holds. The plugin-system spec left a database out on purpose. Calendar-shaped plugins cannot keep events across reloads without each author inventing a store.
+Plugins persist with ad hoc files and oRPC methods. There is no typed store, no query API, and no way for a view to read the same records the server holds. The plugin-system spec left a database out on purpose. A todo plugin cannot keep items across reloads without each author inventing a store.
 
 ## Solution overview
 
@@ -53,6 +53,7 @@ Halo depends on Tandem with git path deps. Tandem is public and unpublished to n
 - Each plugin has its own Tandem remote. Durable state lives under `{workspace}/.halo/plugin-data/<pluginId>/`.
 - Agents and humans see the same durable records on the workspace filesystem.
 - Plugins without `storage.ts` keep working. A plugin that omits `syncRoutes` still loads; storage hooks fail with a tagged error.
+- An in-app agent following the halo-plugin skill can build a working todo plugin: add an item, reload, the item is still there.
 
 ## Non-goals
 
@@ -63,7 +64,7 @@ Halo depends on Tandem with git path deps. Tandem is public and unpublished to n
 - No Turso, libSQL, or `usePluginState`.
 - No schema migrations or backfills.
 - No publishing Tandem to npm. Git deps only.
-- No host auto-load of `storage.ts`. The author imports it from `server.ts` and the view.
+- No host auto-load of `storage.ts` or auto-wrap of `PluginStorageProvider`. The skill tells the author (and the in-app agent) to wrap. The host does not guess.
 - No extra view exports beyond `Sidebar` and `Routes`. `storage.ts` is a file convention, not a named view export.
 - No marketplace, watch, or auto-reload. Reload the window to pick up plugin edits.
 
@@ -75,7 +76,7 @@ Halo depends on Tandem with git path deps. Tandem is public and unpublished to n
 - The renderer `TandemClient` omits `storage`. Reload refetches from the remote.
 - `syncRoutes(tables)` returns `{ sync: { push, pull, connect } }` so authors spread it into the default router.
 - The host cannot tell if `server.sync` exists. `RouterClient<AnyRouter>` is a proxy, so `server.sync` always looks callable. The host also never loads `storage.ts`, so it cannot construct a `TandemClient`.
-- The plugin wraps `PluginStorageProvider` with `tables`. Optional `sync` overrides `server.sync` when the author moved or wrapped the routes.
+- The plugin wraps `PluginStorageProvider` with `tables`. That wrap lives in the halo-plugin skill until the host can detect storage on its own. Optional `sync` overrides `server.sync` when the author moved or wrapped the routes.
 - `Sidebar` and `Routes` each get their own `PluginRuntimeProvider`. Cache one `TandemClient` per `pluginId` so those trees share a client.
 
 ## Important files, docs, and websites
@@ -88,13 +89,14 @@ Halo depends on Tandem with git path deps. Tandem is public and unpublished to n
 - [`apps/electron/src/main/plugins/compilePluginView.ts`](../apps/electron/src/main/plugins/compilePluginView.ts) — Mark `@halo/plugin-sdk/storage` external.
 - [`apps/electron/src/renderer/evaluatePluginView.ts`](../apps/electron/src/renderer/evaluatePluginView.ts) — `requireHost` for the storage subpath.
 - [`apps/electron/mainExternals.ts`](../apps/electron/mainExternals.ts) — Copy Tandem into the packaged app for jiti.
-- [`apps/electron/src/main/plugins/haloPluginSkill.md`](../apps/electron/src/main/plugins/haloPluginSkill.md) — Author docs for `storage.ts` and hooks.
+- [`apps/electron/src/main/plugins/haloPluginSkill.md`](../apps/electron/src/main/plugins/haloPluginSkill.md) — Author and in-app agent recipe. Storage example is a todo plugin, including `PluginStorageProvider`.
 - [`apps/electron/copyMainProcessExternals.ts`](../apps/electron/copyMainProcessExternals.ts) — Disk copy of Tandem with the SDK.
 - [`pnpm-workspace.yaml`](../pnpm-workspace.yaml) — Overrides / `packageExtensions` for Tandem source entry and `@tandem/types`.
 - [`apps/electron/vite.renderer.config.ts`](../apps/electron/vite.renderer.config.ts) — Let Vite compile Tandem TypeScript from `node_modules`.
 - [Tandem repo](https://github.com/tanishqkancharla/tandem) — `TandemClient`, `RemoteServer`, `RemoteApi` (`push` / `pull` / `connect`), `collection`, `defineSchema`.
 - [Tandem remote guide](https://github.com/tanishqkancharla/tandem/blob/main/docs/how_to_implement_remote.md) — Shape of `push`, `pull`, `connect`.
 - [pnpm git subdirectory installs](https://pnpm.io/git#install-from-a-subdirectory) — `github:user/repo#path:packages/foo`.
+- [`.agents/skills/halo-web/SKILL.md`](../.agents/skills/halo-web/SKILL.md) — Drive the live renderer for the todo plugin test.
 
 ## Implementation
 
@@ -177,7 +179,7 @@ function pluginRemote(args: {
  loadPluginServer
  └── jiti import server.ts
      └── export default router
-+        └── syncRoutes(calendarTables)
++        └── syncRoutes(todoTables)
 +            └── pluginOs.handler
 +                └── RemoteServer.push / pull / connect
 +                    └── FileRemoteStore
@@ -255,7 +257,7 @@ export class PluginStorageMissingError extends errore.createTaggedError({
  plugin.Routes
  └── PluginRuntimeProvider
 -    └── usePluginQuery
-+    └── PluginStorageProvider({ tables: calendarTables })
++    └── PluginStorageProvider({ tables: todoTables })
 +        └── getPluginClient(pluginId, tables, sync ?? server.sync)
 +            └── TandemClient({ remote, schema })
 +                └── usePluginQuery(query)
@@ -269,18 +271,18 @@ export class PluginStorageMissingError extends errore.createTaggedError({
 #### Code diff preview
 
 ```diff
- // {workspace}/.halo/plugins/calendar/view.tsx
+ // {workspace}/.halo/plugins/todos/view.tsx
  export function Routes() {
 -  return <Home />
 +  return (
-+    <PluginStorageProvider tables={calendarTables}>
++    <PluginStorageProvider tables={todoTables}>
 +      <Home />
 +    </PluginStorageProvider>
 +  )
  }
 
  function Home() {
-+  const events = usePluginQuery({ collection: "events" })
++  const todos = usePluginQuery({ collection: "todos" })
 +  const { transact, commit } = usePluginTransaction()
    ...
  }
@@ -333,29 +335,24 @@ const viewExternals = [
  Optional:
  - view.tsx
  - server.ts
-+- storage.ts  (collections; import from @halo/plugin-sdk/storage)
++- storage.ts
 +
 +## Storage
 +
-+```ts
-+import { collection, defineSchema, t } from "@halo/plugin-sdk/storage";
-+export const calendarTables = defineSchema({
-+  events: collection({
-+    id: t.id(),
-+    title: t.string(),
-+  }),
-+});
-+```
++The host does not wrap storage. If the plugin uses `syncRoutes`, wrap
++`PluginStorageProvider` in `Routes` and in `Sidebar` if the sidebar queries.
 +
-+In server.ts: `export default { ...syncRoutes(calendarTables) }`
-+In view: wrap Routes (and Sidebar if it queries) with
-+`PluginStorageProvider tables={calendarTables}`. Then
-+`usePluginQuery({ collection: "events" })`.
++The skill's complete example is a todo plugin at `.halo/plugins/todos`:
++`storage.ts` exports `todoTables` (`todos` with `id`, `title`, `done`).
++`server.ts` default-exports `{ ...syncRoutes(todoTables) }`. `halo.name`
++is `Todos`. `Sidebar` has a `SidebarItem` named `List`. `Routes` wraps
++`PluginStorageProvider tables={todoTables}`, lists todos, and adds items
++with a field labeled `New todo` and a button named `Add`.
 ```
 
 - [ ] Add `@halo/plugin-sdk/storage` to `viewExternals`, `requireHost`, and jiti aliases. Alias Tandem packages for jiti. Add them to `pluginSdkJitiDependencies`.
 - [ ] Teach `vite.renderer.config.ts` to compile `@tandem/*` TypeScript (include in `optimizeDeps` / allow `node_modules/@tandem`).
-- [ ] Update `haloPluginSkill.md` with `storage.ts`, `syncRoutes`, and the two hooks. Keep `usePluginServer` for non-storage RPC. Do not mention IndexedDB.
+- [ ] Update `haloPluginSkill.md` with that complete todo plugin, including the `PluginStorageProvider` wrap. Keep `usePluginServer` for non-storage RPC. Do not mention IndexedDB. Do not import `PluginStorageProvider` from `MainPane.tsx` or `Sidebar.tsx`.
 - [ ] Run `pnpm --filter @halo/desktop typecheck`. Smoke that a plugin view importing `@halo/plugin-sdk/storage` compiles. Do not commit this check.
 
 ### Phase 5: Package tests for author-facing storage
@@ -366,10 +363,11 @@ Prove a plugin author can define tables, mount `syncRoutes`, push a record from 
 
 ```ts
 // packages/plugin-sdk/src/storage.test.ts
-const notesTables = defineSchema({
-  notes: collection({
+const todoTables = defineSchema({
+  todos: collection({
     id: t.id(),
     title: t.string(),
+    done: t.boolean(),
   }),
 });
 ```
@@ -380,16 +378,16 @@ const notesTables = defineSchema({
  vitest plugin-sdk
  └── defineSchema + syncRoutes
 +    └── TandemClient({ schema, remote })
-+        └── commit set notes
++        └── commit set todos
 +        └── pullFromRemote
-+        └── query collection notes
++        └── query collection todos
 ```
 
 #### Code diff preview
 
 ```diff
  // packages/plugin-sdk/src/storage.test.ts
-+const notesTest = test.extend({
++const todoTest = test.extend({
 +  root: async ({ task }, use) => {
 +    const directory = await mkdtemp(join(tmpdir(), `halo-store-${task.id}-`));
 +    await use(directory);
@@ -397,23 +395,84 @@ const notesTables = defineSchema({
 +  },
 +});
 +
-+notesTest("round-trips a note through syncRoutes", async ({ root }) => {
-+  const routes = syncRoutes(notesTables);
++todoTest("round-trips a todo through syncRoutes", async ({ root }) => {
++  const routes = syncRoutes(todoTables);
 +  const client = new TandemClient({
-+    schema: notesTables,
-+    remote: orpcRemote(routes, { pluginId: "notes", workspaceRoot: root }),
++    schema: todoTables,
++    remote: orpcRemote(routes, { pluginId: "todos", workspaceRoot: root }),
 +  });
 +  const tx = client.transact();
-+  tx.set("notes", { id: "n1", title: "hello" });
++  tx.set("todos", { id: "t1", title: "Buy milk", done: false });
 +  await client.commit(tx);
 +  await client.pullFromRemote();
-+  expect(client.query({ collection: "notes" })).toEqual([
-+    { id: "n1", title: "hello" },
++  expect(client.query({ collection: "todos" })).toEqual([
++    { id: "t1", title: "Buy milk", done: false },
 +  ]);
 +});
 ```
 
 - [ ] Add a Vitest fixture that makes a temp workspace root.
-- [ ] Commit a plugin-sdk test that acts like author code: `defineSchema`, `syncRoutes`, `TandemClient` with `remote` only, commit, pull, then `query` sees the row.
+- [ ] Commit a plugin-sdk test that acts like author code: `defineSchema`, `syncRoutes`, `TandemClient` with `remote` only, commit, pull, then `query` sees the todo.
 - [ ] Commit a test that a second client with the same `pluginId` and root, also with no storage, pulls the first client's row.
 - [ ] Run `pnpm --filter @halo/plugin-sdk test` and `pnpm run check-affected`.
+
+### Phase 6: Ask the in-app agent to build a todo plugin
+
+The skill is the recipe. Prove a user can ask Pi to build a todo app and then use it. Drive the live renderer with `pnpm halo-web`. No mocks. The host still does not wrap `PluginStorageProvider`; the agent must wrap it because the skill says to.
+
+#### Important types
+
+```ts
+// apps/electron/src/main/plugins/todoPlugin.e2e.test.ts
+const prompt =
+  "Build a todo list plugin. I can add items, mark them done, and they survive a reload.";
+```
+
+#### Call stack diff
+
+```callstack
+ App
+ └── Composer prompt
+-    └── (no plugin)
++    └── Pi writes .halo/plugins/todos
++        └── PluginStorageProvider in view.tsx
++    └── page.reload
++    └── plugin-sidebar-todos
++        └── New todo "Buy milk" / Add
++    └── page.reload
++    └── "Buy milk" still visible
+```
+
+#### Code diff preview
+
+```diff
+ // apps/electron/src/main/plugins/todoPlugin.e2e.test.ts
++todoAgentTest("agent-built todo plugin keeps an item after reload", async () => {
++  await haloWeb.exec(`
++    await page.getByLabel('Message').fill(${JSON.stringify(prompt)});
++    await page.getByRole('button', { name: 'Send' }).click();
++    await page.getByLabel('Thinking').waitFor();
++    await page.getByLabel('Thinking').waitFor({ state: 'hidden', timeout: 180_000 });
++  `);
++  await haloWeb.exec(`await page.reload()`);
++  await haloWeb.exec(`
++    await page.getByTestId('plugin-sidebar-todos').getByRole('link', { name: 'List' }).click();
++    await page.getByLabel('New todo').fill('Buy milk');
++    await page.getByRole('button', { name: 'Add' }).click();
++    await page.getByText('Buy milk').waitFor();
++  `);
++  await haloWeb.exec(`await page.reload()`);
++  await haloWeb.exec(`
++    await page.getByTestId('plugin-sidebar-todos').getByRole('link', { name: 'List' }).click();
++  `);
++  const visible = await haloWeb.exec(
++    `return await page.getByText('Buy milk').isVisible()`,
++  );
++  expect(visible).toBe(true);
++});
+```
+
+- [ ] Add Vitest fixtures that skip when `pnpm halo-web status` fails or no provider key is set (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `OPENROUTER_API_KEY`). Start from a workspace with the seeded halo-plugin skill and no todo plugin yet. Do not start Halo from the test.
+- [ ] Commit a halo-web test that sends that prompt, waits until Thinking is gone, reloads, adds "Buy milk" through the skill's todo UI, reloads, and asserts "Buy milk" is still visible.
+- [ ] Use the skill's todo example as the UI contract: plugin id `todos`, sidebar link `List`, field `New todo`, button `Add`. Do not have the host wrap `PluginStorageProvider`.
+- [ ] Run the test against the running Halo debug app (`pnpm --filter @halo/desktop test` for the new file, with `halo-dev` up).
