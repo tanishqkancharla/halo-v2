@@ -1,7 +1,9 @@
 import type { AnySchema, ClientId, RemoteApi } from "@tandem/types";
 
-type PokeIterator = AsyncIterable<{ type: "poke" }> & {
-  return?: (value?: undefined) => Promise<unknown>;
+type PokeEvent = { type: "poke" };
+
+type PokeIterator = AsyncIterable<PokeEvent> & {
+  return?: (value?: undefined) => Promise<IteratorResult<PokeEvent>>;
 };
 
 export type OrpcSyncClient<Schema extends AnySchema> = {

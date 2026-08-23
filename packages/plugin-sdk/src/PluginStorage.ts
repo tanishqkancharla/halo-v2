@@ -27,6 +27,11 @@ export class PluginStorageMissingError extends errore.createTaggedError({
   message: "usePluginQuery must run inside PluginStorageProvider",
 }) {}
 
+export type PluginTransaction<Schema extends AnySchema> = {
+  transact: () => Transaction<Schema>;
+  commit: (tx: Transaction<Schema>) => Promise<void>;
+};
+
 const PluginStorageContext = createContext<unknown>(undefined);
 
 const clients = new Map<string, unknown>();
@@ -58,25 +63,21 @@ export function PluginStorageProvider<Schema extends AnySchema>(args: {
 export function usePluginQuery<
   Schema extends AnySchema,
   Query extends RelationalQuery<Schema, Relations>,
-  Relations extends RuntimeRelationsDefinition<Schema> = RuntimeRelationsDefinition<Schema>,
+  Relations extends RuntimeRelationsDefinition<Schema> =
+    RuntimeRelationsDefinition<Schema>,
 >(query: Query): RelationalQueryResult<Schema, Relations, Query> {
   const client = useContext(PluginStorageContext);
   if (client === undefined) throw new PluginStorageMissingError();
   // SAFETY: PluginStorageProvider constructs this client with the plugin schema.
   const typed = client as TandemClient<Schema, Relations>;
   const [result, setResult] = useState(() => typed.query(query));
-  useEffect(() => {
-    const subscription = typed.subscribe(query, setResult);
-    setResult(subscription.result);
-    return subscription.destroy;
-  }, [typed, query]);
+  useEffect(() => typed.subscribe(query, setResult).destroy, [typed, query]);
   return result;
 }
 
-export function usePluginTransaction<Schema extends AnySchema>(): {
-  transact: () => Transaction<Schema>;
-  commit: (tx: Transaction<Schema>) => Promise<void>;
-} {
+export function usePluginTransaction<
+  Schema extends AnySchema,
+>(): PluginTransaction<Schema> {
   const client = useContext(PluginStorageContext);
   if (client === undefined) throw new PluginStorageMissingError();
   // SAFETY: PluginStorageProvider constructs this client with the plugin schema.

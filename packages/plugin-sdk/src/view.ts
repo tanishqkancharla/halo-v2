@@ -119,4 +119,5 @@ export {
   PluginStorageProvider,
   usePluginQuery,
   usePluginTransaction,
+  type PluginTransaction,
 } from "./PluginStorage.js";
