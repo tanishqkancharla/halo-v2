@@ -4,7 +4,9 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "noEmit": true
+    "noEmit": true,
+    "noUncheckedIndexedAccess": false,
+    "types": ["node"]
   },
   "include": ["src"],
   "exclude": ["node_modules"]
