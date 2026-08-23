@@ -11,7 +11,7 @@ import {
 } from "./agent-session-errors.js";
 import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
-import { AsyncEventQueue } from "./AsyncEventQueue.js";
+import { AsyncEventQueue } from "../shared/AsyncEventQueue.js";
 import { orpcErrors } from "./orpcErrors.js";
 import type { PiService } from "./pi-service.js";
 import type { PluginService } from "./plugins/PluginService.js";

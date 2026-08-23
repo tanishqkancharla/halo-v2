@@ -2,7 +2,7 @@ import { os, type } from "@orpc/server";
 import { RemoteServer } from "@tandem/server";
 import type { RuntimeSchemaDefinition } from "@tandem/core";
 import type { AnySchema, ClientId, RemoteApi } from "@tandem/types";
-import { AsyncEventQueue } from "./AsyncEventQueue.js";
+import { AsyncEventQueue } from "../../../apps/electron/src/shared/AsyncEventQueue.js";
 import { FileRemoteStore, PluginStorageStoreError } from "./FileRemoteStore.js";
 
 export type PluginServerContext = {
@@ -14,24 +14,32 @@ export const pluginOs = os.$context<PluginServerContext>();
 
 export { os, type, PluginStorageStoreError };
 
-const remotes = new Map<string, RemoteServer>();
-
 export function syncRoutes<Schema extends AnySchema>(
   tables: RuntimeSchemaDefinition<Schema>,
 ) {
   const collections = Object.keys(tables.collections);
+  let remote: RemoteServer | undefined;
+
+  async function pluginRemote(context: PluginServerContext) {
+    if (remote !== undefined) return remote;
+    const store = await FileRemoteStore.open({
+      pluginId: context.pluginId,
+      workspaceRoot: context.workspaceRoot,
+      collections,
+    });
+    if (store instanceof Error) return store;
+    remote = new RemoteServer({ store });
+    return remote;
+  }
+
   return {
     sync: {
       push: pluginOs
         .input(type<Parameters<RemoteApi<AnySchema>["push"]>[0]>())
         .handler(async ({ input, context }) => {
-          const remote = await pluginRemote({
-            pluginId: context.pluginId,
-            workspaceRoot: context.workspaceRoot,
-            collections,
-          });
-          if (remote instanceof Error) return remote;
-          return remote.push(input).catch(
+          const opened = await pluginRemote(context);
+          if (opened instanceof Error) return opened;
+          return opened.push(input).catch(
             (e) =>
               new PluginStorageStoreError({
                 pluginId: context.pluginId,
@@ -42,13 +50,9 @@ export function syncRoutes<Schema extends AnySchema>(
       pull: pluginOs
         .input(type<Parameters<RemoteApi<AnySchema>["pull"]>[0]>())
         .handler(async ({ input, context }) => {
-          const remote = await pluginRemote({
-            pluginId: context.pluginId,
-            workspaceRoot: context.workspaceRoot,
-            collections,
-          });
-          if (remote instanceof Error) return remote;
-          return remote.pull(input).catch(
+          const opened = await pluginRemote(context);
+          if (opened instanceof Error) return opened;
+          return opened.pull(input).catch(
             (e) =>
               new PluginStorageStoreError({
                 pluginId: context.pluginId,
@@ -59,14 +63,10 @@ export function syncRoutes<Schema extends AnySchema>(
       connect: pluginOs
         .input(type<{ clientId: ClientId }>())
         .handler(async ({ input, context, signal }) => {
-          const remote = await pluginRemote({
-            pluginId: context.pluginId,
-            workspaceRoot: context.workspaceRoot,
-            collections,
-          });
-          if (remote instanceof Error) return remote;
+          const opened = await pluginRemote(context);
+          if (opened instanceof Error) return opened;
           const queue = new AsyncEventQueue<{ type: "poke" }>();
-          const unsubscribe = await remote
+          const unsubscribe = await opened
             .connect({
               clientId: input.clientId,
               poke: () => {
@@ -91,22 +91,4 @@ export function syncRoutes<Schema extends AnySchema>(
         }),
     },
   };
-}
-
-async function pluginRemote(args: {
-  pluginId: string;
-  workspaceRoot: string;
-  collections: readonly string[];
-}) {
-  const existing = remotes.get(args.pluginId);
-  if (existing !== undefined) return existing;
-  const store = await FileRemoteStore.open({
-    pluginId: args.pluginId,
-    workspaceRoot: args.workspaceRoot,
-    collections: args.collections,
-  });
-  if (store instanceof Error) return store;
-  const remote = new RemoteServer({ store });
-  remotes.set(args.pluginId, remote);
-  return remote;
 }
