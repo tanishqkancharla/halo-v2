@@ -1,5 +1,5 @@
 import {
-  PluginRuntimeProvider,
+  PluginServerProvider,
   SidebarItem,
   SidebarSection,
   sidebarPadding,
@@ -91,12 +91,12 @@ export function Sidebar({
             className={pluginSidebar}
           >
             <Router base={`/plugins/${plugin.id}`}>
-              <PluginRuntimeProvider
+              <PluginServerProvider
                 pluginId={plugin.id}
                 server={pluginServers[plugin.id]}
               >
                 <plugin.Sidebar />
-              </PluginRuntimeProvider>
+              </PluginServerProvider>
             </Router>
           </div>
         );

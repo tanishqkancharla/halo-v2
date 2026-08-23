@@ -233,4 +233,34 @@ describe("workspace path helpers", () => {
       { type: "delete", path: "src/a.ts" },
     ]);
   });
+
+  test("replaces a workspace skill when frontmatter version is stale", async () => {
+    const root = await testDirectory("workspace");
+    const appDataDir = await testDirectory("app-data");
+    const skillDir = join(root, ".pi", "agent", "skills", "halo-plugin");
+    await mkdir(skillDir, { recursive: true });
+    const skillPath = join(skillDir, "SKILL.md");
+    await writeFile(skillPath, "---\nname: halo-plugin\n---\n\n# old\n");
+
+    const selected = await new WorkspaceService(appDataDir).select(root);
+    expect(selected).not.toBeInstanceOf(Error);
+
+    const written = await readFile(skillPath, "utf8");
+    expect(written.includes("version: 1")).toBe(true);
+    expect(written.includes("# old")).toBe(false);
+  });
+
+  test("keeps a workspace skill when frontmatter version is current", async () => {
+    const root = await testDirectory("workspace");
+    const appDataDir = await testDirectory("app-data");
+    const skillDir = join(root, ".pi", "agent", "skills", "halo-plugin");
+    await mkdir(skillDir, { recursive: true });
+    const skillPath = join(skillDir, "SKILL.md");
+    const custom = "---\nname: halo-plugin\nversion: 999\n---\n\n# custom\n";
+    await writeFile(skillPath, custom);
+
+    const selected = await new WorkspaceService(appDataDir).select(root);
+    expect(selected).not.toBeInstanceOf(Error);
+    expect(await readFile(skillPath, "utf8")).toBe(custom);
+  });
 });

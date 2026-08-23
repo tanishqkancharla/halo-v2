@@ -1,3 +1,4 @@
+import * as pluginSdkStorage from "@halo/plugin-sdk/storage";
 import * as pluginSdkView from "@halo/plugin-sdk/view";
 import * as errore from "errore";
 import * as maui from "maui";
@@ -98,6 +99,8 @@ function requireHost(specifier: string) {
       return wouter;
     case "@halo/plugin-sdk/view":
       return pluginSdkView;
+    case "@halo/plugin-sdk/storage":
+      return pluginSdkStorage;
     default:
       throw new Error(`plugin view cannot require '${specifier}'`);
   }

@@ -1,5 +1,6 @@
 import { dialog, type BrowserWindow } from "electron";
 import { implement } from "@orpc/server";
+import { AsyncEventQueue } from "@halo/plugin-sdk/shared";
 import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
@@ -11,7 +12,6 @@ import {
 } from "./agent-session-errors.js";
 import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
-import { AsyncEventQueue } from "./AsyncEventQueue.js";
 import { orpcErrors } from "./orpcErrors.js";
 import type { PiService } from "./pi-service.js";
 import type { PluginService } from "./plugins/PluginService.js";

@@ -8,6 +8,12 @@ overrides:
   '@effect/platform-node': 4.0.0-beta.103
   '@effect/platform-node-shared': 4.0.0-beta.103
   effect: 4.0.0-beta.103
+  '@tandem/types': github:tanishqkancharla/tandem#path:packages/types
+
+patchedDependencies:
+  '@tandem/core': 1050cb0b0f9ae409ece7327d0153528cdda024caeb23079f65fa70e5891ec315
+  '@tandem/server': afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1
+  '@tandem/types': cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c
 
 importers:
 
@@ -259,6 +265,15 @@ importers:
       '@sinclair/typebox':
         specifier: ^0.34.52
         version: 0.34.52
+      '@tandem/core':
+        specifier: github:tanishqkancharla/tandem#path:packages/core
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/core(patch_hash=1050cb0b0f9ae409ece7327d0153528cdda024caeb23079f65fa70e5891ec315)(react@19.2.8)
+      '@tandem/server':
+        specifier: github:tanishqkancharla/tandem#path:packages/server
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/server(patch_hash=afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1)(react@19.2.8)
+      '@tandem/types':
+        specifier: github:tanishqkancharla/tandem#path:packages/types
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
       errore:
         specifier: ^0.14.1
         version: 0.14.1
@@ -275,6 +290,9 @@ importers:
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
       '@types/react':
         specifier: 19.2.2
         version: 19.2.2
@@ -286,7 +304,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^4.1.10
-        version: 4.1.10(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 4.1.10(@types/node@22.15.3)(jsdom@30.0.1)(vite@8.2.1(@types/node@22.15.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/tkstack:
     dependencies:
@@ -2844,6 +2862,23 @@ packages:
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
 
+  '@tandem/core@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/core':
+    resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/core, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
+    version: 0.2.0
+
+  '@tandem/server@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/server':
+    resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/server, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
+    version: 0.2.0
+    peerDependencies:
+      drizzle-orm: ^0.44.0
+    peerDependenciesMeta:
+      drizzle-orm:
+        optional: true
+
+  '@tandem/types@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types':
+    resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/types, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
+    version: 0.2.0
+
   '@tanishqkancharla/maui@0.0.2':
     resolution: {integrity: sha512-xDkCiQv2B5oGO82zkVixe9596lTyboKND2x6vSsDzFcwU2agchyaGRP6qQ1fFI0xzMHWXq6S0feBn4yNLtliag==}
 
@@ -3032,6 +3067,14 @@ packages:
 
   '@tootallnate/quickjs-emscripten@0.23.0':
     resolution: {integrity: sha512-C5Mc6rdnsaJDjO3UpGW/CQTHtCKaYlScZTly4JIu97Jxo/odCiH0ITnDXSJPTOrEKk/ycSZ0AOgTmkDtkOsvIA==}
+
+  '@triplit/tuple-database@2.2.33':
+    resolution: {integrity: sha512-Qw9QwAweJpJUQLF4ZW84wW+Jy+DJF9RSpafDWbn1DzZmA5YizvgP9Qhd2bu23MsMjSudvgMUmJD4apRBNfy8+w==}
+    peerDependencies:
+      react: '*'
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@turbo/darwin-64@2.10.7':
     resolution: {integrity: sha512-/c9cSBRermWDv85oufLhoH6XRLOVbvzJLRd+WLyfJCP+i0HFLQj4PVNDrHcY17/ve5l8X0Oua4bJBqJUgJPnZA==}
@@ -5093,6 +5136,9 @@ packages:
     resolution: {integrity: sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ==}
     engines: {node: '>=0.10.0'}
 
+  idb@8.0.3:
+    resolution: {integrity: sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==}
+
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
 
@@ -6861,6 +6907,9 @@ packages:
   socks@2.8.9:
     resolution: {integrity: sha512-LJhUYUvItdQ0LkJTmPeaEObWXAqFyfmP85x0tch/ez9cahmhlBBLbIqDFnvBnUJGagb0JbIQrkBs1wJ+yRYpEw==}
     engines: {node: '>= 10.0.0', npm: '>= 3.0.0'}
+
+  sorted-btree@1.8.1:
+    resolution: {integrity: sha512-395+XIP+wqNn3USkFSrNz7G3Ss/MXlZEqesxvzCRFwL14h6e8LukDHdLBePn5pwbm5OQ9vGu8mDyz2lLDIqamQ==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -10448,6 +10497,29 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
+  '@tandem/core@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/core(patch_hash=1050cb0b0f9ae409ece7327d0153528cdda024caeb23079f65fa70e5891ec315)(react@19.2.8)':
+    dependencies:
+      '@tandem/types': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
+      '@triplit/tuple-database': 2.2.33(react@19.2.8)
+      '@types/lodash-es': 4.17.12
+      idb: 8.0.3
+      lodash-es: 4.18.1
+      tuple-database: 2.2.4(react@19.2.8)
+    transitivePeerDependencies:
+      - react
+
+  '@tandem/server@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/server(patch_hash=afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1)(react@19.2.8)':
+    dependencies:
+      '@tandem/types': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
+    transitivePeerDependencies:
+      - react
+
+  '@tandem/types@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)':
+    dependencies:
+      tuple-database: 2.2.4(react@19.2.8)
+    transitivePeerDependencies:
+      - react
+
   '@tanishqkancharla/maui@0.0.2(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(supports-color@8.1.1)':
     dependencies:
       '@radix-ui/colors': 3.0.0
@@ -10722,6 +10794,18 @@ snapshots:
   '@tootallnate/once@2.0.1': {}
 
   '@tootallnate/quickjs-emscripten@0.23.0': {}
+
+  '@triplit/tuple-database@2.2.33(react@19.2.8)':
+    dependencies:
+      elen: 1.0.10
+      fractional-indexing: 3.4.0
+      fs-extra: 11.4.0
+      md5: 2.3.0
+      remeda: 2.33.4
+      sorted-btree: 1.8.1
+      uuid: 9.0.1
+    optionalDependencies:
+      react: 19.2.8
 
   '@turbo/darwin-64@2.10.7':
     optional: true
@@ -11100,14 +11184,6 @@ snapshots:
       magic-string: 0.30.21
     optionalDependencies:
       vite: 8.2.1(@types/node@22.15.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-
-  '@vitest/mocker@4.1.10(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
-    dependencies:
-      '@vitest/spy': 4.1.10
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
   '@vitest/pretty-format@4.1.10':
     dependencies:
@@ -13020,6 +13096,8 @@ snapshots:
   iconv-lite@0.7.3:
     dependencies:
       safer-buffer: 2.1.2
+
+  idb@8.0.3: {}
 
   ieee754@1.2.1: {}
 
@@ -15169,6 +15247,8 @@ snapshots:
       ip-address: 10.3.1
       smart-buffer: 4.2.0
 
+  sorted-btree@1.8.1: {}
+
   source-map-js@1.2.1: {}
 
   source-map-support@0.5.21:
@@ -15750,22 +15830,6 @@ snapshots:
       tsx: 4.23.1
       yaml: 2.9.0
 
-  vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0):
-    dependencies:
-      lightningcss: 1.33.0
-      picomatch: 4.0.5
-      postcss: 8.5.26
-      rolldown: 1.2.3
-      tinyglobby: 0.2.17
-    optionalDependencies:
-      '@types/node': 24.13.3
-      esbuild: 0.28.1
-      fsevents: 2.3.3
-      jiti: 2.7.0
-      terser: 5.49.0
-      tsx: 4.23.1
-      yaml: 2.9.0
-
   vitest@4.1.10(@types/node@22.15.3)(jsdom@30.0.1)(vite@8.2.1(@types/node@22.15.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       '@vitest/expect': 4.1.10
@@ -15790,34 +15854,6 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.15.3
-      jsdom: 30.0.1
-    transitivePeerDependencies:
-      - msw
-
-  vitest@4.1.10(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
-    dependencies:
-      '@vitest/expect': 4.1.10
-      '@vitest/mocker': 4.1.10(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-      '@vitest/pretty-format': 4.1.10
-      '@vitest/runner': 4.1.10
-      '@vitest/snapshot': 4.1.10
-      '@vitest/spy': 4.1.10
-      '@vitest/utils': 4.1.10
-      es-module-lexer: 2.3.1
-      expect-type: 1.4.0
-      magic-string: 0.30.21
-      obug: 2.1.4
-      pathe: 2.0.3
-      picomatch: 4.0.5
-      std-env: 4.2.0
-      tinybench: 2.9.0
-      tinyexec: 1.2.4
-      tinyglobby: 0.2.17
-      tinyrainbow: 3.1.0
-      vite: 8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-      why-is-node-running: 2.3.0
-    optionalDependencies:
-      '@types/node': 24.13.3
       jsdom: 30.0.1
     transitivePeerDependencies:
       - msw

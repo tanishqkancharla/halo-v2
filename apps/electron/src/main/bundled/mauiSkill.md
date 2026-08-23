@@ -1,5 +1,6 @@
 ---
 name: maui
+version: 1
 description: Conventions for consuming the Maui design system. Use when building UI with Maui tokens, components, or purse-styles in an app that depends on Maui.
 ---
 
