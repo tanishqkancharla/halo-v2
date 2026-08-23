@@ -6,6 +6,8 @@ import {
   googleService,
   type GoogleService,
 } from "../shared/GoogleCatalog.js";
+import { googleApiRequest } from "./GoogleApiRequest.js";
+import { refreshGoogleAccessToken } from "./GoogleOAuth.js";
 import {
   defaultIntegrationProfile,
   type ConnectionIntent,
@@ -31,7 +33,8 @@ type IntegrationToolPayload =
       service: string;
       profile: string;
       scopes: string[];
-    };
+    }
+  | { status: number; bodyText: string };
 
 const catalogParameters = Type.Object({
   service: Type.Optional(
@@ -204,9 +207,35 @@ export function createIntegrationTools(
           error: `${service.id} is not connected. Call integrations_connect.`,
         });
       }
-      return textResult({
-        error: "Google API calls are not wired yet.",
+      const tokens = await integrations.getTokens(connection.id);
+      if (tokens instanceof Error) return textResult({ error: tokens.message });
+      if (tokens === undefined) {
+        return textResult({
+          error: `${service.id} is not connected. Call integrations_connect.`,
+        });
+      }
+      const response = await googleApiRequest({
+        connection,
+        tokens,
+        method: params.method,
+        path: params.path,
+        query: params.query,
+        body: params.body,
+        refresh: async (current) => {
+          const refreshed = await refreshGoogleAccessToken(current);
+          if (refreshed instanceof Error) return refreshed;
+          const stored = await integrations.markConnected({
+            id: connection.id,
+            scopes: connection.scopes,
+            tokens: refreshed,
+          });
+          if (stored instanceof Error) return stored;
+          return refreshed;
+        },
       });
+      if (response instanceof Error)
+        return textResult({ error: response.message });
+      return textResult(response);
     },
   };
 

@@ -13,13 +13,18 @@ import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
 import { AsyncEventQueue } from "./AsyncEventQueue.js";
 import { orpcErrors } from "./orpcErrors.js";
-import { GoogleOAuthError, runGoogleLoopbackOAuth } from "./GoogleOAuth.js";
+import {
+  GoogleOAuthError,
+  revokeGoogleToken,
+  runGoogleLoopbackOAuth,
+} from "./GoogleOAuth.js";
 import {
   ConnectionNotFoundError,
   type IntegrationService,
 } from "./IntegrationService.js";
 import {
   integrationConnectedEventText,
+  integrationDisconnectedEventText,
   notifyIntegrationEvent,
 } from "./notifyIntegrationConnected.js";
 import type { PiService } from "./pi-service.js";
@@ -278,34 +283,88 @@ export const router = {
         });
         if (connected instanceof Error) return orpcErrors.badRequest(connected);
 
-        // Reloading the renderer closes the RPC port and clears the session map.
-        const session = await (async () => {
-          const live = context.sessions.get(input.sessionId);
-          if (!(live instanceof Error)) return live;
-          const opened = await context.pi.openAgentSession(input.sessionId);
-          if (opened instanceof Error) return opened;
-          context.sessions.add(opened);
-          return opened;
-        })();
-        if (session instanceof Error) {
-          console.warn(
-            "Connected but could not notify the agent:",
-            session.message,
-          );
-          return connected;
-        }
-        void notifyIntegrationEvent({
-          session,
+        notifySession({
+          context,
+          sessionId: input.sessionId,
           customType: "halo.integration.connected",
           content: integrationConnectedEventText(connected),
-        }).then((notified) => {
-          if (notified instanceof Error) {
-            console.warn("Failed to notify the agent after connect:", notified);
-          }
+          failed: "Connected but could not notify the agent:",
         });
 
         return connected;
       },
     ),
+    disconnect: os.integrations.disconnect.handler(
+      async ({ input, context }) => {
+        context.logger.info({
+          event: "integrations.disconnect",
+          connectionId: input.connectionId,
+          sessionId: input.sessionId,
+        });
+        const connection = await context.integrations.get(input.connectionId);
+        if (connection instanceof Error)
+          return orpcErrors.badRequest(connection);
+        if (connection === undefined) {
+          return orpcErrors.badRequest(
+            new ConnectionNotFoundError({ id: input.connectionId }),
+          );
+        }
+
+        const tokens = await context.integrations.getTokens(connection.id);
+        if (tokens instanceof Error) return orpcErrors.badRequest(tokens);
+        if (tokens !== undefined) {
+          const token =
+            tokens.refreshToken === undefined
+              ? tokens.accessToken
+              : tokens.refreshToken;
+          const revoked = await revokeGoogleToken(token);
+          if (revoked instanceof Error) return orpcErrors.badRequest(revoked);
+        }
+
+        const removed = await context.integrations.remove(connection.id);
+        if (removed instanceof Error) return orpcErrors.badRequest(removed);
+
+        notifySession({
+          context,
+          sessionId: input.sessionId,
+          customType: "halo.integration.disconnected",
+          content: integrationDisconnectedEventText(connection.service),
+          failed: "Disconnected but could not notify the agent:",
+        });
+      },
+    ),
   },
 };
+
+async function resolveLiveSession(context: HaloContext, sessionId: string) {
+  const live = context.sessions.get(sessionId);
+  if (!(live instanceof Error)) return live;
+  const opened = await context.pi.openAgentSession(sessionId);
+  if (opened instanceof Error) return opened;
+  context.sessions.add(opened);
+  return opened;
+}
+
+function notifySession(input: {
+  context: HaloContext;
+  sessionId: string;
+  customType: "halo.integration.connected" | "halo.integration.disconnected";
+  content: string;
+  failed: string;
+}) {
+  void resolveLiveSession(input.context, input.sessionId).then((session) => {
+    if (session instanceof Error) {
+      console.warn(input.failed, session.message);
+      return;
+    }
+    void notifyIntegrationEvent({
+      session,
+      customType: input.customType,
+      content: input.content,
+    }).then((notified) => {
+      if (notified instanceof Error) {
+        console.warn(input.failed, notified);
+      }
+    });
+  });
+}

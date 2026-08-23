@@ -18,6 +18,7 @@ export const HALO_GOOGLE_OAUTH_CLIENT_SECRET =
 
 const googleAuthorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth";
 const googleTokenUrl = "https://oauth2.googleapis.com/token";
+const googleRevokeUrl = "https://oauth2.googleapis.com/revoke";
 const closeTabHtml =
   '<!doctype html><html><head><meta charset="utf-8"><title>Halo</title></head><body>You can close this tab</body></html>';
 
@@ -82,6 +83,63 @@ export async function runGoogleLoopbackOAuth(input: {
     code: authorized.code,
     redirectUri,
     verifier,
+  });
+}
+
+export async function refreshGoogleAccessToken(tokens: StoredTokens) {
+  if (tokens.refreshToken === undefined) {
+    return new GoogleOAuthError({ reason: "No refresh token to renew access" });
+  }
+  const body = new URLSearchParams({
+    client_id: HALO_GOOGLE_OAUTH_CLIENT_ID,
+    client_secret: HALO_GOOGLE_OAUTH_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: tokens.refreshToken,
+  });
+  const response = await fetch(googleTokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  }).catch(
+    (e) => new GoogleOAuthError({ reason: "Token refresh failed", cause: e }),
+  );
+  if (response instanceof Error) return response;
+  const parsed = await readTokenResponse(response, "Token refresh failed");
+  if (parsed instanceof Error) return parsed;
+  return {
+    accessToken: parsed.accessToken,
+    refreshToken:
+      parsed.refreshToken === undefined
+        ? tokens.refreshToken
+        : parsed.refreshToken,
+    expiresAtMs: parsed.expiresAtMs,
+    tokenType: parsed.tokenType,
+  };
+}
+
+export async function revokeGoogleToken(token: string) {
+  const body = new URLSearchParams({ token });
+  const response = await fetch(googleRevokeUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  }).catch(
+    (e) => new GoogleOAuthError({ reason: "Token revoke failed", cause: e }),
+  );
+  if (response instanceof Error) return response;
+  if (response.ok) return;
+  const detail = await response.text().catch(
+    (e) =>
+      new GoogleOAuthError({
+        reason: `Token revoke failed (${response.status})`,
+        cause: e,
+      }),
+  );
+  if (detail instanceof Error) return detail;
+  // Google returns 400 when the token is already gone.
+  if (response.status === 400) return;
+  return new GoogleOAuthError({
+    reason: `Token revoke failed (${response.status}): ${detail}`,
   });
 }
 
@@ -207,17 +265,21 @@ async function exchangeCode(input: {
     (e) => new GoogleOAuthError({ reason: "Token exchange failed", cause: e }),
   );
   if (response instanceof Error) return response;
+  return readTokenResponse(response, "Token exchange failed");
+}
+
+async function readTokenResponse(response: Response, failed: string) {
   if (!response.ok) {
     const detail = await response.text().catch(
       (e) =>
         new GoogleOAuthError({
-          reason: `Token exchange failed (${response.status})`,
+          reason: `${failed} (${response.status})`,
           cause: e,
         }),
     );
     if (detail instanceof Error) return detail;
     return new GoogleOAuthError({
-      reason: `Token exchange failed (${response.status}): ${detail}`,
+      reason: `${failed} (${response.status}): ${detail}`,
     });
   }
 

@@ -55,6 +55,24 @@ export function IntegrationCard({
       console.warn("Google OAuth failed:", error);
     },
   });
+  const disconnect = useMutation({
+    mutationFn: () => {
+      // SAFETY: the button is disabled until both ids are strings.
+      return api.integrations.disconnect({
+        connectionId: connectionId as string,
+        sessionId: sessionId as string,
+      });
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(
+        ["integrations", "get", connectionId],
+        undefined,
+      );
+    },
+    onError: (error) => {
+      console.warn("Google disconnect failed:", error);
+    },
+  });
 
   const disconnected = query.isSuccess && query.data === undefined;
   const live = query.data;
@@ -101,15 +119,18 @@ export function IntegrationCard({
         ) : (
           <Button
             disabled={
-              view.button !== "Disconnect" &&
-              (startOAuth.isPending ||
-                connectionId === undefined ||
-                sessionId === undefined)
+              startOAuth.isPending ||
+              disconnect.isPending ||
+              connectionId === undefined ||
+              sessionId === undefined
             }
             onClick={() => {
-              if (view.button === "Disconnect") return;
               if (connectionId === undefined) return;
               if (sessionId === undefined) return;
+              if (view.button === "Disconnect") {
+                disconnect.mutate();
+                return;
+              }
               startOAuth.mutate();
             }}
           >
