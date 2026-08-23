@@ -1,4 +1,4 @@
-import { dialog, type BrowserWindow } from "electron";
+import { dialog, shell, type BrowserWindow } from "electron";
 import { implement } from "@orpc/server";
 import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
@@ -13,7 +13,11 @@ import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
 import { AsyncEventQueue } from "./AsyncEventQueue.js";
 import { orpcErrors } from "./orpcErrors.js";
-import type { IntegrationService } from "./IntegrationService.js";
+import { GoogleOAuthError, runGoogleLoopbackOAuth } from "./GoogleOAuth.js";
+import {
+  ConnectionNotFoundError,
+  type IntegrationService,
+} from "./IntegrationService.js";
 import type { PiService } from "./pi-service.js";
 import type { PluginService } from "./plugins/PluginService.js";
 import type { WorkspaceService } from "./workspace-service.js";
@@ -204,5 +208,73 @@ export const router = {
       if (connection instanceof Error) return orpcErrors.badRequest(connection);
       return connection;
     }),
+    startOAuth: os.integrations.startOAuth.handler(
+      async ({ input, context }) => {
+        context.logger.info({
+          event: "integrations.startOAuth",
+          connectionId: input.connectionId,
+          sessionId: input.sessionId,
+        });
+        const connection = await context.integrations.get(input.connectionId);
+        if (connection instanceof Error)
+          return orpcErrors.badRequest(connection);
+        if (connection === undefined) {
+          return orpcErrors.badRequest(
+            new ConnectionNotFoundError({ id: input.connectionId }),
+          );
+        }
+        if (
+          connection.intent === "disconnect" ||
+          connection.scopes.length === 0
+        ) {
+          return orpcErrors.badRequest(
+            new GoogleOAuthError({ reason: "Disconnect is not OAuth." }),
+          );
+        }
+
+        const previousTokens = await context.integrations.getTokens(
+          connection.id,
+        );
+        if (previousTokens instanceof Error)
+          return orpcErrors.badRequest(previousTokens);
+
+        const tokens = await runGoogleLoopbackOAuth({
+          scopes: connection.scopes,
+          // Electron shell.openExternal uses the OS default browser.
+          openUrl: (url) =>
+            shell
+              .openExternal(url)
+              .then(() => undefined)
+              .catch(
+                (e) =>
+                  new GoogleOAuthError({
+                    reason: "Failed to open the default browser",
+                    cause: e,
+                  }),
+              ),
+        });
+        if (tokens instanceof Error) return orpcErrors.badRequest(tokens);
+
+        const refreshToken = (() => {
+          if (tokens.refreshToken !== undefined) return tokens.refreshToken;
+          if (previousTokens === undefined) return undefined;
+          // Google omits refresh_token on later grants.
+          return previousTokens.refreshToken;
+        })();
+
+        const connected = await context.integrations.markConnected({
+          id: connection.id,
+          scopes: tokens.grantedScopes,
+          tokens: {
+            accessToken: tokens.accessToken,
+            refreshToken,
+            expiresAtMs: tokens.expiresAtMs,
+            tokenType: tokens.tokenType,
+          },
+        });
+        if (connected instanceof Error) return orpcErrors.badRequest(connected);
+        return connected;
+      },
+    ),
   },
 };

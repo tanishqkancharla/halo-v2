@@ -43,6 +43,9 @@ export const contract = {
     get: oc
       .input(type<{ connectionId: string }>())
       .output(type<IntegrationConnection | undefined>()),
+    startOAuth: oc
+      .input(type<{ connectionId: string; sessionId: string }>())
+      .output(type<IntegrationConnection>()),
   },
 };
 

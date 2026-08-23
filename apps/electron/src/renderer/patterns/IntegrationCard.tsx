@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   Flex,
@@ -27,6 +27,7 @@ export function IntegrationCard({
   part: IntegrationConnectPart;
 }) {
   const api = useApi();
+  const queryClient = useQueryClient();
   const connectionId = part.connectionId;
   const query = useQuery({
     queryKey: ["integrations", "get", connectionId],
@@ -35,6 +36,24 @@ export function IntegrationCard({
       return api.integrations.get({ connectionId: connectionId as string });
     },
     enabled: connectionId !== undefined,
+  });
+  const startOAuth = useMutation({
+    mutationFn: () => {
+      // SAFETY: the button is disabled until both ids are strings.
+      return api.integrations.startOAuth({
+        connectionId: connectionId as string,
+        sessionId: sessionId as string,
+      });
+    },
+    onSuccess: (connection) => {
+      queryClient.setQueryData(
+        ["integrations", "get", connectionId],
+        connection,
+      );
+    },
+    onError: (error) => {
+      console.warn("Google OAuth failed:", error);
+    },
   });
 
   const disconnected = query.isSuccess && query.data === undefined;
@@ -80,7 +99,22 @@ export function IntegrationCard({
         {view.button === undefined ? (
           <div className={statusLabel}>{view.statusText}</div>
         ) : (
-          <Button onClick={() => undefined}>{view.button}</Button>
+          <Button
+            disabled={
+              view.button !== "Disconnect" &&
+              (startOAuth.isPending ||
+                connectionId === undefined ||
+                sessionId === undefined)
+            }
+            onClick={() => {
+              if (view.button === "Disconnect") return;
+              if (connectionId === undefined) return;
+              if (sessionId === undefined) return;
+              startOAuth.mutate();
+            }}
+          >
+            {view.button}
+          </Button>
         )}
       </Flex>
     </section>
