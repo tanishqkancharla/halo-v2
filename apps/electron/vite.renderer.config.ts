@@ -12,6 +12,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // Tandem Logger.ts imports node:fs at module load.
       "node:fs": fileURLToPath(
         new URL("./src/renderer/emptyNodeFs.ts", import.meta.url),
       ),

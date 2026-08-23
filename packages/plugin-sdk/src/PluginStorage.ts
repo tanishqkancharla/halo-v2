@@ -5,32 +5,29 @@ import type {
   RuntimeRelationsDefinition,
   RuntimeSchemaDefinition,
 } from "@tandem/core";
-import type { AnySchema, RemoteApi } from "@tandem/types";
+import type { AnySchema, CollectionName, RemoteApi } from "@tandem/types";
 import * as errore from "errore";
 import {
   createContext,
   createElement,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { orpcSyncRemote } from "./OrpcSyncRemote.js";
 import {
-  PluginRuntimeContext,
-  PluginRuntimeMissingError,
-  type PluginRuntimeValue,
-} from "./PluginRuntime.js";
+  PluginServerMissingError,
+  PluginServerProviderContext,
+  type PluginServerValue,
+} from "./PluginServerProvider.js";
 
 export class PluginStorageMissingError extends errore.createTaggedError({
   name: "PluginStorageMissingError",
   message: "usePluginQuery must run inside PluginStorageProvider",
 }) {}
-
-export type PluginTransaction<Schema extends AnySchema> = {
-  transact: () => Transaction<Schema>;
-  commit: (tx: Transaction<Schema>) => Promise<void>;
-};
 
 const PluginStorageContext = createContext<unknown>(undefined);
 
@@ -41,13 +38,13 @@ export function PluginStorageProvider<Schema extends AnySchema>(args: {
   sync?: RemoteApi<Schema>;
   children: ReactNode;
 }): ReactNode {
-  const runtime = useContext(PluginRuntimeContext);
-  if (runtime === undefined) throw new PluginRuntimeMissingError();
+  const runtime = useContext(PluginServerProviderContext);
+  if (runtime === undefined) throw new PluginServerMissingError();
   const remote =
     args.sync !== undefined
       ? args.sync
       : remoteFromServer<Schema>(runtime.server);
-  if (remote === undefined) throw new PluginRuntimeMissingError();
+  if (remote === undefined) throw new PluginServerMissingError();
   const client = pluginClient({
     pluginId: runtime.pluginId,
     tables: args.tables,
@@ -65,31 +62,91 @@ export function usePluginQuery<
   Query extends RelationalQuery<Schema, Relations>,
   Relations extends RuntimeRelationsDefinition<Schema> =
     RuntimeRelationsDefinition<Schema>,
->(query: Query): RelationalQueryResult<Schema, Relations, Query> {
+>(query: Query): RelationalQueryResult<Schema, Relations, Query>;
+export function usePluginQuery<
+  Schema extends AnySchema,
+  Query extends RelationalQuery<Schema, Relations>,
+  Relations extends RuntimeRelationsDefinition<Schema> =
+    RuntimeRelationsDefinition<Schema>,
+>(
+  query: Query | undefined,
+): RelationalQueryResult<Schema, Relations, Query> | undefined;
+export function usePluginQuery<
+  Schema extends AnySchema,
+  Query extends RelationalQuery<Schema, Relations>,
+  Relations extends RuntimeRelationsDefinition<Schema> =
+    RuntimeRelationsDefinition<Schema>,
+>(
+  query: Query | undefined,
+): RelationalQueryResult<Schema, Relations, Query> | undefined {
   const client = useContext(PluginStorageContext);
   if (client === undefined) throw new PluginStorageMissingError();
   // SAFETY: PluginStorageProvider constructs this client with the plugin schema.
   const typed = client as TandemClient<Schema, Relations>;
-  const [result, setResult] = useState(() => typed.query(query));
-  useEffect(() => typed.subscribe(query, setResult).destroy, [typed, query]);
-  return result;
+  const [value, setValue] = useState(() => {
+    if (query === undefined) return undefined;
+    return typed.query(query);
+  });
+  useEffect(() => {
+    if (query === undefined) {
+      // Tandem subscribe does not emit the first result through the callback.
+      // oxlint-disable-next-line react/set-state-in-effect
+      setValue(undefined);
+      return undefined;
+    }
+    const { destroy, result } = typed.subscribe(query, (nextValue) => {
+      setValue(nextValue);
+    });
+    // Tandem subscribe does not emit the first result through the callback.
+    // oxlint-disable-next-line react/set-state-in-effect
+    setValue(result);
+    return destroy;
+  }, [typed, query]);
+  return value;
 }
 
 export function usePluginTransaction<
   Schema extends AnySchema,
->(): PluginTransaction<Schema> {
+  Args extends unknown[],
+>(
+  callback: (tx: Transaction<Schema>, ...args: Args) => void,
+): (...args: Args) => void {
   const client = useContext(PluginStorageContext);
   if (client === undefined) throw new PluginStorageMissingError();
   // SAFETY: PluginStorageProvider constructs this client with the plugin schema.
   const typed = client as TandemClient<Schema>;
-  return {
-    transact: () => typed.transact(),
-    commit: (tx) => typed.commit(tx),
-  };
+  return useCallback(
+    (...args: Args) => {
+      const tx = typed.transact();
+      callback(tx, ...args);
+      void typed.commit(tx);
+    },
+    [callback, typed],
+  );
+}
+
+export function usePluginEntity<
+  Schema extends AnySchema,
+  Collection extends CollectionName<Schema>,
+>(
+  collection: Collection,
+  id: Schema[Collection]["id"] | undefined,
+): Schema[Collection] | undefined {
+  const query = useMemo(() => {
+    if (id === undefined) return undefined;
+    return {
+      collection,
+      where: { id },
+    };
+  }, [collection, id]);
+  const rows = usePluginQuery(query);
+  if (rows === undefined) return undefined;
+  // SAFETY: a query of one collection with where id returns that collection's row.
+  return rows[0] as Schema[Collection] | undefined;
 }
 
 function remoteFromServer<Schema extends AnySchema>(
-  server: PluginRuntimeValue["server"],
+  server: PluginServerValue["server"],
 ) {
   if (server === undefined) return undefined;
   // SAFETY: default remote is syncRoutes; RouterClient<AnyRouter> cannot name it.

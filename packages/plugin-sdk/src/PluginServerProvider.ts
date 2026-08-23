@@ -7,37 +7,37 @@ import {
   type ReactNode,
 } from "react";
 
-export type PluginRuntimeValue = {
+export type PluginServerValue = {
   pluginId: string;
   server?: RouterClient<AnyRouter>;
 };
 
-export const PluginRuntimeContext = createContext<
-  PluginRuntimeValue | undefined
+export const PluginServerProviderContext = createContext<
+  PluginServerValue | undefined
 >(undefined);
 
-export function PluginRuntimeProvider(args: {
+export function PluginServerProvider(args: {
   pluginId: string;
   server?: RouterClient<AnyRouter>;
   children: ReactNode;
 }) {
   return createElement(
-    PluginRuntimeContext.Provider,
+    PluginServerProviderContext.Provider,
     { value: { pluginId: args.pluginId, server: args.server } },
     args.children,
   );
 }
 
-export class PluginRuntimeMissingError extends errore.createTaggedError({
-  name: "PluginRuntimeMissingError",
+export class PluginServerMissingError extends errore.createTaggedError({
+  name: "PluginServerMissingError",
   message: "usePluginServer must run inside a Halo plugin view",
 }) {}
 
 // Import the plugin router as a type only: import type router from "./server.ts"
 export function usePluginServer<T extends AnyRouter>(): RouterClient<T> {
-  const runtime = useContext(PluginRuntimeContext);
-  if (runtime === undefined) throw new PluginRuntimeMissingError();
-  if (runtime.server === undefined) throw new PluginRuntimeMissingError();
+  const runtime = useContext(PluginServerProviderContext);
+  if (runtime === undefined) throw new PluginServerMissingError();
+  if (runtime.server === undefined) throw new PluginServerMissingError();
   // SAFETY: this view is compiled against router T; the host client is that router.
   return runtime.server as RouterClient<T>;
 }

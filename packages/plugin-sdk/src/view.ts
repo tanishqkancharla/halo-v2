@@ -109,15 +109,15 @@ export {
   sidebarSection,
 } from "./SidebarSection.js";
 export {
-  PluginRuntimeMissingError,
-  PluginRuntimeProvider,
+  PluginServerMissingError,
+  PluginServerProvider,
   usePluginServer,
-  type PluginRuntimeValue,
-} from "./PluginRuntime.js";
+  type PluginServerValue,
+} from "./PluginServerProvider.js";
 export {
   PluginStorageMissingError,
   PluginStorageProvider,
+  usePluginEntity,
   usePluginQuery,
   usePluginTransaction,
-  type PluginTransaction,
 } from "./PluginStorage.js";

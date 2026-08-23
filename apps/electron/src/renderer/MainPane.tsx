@@ -1,4 +1,4 @@
-import { PluginRuntimeProvider } from "@halo/plugin-sdk/view";
+import { PluginServerProvider } from "@halo/plugin-sdk/view";
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Route, Switch, useLocation } from "wouter";
@@ -68,12 +68,12 @@ export function MainPane({
             return <MissingPlugin pluginId={params.pluginId} />;
           }
           return (
-            <PluginRuntimeProvider
+            <PluginServerProvider
               pluginId={plugin.id}
               server={pluginServers[plugin.id]}
             >
               <plugin.Routes />
-            </PluginRuntimeProvider>
+            </PluginServerProvider>
           );
         }}
       </Route>

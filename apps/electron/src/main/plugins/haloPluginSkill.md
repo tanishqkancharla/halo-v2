@@ -208,22 +208,21 @@ export function Routes() {
 
 function Home() {
   const todos = usePluginQuery({ collection: "todos" });
-  const { transact, commit } = usePluginTransaction();
+  const addTodo = usePluginTransaction((tx, title: string) => {
+    tx.set("todos", { id: crypto.randomUUID(), title, done: false });
+  });
+  const toggleTodo = usePluginTransaction(
+    (tx, todo: (typeof todos)[number]) => {
+      tx.set("todos", { ...todo, done: !todo.done });
+    },
+  );
   const [title, setTitle] = useState("");
 
-  async function add() {
+  function add() {
     const trimmed = title.trim();
     if (trimmed.length === 0) return;
-    const tx = transact();
-    tx.set("todos", { id: crypto.randomUUID(), title: trimmed, done: false });
-    await commit(tx);
+    addTodo(trimmed);
     setTitle("");
-  }
-
-  async function toggle(todo: (typeof todos)[number]) {
-    const tx = transact();
-    tx.set("todos", { ...todo, done: !todo.done });
-    await commit(tx);
   }
 
   return (
@@ -247,7 +246,7 @@ function Home() {
               label={todo.title}
               checked={todo.done}
               setChecked={() => {
-                void toggle(todo);
+                toggleTodo(todo);
               }}
             />
           </Flex>
