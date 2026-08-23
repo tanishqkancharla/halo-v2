@@ -10,10 +10,20 @@ import type { AgentSessionState } from "./AgentSessionState.js";
 import type {
   AppInfo,
   PluginList,
+  PluginLoadError,
   SessionSummary,
   WorkspaceInfo,
   WorkspaceTreeEvent,
 } from "./rpc.js";
+
+export const reservedPluginIds = ["new", "build", "types"] as const;
+
+export type PluginTypeDiagnostic = {
+  id: string;
+  file: string;
+  line: number;
+  message: string;
+};
 
 export const contract = {
   getAppInfo: oc.output(type<AppInfo>()),
@@ -37,6 +47,19 @@ export const contract = {
     prompt: oc.input(type<{ sessionId: string; text: string }>()),
     abort: oc.input(type<{ sessionId: string }>()),
     close: oc.input(type<{ sessionId: string }>()),
+  },
+  plugin: {
+    create: oc
+      .input(type<{ id: string }>())
+      .output(type<{ id: string; directory: string }>()),
+    build: oc.output(type<{ built: string[]; errors: PluginLoadError[] }>()),
+    types:
+      oc.output(
+        type<{
+          written: string[];
+          diagnostics: PluginTypeDiagnostic[];
+        }>(),
+      ),
   },
 };
 

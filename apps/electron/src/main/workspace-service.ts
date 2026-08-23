@@ -8,12 +8,13 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { basename, join, relative, sep } from "node:path";
+import { basename, delimiter, join, relative, sep } from "node:path";
 import * as watcher from "@parcel/watcher";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import type { WorkspaceTreeEvent } from "../shared/rpc.js";
+import { haloCliBinDir, installHaloCli } from "./installHaloCli.js";
 import { seedPluginWorkspace } from "./plugins/seedPluginWorkspace.js";
 
 export type WorkspaceLayout = {
@@ -160,13 +161,21 @@ function removeDirectoryAndDescendants(
   }
 }
 
+export type WorkspaceServiceOptions = {
+  appVersion: string;
+  cliEntry?: string;
+};
+
 export class WorkspaceService {
   private state: WorkspaceState = { status: "notStarted" };
   private treeListener: TreeListener | undefined;
   private watchSubscription: watcher.AsyncSubscription | undefined;
   private directoryPaths = new Set<string>();
 
-  constructor(private readonly appDataDir: string) {}
+  constructor(
+    private readonly appDataDir: string,
+    private readonly options: WorkspaceServiceOptions = { appVersion: "0.0.0" },
+  ) {}
 
   getWorkspace(): WorkspaceInfo | undefined {
     if (this.state.status === "notStarted") return undefined;
@@ -238,8 +247,20 @@ export class WorkspaceService {
     }).catch((e) => new WorkspaceIoError({ cause: e }));
     if (sessionDir instanceof Error) return sessionDir;
 
-    const seeded = await seedPluginWorkspace(layout);
+    const seeded = await seedPluginWorkspace(layout, {
+      appVersion: this.options.appVersion,
+    });
     if (seeded instanceof Error) return seeded;
+
+    if (this.options.cliEntry !== undefined) {
+      const installed = await installHaloCli({
+        workspaceRoot: root,
+        appVersion: this.options.appVersion,
+        cliEntry: this.options.cliEntry,
+      });
+      if (installed instanceof Error) return installed;
+    }
+    prependHaloCliPath(root);
 
     const preference = await writeWorkspacePreference(this.appDataDir, root);
     if (preference instanceof Error) return preference;
@@ -417,6 +438,17 @@ async function writeWorkspacePreference(
     { mode: 0o600 },
   ).catch((e) => new WorkspaceIoError({ cause: e }));
   if (written instanceof Error) return written;
+}
+
+function prependHaloCliPath(workspaceRoot: string) {
+  const binDir = haloCliBinDir(workspaceRoot);
+  const path = process.env.PATH;
+  if (path === undefined) {
+    process.env.PATH = binDir;
+    return;
+  }
+  if (path.split(delimiter).includes(binDir)) return;
+  process.env.PATH = `${binDir}${delimiter}${path}`;
 }
 
 async function clearWorkspacePreference(appDataDir: string) {

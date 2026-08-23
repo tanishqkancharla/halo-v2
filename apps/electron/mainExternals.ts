@@ -4,6 +4,7 @@ export const mainProcessExternals = [
   "@parcel/watcher",
   "esbuild",
   "jiti",
+  "typescript6",
 ] as const;
 
 // jiti loads plugin servers from disk. Those files import this package, so

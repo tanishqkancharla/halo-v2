@@ -12,6 +12,17 @@ Plugins live in `{workspace}/.halo/plugins/<id>/`. The folder name is the plugin
 
 Write plugin code only in that folder. Do not edit Halo app source.
 
+Halo must be running. Use the `halo` CLI (on PATH in the app, or `pnpm halo` in the Halo repo). `new`, `build`, and `types` are reserved ids.
+
+1. `halo plugin new <id>` — scaffold the plugin folder
+2. Edit sources in that folder
+3. `halo plugin types` — refresh declarations and typecheck. Fix errors here.
+4. `halo plugin build` — write `dist/view.js`
+5. Reload (View → Reload, or Cmd-R / Ctrl-R)
+6. `halo plugin <id> <endpoint>` — call the plugin server (example: `halo plugin notes ping`)
+
+Do not compile the view yourself. Halo reads `dist/view.js` on load. A missing file is a load error for that plugin only.
+
 ## Layout
 
 Required:
@@ -26,15 +37,11 @@ Optional:
 - `server.ts` (or `server/index.ts`) with a default oRPC router
 - `storage.ts` with Tandem collections from `@halo/plugin-sdk/storage`
 
-Halo loads plugins when the workspace is ready. Reload (View → Reload, or Cmd-R / Ctrl-R) to pick up plugin edits.
-
 ## View bundle
 
-Halo compiles the plugin view with esbuild on load. Read `{{HALO_COMPILE_PLUGIN_VIEW}}` for the config it runs. Do not edit that file.
+`halo plugin build` compiles the view with esbuild. Packages Halo already ships are external: `react`, `maui`, `purse-styles`, `wouter`, `@halo/plugin-sdk/view`. Import UI from `@halo/plugin-sdk/view`. That module is Maui, purse-styles (`style`, `useStyles`), and wouter. Read the `maui` skill for tokens, shadows, focus, and Flex spacing. Import those names from `@halo/plugin-sdk/view`, not `"maui"`. Do not wrap `MauiProvider`. Do not `npm install` `react`, `maui`, `purse-styles`, or `wouter`.
 
-Packages in `external` are Halo's copies. Import UI from `@halo/plugin-sdk/view`. That module is Maui, purse-styles (`style`, `useStyles`), and wouter. Read the `maui` skill for tokens, shadows, focus, and Flex spacing. Import those names from `@halo/plugin-sdk/view`, not `"maui"`. Do not wrap `MauiProvider`. Do not `npm install` `react`, `maui`, `purse-styles`, or `wouter`.
-
-Other packages are allowed. Add them to that plugin's `package.json`, run `npm install` in the plugin folder, then reload. esbuild inlines them. A missing package fails compile.
+Other packages are allowed. Add them to that plugin's `package.json`, run `npm install` in the plugin folder, then `halo plugin build`. esbuild inlines them. A missing package fails the build.
 
 Import `pluginOs` and `syncRoutes` from `@halo/plugin-sdk/server`. Import `collection`, `defineSchema`, and `t` from `@halo/plugin-sdk/storage`. Parse JSON with `parseVersioned` from `@halo/plugin-sdk/schema`.
 

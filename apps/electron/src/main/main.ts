@@ -26,9 +26,11 @@ import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
+import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
+import { resolveHaloCliEntry } from "./installHaloCli.js";
 import { PiService } from "./pi-service.js";
 import { PluginService } from "./plugins/PluginService.js";
-import { router, type HaloContext } from "./router.js";
+import { haloRpcRouter, type HaloContext } from "./router.js";
 import { UserService } from "./UserService.js";
 import { WorkspaceService } from "./workspace-service.js";
 
@@ -66,16 +68,43 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
   app.commandLine.appendSwitch("disable-gpu-sandbox");
 }
 
-const workspaceService = new WorkspaceService(applicationConfig.dataDir);
+process.env.HALO_USER_DATA = applicationConfig.dataDir;
+
+const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
+  appVersion: app.getVersion(),
+  cliEntry: resolveHaloCliEntry(import.meta.url),
+});
 const userService = new UserService(applicationConfig.dataDir);
 const piService = new PiService(workspaceService, userService);
 const pluginService = new PluginService(workspaceService);
 let mainWindow: BrowserWindow | undefined;
+let rpcHttp: HaloRpcHttp | undefined;
 
 app.whenReady().then(async () => {
   await workspaceService.restore();
   registerLogBridge();
   registerRpcBridge();
+  const listening = await listenHaloRpcHttp({
+    context: {
+      workspace: workspaceService,
+      pi: piService,
+      plugins: pluginService,
+      sessions: new AgentSessionRegistry(),
+      getWindow: () => {
+        if (mainWindow === undefined) {
+          throw new Error("Halo main window is not open.");
+        }
+        return mainWindow;
+      },
+      logger: rpcLogger,
+    },
+    userDataDir: applicationConfig.dataDir,
+  });
+  if (listening instanceof Error) {
+    logger.error({ event: "rpc-http-listen-failed", error: listening });
+  } else {
+    rpcHttp = listening;
+  }
   installMenu();
   openMainWindow();
   startAppUpdates({
@@ -93,8 +122,18 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("will-quit", () => {
-  logger.destroy();
+app.on("will-quit", (event) => {
+  if (rpcHttp === undefined) {
+    logger.destroy();
+    return;
+  }
+  event.preventDefault();
+  const pending = rpcHttp;
+  rpcHttp = undefined;
+  void pending.close().finally(() => {
+    logger.destroy();
+    app.quit();
+  });
 });
 
 function openMainWindow(): void {
@@ -164,12 +203,11 @@ function registerRpcBridge(): void {
       throw new Error("Halo rejected RPC without a sender frame.");
     }
     const { port1, port2 } = new MessageChannelMain();
-    const sessions = new AgentSessionRegistry();
     const context: HaloContext = {
       workspace: workspaceService,
       pi: piService,
       plugins: pluginService,
-      sessions,
+      sessions: new AgentSessionRegistry(),
       getWindow: () => {
         if (mainWindow === undefined) {
           throw new Error("Halo main window is not open.");
@@ -178,24 +216,21 @@ function registerRpcBridge(): void {
       },
       logger: rpcLogger,
     };
-    const handler = new RPCHandler(
-      { ...router, plugins: pluginService.lazyRouter },
-      {
-        interceptors: [
-          onError((error) => {
-            if (error instanceof Error) {
-              rpcLogger.warn({ event: "orpc", error });
-              return;
-            }
-            rpcLogger.warn({ event: "orpc", error: String(error) });
-          }),
-        ],
-      },
-    );
+    const handler = new RPCHandler(haloRpcRouter(pluginService), {
+      interceptors: [
+        onError((error) => {
+          if (error instanceof Error) {
+            rpcLogger.warn({ event: "orpc", error });
+            return;
+          }
+          rpcLogger.warn({ event: "orpc", error: String(error) });
+        }),
+      ],
+    });
     handler.upgrade(port1, { context });
     port1.start();
     port1.on("close", () => {
-      sessions.closeAll();
+      context.sessions.closeAll();
     });
     // Electron's postMessage payload; the ports carry the RPC transport.
     // oxlint-disable-next-line unicorn/no-null

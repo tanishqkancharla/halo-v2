@@ -8,11 +8,13 @@
     "./server": "./src/server.ts",
     "./schema": "./src/schema.ts",
     "./storage": "./src/storage.ts",
-    "./shared": "./src/AsyncEventQueue.ts"
+    "./shared": "./src/AsyncEventQueue.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings .",
-    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix .",
+    "build:types": "node scripts/buildBundledDts.mjs",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src scripts",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src scripts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "test": "vitest run src",

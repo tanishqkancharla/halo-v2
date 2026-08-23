@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import * as errore from "errore";
 import type { CompiledPluginView } from "../../shared/plugin.js";
@@ -20,11 +21,17 @@ export class PluginViewCompileError extends errore.createTaggedError({
   message: "Plugin '$id' view failed to compile: $detail",
 }) {}
 
+export class PluginViewDistError extends errore.createTaggedError({
+  name: "PluginViewDistError",
+  message: "Plugin '$id' is missing dist/view.js. Run halo plugin build.",
+}) {}
+
 export async function compilePluginView(args: {
   id: string;
   directory: string;
   viewPath: string;
-}): Promise<PluginViewCompileError | CompiledPluginView> {
+  outfile: string;
+}): Promise<PluginViewCompileError | { id: string; outfile: string }> {
   const esbuild = await loadEsbuild();
   const built = await Promise.resolve()
     .then(() =>
@@ -32,7 +39,8 @@ export async function compilePluginView(args: {
         absWorkingDir: args.directory,
         entryPoints: [args.viewPath],
         bundle: true,
-        write: false,
+        write: true,
+        outfile: args.outfile,
         format: "cjs",
         platform: "browser",
         jsx: "automatic",
@@ -50,8 +58,7 @@ export async function compilePluginView(args: {
     );
   if (built instanceof Error) return built;
 
-  const output = built.outputFiles[0];
-  if (built.errors.length > 0 || output === undefined) {
+  if (built.errors.length > 0) {
     const first = built.errors[0];
     return new PluginViewCompileError({
       id: args.id,
@@ -59,7 +66,19 @@ export async function compilePluginView(args: {
     });
   }
 
-  return { id: args.id, source: output.text };
+  return { id: args.id, outfile: args.outfile };
+}
+
+export async function readPluginViewDist(args: {
+  id: string;
+  directory: string;
+}): Promise<PluginViewDistError | CompiledPluginView> {
+  const source = await readFile(
+    join(args.directory, "dist", "view.js"),
+    "utf8",
+  ).catch((e) => new PluginViewDistError({ id: args.id, cause: e }));
+  if (source instanceof Error) return source;
+  return { id: args.id, source };
 }
 
 let esbuildModule: Promise<typeof import("esbuild")> | undefined;
