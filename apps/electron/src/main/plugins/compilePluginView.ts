@@ -12,6 +12,7 @@ const viewExternals = [
   "purse-styles",
   "wouter",
   "@halo/plugin-sdk/view",
+  "@halo/plugin-sdk/storage",
 ] as const;
 
 export class PluginViewCompileError extends errore.createTaggedError({

@@ -17,6 +17,7 @@ export const pluginSdkJitiDependencies = [
   "@orpc/server",
   "@tandem/core",
   "@tandem/server",
+  "@tandem/types",
   "errore",
 ] as const;
 

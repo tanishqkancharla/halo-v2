@@ -8,11 +8,13 @@ export default defineConfig({
     minify: false,
   },
   optimizeDeps: {
-    include: ["@tandem/core", "@tandem/types"],
+    include: ["@tandem/core", "@tandem/types", "@halo/plugin-sdk/storage"],
   },
   resolve: {
     alias: {
-      "node:fs": fileURLToPath(new URL("./src/renderer/emptyNodeFs.ts", import.meta.url)),
+      "node:fs": fileURLToPath(
+        new URL("./src/renderer/emptyNodeFs.ts", import.meta.url),
+      ),
     },
     dedupe: ["react", "react-dom", "purse-styles", "wouter"],
     preserveSymlinks: false,

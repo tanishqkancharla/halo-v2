@@ -26,12 +26,14 @@ describe("copyMainProcessExternals", () => {
       const requireFromMain = createRequire(mainPath);
       const schema = requireFromMain.resolve("@halo/plugin-sdk/schema");
       const server = requireFromMain.resolve("@halo/plugin-sdk/server");
+      const storage = requireFromMain.resolve("@halo/plugin-sdk/storage");
       const view = requireFromMain.resolve("@halo/plugin-sdk/view");
 
       const jiti = createJiti(mainPath, {
         alias: {
           "@halo/plugin-sdk/schema": schema,
           "@halo/plugin-sdk/server": server,
+          "@halo/plugin-sdk/storage": storage,
           "@halo/plugin-sdk/view": view,
         },
       });

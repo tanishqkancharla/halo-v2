@@ -23,6 +23,7 @@ Optional:
 
 - `view.tsx` (or `view/index.tsx`, `view.ts`, `view/index.ts`) with named exports `Sidebar` and `Routes`
 - `server.ts` (or `server/index.ts`) with a default oRPC router
+- `storage.ts` with Tandem collections from `@halo/plugin-sdk/storage`
 
 Halo loads plugins when the workspace is ready. Reload (View → Reload, or Cmd-R / Ctrl-R) to pick up plugin edits.
 
@@ -34,7 +35,7 @@ Packages in `external` are Halo's copies. Import UI from `@halo/plugin-sdk/view`
 
 Other packages are allowed. Add them to that plugin's `package.json`, run `npm install` in the plugin folder, then reload. esbuild inlines them. A missing package fails compile.
 
-Import `pluginOs` from `@halo/plugin-sdk/server`. Parse JSON with `parseVersioned` from `@halo/plugin-sdk/schema`.
+Import `pluginOs` and `syncRoutes` from `@halo/plugin-sdk/server`. Import `collection`, `defineSchema`, and `t` from `@halo/plugin-sdk/storage`. Parse JSON with `parseVersioned` from `@halo/plugin-sdk/schema`.
 
 ## package.json
 
@@ -119,4 +120,140 @@ In the view:
 ```ts
 const server = usePluginServer<typeof router>();
 await server.ping();
+```
+
+## Storage
+
+The host does not wrap storage. If the plugin uses `syncRoutes`, wrap `PluginStorageProvider` in `Routes` and in `Sidebar` if the sidebar queries. Use `usePluginServer` for other RPC.
+
+A complete todo plugin lives at `.halo/plugins/todos`. `halo.name` is `Todos`. `Sidebar` has a `SidebarItem` named `List`. `Routes` wraps `PluginStorageProvider` with `tables={todoTables}`, lists todos, and adds items with a field labeled `New todo` and a button named `Add`.
+
+`storage.ts`:
+
+```ts
+import { collection, defineSchema, t } from "@halo/plugin-sdk/storage";
+
+export const todoTables = defineSchema({
+  todos: collection({
+    id: t.id(),
+    title: t.string(),
+    done: t.boolean(),
+  }),
+});
+```
+
+`server.ts`:
+
+```ts
+import { syncRoutes } from "@halo/plugin-sdk/server";
+import { todoTables } from "./storage.ts";
+
+export default {
+  ...syncRoutes(todoTables),
+};
+```
+
+`package.json`:
+
+```json
+{
+  "name": "halo-plugin-todos",
+  "halo": {
+    "version": 1,
+    "name": "Todos",
+    "description": "A list that survives reload.",
+    "view": "./view.tsx",
+    "server": "./server.ts"
+  }
+}
+```
+
+`view.tsx`:
+
+```tsx
+import { useState } from "react";
+import {
+  Button,
+  Checkbox,
+  Flex,
+  H1,
+  PluginStorageProvider,
+  Route,
+  SidebarItem,
+  SidebarSection,
+  Switch,
+  TextField,
+  usePluginQuery,
+  usePluginTransaction,
+} from "@halo/plugin-sdk/view";
+import { todoTables } from "./storage.ts";
+
+export function Sidebar() {
+  return (
+    <SidebarSection label="Todos">
+      <SidebarItem href="/">List</SidebarItem>
+    </SidebarSection>
+  );
+}
+
+export function Routes() {
+  return (
+    <PluginStorageProvider tables={todoTables}>
+      <Switch>
+        <Route path="/" component={Home} />
+      </Switch>
+    </PluginStorageProvider>
+  );
+}
+
+function Home() {
+  const todos = usePluginQuery({ collection: "todos" });
+  const { transact, commit } = usePluginTransaction();
+  const [title, setTitle] = useState("");
+
+  async function add() {
+    const trimmed = title.trim();
+    if (trimmed.length === 0) return;
+    const tx = transact();
+    tx.set("todos", { id: crypto.randomUUID(), title: trimmed, done: false });
+    await commit(tx);
+    setTitle("");
+  }
+
+  async function toggle(todo: (typeof todos)[number]) {
+    const tx = transact();
+    tx.set("todos", { ...todo, done: !todo.done });
+    await commit(tx);
+  }
+
+  return (
+    <Flex column gap={4}>
+      <H1>Todos</H1>
+      <Flex gap={2}>
+        <TextField
+          label="New todo"
+          value={title}
+          onChange={setTitle}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void add();
+          }}
+        />
+        <Button onClick={add}>Add</Button>
+      </Flex>
+      <Flex column gap={2}>
+        {todos.map((todo) => (
+          <Flex key={todo.id} gap={2}>
+            <Checkbox
+              label={todo.title}
+              checked={todo.done}
+              setChecked={() => {
+                void toggle(todo);
+              }}
+            />
+          </Flex>
+        ))}
+      </Flex>
+    </Flex>
+  );
+}
 ```
