@@ -28,29 +28,7 @@ const jiti = createJiti(import.meta.url, {
 export async function loadPluginServer(args: {
   id: string;
   serverPath: string;
-  workspaceRoot: string;
 }): Promise<PluginServerLoadError | AnyRouter> {
-  const sdk = await jiti.import("@halo/plugin-sdk/server").catch(
-    (e) =>
-      new PluginServerLoadError({
-        id: args.id,
-        detail: String(e),
-        cause: e,
-      }),
-  );
-  if (sdk instanceof PluginServerLoadError) return sdk;
-  // SAFETY: jiti loads the SDK from disk; bind must run on that module instance.
-  (
-    sdk as {
-      bindPluginServerContext: (context: {
-        pluginId: string;
-        workspaceRoot: string;
-      }) => void;
-    }
-  ).bindPluginServerContext({
-    pluginId: args.id,
-    workspaceRoot: args.workspaceRoot,
-  });
   const imported = await jiti.import(args.serverPath).catch(
     (e) =>
       new PluginServerLoadError({

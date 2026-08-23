@@ -77,7 +77,6 @@ export class PluginService {
         const server = await loadPluginServer({
           id,
           serverPath: manifest.serverPath,
-          workspaceRoot: layout.root,
         });
         if (server instanceof Error) {
           errors.push({ id, message: server.message });

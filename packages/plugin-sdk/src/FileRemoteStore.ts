@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
@@ -47,13 +47,13 @@ export class FileRemoteStore<
     >,
   ) {}
 
-  static open<Schema extends AnySchema>(args: {
+  static async open<Schema extends AnySchema>(args: {
     pluginId: string;
     workspaceRoot: string;
     collections: readonly string[];
-  }): PluginStorageStoreError | FileRemoteStore<Schema> {
+  }): Promise<PluginStorageStoreError | FileRemoteStore<Schema>> {
     const path = storePath(args.workspaceRoot, args.pluginId);
-    const records = readStore<Schema>(path, args.pluginId);
+    const records = await readStore<Schema>(path, args.pluginId);
     if (records instanceof PluginStorageStoreError) return records;
     for (const collection of args.collections) {
       if (records.has(collection)) continue;
@@ -163,19 +163,19 @@ function compareByOrder<Schema extends AnySchema>(
   };
 }
 
-function readStore<Schema extends AnySchema>(
+async function readStore<Schema extends AnySchema>(
   path: string,
   pluginId: string,
-):
+): Promise<
   | PluginStorageStoreError
-  | Map<CollectionName<Schema>, CollectionRecords<Schema>> {
+  | Map<CollectionName<Schema>, CollectionRecords<Schema>>
+> {
   if (!existsSync(path)) {
     return new Map<CollectionName<Schema>, CollectionRecords<Schema>>();
   }
-  const raw = errore.try({
-    try: () => readFileSync(path, "utf8"),
-    catch: (e) => new PluginStorageStoreError({ pluginId, cause: e }),
-  });
+  const raw = await readFile(path, "utf8").catch(
+    (e) => new PluginStorageStoreError({ pluginId, cause: e }),
+  );
   if (raw instanceof Error) return raw;
   const parsed = errore.try({
     try: () => {
