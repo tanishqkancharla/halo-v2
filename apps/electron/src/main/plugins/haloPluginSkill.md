@@ -231,7 +231,7 @@ function Home() {
       <H1>Todos</H1>
       <Flex gap={2}>
         <TextField
-          label="New todo"
+          aria-label="New todo"
           value={title}
           onChange={setTitle}
           onKeyDown={(event) => {
