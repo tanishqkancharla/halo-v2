@@ -4,6 +4,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "halo": "pnpm --silent --filter @halo/cli cli",
     "halo-web": "pnpm --silent --filter @halo/web-cli cli",
     "tkstack": "pnpm --silent exec tkstack",
     "spec": "pnpm --silent exec tkstack",

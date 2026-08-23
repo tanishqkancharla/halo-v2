@@ -4,6 +4,7 @@ export const mainProcessExternals = [
   "@parcel/watcher",
   "esbuild",
   "jiti",
+  "typescript6",
 ] as const;
 
 // jiti loads plugin servers from disk. Those files import this package, so
@@ -15,6 +16,9 @@ export const mainProcessDiskPackages = ["@halo/plugin-sdk"] as const;
 export const pluginSdkJitiDependencies = [
   "@sinclair/typebox",
   "@orpc/server",
+  "@tandem/core",
+  "@tandem/server",
+  "@tandem/types",
   "errore",
 ] as const;
 

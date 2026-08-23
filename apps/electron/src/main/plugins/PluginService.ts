@@ -3,21 +3,35 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { os as orpc, ORPCError, type AnyRouter } from "@orpc/server";
 import * as errore from "errore";
-import type { PluginList } from "../../shared/plugin.js";
+import type { PluginList, PluginLoadError } from "../../shared/plugin.js";
+import type { PluginManifest } from "../../shared/pluginManifest.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { HaloContext } from "../router.js";
 import {
   WorkspaceNotReadyError,
   type WorkspaceService,
 } from "../workspace-service.js";
-import { compilePluginView } from "./compilePluginView.js";
+import { compilePluginView, readPluginViewDist } from "./compilePluginView.js";
 import { loadPluginServer } from "./loadPluginServer.js";
+import { parsePluginId } from "./pluginId.js";
 import { readPluginManifest } from "./readPluginManifest.js";
+import { writePluginScaffold } from "./scaffoldPlugin.js";
+import { typecheckPlugin, writePluginTypes } from "./typecheckPlugin.js";
 
 export class PluginIoError extends errore.createTaggedError({
   name: "PluginIoError",
   message: "Failed to list plugins",
 }) {}
+
+export class PluginExistsError extends errore.createTaggedError({
+  name: "PluginExistsError",
+  message: "Plugin '$id' already exists",
+}) {}
+
+type PluginDirectory = {
+  id: string;
+  directory: string;
+};
 
 export class PluginService {
   readonly router: Record<string, AnyRouter> = {};
@@ -25,49 +39,100 @@ export class PluginService {
 
   constructor(private readonly workspace: WorkspaceService) {}
 
-  async list() {
+  async create(id: string) {
+    const parsed = parsePluginId(id);
+    if (parsed instanceof Error) return parsed;
+
     const layout = this.workspace.getLayout();
     if (layout instanceof Error) return layout;
 
-    const pluginsRoot = join(layout.root, ".halo", "plugins");
-    if (!existsSync(pluginsRoot)) {
-      this.clearMounted();
-      return { plugins: [], compiledViews: [], errors: [] };
+    const directory = join(layout.root, ".halo", "plugins", parsed);
+    if (existsSync(directory)) return new PluginExistsError({ id: parsed });
+
+    const written = await writePluginScaffold({ directory, id: parsed });
+    if (written instanceof Error) return written;
+    return { id: parsed, directory };
+  }
+
+  async build() {
+    const listed = await this.listPluginDirectories();
+    if (listed instanceof Error) return listed;
+
+    const built: string[] = [];
+    const errors: PluginLoadError[] = [];
+    for (const plugin of listed) {
+      const manifest = await readPluginManifest(plugin);
+      if (manifest instanceof Error) {
+        errors.push({ id: plugin.id, message: manifest.message });
+        continue;
+      }
+      if (manifest.viewPath === undefined) continue;
+
+      const compiled = await compilePluginView({
+        id: plugin.id,
+        directory: manifest.directory,
+        viewPath: manifest.viewPath,
+        outfile: join(manifest.directory, "dist", "view.js"),
+      });
+      if (compiled instanceof Error) {
+        errors.push({ id: plugin.id, message: compiled.message });
+        continue;
+      }
+      built.push(plugin.id);
     }
 
-    const entries = await readdir(pluginsRoot, { withFileTypes: true }).catch(
-      (e) => new PluginIoError({ cause: e }),
-    );
-    if (entries instanceof Error) return entries;
+    const remounted = await this.list();
+    if (remounted instanceof Error) return remounted;
+    return { built, errors };
+  }
 
-    const ids = entries
-      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
-      .map((entry) => entry.name)
-      .toSorted((left, right) => left.localeCompare(right));
+  async types() {
+    const listed = await this.listManifests();
+    if (listed instanceof Error) return listed;
+
+    const written: string[] = [];
+    const diagnostics: Array<{
+      id: string;
+      file: string;
+      line: number;
+      message: string;
+    }> = [];
+    for (const plugin of listed) {
+      const copied = await writePluginTypes(plugin.directory);
+      if (copied instanceof Error) return copied;
+      written.push(plugin.id);
+      const checked = await typecheckPlugin(plugin.directory);
+      if (checked instanceof Error) return checked;
+      for (const diagnostic of checked) {
+        diagnostics.push({ id: plugin.id, ...diagnostic });
+      }
+    }
+    return { written, diagnostics };
+  }
+
+  async list() {
+    const listed = await this.listPluginDirectories();
+    if (listed instanceof Error) return listed;
 
     const plugins: PluginList["plugins"] = [];
     const compiledViews: PluginList["compiledViews"] = [];
     const errors: PluginList["errors"] = [];
     this.clearMounted();
-    for (const id of ids) {
-      const manifest = await readPluginManifest({
-        id,
-        directory: join(pluginsRoot, id),
-      });
+    for (const plugin of listed) {
+      const manifest = await readPluginManifest(plugin);
       if (manifest instanceof Error) {
-        errors.push({ id, message: manifest.message });
+        errors.push({ id: plugin.id, message: manifest.message });
         continue;
       }
 
       let compiled: PluginList["compiledViews"][number] | undefined;
       if (manifest.viewPath !== undefined) {
-        const view = await compilePluginView({
-          id,
+        const view = await readPluginViewDist({
+          id: plugin.id,
           directory: manifest.directory,
-          viewPath: manifest.viewPath,
         });
         if (view instanceof Error) {
-          errors.push({ id, message: view.message });
+          errors.push({ id: plugin.id, message: view.message });
           continue;
         }
         compiled = view;
@@ -75,20 +140,58 @@ export class PluginService {
 
       if (manifest.serverPath !== undefined) {
         const server = await loadPluginServer({
-          id,
+          id: plugin.id,
           serverPath: manifest.serverPath,
         });
         if (server instanceof Error) {
-          errors.push({ id, message: server.message });
+          errors.push({ id: plugin.id, message: server.message });
           continue;
         }
-        this.router[id] = mountPluginRouter({ pluginId: id, router: server });
+        this.router[plugin.id] = mountPluginRouter({
+          pluginId: plugin.id,
+          router: server,
+        });
       }
 
       plugins.push(manifest);
       if (compiled !== undefined) compiledViews.push(compiled);
     }
     return { plugins, compiledViews, errors };
+  }
+
+  async listManifests() {
+    const listed = await this.listPluginDirectories();
+    if (listed instanceof Error) return listed;
+    const manifests: PluginManifest[] = [];
+    for (const plugin of listed) {
+      const manifest = await readPluginManifest(plugin);
+      if (manifest instanceof Error) continue;
+      manifests.push(manifest);
+    }
+    return manifests;
+  }
+
+  private async listPluginDirectories() {
+    const layout = this.workspace.getLayout();
+    if (layout instanceof Error) return layout;
+
+    const pluginsRoot = join(layout.root, ".halo", "plugins");
+    if (!existsSync(pluginsRoot)) return [];
+
+    const entries = await readdir(pluginsRoot, { withFileTypes: true }).catch(
+      (e) => new PluginIoError({ cause: e }),
+    );
+    if (entries instanceof Error) return entries;
+
+    return entries
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+      .map(
+        (entry): PluginDirectory => ({
+          id: entry.name,
+          directory: join(pluginsRoot, entry.name),
+        }),
+      )
+      .toSorted((left, right) => left.id.localeCompare(right.id));
   }
 
   private clearMounted() {

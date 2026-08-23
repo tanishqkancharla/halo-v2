@@ -20,7 +20,11 @@ const jiti = createJiti(import.meta.url, {
   alias: {
     "@halo/plugin-sdk/schema": sdkEntry("schema"),
     "@halo/plugin-sdk/server": sdkEntry("server"),
+    "@halo/plugin-sdk/storage": sdkEntry("storage"),
     "@halo/plugin-sdk/view": sdkEntry("view"),
+    "@tandem/core": requireFromThisFile.resolve("@tandem/core"),
+    "@tandem/server": requireFromThisFile.resolve("@tandem/server"),
+    "@tandem/types": requireFromThisFile.resolve("@tandem/types"),
   },
 });
 
@@ -90,6 +94,6 @@ function isPluginRouter(value: AnyRouter | Lazy<AnyRouter>) {
   return true;
 }
 
-function sdkEntry(subpath: "schema" | "server" | "view") {
+function sdkEntry(subpath: "schema" | "server" | "storage" | "view") {
   return requireFromThisFile.resolve(`@halo/plugin-sdk/${subpath}`);
 }

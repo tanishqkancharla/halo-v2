@@ -11,10 +11,20 @@ import type { IntegrationConnection } from "./integrations.js";
 import type {
   AppInfo,
   PluginList,
+  PluginLoadError,
   SessionSummary,
   WorkspaceInfo,
   WorkspaceTreeEvent,
 } from "./rpc.js";
+
+export const reservedPluginIds = ["new", "build", "types"] as const;
+
+export type PluginTypeDiagnostic = {
+  id: string;
+  file: string;
+  line: number;
+  message: string;
+};
 
 export const contract = {
   getAppInfo: oc.output(type<AppInfo>()),
@@ -47,6 +57,18 @@ export const contract = {
       .input(type<{ connectionId: string; sessionId: string }>())
       .output(type<IntegrationConnection>()),
     disconnect: oc.input(type<{ connectionId: string; sessionId: string }>()),
+  },
+  plugin: {
+    create: oc
+      .input(type<{ id: string }>())
+      .output(type<{ id: string; directory: string }>()),
+    build: oc.output(type<{ built: string[]; errors: PluginLoadError[] }>()),
+    types: oc.output(
+      type<{
+        written: string[];
+        diagnostics: PluginTypeDiagnostic[];
+      }>(),
+    ),
   },
 };
 

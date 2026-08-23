@@ -1,5 +1,6 @@
 import { dialog, shell, type BrowserWindow } from "electron";
 import { implement } from "@orpc/server";
+import { AsyncEventQueue } from "@halo/plugin-sdk/shared";
 import type { Logger } from "@repo/logger";
 import { agentSessionStateFromSession } from "../shared/AgentSessionState.js";
 import { contract } from "../shared/contract.js";
@@ -11,7 +12,6 @@ import {
 } from "./agent-session-errors.js";
 import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
-import { AsyncEventQueue } from "./AsyncEventQueue.js";
 import { orpcErrors } from "./orpcErrors.js";
 import {
   GoogleOAuthError,
@@ -334,7 +334,31 @@ export const router = {
       },
     ),
   },
+  plugin: {
+    create: os.plugin.create.handler(async ({ input, context }) => {
+      context.logger.info({ event: "plugin.create", id: input.id });
+      const created = await context.plugins.create(input.id);
+      if (created instanceof Error) return orpcErrors.badRequest(created);
+      return created;
+    }),
+    build: os.plugin.build.handler(async ({ context }) => {
+      context.logger.info({ event: "plugin.build" });
+      const built = await context.plugins.build();
+      if (built instanceof Error) return orpcErrors.badRequest(built);
+      return built;
+    }),
+    types: os.plugin.types.handler(async ({ context }) => {
+      context.logger.info({ event: "plugin.types" });
+      const checked = await context.plugins.types();
+      if (checked instanceof Error) return orpcErrors.badRequest(checked);
+      return checked;
+    }),
+  },
 };
+
+export function haloRpcRouter(plugins: PluginService) {
+  return { ...router, plugins: plugins.lazyRouter };
+}
 
 async function resolveLiveSession(context: HaloContext, sessionId: string) {
   const live = context.sessions.get(sessionId);

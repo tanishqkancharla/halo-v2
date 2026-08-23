@@ -6,11 +6,15 @@
   "exports": {
     "./view": "./src/view.ts",
     "./server": "./src/server.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./storage": "./src/storage.ts",
+    "./shared": "./src/AsyncEventQueue.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings .",
-    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix .",
+    "build:types": "node scripts/buildBundledDts.mjs",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src scripts",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src scripts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "test": "vitest run src",
@@ -20,6 +24,9 @@
     "@orpc/client": "2.0.0-beta.29",
     "@orpc/server": "2.0.0-beta.29",
     "@sinclair/typebox": "^0.34.52",
+    "@tandem/core": "github:tanishqkancharla/tandem#path:packages/core",
+    "@tandem/server": "github:tanishqkancharla/tandem#path:packages/server",
+    "@tandem/types": "github:tanishqkancharla/tandem#path:packages/types",
     "errore": "^0.14.1",
     "maui": "npm:@tanishqkancharla/maui@0.0.2",
     "purse-styles": "^0.2.1",
@@ -27,6 +34,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "react": "^19.2.8",
     "typescript": "7.0.2",
