@@ -49,7 +49,7 @@ describe.skipIf(skipReason !== undefined)("todo plugin agent", () => {
 
       await haloWebExec(`
         await page.getByLabel('Message').fill(${JSON.stringify(prompt)});
-        await page.getByRole('button', { name: 'Send' }).click();
+        await page.getByLabel('New session').getByRole('button', { name: 'Send' }).click();
         await page.getByLabel('Thinking').waitFor();
         await page.getByLabel('Thinking').waitFor({ state: 'hidden', timeout: 180_000 });
       `);
