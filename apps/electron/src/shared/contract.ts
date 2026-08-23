@@ -63,12 +63,13 @@ export const contract = {
       .input(type<{ id: string }>())
       .output(type<{ id: string; directory: string }>()),
     build: oc.output(type<{ built: string[]; errors: PluginLoadError[] }>()),
-    types: oc.output(
-      type<{
-        written: string[];
-        diagnostics: PluginTypeDiagnostic[];
-      }>(),
-    ),
+    types:
+      oc.output(
+        type<{
+          written: string[];
+          diagnostics: PluginTypeDiagnostic[];
+        }>(),
+      ),
   },
 };
 
