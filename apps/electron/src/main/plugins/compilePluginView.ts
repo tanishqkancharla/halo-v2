@@ -12,8 +12,8 @@ const viewExternals = [
   "maui",
   "purse-styles",
   "wouter",
-  "@halo/plugin-sdk/view",
-  "@halo/plugin-sdk/storage",
+  "@get-halo/plugin-sdk/view",
+  "@get-halo/plugin-sdk/storage",
 ] as const;
 
 export class PluginViewCompileError extends errore.createTaggedError({

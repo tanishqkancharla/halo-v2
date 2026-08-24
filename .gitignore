@@ -46,6 +46,9 @@ specs/
 # Development Electron userData
 .halo/
 
+# Packed plugin SDK contract (types-only publish dir)
+packages/plugin-sdk/contract/
+
 # Alchemy local state
 .alchemy/
 infra/.alchemy/

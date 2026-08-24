@@ -62,7 +62,10 @@ export function usePluginQuery<
   Query extends RelationalQuery<Schema, Relations>,
   Relations extends RuntimeRelationsDefinition<Schema> =
     RuntimeRelationsDefinition<Schema>,
->(query: Query): RelationalQueryResult<Schema, Relations, Query>;
+>(
+  query: Query,
+  deps: readonly unknown[],
+): RelationalQueryResult<Schema, Relations, Query>;
 export function usePluginQuery<
   Schema extends AnySchema,
   Query extends RelationalQuery<Schema, Relations>,
@@ -70,6 +73,7 @@ export function usePluginQuery<
     RuntimeRelationsDefinition<Schema>,
 >(
   query: Query | undefined,
+  deps: readonly unknown[],
 ): RelationalQueryResult<Schema, Relations, Query> | undefined;
 export function usePluginQuery<
   Schema extends AnySchema,
@@ -78,30 +82,35 @@ export function usePluginQuery<
     RuntimeRelationsDefinition<Schema>,
 >(
   query: Query | undefined,
+  deps: readonly unknown[],
 ): RelationalQueryResult<Schema, Relations, Query> | undefined {
   const client = useContext(PluginStorageContext);
   if (client === undefined) throw new PluginStorageMissingError();
   // SAFETY: PluginStorageProvider constructs this client with the plugin schema.
   const typed = client as TandemClient<Schema, Relations>;
+  // Caller passes deps, same as useMemo(fn, deps).
+  // oxlint-disable-next-line react/use-memo
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
+  const stableQuery = useMemo(() => query, deps);
   const [value, setValue] = useState(() => {
-    if (query === undefined) return undefined;
-    return typed.query(query);
+    if (stableQuery === undefined) return undefined;
+    return typed.query(stableQuery);
   });
   useEffect(() => {
-    if (query === undefined) {
+    if (stableQuery === undefined) {
       // Tandem subscribe does not emit the first result through the callback.
       // oxlint-disable-next-line react/set-state-in-effect
       setValue(undefined);
       return undefined;
     }
-    const { destroy, result } = typed.subscribe(query, (nextValue) => {
+    const { destroy, result } = typed.subscribe(stableQuery, (nextValue) => {
       setValue(nextValue);
     });
     // Tandem subscribe does not emit the first result through the callback.
     // oxlint-disable-next-line react/set-state-in-effect
     setValue(result);
     return destroy;
-  }, [typed, query]);
+  }, [typed, stableQuery]);
   return value;
 }
 
@@ -139,7 +148,7 @@ export function usePluginEntity<
       where: { id },
     };
   }, [collection, id]);
-  const rows = usePluginQuery(query);
+  const rows = usePluginQuery(query, [query]);
   if (rows === undefined) return undefined;
   // SAFETY: a query of one collection with where id returns that collection's row.
   return rows[0] as Schema[Collection] | undefined;

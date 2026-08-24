@@ -74,6 +74,7 @@ process.env.HALO_USER_DATA = applicationConfig.dataDir;
 const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
   appVersion: app.getVersion(),
   cliEntry: resolveHaloCliEntry(import.meta.url),
+  isDevelopment,
 });
 const userService = new UserService(applicationConfig.dataDir);
 const integrationService = new IntegrationService(workspaceService);

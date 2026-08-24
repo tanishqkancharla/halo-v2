@@ -16,7 +16,9 @@ import { loadPluginServer } from "./loadPluginServer.js";
 import { parsePluginId } from "./pluginId.js";
 import { readPluginManifest } from "./readPluginManifest.js";
 import { writePluginScaffold } from "./scaffoldPlugin.js";
-import { typecheckPlugin, writePluginTypes } from "./typecheckPlugin.js";
+import { installPluginSdkContract } from "./installPluginSdk.js";
+import { assertPluginSdkPin, readPluginSdkPinFile } from "./pluginSdkPin.js";
+import { typecheckPlugin, writePluginTsconfig } from "./typecheckPlugin.js";
 
 export class PluginIoError extends errore.createTaggedError({
   name: "PluginIoError",
@@ -49,7 +51,11 @@ export class PluginService {
     const directory = join(layout.root, ".halo", "plugins", parsed);
     if (existsSync(directory)) return new PluginExistsError({ id: parsed });
 
-    const written = await writePluginScaffold({ directory, id: parsed });
+    const written = await writePluginScaffold({
+      directory,
+      id: parsed,
+      appVersion: this.workspace.appVersion,
+    });
     if (written instanceof Error) return written;
     return { id: parsed, directory };
   }
@@ -67,6 +73,12 @@ export class PluginService {
         continue;
       }
       if (manifest.viewPath === undefined) continue;
+
+      const pin = await this.assertPin(plugin);
+      if (pin instanceof Error) {
+        errors.push({ id: plugin.id, message: pin.message });
+        continue;
+      }
 
       const compiled = await compilePluginView({
         id: plugin.id,
@@ -98,8 +110,26 @@ export class PluginService {
       message: string;
     }> = [];
     for (const plugin of listed) {
-      const copied = await writePluginTypes(plugin.directory);
-      if (copied instanceof Error) return copied;
+      const pin = await this.assertPin({
+        id: plugin.id,
+        directory: plugin.directory,
+      });
+      if (pin instanceof Error) {
+        diagnostics.push({
+          id: plugin.id,
+          file: "package.json",
+          line: 1,
+          message: pin.message,
+        });
+        continue;
+      }
+      const installed = await installPluginSdkContract({
+        directory: plugin.directory,
+        appVersion: this.workspace.appVersion,
+      });
+      if (installed instanceof Error) return installed;
+      const prepared = await writePluginTsconfig(plugin.directory);
+      if (prepared instanceof Error) return prepared;
       written.push(plugin.id);
       const checked = await typecheckPlugin(plugin.directory);
       if (checked instanceof Error) return checked;
@@ -122,6 +152,12 @@ export class PluginService {
       const manifest = await readPluginManifest(plugin);
       if (manifest instanceof Error) {
         errors.push({ id: plugin.id, message: manifest.message });
+        continue;
+      }
+
+      const pin = await this.assertPin(plugin);
+      if (pin instanceof Error) {
+        errors.push({ id: plugin.id, message: pin.message });
         continue;
       }
 
@@ -192,6 +228,16 @@ export class PluginService {
         }),
       )
       .toSorted((left, right) => left.id.localeCompare(right.id));
+  }
+
+  private async assertPin(plugin: PluginDirectory) {
+    const pin = await readPluginSdkPinFile(plugin);
+    if (pin instanceof Error) return pin;
+    return assertPluginSdkPin({
+      id: plugin.id,
+      pin,
+      appVersion: this.workspace.appVersion,
+    });
   }
 
   private clearMounted() {

@@ -164,6 +164,7 @@ function removeDirectoryAndDescendants(
 export type WorkspaceServiceOptions = {
   appVersion: string;
   cliEntry?: string;
+  isDevelopment?: boolean;
 };
 
 export class WorkspaceService {
@@ -180,6 +181,10 @@ export class WorkspaceService {
   getWorkspace(): WorkspaceInfo | undefined {
     if (this.state.status === "notStarted") return undefined;
     return workspaceInfo(this.state.layout);
+  }
+
+  get appVersion() {
+    return this.options.appVersion;
   }
 
   getLayout() {
@@ -249,6 +254,7 @@ export class WorkspaceService {
 
     const seeded = await seedPluginWorkspace(layout, {
       appVersion: this.options.appVersion,
+      alwaysWrite: this.options.isDevelopment === true,
     });
     if (seeded instanceof Error) return seeded;
 

@@ -69,16 +69,33 @@ export function MainPane({
             return <MissingPlugin pluginId={params.pluginId} />;
           }
           return (
-            <PluginServerProvider
-              pluginId={plugin.id}
+            <PluginRoutesPane
+              plugin={plugin}
               server={pluginServers[plugin.id]}
-            >
-              <plugin.Routes />
-            </PluginServerProvider>
+            />
           );
         }}
       </Route>
     </Switch>
+  );
+}
+
+function PluginRoutesPane({
+  plugin,
+  server,
+}: {
+  plugin: LoadedPluginView;
+  server: RouterClient<AnyRouter> | undefined;
+}) {
+  const pane = useStyles(styles.pluginPane);
+  const Routes = plugin.Routes;
+  if (Routes === undefined) return <MissingPlugin pluginId={plugin.id} />;
+  return (
+    <main className={pane} aria-label={plugin.id}>
+      <PluginServerProvider pluginId={plugin.id} server={server}>
+        <Routes />
+      </PluginServerProvider>
+    </main>
   );
 }
 
@@ -359,6 +376,13 @@ const styles = {
     minWidth: 0,
     minHeight: 0,
     overflow: "hidden",
+    backgroundColor: backgroundColor.app,
+  }),
+  pluginPane: style(flex({ direction: "column" }), {
+    width: "100%",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "auto",
     backgroundColor: backgroundColor.app,
   }),
   body: style(

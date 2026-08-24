@@ -1,31 +1,26 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
 import * as errore from "errore";
 import ts from "typescript6";
-import { bundledTypesDirectory } from "./bundledTypes.js";
-
-const bundledTypeFiles = [
-  "view.d.ts",
-  "server.d.ts",
-  "schema.d.ts",
-  "jsx-runtime.d.ts",
-] as const;
 
 const pluginTsconfig = `${JSON.stringify(
   {
     compilerOptions: {
       strict: true,
       noEmit: true,
+      allowImportingTsExtensions: true,
       jsx: "react-jsx",
       module: "ESNext",
       moduleResolution: "bundler",
       skipLibCheck: true,
       paths: {
-        "@halo/plugin-sdk/view": ["./types/view.d.ts"],
-        "@halo/plugin-sdk/server": ["./types/server.d.ts"],
-        "@halo/plugin-sdk/schema": ["./types/schema.d.ts"],
-        "react/jsx-runtime": ["./types/jsx-runtime.d.ts"],
-        "react/jsx-dev-runtime": ["./types/jsx-runtime.d.ts"],
+        react: ["./node_modules/@get-halo/plugin-sdk/bundled-types/react.d.ts"],
+        "react/jsx-runtime": [
+          "./node_modules/@get-halo/plugin-sdk/bundled-types/jsx-runtime.d.ts",
+        ],
+        "react/jsx-dev-runtime": [
+          "./node_modules/@get-halo/plugin-sdk/bundled-types/jsx-runtime.d.ts",
+        ],
       },
     },
     include: ["*.ts", "*.tsx", "view/**/*", "server/**/*"],
@@ -39,28 +34,7 @@ export class PluginTypesError extends errore.createTaggedError({
   message: "Plugin types failed: $detail",
 }) {}
 
-export async function writePluginTypes(directory: string) {
-  const typesDir = join(directory, "types");
-  const created = await mkdir(typesDir, { recursive: true }).catch(
-    (e) => new PluginTypesError({ detail: "create types directory", cause: e }),
-  );
-  if (created instanceof Error) return created;
-
-  const sourceDir = bundledTypesDirectory();
-  for (const file of bundledTypeFiles) {
-    const copied = await copyFile(
-      join(sourceDir, file),
-      join(typesDir, file),
-    ).catch(
-      (e) =>
-        new PluginTypesError({
-          detail: `copy ${file}`,
-          cause: e,
-        }),
-    );
-    if (copied instanceof Error) return copied;
-  }
-
+export async function writePluginTsconfig(directory: string) {
   return writeFile(join(directory, "tsconfig.json"), pluginTsconfig).catch(
     (e) => new PluginTypesError({ detail: "write tsconfig.json", cause: e }),
   );

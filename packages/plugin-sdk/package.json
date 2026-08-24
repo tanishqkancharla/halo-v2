@@ -9,10 +9,12 @@
     "./schema": "./src/schema.ts",
     "./storage": "./src/storage.ts",
     "./shared": "./src/AsyncEventQueue.ts",
+    "./contract": "./src/contractPackage.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
     "build:types": "node scripts/buildBundledDts.mjs",
+    "pack:contract": "node --experimental-strip-types scripts/packContract.ts",
     "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src scripts",
     "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src scripts",
     "format": "oxfmt .",

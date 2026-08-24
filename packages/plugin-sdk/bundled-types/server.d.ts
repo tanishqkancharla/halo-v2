@@ -14,3 +14,5 @@ export const pluginOs: {
 export const os: typeof pluginOs;
 
 export function type<T>(): unknown;
+
+export function syncRoutes(tables: unknown): Record<string, unknown>;

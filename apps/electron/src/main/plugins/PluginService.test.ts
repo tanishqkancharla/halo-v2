@@ -22,7 +22,9 @@ const pluginServiceTest = test.extend<{
     const userDataDir = await mkdtemp(
       join(tmpdir(), `halo-plugin-ud-${task.id}-`),
     );
-    const workspace = new WorkspaceService(userDataDir);
+    const workspace = new WorkspaceService(userDataDir, {
+      appVersion: "1.2.3",
+    });
     const selected = await workspace.select(workspaceRoot);
     if (selected instanceof Error) throw selected;
     await use(new PluginService(workspace));
@@ -42,11 +44,15 @@ describe("PluginService", () => {
         join(workspaceRoot, ".halo", "plugins", "notes"),
       );
 
-      // SAFETY: scaffold package.json is { halo: { name } }.
+      // SAFETY: scaffold package.json is { halo: { name }, devDependencies }.
       const packageJson = JSON.parse(
         await readFile(join(created.directory, "package.json"), "utf8"),
-      ) as { halo: { name: string } };
+      ) as {
+        halo: { name: string };
+        devDependencies: { "@get-halo/plugin-sdk": string };
+      };
       expect(packageJson.halo.name).toBe("Notes");
+      expect(packageJson.devDependencies["@get-halo/plugin-sdk"]).toBe("1.2.3");
 
       const built = await plugins.build();
       if (built instanceof Error) throw built;
@@ -143,7 +149,7 @@ describe("PluginService", () => {
 
       await writeFile(
         join(workspaceRoot, ".halo", "plugins", "notes", "view.tsx"),
-        `import { Flex } from "@halo/plugin-sdk/view";
+        `import { Flex } from "@get-halo/plugin-sdk/view";
 export function Routes() {
   return <Flex noSuchProp />;
 }
@@ -156,6 +162,140 @@ export function Routes() {
       expect(broken.diagnostics[0]?.id).toBe("notes");
       expect(broken.diagnostics[0]?.file).toContain("view.tsx");
       expect(broken.diagnostics[0]?.message.length).toBeGreaterThan(0);
+    },
+  );
+
+  pluginServiceTest(
+    "types accepts storage.ts and Maui controls",
+    async ({ plugins, workspaceRoot }) => {
+      const created = await plugins.create("todos");
+      if (created instanceof Error) throw created;
+      const directory = join(workspaceRoot, ".halo", "plugins", "todos");
+
+      await writeFile(
+        join(directory, "storage.ts"),
+        `import { collection, defineSchema, t } from "@get-halo/plugin-sdk/storage";
+
+export const todoTables = defineSchema({
+  todos: collection({
+    id: t.id(),
+    title: t.string(),
+    done: t.boolean(),
+  }),
+});
+`,
+      );
+      await writeFile(
+        join(directory, "server.ts"),
+        `import { syncRoutes } from "@get-halo/plugin-sdk/server";
+import { todoTables } from "./storage.ts";
+
+export default {
+  ...syncRoutes(todoTables),
+};
+`,
+      );
+      await writeFile(
+        join(directory, "view.tsx"),
+        `import {
+  Button,
+  Checkbox,
+  Flex,
+  H1,
+  PluginStorageProvider,
+  Route,
+  Switch,
+  TextField,
+  usePluginQuery,
+  usePluginTransaction,
+  useState,
+} from "@get-halo/plugin-sdk/view";
+import { todoTables } from "./storage.ts";
+
+type Todo = { id: string; title: string; done: boolean };
+
+export function Routes() {
+  return (
+    <PluginStorageProvider tables={todoTables}>
+      <Switch>
+        <Route path="/" component={Home} />
+      </Switch>
+    </PluginStorageProvider>
+  );
+}
+
+function Home() {
+  const todos = usePluginQuery<Todo>({ collection: "todos" }, []);
+  const addTodo = usePluginTransaction((tx, title: string) => {
+    tx.set("todos", { id: crypto.randomUUID(), title, done: false });
+  });
+  const [title, setTitle] = useState("");
+  return (
+    <Flex column gap={4}>
+      <H1>Todos</H1>
+      <TextField aria-label="New todo" value={title} onChange={setTitle} />
+      <Button onClick={() => addTodo(title)}>Add</Button>
+      {todos.map((todo) => (
+        <Flex key={todo.id} gap={2}>
+          <Checkbox
+            label={todo.title}
+            checked={todo.done}
+            setChecked={() => {
+              addTodo(todo.title);
+            }}
+          />
+        </Flex>
+      ))}
+    </Flex>
+  );
+}
+`,
+      );
+
+      const checked = await plugins.types();
+      if (checked instanceof Error) throw checked;
+      expect(checked.diagnostics).toEqual([]);
+    },
+  );
+
+  pluginServiceTest(
+    "wrong SDK pin is rejected on types, build, and list",
+    async ({ plugins, workspaceRoot }) => {
+      const created = await plugins.create("notes");
+      if (created instanceof Error) throw created;
+
+      const packagePath = join(
+        workspaceRoot,
+        ".halo",
+        "plugins",
+        "notes",
+        "package.json",
+      );
+      // SAFETY: scaffold package.json is a JSON object.
+      const packageJson = JSON.parse(await readFile(packagePath, "utf8")) as {
+        devDependencies: { "@get-halo/plugin-sdk": string };
+      };
+      packageJson.devDependencies["@get-halo/plugin-sdk"] = "9.9.9";
+      await writeFile(
+        packagePath,
+        `${JSON.stringify(packageJson, undefined, 2)}\n`,
+      );
+
+      const checked = await plugins.types();
+      if (checked instanceof Error) throw checked;
+      expect(checked.written).toEqual([]);
+      expect(checked.diagnostics[0]?.file).toBe("package.json");
+      expect(checked.diagnostics[0]?.message).toContain("9.9.9");
+
+      const built = await plugins.build();
+      if (built instanceof Error) throw built;
+      expect(built.built).toEqual([]);
+      expect(built.errors[0]?.message).toContain("9.9.9");
+
+      const listed = await plugins.list();
+      if (listed instanceof Error) throw listed;
+      expect(listed.plugins).toEqual([]);
+      expect(listed.errors[0]?.message).toContain("9.9.9");
     },
   );
 });

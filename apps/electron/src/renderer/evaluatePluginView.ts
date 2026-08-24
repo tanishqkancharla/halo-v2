@@ -97,9 +97,9 @@ function requireHost(specifier: string) {
       return purseStyles;
     case "wouter":
       return wouter;
-    case "@halo/plugin-sdk/view":
+    case "@get-halo/plugin-sdk/view":
       return pluginSdkView;
-    case "@halo/plugin-sdk/storage":
+    case "@get-halo/plugin-sdk/storage":
       return pluginSdkStorage;
     default:
       throw new Error(`plugin view cannot require '${specifier}'`);

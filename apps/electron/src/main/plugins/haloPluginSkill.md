@@ -2,8 +2,7 @@
 name: halo-plugin
 version: 1
 description: >
-  Create or edit a Halo plugin in the current workspace. Use when the user
-  asks to add a sidebar view, a main-pane page, or a plugin server.
+  Create or edit a Halo plugin, which provides extension points to create and customize UI on the Halo app.
 ---
 
 # Halo plugins
@@ -12,16 +11,20 @@ Plugins live in `{workspace}/.halo/plugins/<id>/`. The folder name is the plugin
 
 Write plugin code only in that folder. Do not edit Halo app source.
 
+Always read the maui skill before writing view code. Use Maui components and React hooks from `@get-halo/plugin-sdk/view`. Do not use raw HTML controls. Do not import from `"react"`, `"maui"`, or `"purse-styles"`.
+
+If the plugin keeps data, add `storage.ts` and `syncRoutes`. Do not use `localStorage`, `sessionStorage`, cookies, or files you invent.
+
 Halo must be running. Use the `halo` CLI (on PATH in the app, or `pnpm halo` in the Halo repo). `new`, `build`, and `types` are reserved ids.
 
-1. `halo plugin new <id>` — scaffold the plugin folder
+1. `halo plugin new <id>` — scaffold the plugin folder, pin `@get-halo/plugin-sdk` to this Halo version, and install that contract
 2. Edit sources in that folder
-3. `halo plugin types` — refresh declarations and typecheck. Fix errors here.
+3. `halo plugin types` — typecheck. The pin must equal this Halo version. Fix errors here.
 4. `halo plugin build` — write `dist/view.js`
 5. Reload (View → Reload, or Cmd-R / Ctrl-R)
 6. `halo plugin <id> <endpoint>` — call the plugin server (example: `halo plugin notes ping`)
 
-Do not compile the view yourself. Halo reads `dist/view.js` on load. A missing file is a load error for that plugin only.
+Do not compile the view yourself. Halo reads `dist/view.js` on load. A missing file is a load error for that plugin only. A pin that is missing or not this Halo version is a load error for that plugin only.
 
 ## Layout
 
@@ -35,15 +38,17 @@ Optional:
 
 - `view.tsx` (or `view/index.tsx`, `view.ts`, `view/index.ts`) with named exports `Sidebar` and `Routes`
 - `server.ts` (or `server/index.ts`) with a default oRPC router
-- `storage.ts` with Tandem collections from `@halo/plugin-sdk/storage`
+- `storage.ts` with Tandem collections from `@get-halo/plugin-sdk/storage`
 
 ## View bundle
 
-`halo plugin build` compiles the view with esbuild. Packages Halo already ships are external: `react`, `maui`, `purse-styles`, `wouter`, `@halo/plugin-sdk/view`. Import UI from `@halo/plugin-sdk/view`. That module is Maui, purse-styles (`style`, `useStyles`), and wouter. Read the `maui` skill for tokens, shadows, focus, and Flex spacing. Import those names from `@halo/plugin-sdk/view`, not `"maui"`. Do not wrap `MauiProvider`. Do not `npm install` `react`, `maui`, `purse-styles`, or `wouter`.
+Pin `@get-halo/plugin-sdk` in `devDependencies` to the exact Halo app version, with no caret. A mismatch fails types, build, and load. Halo copies this app's contract into the plugin `node_modules`. A clone without Halo runs `npm install` for the same pin, then `tsc`. Run and rebuild still need Halo.
+
+`halo plugin build` compiles the view with esbuild. Packages Halo already ships are external: `react`, `maui`, `purse-styles`, `wouter`, `@get-halo/plugin-sdk/view`. Import UI and hooks from `@get-halo/plugin-sdk/view`. That module is Maui, purse-styles (`style`, `useStyles`), wouter, and React hooks. Follow the maui skill. Do not wrap `MauiProvider`. Do not `npm install` `react`, `maui`, `purse-styles`, or `wouter`.
 
 Other packages are allowed. Add them to that plugin's `package.json`, run `npm install` in the plugin folder, then `halo plugin build`. esbuild inlines them. A missing package fails the build.
 
-Import `pluginOs` and `syncRoutes` from `@halo/plugin-sdk/server`. Import `collection`, `defineSchema`, and `t` from `@halo/plugin-sdk/storage`. Parse JSON with `parseVersioned` from `@halo/plugin-sdk/schema`.
+Import `pluginOs` and `syncRoutes` from `@get-halo/plugin-sdk/server`. Import `collection`, `defineSchema`, and `t` from `@get-halo/plugin-sdk/storage`. Parse JSON with `parseVersioned` from `@get-halo/plugin-sdk/schema`.
 
 ## package.json
 
@@ -55,23 +60,32 @@ Import `pluginOs` and `syncRoutes` from `@halo/plugin-sdk/server`. Import `colle
     "name": "Notes",
     "description": "Scratch notes.",
     "view": "./view.tsx"
+  },
+  "devDependencies": {
+    "@get-halo/plugin-sdk": "0.1.20"
   }
 }
 ```
+
+Use the running Halo version, not this example number.
 
 ## View
 
 `Sidebar` mounts in the app sidebar only when you export it. `Routes` fills the main pane at `/plugins/<id>`. Both are React components. Use `SidebarSection` and `SidebarItem` for sidebar chrome. Plugin links are relative to `/plugins/<id>`.
 
+The host paints that pane with `backgroundColor.app`. Follow the maui skill for page width: center ordinary pages at `proseMaxWidth`. Full pane width should be reserved for when you need it (horizontally dense tools, like tables, a CRM, kanban, or side-by-side panes).
+
 ```tsx
 import {
   Flex,
   H1,
+  Padding,
   Route,
   SidebarItem,
   SidebarSection,
   Switch,
-} from "@halo/plugin-sdk/view";
+  proseMaxWidth,
+} from "@get-halo/plugin-sdk/view";
 
 export function Sidebar() {
   return (
@@ -91,9 +105,15 @@ export function Routes() {
 
 function Home() {
   return (
-    <Flex column gap={4}>
-      <H1>Notes</H1>
-    </Flex>
+    <Padding xy={6}>
+      <Flex
+        column
+        gap={4}
+        style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
+      >
+        <H1>Notes</H1>
+      </Flex>
+    </Padding>
   );
 }
 ```
@@ -102,7 +122,7 @@ A view that exports neither `Sidebar` nor `Routes` is empty, not an error. Impor
 
 ```ts
 import type router from "./server.ts";
-import { usePluginServer } from "@halo/plugin-sdk/view";
+import { usePluginServer } from "@get-halo/plugin-sdk/view";
 ```
 
 ## Server
@@ -110,7 +130,7 @@ import { usePluginServer } from "@halo/plugin-sdk/view";
 Export a default oRPC router. Handlers read `{ pluginId, workspaceRoot }` from context. Return an `Error` from a handler to fail the RPC call.
 
 ```ts
-import { pluginOs } from "@halo/plugin-sdk/server";
+import { pluginOs } from "@get-halo/plugin-sdk/server";
 
 const plugin = pluginOs;
 
@@ -132,14 +152,16 @@ await server.ping();
 
 ## Storage
 
-The host does not wrap storage. If the plugin uses `syncRoutes`, wrap `PluginStorageProvider` in `Routes` and in `Sidebar` if the sidebar queries. Use `usePluginServer` for other RPC.
+This is the only persistence API. Do not use `localStorage`, `sessionStorage`, cookies, or files you invent.
+
+Add `storage.ts` with Tandem collections. Spread `syncRoutes(tables)` into the server. Wrap `PluginStorageProvider` around `Routes`, and around `Sidebar` if the sidebar queries. Use `usePluginServer` for other RPC.
 
 A complete todo plugin lives at `.halo/plugins/todos`. `halo.name` is `Todos`. `Sidebar` has a `SidebarItem` named `List`. `Routes` wraps `PluginStorageProvider` with `tables={todoTables}`, lists todos, and adds items with a field labeled `New todo` and a button named `Add`.
 
 `storage.ts`:
 
 ```ts
-import { collection, defineSchema, t } from "@halo/plugin-sdk/storage";
+import { collection, defineSchema, t } from "@get-halo/plugin-sdk/storage";
 
 export const todoTables = defineSchema({
   todos: collection({
@@ -153,7 +175,7 @@ export const todoTables = defineSchema({
 `server.ts`:
 
 ```ts
-import { syncRoutes } from "@halo/plugin-sdk/server";
+import { syncRoutes } from "@get-halo/plugin-sdk/server";
 import { todoTables } from "./storage.ts";
 
 export default {
@@ -172,6 +194,9 @@ export default {
     "description": "A list that survives reload.",
     "view": "./view.tsx",
     "server": "./server.ts"
+  },
+  "devDependencies": {
+    "@get-halo/plugin-sdk": "0.1.20"
   }
 }
 ```
@@ -179,21 +204,23 @@ export default {
 `view.tsx`:
 
 ```tsx
-import { useState } from "react";
 import {
   Button,
   Checkbox,
   Flex,
   H1,
+  Padding,
   PluginStorageProvider,
   Route,
   SidebarItem,
   SidebarSection,
   Switch,
   TextField,
+  proseMaxWidth,
   usePluginQuery,
   usePluginTransaction,
-} from "@halo/plugin-sdk/view";
+  useState,
+} from "@get-halo/plugin-sdk/view";
 import { todoTables } from "./storage.ts";
 
 export function Sidebar() {
@@ -214,16 +241,16 @@ export function Routes() {
   );
 }
 
+type Todo = { id: string; title: string; done: boolean };
+
 function Home() {
-  const todos = usePluginQuery({ collection: "todos" });
+  const todos = usePluginQuery<Todo>({ collection: "todos" }, []);
   const addTodo = usePluginTransaction((tx, title: string) => {
     tx.set("todos", { id: crypto.randomUUID(), title, done: false });
   });
-  const toggleTodo = usePluginTransaction(
-    (tx, todo: (typeof todos)[number]) => {
-      tx.set("todos", { ...todo, done: !todo.done });
-    },
-  );
+  const toggleTodo = usePluginTransaction((tx, todo: Todo) => {
+    tx.set("todos", { ...todo, done: !todo.done });
+  });
   const [title, setTitle] = useState("");
 
   function add() {
@@ -234,33 +261,39 @@ function Home() {
   }
 
   return (
-    <Flex column gap={4}>
-      <H1>Todos</H1>
-      <Flex gap={2}>
-        <TextField
-          aria-label="New todo"
-          value={title}
-          onChange={setTitle}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void add();
-          }}
-        />
-        <Button onClick={add}>Add</Button>
+    <Padding xy={6}>
+      <Flex
+        column
+        gap={4}
+        style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
+      >
+        <H1>Todos</H1>
+        <Flex gap={2}>
+          <TextField
+            aria-label="New todo"
+            value={title}
+            onChange={setTitle}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void add();
+            }}
+          />
+          <Button onClick={add}>Add</Button>
+        </Flex>
+        <Flex column gap={2}>
+          {todos.map((todo) => (
+            <Flex key={todo.id} gap={2}>
+              <Checkbox
+                label={todo.title}
+                checked={todo.done}
+                setChecked={() => {
+                  toggleTodo(todo);
+                }}
+              />
+            </Flex>
+          ))}
+        </Flex>
       </Flex>
-      <Flex column gap={2}>
-        {todos.map((todo) => (
-          <Flex key={todo.id} gap={2}>
-            <Checkbox
-              label={todo.title}
-              checked={todo.done}
-              setChecked={() => {
-                toggleTodo(todo);
-              }}
-            />
-          </Flex>
-        ))}
-      </Flex>
-    </Flex>
+    </Padding>
   );
 }
 ```

@@ -6,6 +6,8 @@ export type FlexProps = {
   row?: boolean;
   gap?: number;
   children?: ReactNode;
+  key?: string;
+  style?: unknown;
 };
 
 export function Flex(props: FlexProps): JsxElement;
@@ -18,13 +20,18 @@ export function P(props: { children?: ReactNode }): JsxElement;
 export function Button(props: {
   children?: ReactNode;
   onClick?: () => void;
+  variant?: "default" | "quiet";
 }): JsxElement;
 export function Divider(props?: Record<string, never>): unknown;
 export function Spacer(props?: Record<string, never>): unknown;
 export function Avatar(props: unknown): unknown;
 export function Badge(props: unknown): unknown;
 export function Blockquote(props: unknown): unknown;
-export function Checkbox(props: unknown): unknown;
+export function Checkbox(props: {
+  label?: string;
+  checked: boolean;
+  setChecked: (checked: boolean) => void;
+}): JsxElement;
 export function CodeBlock(props: unknown): unknown;
 export function CollectionPopover(props: unknown): unknown;
 export function Dialog(props: unknown): unknown;
@@ -41,7 +48,16 @@ export function MenuTrigger(props: unknown): unknown;
 export function NumberField(props: unknown): unknown;
 export function Ol(props: unknown): unknown;
 export function Overlay(props: unknown): unknown;
-export function Padding(props: unknown): unknown;
+export function Padding(props: {
+  xy?: number;
+  x?: number;
+  y?: number;
+  top?: number;
+  left?: number;
+  right?: number;
+  bottom?: number;
+  children?: ReactNode;
+}): JsxElement;
 export function Panel(props: unknown): unknown;
 export function Prose(props: unknown): unknown;
 export function QuietTextField(props: unknown): unknown;
@@ -57,7 +73,14 @@ export function TableCell(props: unknown): unknown;
 export function TableHead(props: unknown): unknown;
 export function TableHeaderCell(props: unknown): unknown;
 export function TableRow(props: unknown): unknown;
-export function TextField(props: unknown): unknown;
+export function TextField(props: {
+  value?: string;
+  onChange?: (value: string) => void;
+  label?: string;
+  "aria-label"?: string;
+  placeholder?: string;
+  onKeyDown?: (event: { key: string }) => void;
+}): JsxElement;
 export function Tooltip(props: unknown): unknown;
 export function Ul(props: unknown): unknown;
 
@@ -86,7 +109,7 @@ export const motionStreamDurationMs: unknown;
 export const navigationItem: unknown;
 export const prose: unknown;
 export const proseHtml: unknown;
-export const proseMaxWidth: unknown;
+export const proseMaxWidth: string;
 export const proseRhythm: unknown;
 export const proseStreamingMarkers: unknown;
 export const radius: unknown;
@@ -152,3 +175,44 @@ export function PluginRuntimeProvider(args: {
 }): unknown;
 
 export function usePluginServer<T = unknown>(): T;
+
+export function PluginStorageProvider(props: {
+  tables: unknown;
+  children?: ReactNode;
+}): JsxElement;
+
+export function useState<T>(
+  initial: T | (() => T),
+): [T, (value: T | ((previous: T) => T)) => void];
+export function useMemo<T>(factory: () => T, deps: readonly unknown[]): T;
+export function useCallback<T extends (...args: never[]) => unknown>(
+  callback: T,
+  deps: readonly unknown[],
+): T;
+export function useEffect(
+  effect: () => void | (() => void),
+  deps?: readonly unknown[],
+): void;
+
+export function usePluginQuery<Row = { id: string }>(
+  query: {
+    collection: string;
+    where?: unknown;
+  },
+  deps: readonly unknown[],
+): Row[];
+
+export function usePluginTransaction<Args extends unknown[]>(
+  callback: (
+    tx: {
+      set: (collection: string, row: unknown) => void;
+      remove: (collection: string, id: string) => void;
+    },
+    ...args: Args
+  ) => void,
+): (...args: Args) => void;
+
+export function usePluginEntity(
+  collection: string,
+  id: string | undefined,
+): { id: string } | undefined;

@@ -18,10 +18,10 @@ type PluginModule = AnyRouter & {
 const requireFromThisFile = createRequire(import.meta.url);
 const jiti = createJiti(import.meta.url, {
   alias: {
-    "@halo/plugin-sdk/schema": sdkEntry("schema"),
-    "@halo/plugin-sdk/server": sdkEntry("server"),
-    "@halo/plugin-sdk/storage": sdkEntry("storage"),
-    "@halo/plugin-sdk/view": sdkEntry("view"),
+    "@get-halo/plugin-sdk/schema": sdkEntry("schema"),
+    "@get-halo/plugin-sdk/server": sdkEntry("server"),
+    "@get-halo/plugin-sdk/storage": sdkEntry("storage"),
+    "@get-halo/plugin-sdk/view": sdkEntry("view"),
     "@tandem/core": requireFromThisFile.resolve("@tandem/core"),
     "@tandem/server": requireFromThisFile.resolve("@tandem/server"),
     "@tandem/types": requireFromThisFile.resolve("@tandem/types"),

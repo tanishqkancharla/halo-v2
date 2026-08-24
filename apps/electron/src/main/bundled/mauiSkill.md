@@ -1,88 +1,136 @@
 ---
 name: maui
-version: 1
-description: Conventions for consuming the Maui design system. Use when building UI with Maui tokens, components, or purse-styles in an app that depends on Maui.
+description: >
+  Required for every Halo plugin view. Use Maui components, tokens, Flex
+  spacing, and purse-styles whenever you create or edit plugin UI.
 ---
 
-# Maui
+# Maui in Halo plugins
 
-TypeScript-first design system styled with `purse-styles`. Wrap the app in `MauiProvider`, then import tokens and components from `"maui"`.
+Halo already wraps the app in `MauiProvider` and paints the plugin pane with `backgroundColor.app`. Import every UI name from `@get-halo/plugin-sdk/view`. Do not import from `"maui"` or `"purse-styles"`. Do not wrap `MauiProvider`.
 
-```ts
-import { style } from "purse-styles"
-import {
-	MauiProvider,
-	background,
-	border,
-	colors,
-	radius,
-	shadow,
-} from "maui"
+Source (TypeScript, unminified): [maui/src/components](https://github.com/tanishqkancharla/maui/tree/main/src/components). Barrel: [maui/src/maui.ts](https://github.com/tanishqkancharla/maui/blob/main/src/maui.ts). Read those files for props.
 
-function App() {
-	return (
-		<MauiProvider>
-			{/* … */}
-		</MauiProvider>
-	)
-}
+Do not use raw `<button>`, `<input>`, `<textarea>`, `<select>`, or a native checkbox.
+
+## Page width
+
+The pane is the full main column. Do not stretch a simple page across it.
+
+For a list, form, notes, or settings screen, wrap content in a centered column at `proseMaxWidth` (`72ch`) with `Padding xy={6}`:
+
+```tsx
+import { Flex, Padding, proseMaxWidth } from "@get-halo/plugin-sdk/view";
+
+<Padding xy={6}>
+  <Flex
+    column
+    gap={4}
+    style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
+  >
+    {/* page */}
+  </Flex>
+</Padding>;
 ```
 
-The published package exposes:
+Full pane width should be reserved for when you need it (horizontally dense tools, like tables, a CRM, kanban, or side-by-side panes).
 
-- `"maui"` — built barrel (`dist/`) of provider, theme, tokens, and components
-- `"maui/src/*"` — TypeScript source for deep imports
-- `"maui/skills/maui"` — this skill file
+Do not set a page-level gray background. The host already uses `backgroundColor.app`.
 
-`MauiProvider` sets up theme (`data-theme` / `color-scheme`), `PurseProvider`, design-system globals, and the focus UI database used by Button/Dialog.
+## Components
 
-## Theme FOUC
+### Layout
 
-Put the exported `themeFoucScript` string in a classic inline `<script>` in `<head>` (before React boots) so `data-theme` is correct on first paint. The gallery `src/index.html` uses the same script.
+- `Flex` — row or column. `gap` is a spacing step (`1 | 2 | 3 | 4 | 6 | 8 | 12 | 16`), not pixels. `<Flex row gap={4}>` is a scale step, not 4px.
+- `Padding` — `xy`, `x`, `y`, `top`, `left`, `right`, `bottom` are spacing steps.
+- `Gap` — fixed spacer (`width` or `height` as a spacing step).
+- `Spacer` — flex grow.
+- `Divider` — rule.
+- `Panel` — demo/surface card. Skip for ordinary pages.
+- `Overlay` — portal + click-outside.
 
-Use `useTheme()` for preference / resolved theme. Token dark values use the `DARK_THEME` selector (`:root[data-theme="dark"]`). Prefer semantic tokens (`colors`, `background`, `avatar`, `focusRing()`) over bespoke CSS variables.
+Prefer `Flex` over `style({ display: "flex" })`.
 
-## Shadows
+### Typography
 
-Use the three-level elevation scale:
+- `H1` `H2` `H3` `H4` `P` `Label` `Blockquote` `Ul` `Ol` `Li`
+- `Prose` — long-form type scale and rhythm. `proseMaxWidth` is `72ch`.
+- `CodeBlock` — fenced code.
 
-- `shadow.subtle` — controls, cards, and ordinary raised surfaces
-- `shadow.medium` — tooltips and larger floating panels
-- `shadow.strong` — dropdowns, popovers, and dominant overlays
+### Controls
 
-All three already include a 1px ring. Do not also apply `border()`, `borderColor.outline`, or another ring on the same element.
+- `Button` — actions. `variant="quiet"` for secondary actions.
+- `TextField` — text. `value`, `onChange(value)`, `aria-label` or `label`.
+- `QuietTextField` — borderless text.
+- `SearchField` `NumberField`
+- `Checkbox` — `label`, `checked`, `setChecked(checked)`.
+- `Select` + `SelectItem`
+- `RadioOptionGroup` + `RadioOption`
+- `Slider`
 
-Buttons and form-control surfaces use `shadow.subtle` by default. For compound
-controls, apply it once to the outer control boundary rather than to every
-internal button or segment.
+### Overlays and menus
 
-## Focus
+- `Dialog` — modal. Pair with `Overlay` if you need a backdrop.
+- `Tooltip`
+- `MenuTrigger` `Menu` `MenuItem`
+- `ListBox` `ListBoxItem`
+- `CollectionPopover` — menu/select popover chrome.
 
-`focusRing()` applies a theme-aware Radix blue shadow (`blueAlpha[8]` hard edge + `blueAlpha[5]` glow). Do not hand-roll a competing outline or box-shadow for keyboard focus.
+### Data and chrome
 
-## Layout utilities
+- `Table` `TableHead` `TableBody` `TableRow` `TableHeaderCell` `TableCell`
+- `Avatar` `Badge` `Icons`
+- `FuzzyString` — highlighted fuzzy match.
 
-`Flex`, `Padding`, and `Gap` take spacing scale steps (`1 | 2 | 3 | 4 | 6 | 8 | 12 | 16`), not raw pixels. Example: `<Flex row gap={4}>` is 9px, not 4px.
+Plugin routing uses wouter's `Link`, `Route`, and `Switch` from `@get-halo/plugin-sdk/view`, not Maui's.
 
-## Reference: patterns and apps
+```tsx
+import {
+  Button,
+  Checkbox,
+  Flex,
+  H1,
+  Padding,
+  TextField,
+  proseMaxWidth,
+} from "@get-halo/plugin-sdk/view";
 
-Patterns and demo apps are **not** part of the `"maui"` package barrel. Use them as in-repo reference implementations (also available via `"maui/src/..."` when the package ships source):
+<Padding xy={6}>
+  <Flex
+    column
+    gap={4}
+    style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
+  >
+    <H1>Todos</H1>
+    <Flex gap={2}>
+      <TextField aria-label="New todo" value={title} onChange={setTitle} />
+      <Button onClick={add}>Add</Button>
+    </Flex>
+    <Checkbox
+      label={todo.title}
+      checked={todo.done}
+      setChecked={() => toggle(todo)}
+    />
+  </Flex>
+</Padding>;
+```
 
-### Patterns — `src/patterns/`
+## Tokens
 
-| Path                                | Role                                               |
-| ----------------------------------- | -------------------------------------------------- |
-| `src/patterns/AssistantMessage.tsx` | Streaming markdown reply (Streamdown + Maui prose) |
-| `src/patterns/Editor.tsx`           | TipTap markdown composer                           |
-| `src/patterns/Loader.tsx`           | Game-of-life loader                                |
-| `src/patterns/Sidebar.tsx`          | App sidebar chrome                                 |
-| `src/patterns/Tree.tsx`             | Nested tree navigation                             |
-| `src/patterns/Inbox.tsx`            | Mail inbox layout                                  |
-| `src/patterns/MessageList.tsx`      | Message list rows                                  |
+If you need `style()`, import `style` and tokens from `@get-halo/plugin-sdk/view`. Use `colors`, `background`, `backgroundColor`, `shadow`, `radius`, and `spacing`. Do not use raw `rgba(...)`, hex colors, or pixel padding.
 
-### Apps — `src/apps/`
+- `backgroundColor.app` — page
+- `backgroundColor.element` — raised control/surface
+- `shadow.subtle` — cards and controls
+- `shadow.medium` — tooltips
+- `shadow.strong` — dropdowns
 
-| Path                    | Role                                               |
-| ----------------------- | -------------------------------------------------- |
-| `src/apps/AiChat/`      | Mock streaming AI chat (Editor + AssistantMessage) |
-| `src/apps/EmailClient/` | Email client demo composing inbox patterns         |
+Shadows already include a 1px ring. Do not also apply `border()`.
+
+`focusRing()` is the keyboard focus style. Do not hand-roll an outline.
+
+Token source: [maui/src/tokens](https://github.com/tanishqkancharla/maui/tree/main/src/tokens).
+
+## Custom CSS
+
+Use `style` and `useStyles` only when a Maui component cannot do the job. Most screens need no `style()` besides the `proseMaxWidth` column.

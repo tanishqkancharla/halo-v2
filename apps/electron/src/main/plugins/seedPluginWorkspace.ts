@@ -13,7 +13,7 @@ export class PluginSeedError extends errore.createTaggedError({
 
 export async function seedPluginWorkspace(
   layout: WorkspaceLayout,
-  args: { appVersion: string },
+  args: { appVersion: string; alwaysWrite: boolean },
 ) {
   const pluginSkillPath = join(
     layout.agentDir,
@@ -22,13 +22,19 @@ export async function seedPluginWorkspace(
     "SKILL.md",
   );
   const mauiSkillPath = join(layout.agentDir, "skills", "maui", "SKILL.md");
-  const pluginSkill = await writeIfStale(
-    pluginSkillPath,
-    haloPluginSkill,
-    args.appVersion,
-  );
+  const pluginSkill = await writeIfStale({
+    path: pluginSkillPath,
+    contents: haloPluginSkill,
+    appVersion: args.appVersion,
+    alwaysWrite: args.alwaysWrite,
+  });
   if (pluginSkill instanceof Error) return pluginSkill;
-  return writeIfStale(mauiSkillPath, mauiSkill, args.appVersion);
+  return writeIfStale({
+    path: mauiSkillPath,
+    contents: mauiSkill,
+    appVersion: args.appVersion,
+    alwaysWrite: args.alwaysWrite,
+  });
 }
 
 export function stampSkillVersion(contents: string, version: string) {
@@ -52,24 +58,25 @@ export function readSkillVersion(contents: string) {
   return match[1];
 }
 
-async function writeIfStale(
-  path: string,
-  contents: string,
-  appVersion: string,
-) {
-  const stamped = stampSkillVersion(contents, appVersion);
-  if (existsSync(path)) {
-    const existing = await readFile(path, "utf8").catch(
+async function writeIfStale(args: {
+  path: string;
+  contents: string;
+  appVersion: string;
+  alwaysWrite: boolean;
+}) {
+  const stamped = stampSkillVersion(args.contents, args.appVersion);
+  if (!args.alwaysWrite && existsSync(args.path)) {
+    const existing = await readFile(args.path, "utf8").catch(
       (e) => new PluginSeedError({ cause: e }),
     );
     if (existing instanceof Error) return existing;
-    if (readSkillVersion(existing) === appVersion) return;
+    if (readSkillVersion(existing) === args.appVersion) return;
   }
-  const created = await mkdir(dirname(path), { recursive: true }).catch(
+  const created = await mkdir(dirname(args.path), { recursive: true }).catch(
     (e) => new PluginSeedError({ cause: e }),
   );
   if (created instanceof Error) return created;
-  const written = await writeFile(path, stamped).catch(
+  const written = await writeFile(args.path, stamped).catch(
     (e) => new PluginSeedError({ cause: e }),
   );
   if (written instanceof Error) return written;

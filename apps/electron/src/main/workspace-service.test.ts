@@ -210,6 +210,43 @@ describe("workspace path helpers", () => {
     expect(toPosixRelative(root, outside)).toBeUndefined();
   });
 
+  test("development restart overwrites skills stamped with the same version", async () => {
+    const root = await testDirectory("skill-refresh");
+    const appDataDir = await testDirectory("skill-refresh-app");
+    const first = new WorkspaceService(appDataDir, { appVersion: "1.2.3" });
+    const selected = await first.select(root);
+    if (selected instanceof Error) throw selected;
+
+    const skillPath = join(
+      root,
+      ".pi",
+      "agent",
+      "skills",
+      "halo-plugin",
+      "SKILL.md",
+    );
+    const original = await readFile(skillPath, "utf8");
+    await writeFile(
+      skillPath,
+      '---\nversion: 1.2.3\n---\n# stale skill\nimport from "@halo/plugin-sdk/view"\n',
+    );
+
+    const packaged = new WorkspaceService(appDataDir, { appVersion: "1.2.3" });
+    const packagedSelect = await packaged.select(root);
+    if (packagedSelect instanceof Error) throw packagedSelect;
+    expect(await readFile(skillPath, "utf8")).toContain(
+      "@halo/plugin-sdk/view",
+    );
+
+    const development = new WorkspaceService(appDataDir, {
+      appVersion: "1.2.3",
+      isDevelopment: true,
+    });
+    const developmentSelect = await development.select(root);
+    if (developmentSelect instanceof Error) throw developmentSelect;
+    expect(await readFile(skillPath, "utf8")).toBe(original);
+  });
+
   test("mapParcelEventsToTreeEvents drops updates and maps create/delete", async () => {
     const root = await testDirectory("watch-map");
     await mkdir(join(root, "src"), { recursive: true });
