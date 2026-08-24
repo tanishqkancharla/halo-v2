@@ -16,8 +16,7 @@ allowBuilds:
   geckodriver: false
   koffi: false
   macos-alias: true
-  maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/8fb6ba3a4d58ed2da1a783f088995d041a57f458: false
-  maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/cb99be2b6872afff0d865f9aba48cffa93ac6f98: true
+  "@tanishqkancharla/maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/5a6e53d3b17cfb99068542ce048065f420f79175": true
   msgpackr-extract: false
   protobufjs: false
   sharp: false
@@ -38,7 +37,6 @@ minimumReleaseAgeExclude:
   - "@effect/platform-node-shared@4.0.0-beta.103"
   - "@effect/platform-node@4.0.0-beta.103"
   - effect@4.0.0-beta.103
-  - "@tanishqkancharla/maui@0.0.2"
   - "@oxlint/binding-android-arm-eabi@1.79.0"
   - "@oxlint/binding-android-arm64@1.79.0"
   - "@oxlint/binding-darwin-arm64@1.79.0"
