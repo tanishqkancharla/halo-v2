@@ -14,6 +14,7 @@ import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
 import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
+import { IntegrationService } from "./IntegrationService.js";
 import { PiService } from "./pi-service.js";
 import { PluginService } from "./plugins/PluginService.js";
 import type { HaloContext } from "./router.js";
@@ -48,9 +49,11 @@ const rpcHttpTest = test.extend<{
       throw new Error("workspace restore returned undefined");
     }
 
+    const integrations = new IntegrationService(workspace);
     const context: HaloContext = {
       workspace,
-      pi: new PiService(workspace, new UserService(userDataDir)),
+      integrations,
+      pi: new PiService(workspace, new UserService(userDataDir), integrations),
       plugins: new PluginService(workspace),
       sessions: new AgentSessionRegistry(),
       getWindow: () => {

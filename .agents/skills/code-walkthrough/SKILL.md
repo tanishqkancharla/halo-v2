@@ -52,6 +52,22 @@ flowchart TD
   C --> D[Observable result]
 ```
 
+## User flows
+
+After Solution, add a Mermaid `sequenceDiagram` for each main user-visible flow (happy path and the other paths a user actually takes). Name participants that exist in the landed design. Keep node text short. Skip this section only when the change has no user-facing sequence.
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant App
+  participant Service
+
+  User->>App: action
+  App->>Service: call
+  Service-->>App: result
+  App-->>User: visible outcome
+```
+
 ## Goals
 
 - State a user-visible or system-level result that is true after the change.
@@ -66,13 +82,16 @@ No `Chapter:` prefix. The heading is the outcome name only.
 
 The handler now validates before it stores. The call path gained `validateInput`:
 
+Put a `#` comment on a stack line when the symbol name is not enough: why the call is there, what it returns, or a surprising side effect. Trailing `#` on the same line is the usual form. A line that is only `# …` is fine when the note covers the next step, not one symbol. Skip comments on lines that already read as the behavior.
+
 ```callstack
  requestHandler
 -└── existingService
 -    └── dataStore
-+└── validateInput
++└── validateInput  # tagged error, no throw
 +    └── existingService
         └── dataStore
+# store write is unchanged
 ```
 
 `validateInput` returns a tagged error. The handler returns that error. It does not throw.
@@ -98,7 +117,7 @@ File excerpts use `start:end:repo-relative-path`. Line numbers are 1-based and i
 
 Use an `html` fence, or write HTML in the markdown, for callouts. HTML from this file is trusted local content. tkstack does not sanitize it. Only use it for files you wrote.
 
-Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter when a local flow is clearer than the Problem or Solution diagram. Keep each chapter on one outcome. Skip a Mermaid fence in Problem or Solution when prose is enough.
+Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter when a local flow is clearer than the Problem, Solution, or User flows diagrams. Keep each chapter on one outcome. Skip a Mermaid fence in Problem or Solution when prose is enough.
 
 ## Fence reference
 
@@ -141,14 +160,16 @@ Tell the user the markdown path and the URL.
 
 ## Chapter rules
 
+- After Solution, add a `sequenceDiagram` for each main user-visible flow. Name participants that exist in the landed design.
 - Name exact files, symbols, behavior, and commands that exist in the tree.
 - In each code chapter, include a call-stack fence, then the code (diffs, types, excerpts). Put the call stack first. Do not title those blocks. Do not add a fixed set of subheadings.
 - Walk through the fences in prose. Put a sentence or two next to each one. Do not collect every artifact into one appendix.
 - Make the call-stack diff start from the previous path and mark the landed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
+- Annotate call-stack lines with `#` comments where the reader needs a reason, return, or side effect that the symbol name does not say. Do not comment every line.
 - Make the code a real excerpt of the landed edit or the current types. Include a file path and enough surrounding control flow to place it.
 - Use `Not applicable — no code path changed` only for a true docs, data, or config slice.
 - Do not invent types, call paths, or diffs. If a slice has no code path change, skip those fences.
 
 ## Final check
 
-Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; Mermaid appears only where it helps; each code chapter has a call stack and then the code, with prose between the fences and no titles on those blocks; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.
+Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; User flows has a sequence diagram for each main user path; Mermaid appears only where it helps; each code chapter has a call stack and then the code, with prose between the fences and no titles on those blocks; call-stack lines that need a reason use a `#` comment; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.

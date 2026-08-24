@@ -131,6 +131,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
 
 export type UseDraftAgentSessionResult = {
   state: AgentSessionState;
+  sessionId: string | undefined;
   prompt: (text: string) => Promise<void | PromptFailedError>;
   abort: () => Promise<void | AbortFailedError>;
 };
@@ -144,6 +145,7 @@ export function useDraftAgentSession(
   const api = useApi();
   const queryClient = useQueryClient();
   const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const sessionIdRef = useRef<string | undefined>(undefined);
   const onCreatedRef = useRef(onCreated);
 
@@ -164,6 +166,7 @@ export function useDraftAgentSession(
       return created;
     }
     sessionIdRef.current = created.sessionId;
+    setSessionId(created.sessionId);
     onCreatedRef.current(created.sessionId);
 
     setState((current) => ({ ...current, error: undefined }));
@@ -192,10 +195,10 @@ export function useDraftAgentSession(
   }
 
   async function abort() {
-    const sessionId = sessionIdRef.current;
-    if (sessionId === undefined) return;
+    const createdSessionId = sessionIdRef.current;
+    if (createdSessionId === undefined) return;
     const result = await api.agentSession
-      .abort({ sessionId })
+      .abort({ sessionId: createdSessionId })
       .then(() => undefined)
       .catch(
         (e) =>
@@ -210,5 +213,5 @@ export function useDraftAgentSession(
     }
   }
 
-  return { state, prompt, abort };
+  return { state, sessionId, prompt, abort };
 }

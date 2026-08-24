@@ -27,6 +27,7 @@ import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
+import { IntegrationService } from "./IntegrationService.js";
 import { resolveHaloCliEntry } from "./installHaloCli.js";
 import { PiService } from "./pi-service.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -75,7 +76,12 @@ const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
   cliEntry: resolveHaloCliEntry(import.meta.url),
 });
 const userService = new UserService(applicationConfig.dataDir);
-const piService = new PiService(workspaceService, userService);
+const integrationService = new IntegrationService(workspaceService);
+const piService = new PiService(
+  workspaceService,
+  userService,
+  integrationService,
+);
 const pluginService = new PluginService(workspaceService);
 let mainWindow: BrowserWindow | undefined;
 let rpcHttp: HaloRpcHttp | undefined;
@@ -87,6 +93,7 @@ app.whenReady().then(async () => {
   const listening = await listenHaloRpcHttp({
     context: {
       workspace: workspaceService,
+      integrations: integrationService,
       pi: piService,
       plugins: pluginService,
       sessions: new AgentSessionRegistry(),
@@ -205,6 +212,7 @@ function registerRpcBridge(): void {
     const { port1, port2 } = new MessageChannelMain();
     const context: HaloContext = {
       workspace: workspaceService,
+      integrations: integrationService,
       pi: piService,
       plugins: pluginService,
       sessions: new AgentSessionRegistry(),

@@ -1,7 +1,9 @@
+import * as errore from "errore";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import type { AgentMessage } from "../../shared/rpc.js";
 import type { AgentSessionState } from "../../shared/AgentSessionState.js";
+import type { ConnectionIntent } from "../../shared/integrations.js";
 
 export type SessionViewItem =
   | { kind: "user"; id: string; text: string }
@@ -19,12 +21,41 @@ export type SessionViewPart =
       toolName: string;
       args: unknown;
       resultText?: string;
+    }
+  | {
+      kind: "integrationConnect";
+      id: string;
+      connectionId: string | undefined;
+      service: string;
+      scopes: string[];
+      intent: ConnectionIntent | undefined;
     };
 
 export type ToolPartLabel = {
   kind: "read" | "wrote" | "shell" | "other";
   text: string;
 };
+
+const connectArgsSchema = Type.Object({
+  service: Type.String(),
+  scopes: Type.Optional(Type.Array(Type.String())),
+});
+
+const connectResultSchema = Type.Object({
+  status: Type.Optional(Type.String()),
+  intent: Type.Optional(
+    Type.Union([
+      Type.Literal("connect"),
+      Type.Literal("upgrade"),
+      Type.Literal("disconnect"),
+    ]),
+  ),
+  connectionId: Type.Optional(Type.String()),
+  service: Type.Optional(Type.String()),
+  profile: Type.Optional(Type.String()),
+  scopes: Type.Optional(Type.Array(Type.String())),
+  error: Type.Optional(Type.String()),
+});
 
 const pathArgsSchema = Type.Object({
   path: Type.String(),
@@ -84,6 +115,19 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
       if (emittedTools.has(part.id)) continue;
       emittedTools.add(part.id);
       const resultText = toolResults.get(part.id);
+      const connectArgs = Value.Check(connectArgsSchema, part.arguments)
+        ? part.arguments
+        : undefined;
+      const connectPart = integrationConnectPart({
+        id: part.id,
+        toolName: part.name,
+        args: connectArgs,
+        resultText,
+      });
+      if (connectPart !== undefined) {
+        assistantParts.push(connectPart);
+        continue;
+      }
       const toolPart: Extract<SessionViewPart, { kind: "tool" }> = {
         kind: "tool",
         id: part.id,
@@ -192,6 +236,76 @@ function stripWorkspaceRootPrefix(
 
 function toPosixPath(value: string): string {
   return value.replaceAll("\\", "/");
+}
+
+type ConnectArgs = {
+  service: string;
+  scopes?: string[];
+};
+
+function integrationConnectPart(input: {
+  id: string;
+  toolName: string;
+  args: ConnectArgs | undefined;
+  resultText: string | undefined;
+}): Extract<SessionViewPart, { kind: "integrationConnect" }> | undefined {
+  if (input.toolName !== "integrations_connect") return undefined;
+  const parsedArgs = input.args;
+  const parsedResult = parseConnectResult(input.resultText);
+  if (parsedResult !== undefined && parsedResult.error !== undefined) {
+    return undefined;
+  }
+  const service = (() => {
+    if (parsedResult !== undefined && parsedResult.service !== undefined) {
+      return parsedResult.service;
+    }
+    if (parsedArgs !== undefined) return parsedArgs.service;
+    return undefined;
+  })();
+  if (service === undefined) return undefined;
+
+  const scopes = (() => {
+    if (parsedResult !== undefined && parsedResult.scopes !== undefined) {
+      return parsedResult.scopes;
+    }
+    if (parsedArgs !== undefined && parsedArgs.scopes !== undefined) {
+      return parsedArgs.scopes;
+    }
+    return [];
+  })();
+
+  const intent = (() => {
+    if (parsedResult !== undefined && parsedResult.intent !== undefined) {
+      return parsedResult.intent;
+    }
+    if (scopes.length === 0) return "disconnect";
+    return "connect";
+  })();
+
+  return {
+    kind: "integrationConnect",
+    id: input.id,
+    connectionId:
+      parsedResult === undefined ? undefined : parsedResult.connectionId,
+    service,
+    scopes,
+    intent,
+  };
+}
+
+function parseConnectResult(resultText: string | undefined) {
+  if (resultText === undefined || resultText.length === 0) return undefined;
+  const parsed = errore.try({
+    try: () => {
+      // SAFETY: JSON.parse is untyped; connectResultSchema is the tool result contract.
+      return JSON.parse(resultText) as unknown;
+    },
+    catch: (e) =>
+      new Error("Invalid integrations_connect result", { cause: e }),
+  });
+  if (parsed instanceof Error) return undefined;
+  if (!Value.Check(connectResultSchema, parsed)) return undefined;
+  return parsed;
 }
 
 function toolResultsByCallId(state: AgentSessionState): Map<string, string> {
