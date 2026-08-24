@@ -23,6 +23,10 @@ export function contractPackageJson(version: string) {
     name: contractPackageName,
     version,
     type: "module",
+    repository: {
+      type: "git",
+      url: "https://github.com/tanishqkancharla/halo-v2.git",
+    },
     publishConfig: {
       access: "public",
     },
