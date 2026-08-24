@@ -45,7 +45,7 @@
     "errore": "^0.14.1",
     "esbuild": "^0.28.1",
     "jiti": "2.7.0",
-    "maui": "npm:@tanishqkancharla/maui@0.0.2",
+    "maui": "github:tanishqkancharla/maui#v0.0.4",
     "purse-styles": "^0.2.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
