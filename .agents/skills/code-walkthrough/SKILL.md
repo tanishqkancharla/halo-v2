@@ -79,13 +79,16 @@ The fence info string is `start:end:repo-relative-path`. Line numbers are 1-base
 
 Show how this slice changed the call path. Keep the entry point and enough parents to make ownership clear. Use a `callstack` fence, or a `diff` fence that contains `└──` / `├──`. Call stacks render without a Pierre file header.
 
+Put a `#` comment on a stack line when the symbol name is not enough: why the call is there, what it returns, or a surprising side effect. Trailing `#` on the same line is the usual form. A line that is only `# …` is fine when the note covers the next step, not one symbol. Skip comments on lines that already read as the behavior.
+
 ```callstack
  requestHandler
 -└── existingService
 -    └── dataStore
-+└── validateInput
++└── validateInput  # tagged error, no throw
 +    └── existingService
         └── dataStore
+# store write is unchanged
 ```
 
 ### Code diff
@@ -162,6 +165,7 @@ Tell the user the markdown path and the URL.
 - Name exact files, symbols, behavior, and commands that exist in the tree.
 - Show inputs, outputs, state, events, errors, or unions that the slice actually uses under `Important types`.
 - Make the call-stack diff start from the previous path and mark the landed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
+- Annotate call-stack lines with `#` comments where the reader needs a reason, return, or side effect that the symbol name does not say. Do not comment every line.
 - Make the code diff a real excerpt of the landed edit. Include a file path and enough surrounding control flow to place it.
 - Use `Not applicable — no code path changed` only for a true docs, data, or config slice.
 - Do not invent types, call paths, or diffs. If a slice has no code path change, skip those fences.
@@ -169,4 +173,4 @@ Tell the user the markdown path and the URL.
 
 ## Final check
 
-Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; Mermaid appears only where it helps; each code chapter has the types, call stack, and diff that belong to it; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.
+Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; Mermaid appears only where it helps; each code chapter has the types, call stack, and diff that belong to it; call-stack lines that need a reason use a `#` comment; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.
