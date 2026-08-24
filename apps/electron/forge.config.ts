@@ -1,5 +1,6 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
-import { copyMainProcessExternals } from "./copyMainProcessExternals.js";
+import { bundleHaloCli, haloCliBundlePath } from "./forge/bundleHaloCli.js";
+import { copyMainProcessExternals } from "./forge/copyMainProcessExternals.js";
 
 const appleApiKey = process.env.APPLE_API_KEY;
 const appleApiKeyId = process.env.APPLE_API_KEY_ID;
@@ -20,6 +21,7 @@ const packagerConfig: NonNullable<ForgeConfig["packagerConfig"]> = {
   name: "Halo",
   executableName: "Halo",
   osxSign: {},
+  extraResource: [haloCliBundlePath()],
 };
 if (shouldNotarize) {
   packagerConfig.osxNotarize = {
@@ -37,6 +39,9 @@ const config: ForgeConfig = {
     ignoreModules: ["@parcel/watcher"],
   },
   hooks: {
+    prePackage: async () => {
+      await bundleHaloCli();
+    },
     packageAfterCopy: async (_forgeConfig, buildPath) => {
       await copyMainProcessExternals(buildPath);
     },

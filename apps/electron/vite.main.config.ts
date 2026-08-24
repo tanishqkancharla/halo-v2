@@ -1,6 +1,6 @@
 import { builtinModules } from "node:module";
 import { defineConfig } from "vite";
-import { viteMainExternals } from "./mainExternals.js";
+import { viteMainExternals } from "./forge/mainExternals.js";
 
 const nodeBuiltins = [
   ...builtinModules,

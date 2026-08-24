@@ -18,6 +18,8 @@ export function haloCliBinPath(workspaceRoot: string) {
   return join(haloCliBinDir(workspaceRoot), "halo");
 }
 
+export const haloCliResourceName = "halo-cli.cjs";
+
 export function resolveHaloCliEntry(fromMainUrl: string) {
   const electronRoot = join(dirname(fileURLToPath(fromMainUrl)), "../..");
   const destCli = join(electronRoot, "../../packages/halo-cli/src/cli.ts");
@@ -26,7 +28,7 @@ export function resolveHaloCliEntry(fromMainUrl: string) {
     process.platform === "darwin"
       ? join(dirname(process.execPath), "..", "Resources")
       : join(dirname(process.execPath), "resources");
-  const packaged = join(resourcesDir, "halo-cli.cjs");
+  const packaged = join(resourcesDir, haloCliResourceName);
   if (existsSync(packaged)) return packaged;
   return undefined;
 }
@@ -43,14 +45,21 @@ export function haloCliWrapper(args: {
   appVersion: string;
   cliEntry: string;
   importHook?: string;
+  nodeExecutable: string;
+  electronRunAsNode: boolean;
 }) {
   const nodeArgs =
     args.importHook === undefined
       ? [args.cliEntry]
       : ["--import", args.importHook, args.cliEntry];
+  // Electron treats extra argv as app args unless this is set, and then runs
+  // as Node using this same binary.
+  const runAsNode = args.electronRunAsNode
+    ? "export ELECTRON_RUN_AS_NODE=1\n"
+    : "";
   return `#!/bin/sh
 export HALO_VERSION=${shQuote(args.appVersion)}
-exec node ${nodeArgs.map(shQuote).join(" ")} "$@"
+${runAsNode}exec ${shQuote(args.nodeExecutable)} ${nodeArgs.map(shQuote).join(" ")} "$@"
 `;
 }
 
@@ -72,6 +81,8 @@ export async function installHaloCli(args: {
   workspaceRoot: string;
   appVersion: string;
   cliEntry: string;
+  nodeExecutable?: string;
+  electronRunAsNode?: boolean;
 }) {
   const binPath = haloCliBinPath(args.workspaceRoot);
   if (existsSync(binPath)) {
@@ -94,6 +105,9 @@ export async function installHaloCli(args: {
     appVersion: args.appVersion,
     cliEntry: args.cliEntry,
     importHook,
+    nodeExecutable:
+      args.nodeExecutable === undefined ? "node" : args.nodeExecutable,
+    electronRunAsNode: args.electronRunAsNode === true,
   });
   const written = await writeFile(binPath, script, { mode: 0o755 }).catch(
     (e) => new InstallHaloCliError({ detail: "write halo", cause: e }),

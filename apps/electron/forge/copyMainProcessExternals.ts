@@ -12,7 +12,10 @@ import {
   pluginSdkJitiDependencies,
 } from "./mainExternals.js";
 
-const electronDir = path.dirname(fileURLToPath(import.meta.url));
+const electronDir = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 const requireFromElectron = createRequire(
   path.join(electronDir, "package.json"),
 );

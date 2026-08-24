@@ -13,6 +13,7 @@
     "src/main/**/*.ts",
     "src/main/**/*.d.ts",
     "src/shared/**/*.ts",
+    "forge/**/*.ts",
     "forge.config.ts",
     "vite.main.config.ts",
     "vite.preload.config.ts",

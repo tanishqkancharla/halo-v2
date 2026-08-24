@@ -164,6 +164,8 @@ function removeDirectoryAndDescendants(
 export type WorkspaceServiceOptions = {
   appVersion: string;
   cliEntry?: string;
+  cliNodeExecutable?: string;
+  cliElectronRunAsNode?: boolean;
   isDevelopment?: boolean;
 };
 
@@ -263,6 +265,8 @@ export class WorkspaceService {
         workspaceRoot: root,
         appVersion: this.options.appVersion,
         cliEntry: this.options.cliEntry,
+        nodeExecutable: this.options.cliNodeExecutable,
+        electronRunAsNode: this.options.cliElectronRunAsNode,
       });
       if (installed instanceof Error) return installed;
     }

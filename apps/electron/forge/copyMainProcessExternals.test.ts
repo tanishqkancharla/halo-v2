@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti";
 import { describe, expect, test } from "vitest";
-import { copyMainProcessExternals } from "../../copyMainProcessExternals.js";
-import { isCallable } from "../shared/isCallable.js";
+import { isCallable } from "../src/shared/isCallable.js";
+import { copyMainProcessExternals } from "./copyMainProcessExternals.js";
 
 const copyTest = test.extend<{ buildPath: string }>({
   buildPath: async ({ task }, use) => {

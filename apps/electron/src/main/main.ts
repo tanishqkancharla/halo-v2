@@ -74,6 +74,8 @@ process.env.HALO_USER_DATA = applicationConfig.dataDir;
 const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
   appVersion: app.getVersion(),
   cliEntry: resolveHaloCliEntry(import.meta.url),
+  cliNodeExecutable: isDevelopment ? "node" : process.execPath,
+  cliElectronRunAsNode: !isDevelopment,
   isDevelopment,
 });
 const userService = new UserService(applicationConfig.dataDir);
