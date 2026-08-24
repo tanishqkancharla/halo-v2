@@ -8,6 +8,7 @@ export type GoogleScope = {
 export type GoogleService = {
   id: GoogleServiceId;
   label: string;
+  description: string;
   apiHost: string;
   scopes: GoogleScope[];
 };
@@ -16,6 +17,7 @@ const services: GoogleService[] = [
   {
     id: "gmail",
     label: "Gmail",
+    description: "Search, read, draft, and manage email.",
     apiHost: "https://gmail.googleapis.com",
     scopes: [
       {
@@ -35,6 +37,7 @@ const services: GoogleService[] = [
   {
     id: "calendar",
     label: "Calendar",
+    description: "See and change events on your calendars.",
     apiHost: "https://www.googleapis.com",
     scopes: [
       {
@@ -54,6 +57,7 @@ const services: GoogleService[] = [
   {
     id: "drive",
     label: "Drive",
+    description: "Search, read, and manage files.",
     apiHost: "https://www.googleapis.com",
     scopes: [
       {
