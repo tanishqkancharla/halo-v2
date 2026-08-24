@@ -52,6 +52,22 @@ flowchart TD
   C --> D[Observable result]
 ```
 
+## User flows
+
+After Solution, add a Mermaid `sequenceDiagram` for each main user-visible flow (happy path and the other paths a user actually takes). Name participants that exist in the landed design. Keep node text short. Skip this section only when the change has no user-facing sequence.
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant App
+  participant Service
+
+  User->>App: action
+  App->>Service: call
+  Service-->>App: result
+  App-->>User: visible outcome
+```
+
 ## Goals
 
 - State a user-visible or system-level result that is true after the change.
@@ -119,7 +135,7 @@ Use an `html` fence, or write HTML in the markdown, for callouts, tables, and sm
 ```
 ````
 
-Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter when a local flow is clearer than the Problem or Solution diagram. Keep each chapter on one outcome. Skip a Mermaid fence in Problem or Solution when prose is enough.
+Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter when a local flow is clearer than the Problem, Solution, or User flows diagrams. Keep each chapter on one outcome. Skip a Mermaid fence in Problem or Solution when prose is enough.
 
 ## Fence reference
 
@@ -162,6 +178,7 @@ Tell the user the markdown path and the URL.
 
 ## Chapter rules
 
+- After Solution, add a `sequenceDiagram` for each main user-visible flow. Name participants that exist in the landed design.
 - Name exact files, symbols, behavior, and commands that exist in the tree.
 - Show inputs, outputs, state, events, errors, or unions that the slice actually uses under `Important types`.
 - Make the call-stack diff start from the previous path and mark the landed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
@@ -173,4 +190,4 @@ Tell the user the markdown path and the URL.
 
 ## Final check
 
-Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; Mermaid appears only where it helps; each code chapter has the types, call stack, and diff that belong to it; call-stack lines that need a reason use a `#` comment; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.
+Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; User flows has a sequence diagram for each main user path; Mermaid appears only where it helps; each code chapter has the types, call stack, and diff that belong to it; call-stack lines that need a reason use a `#` comment; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.
