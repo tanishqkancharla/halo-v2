@@ -1,6 +1,6 @@
 import path from "node:path";
 
-export function invokeWorkingDirectory() {
+function invokeWorkingDirectory() {
   if (process.env.INIT_CWD === undefined) return process.cwd();
   return process.env.INIT_CWD;
 }

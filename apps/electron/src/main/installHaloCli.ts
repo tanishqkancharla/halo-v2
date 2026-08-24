@@ -1,9 +1,9 @@
+import * as errore from "errore";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import * as errore from "errore";
 
 export class InstallHaloCliError extends errore.createTaggedError({
   name: "InstallHaloCliError",
@@ -14,7 +14,7 @@ export function haloCliBinDir(workspaceRoot: string) {
   return join(workspaceRoot, ".halo", "bin");
 }
 
-export function haloCliBinPath(workspaceRoot: string) {
+function haloCliBinPath(workspaceRoot: string) {
   return join(haloCliBinDir(workspaceRoot), "halo");
 }
 
@@ -33,7 +33,7 @@ export function resolveHaloCliEntry(fromMainUrl: string) {
   return undefined;
 }
 
-export function readInstalledHaloVersion(script: string) {
+function readInstalledHaloVersion(script: string) {
   const node = /process\.env\.HALO_VERSION = "([^"]+)"/.exec(script);
   if (node !== null) return node[1];
   const shell = /^export HALO_VERSION='([^']+)'/m.exec(script);
@@ -41,7 +41,7 @@ export function readInstalledHaloVersion(script: string) {
   return shell[1];
 }
 
-export function haloCliWrapper(args: {
+function wrapHaloCli(args: {
   appVersion: string;
   cliEntry: string;
   importHook?: string;
@@ -67,7 +67,7 @@ function shQuote(value: string) {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-export function resolveHaloCliImportHook(cliEntry: string) {
+function resolveHaloCliImportHook(cliEntry: string) {
   if (!cliEntry.endsWith(".ts")) return undefined;
   const require = createRequire(pathToFileURL(cliEntry).href);
   return errore.try({
@@ -101,7 +101,7 @@ export async function installHaloCli(args: {
   }).catch((e) => new InstallHaloCliError({ detail: "mkdir bin", cause: e }));
   if (created instanceof Error) return created;
 
-  const script = haloCliWrapper({
+  const script = wrapHaloCli({
     appVersion: args.appVersion,
     cliEntry: args.cliEntry,
     importHook,

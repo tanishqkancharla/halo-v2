@@ -43,7 +43,7 @@ export type HaloContext = {
 
 const os = implement(contract).$context<HaloContext>();
 
-export const router = {
+const router = {
   getAppInfo: os.getAppInfo.handler(({ context }) => {
     context.logger.info({ event: "getAppInfo" });
     return getAppInfo();

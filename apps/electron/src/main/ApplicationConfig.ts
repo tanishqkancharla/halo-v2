@@ -2,7 +2,7 @@ import { app } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-export type ApplicationConfig = {
+type ApplicationConfig = {
   isDevelopment: boolean;
   dataDir: string;
   logsDir: string;

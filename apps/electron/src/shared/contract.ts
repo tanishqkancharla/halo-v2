@@ -19,7 +19,7 @@ import type {
 
 export const reservedPluginIds = ["new", "build", "types"] as const;
 
-export type PluginTypeDiagnostic = {
+type PluginTypeDiagnostic = {
   id: string;
   file: string;
   line: number;

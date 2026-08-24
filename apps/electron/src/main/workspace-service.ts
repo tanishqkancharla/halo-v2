@@ -23,7 +23,7 @@ export type WorkspaceLayout = {
   sessionDir: string;
 };
 
-export type WorkspaceInfo = {
+type WorkspaceInfo = {
   name: string;
   workspaceRoot: string;
 };
@@ -84,13 +84,13 @@ export function toPosixRelative(
   return rel.split(sep).join("/");
 }
 
-export const parcelWatcherIgnore = [
+const parcelWatcherIgnore = [
   "**/node_modules/**",
   "**/.*",
   "**/.*/**",
 ] as const;
 
-export type ParcelWatchEvent = {
+type ParcelWatchEvent = {
   type: "create" | "update" | "delete";
   path: string;
 };
@@ -161,7 +161,7 @@ function removeDirectoryAndDescendants(
   }
 }
 
-export type WorkspaceServiceOptions = {
+type WorkspaceServiceOptions = {
   appVersion: string;
   cliEntry?: string;
   cliNodeExecutable?: string;

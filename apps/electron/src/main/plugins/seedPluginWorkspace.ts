@@ -37,7 +37,7 @@ export async function seedPluginWorkspace(
   });
 }
 
-export function stampSkillVersion(contents: string, version: string) {
+function stampSkillVersion(contents: string, version: string) {
   if (!contents.startsWith("---\n")) {
     return `---\nversion: ${version}\n---\n${contents}`;
   }
@@ -49,7 +49,7 @@ export function stampSkillVersion(contents: string, version: string) {
   return `---\nversion: ${version}\n${matter}${contents.slice(end)}`;
 }
 
-export function readSkillVersion(contents: string) {
+function readSkillVersion(contents: string) {
   if (!contents.startsWith("---\n")) return undefined;
   const end = contents.indexOf("\n---\n", 4);
   if (end === -1) return undefined;

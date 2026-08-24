@@ -6,7 +6,7 @@ type PokeIterator = AsyncIterable<PokeEvent> & {
   return?: (value?: undefined) => Promise<IteratorResult<PokeEvent>>;
 };
 
-export type OrpcSyncClient<Schema extends AnySchema> = {
+type OrpcSyncClient<Schema extends AnySchema> = {
   push: (
     args: Parameters<RemoteApi<Schema>["push"]>[0],
   ) => Promise<Error | void>;

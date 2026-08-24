@@ -3,7 +3,7 @@ import { style } from "purse-styles";
 import { codeFontFamily } from "../codeFont.js";
 import { diffsTheme } from "./diffsTheme.ts";
 
-export const pierreUnsafeCss = `:host { --diffs-font-family: ${codeFontFamily}; }`;
+const pierreUnsafeCss = `:host { --diffs-font-family: ${codeFontFamily}; }`;
 
 export const pierreShell = style(radius.md, shadow.subtle, {
   overflow: "hidden",

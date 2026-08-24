@@ -6,7 +6,7 @@ import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 
-export type User = {
+type User = {
   id: string;
 };
 

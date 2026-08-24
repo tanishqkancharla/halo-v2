@@ -22,7 +22,7 @@ class WorkspaceRestoreError extends errore.createTaggedError({
   message: "Workspace restore failed",
 }) {}
 
-export type WorkspaceState =
+type WorkspaceState =
   | { status: "needs-workspace"; message?: string }
   | { status: "ready"; workspace: WorkspaceInfo };
 

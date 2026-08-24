@@ -19,7 +19,7 @@ class AbortFailedError extends errore.createTaggedError({
   message: "$reason",
 }) {}
 
-export type UseAgentSessionResult = {
+type UseAgentSessionResult = {
   state: AgentSessionState;
   prompt: (text: string) => Promise<void | PromptFailedError>;
   abort: () => Promise<void | AbortFailedError>;
@@ -129,7 +129,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
   return { state, prompt, abort };
 }
 
-export type UseDraftAgentSessionResult = {
+type UseDraftAgentSessionResult = {
   state: AgentSessionState;
   sessionId: string | undefined;
   prompt: (text: string) => Promise<void | PromptFailedError>;

@@ -47,7 +47,7 @@ export function loadPluginViews(list: PluginList): LoadedPluginList {
   return { plugins: list.plugins, views, errors };
 }
 
-export function evaluatePluginView(args: {
+function evaluatePluginView(args: {
   id: string;
   source: string;
 }): PluginViewEvaluateError | LoadedPluginView {

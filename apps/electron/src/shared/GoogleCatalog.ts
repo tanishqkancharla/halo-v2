@@ -1,6 +1,6 @@
 export type GoogleServiceId = "gmail" | "calendar" | "drive";
 
-export type GoogleScope = {
+type GoogleScope = {
   id: string;
   label: string;
 };

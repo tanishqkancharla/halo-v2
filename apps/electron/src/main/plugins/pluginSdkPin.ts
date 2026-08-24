@@ -27,7 +27,7 @@ const pluginSdkPinPackageSchema = Type.Object({
 
 type PluginSdkPinPackage = Static<typeof pluginSdkPinPackageSchema>;
 
-export function readPluginSdkPin(
+function readPluginSdkPin(
   packageJson: PluginSdkPinPackage,
 ): string | undefined {
   const deps = packageJson.devDependencies;

@@ -1,6 +1,6 @@
 import { DefaultResourceLoader } from "@mariozechner/pi-coding-agent";
 
-export function workspacePrompt(workspaceRoot: string) {
+function workspacePrompt(workspaceRoot: string) {
   const path = workspaceRoot.replaceAll("\\", "/");
   return `## Workspace
 

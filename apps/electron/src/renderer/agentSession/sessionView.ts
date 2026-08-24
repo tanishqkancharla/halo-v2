@@ -31,7 +31,7 @@ export type SessionViewPart =
       intent: ConnectionIntent | undefined;
     };
 
-export type ToolPartLabel = {
+type ToolPartLabel = {
   kind: "read" | "wrote" | "shell" | "other";
   text: string;
 };

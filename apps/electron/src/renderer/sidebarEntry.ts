@@ -1,41 +1,9 @@
-import { backgroundColor, colors, flex, fontFamily, spacing, text } from "maui";
-import { style } from "purse-styles";
+import { backgroundColor, colors, fontFamily, spacing } from "maui";
 
-export const sidebarEntrySurface = backgroundColor.elementHover;
-export const sidebarEntryFg = colors.gray[12];
-export const sidebarEntryMutedFg = colors.gray[11];
-export const sidebarEntrySelectedFg = colors.accent[9];
-
-export const sidebarEntry = style(
-  spacing.padding({ y: 2 }),
-  text("sm", 400, "highContrast"),
-  flex({ align: "center", gap: 3 }),
-  {
-    width: "100%",
-    minWidth: 0,
-    border: 0,
-    outline: "none",
-    cursor: "default",
-    background: "transparent",
-    textAlign: "left",
-    textDecoration: "none",
-    color: "inherit",
-    paddingInline: `calc(${spacing.value(2)} + ${spacing.value(4)})`,
-    "&:hover": { background: sidebarEntrySurface },
-    "&[aria-current='page']": {
-      background: sidebarEntrySurface,
-      color: sidebarEntrySelectedFg,
-      fontWeight: 500,
-    },
-  },
-);
-
-export const sidebarEntryLabel = style({
-  minWidth: 0,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-});
+const sidebarEntrySurface = backgroundColor.elementHover;
+const sidebarEntryFg = colors.gray[12];
+const sidebarEntryMutedFg = colors.gray[11];
+const sidebarEntrySelectedFg = colors.accent[9];
 
 export const sidebarEntryTreeStyles = {
   "--trees-font-family-override": fontFamily,

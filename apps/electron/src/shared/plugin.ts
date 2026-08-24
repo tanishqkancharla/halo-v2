@@ -22,8 +22,3 @@ export type PluginList = {
   compiledViews: CompiledPluginView[];
   errors: PluginLoadError[];
 };
-
-export type PluginBuildResult = {
-  built: string[];
-  errors: PluginLoadError[];
-};

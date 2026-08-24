@@ -4,7 +4,7 @@ import { updateElectronApp } from "update-electron-app";
 import type { AppInfo, AppUpdateStatus } from "../shared/rpc.js";
 
 /** How often packaged macOS/Windows builds poll update.electronjs.org. */
-export const UPDATE_POLL_INTERVAL = "10 minutes";
+const UPDATE_POLL_INTERVAL = "10 minutes";
 
 class UpdateNotReadyError extends errore.createTaggedError({
   name: "UpdateNotReadyError",

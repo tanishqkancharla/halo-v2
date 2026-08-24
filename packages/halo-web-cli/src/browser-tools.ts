@@ -21,14 +21,14 @@ type ConnectedTools = {
   toolkit: BrowserToolkit;
 };
 
-export type ExecutionResult = {
+type ExecutionResult = {
   result: unknown;
   snapshotDiff: string;
   stderr: string;
   stdout: string;
 };
 
-export type SnapshotResult = {
+type SnapshotResult = {
   screenshot?: {
     base64: string;
     mimeType: "image/png";

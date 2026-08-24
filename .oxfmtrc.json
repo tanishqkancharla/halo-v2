@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "printWidth": 80,
-  "ignorePatterns": ["tools/oxlint/anti-slop/**"]
+  "ignorePatterns": [
+    "tools/oxlint/anti-slop/**",
+    "tools/oxlint/no-unused-exports/**"
+  ]
 }
