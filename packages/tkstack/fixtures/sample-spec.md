@@ -33,9 +33,16 @@ Specs lived as markdown files with no local page, so mermaid, call stacks, and d
 
 ### Phase 1: Serve the spec file
 
-The CLI already parses markdown. Point it at a spec path.
+The CLI already parses markdown. Point it at a spec path. `startServer` now builds the Vite page instead of writing walkthrough HTML:
 
-#### Important types
+```callstack
+ startServer
+-└── readWalkthroughOnly
++└── createViteServer
+    └── handleTkstackRequest
+```
+
+`StartServerInput` is the listen contract: file, workspace root, and port.
 
 ```ts
 // src/serve.ts
@@ -46,16 +53,7 @@ type StartServerInput = {
 };
 ```
 
-#### Call stack diff
-
-```callstack
- startServer
--└── readWalkthroughOnly
-+└── createViteServer
-    └── handleTkstackRequest
-```
-
-#### Code diff preview
+The CLI description covers both specs and walkthroughs.
 
 ```diff
  // src/cli.ts
@@ -66,5 +64,5 @@ type StartServerInput = {
 
 - [ ] Add a `pnpm spec` alias that runs the same CLI.
 - [ ] Teach generate-spec-v2 to serve `specs/<name>.md` after writing it.
-- [ ] Smoke that mermaid and diffs render. Do not commit this check until the feature is package-level end-to-end testable.
+- [ ] Smoke that mermaid and diffs render. Delete any harness. Do not commit this check.
 - [ ] Run `pnpm --filter tkstack typecheck`.

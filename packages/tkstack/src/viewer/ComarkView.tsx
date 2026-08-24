@@ -45,7 +45,12 @@ function renderElement(node: ViewerElement, key: number): ReactNode {
   }
   if (node.tag === "li" && node.attrs.task === true) {
     return (
-      <li key={key} id={node.attrs.id} className={node.attrs.className}>
+      <li
+        key={key}
+        id={node.attrs.id}
+        className={node.attrs.className}
+        data-task=""
+      >
         <input
           type="checkbox"
           disabled

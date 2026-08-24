@@ -111,6 +111,19 @@ const styles = {
     maxWidth: proseMaxWidth,
     marginInline: "auto",
     minWidth: 0,
+    "& ul > li[data-task]::before, & ol > li[data-task]::before": {
+      content: "none",
+    },
+    "& ul > li[data-task] > input[type=checkbox], & ol > li[data-task] > input[type=checkbox]":
+      {
+        // Maui proseHtml md listPadding.
+        position: "absolute",
+        left: "-26px",
+        width: "26px",
+        height: "28px",
+        margin: 0,
+        accentColor: colors.accent[9],
+      },
   }),
   closed: style(text("md", 500, "highContrast"), spacing.padding({ all: 12 }), {
     minHeight: "100vh",
