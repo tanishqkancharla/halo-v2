@@ -141,17 +141,17 @@ md4x Comark `::name` blocks map to the same views. Fences keep whitespace; use t
 </aside>
 ::
 
+::callstack
+parseViewerDocument
+-└── compileMdx
++└── parseAST
+└── fromNode
+::
+
 ::diff{path="src/parseViewer.ts"}
 --- a/src/parseViewer.ts
 +++ b/src/parseViewer.ts
 @@ -1,3 +1,4 @@
 import { parseAST } from "md4x/napi";
 +import { parseFence } from "./parseFence.js";
-::
-
-::callstack
-parseViewerDocument
--└── compileMdx
-+└── parseAST
-└── fromNode
 ::

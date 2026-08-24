@@ -85,12 +85,29 @@ function fromElement(
   }
   if (tag === "file") return fileView(element, children);
   if (tag === "html") return htmlView(element, children);
+  const convertedChildren = children.flatMap(fromNode);
   return {
     type: "element",
     tag,
     attrs: elementAttrs(element),
-    children: children.flatMap(fromNode),
+    children:
+      tag === "li" && element[1].task === true
+        ? unwrapTaskParagraph(convertedChildren)
+        : convertedChildren,
   };
+}
+
+function unwrapTaskParagraph(children: ViewerNode[]): ViewerNode[] {
+  const first = children[0];
+  if (
+    children.length === 1 &&
+    first !== undefined &&
+    first.type === "element" &&
+    first.tag === "p"
+  ) {
+    return first.children;
+  }
+  return children;
 }
 
 function fenceView(lang: string | undefined, source: string): ViewerView {
