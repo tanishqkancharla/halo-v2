@@ -1,8 +1,4 @@
-export function GoogleServiceIcon({
-  serviceId,
-}: {
-  serviceId: string;
-}) {
+export function GoogleServiceIcon({ serviceId }: { serviceId: string }) {
   if (serviceId === "gmail") return <GmailMark />;
   if (serviceId === "calendar") return <CalendarMark />;
   if (serviceId === "drive") return <DriveMark />;
@@ -23,7 +19,10 @@ function GmailMark() {
         d="M1.5 6.75v10.5A2.25 2.25 0 0 0 3.75 19.5h2.25V8.85L12 13.2l6-4.35V19.5h2.25a2.25 2.25 0 0 0 2.25-2.25V6.75L12 14.1Z"
       />
       <path fill="#EA4335" d="M20.25 4.5h-3L12 8.1 6.75 4.5h-3L12 11.1Z" />
-      <path fill="#34A853" d="M3.75 4.5A2.25 2.25 0 0 0 1.5 6.75V8.1L6 11.25V4.5Z" />
+      <path
+        fill="#34A853"
+        d="M3.75 4.5A2.25 2.25 0 0 0 1.5 6.75V8.1L6 11.25V4.5Z"
+      />
       <path
         fill="#FBBC04"
         d="M20.25 4.5H18v6.75l4.5-3.15V6.75A2.25 2.25 0 0 0 20.25 4.5Z"
