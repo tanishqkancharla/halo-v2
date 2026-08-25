@@ -12,6 +12,7 @@ import {
 } from "streamdown";
 import { code } from "@streamdown/code";
 import {
+  Code,
   CodeBlock,
   backgroundColor,
   motionEasing,
@@ -28,7 +29,6 @@ import {
   inlineCodeAnimateTag,
   rehypeInlineCodeAnimate,
 } from "./rehypeInlineCodeAnimate.ts";
-import { proseInlineCode } from "./proseInlineCode.ts";
 import "streamdown/styles.css";
 
 type AssistantMessageProps = {
@@ -128,12 +128,7 @@ function InlineCode({
   children,
   ...props
 }: ComponentPropsWithoutRef<"code"> & { node?: unknown }) {
-  const chipClassName = useStyles(proseInlineCode);
-  return (
-    <code className={chipClassName} {...props}>
-      {children}
-    </code>
-  );
+  return <Code {...props}>{children}</Code>;
 }
 
 /** Defaults + inline-code retag so animate can stagger inline code with prose. */
