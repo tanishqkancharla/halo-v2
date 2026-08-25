@@ -80,11 +80,11 @@ function listenWorkspaceTree(
 ) {
   let cancelled = false;
   let iterator:
-    | Awaited<ReturnType<HaloClient["subscribeWorkspaceTree"]>>
+    | Awaited<ReturnType<HaloClient["workspace"]["events"]>>
     | undefined;
 
   void (async () => {
-    iterator = await api.subscribeWorkspaceTree();
+    iterator = await api.workspace.events();
     for await (const events of iterator) {
       if (cancelled) return;
       onEvents(events);

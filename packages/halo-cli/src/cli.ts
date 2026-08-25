@@ -13,8 +13,10 @@ type WorkspaceInfo = {
 
 type HaloHost = {
   getAppInfo: () => Promise<{ version: string }>;
-  getWorkspace: () => Promise<WorkspaceInfo | undefined>;
-  plugin: {
+  workspace: {
+    get: () => Promise<WorkspaceInfo | undefined>;
+  };
+  plugins: {
     create: (input: { id: string }) => Promise<{
       id: string;
       directory: string;
@@ -32,8 +34,8 @@ type HaloHost = {
         message: string;
       }>;
     }>;
+    servers: PluginRouter;
   };
-  plugins: PluginRouter;
 };
 
 const haloRpcEnv = z.object({
@@ -77,7 +79,7 @@ const plugin = Cli.create("plugin", {
           message: connected.message,
         });
       }
-      const created = await connected.client.plugin
+      const created = await connected.client.plugins
         .create({ id: c.args.id })
         .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
       if (created instanceof Error) {
@@ -101,7 +103,7 @@ const plugin = Cli.create("plugin", {
           message: connected.message,
         });
       }
-      const built = await connected.client.plugin
+      const built = await connected.client.plugins
         .build()
         .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
       if (built instanceof Error) {
@@ -140,7 +142,7 @@ const plugin = Cli.create("plugin", {
           message: connected.message,
         });
       }
-      const checked = await connected.client.plugin
+      const checked = await connected.client.plugins
         .types()
         .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
       if (checked instanceof Error) {
@@ -204,7 +206,7 @@ const plugin = Cli.create("plugin", {
       }
 
       const result = await callPluginProcedure({
-        client: connected.client,
+        client: { plugins: connected.client.plugins.servers },
         id: parsed.id,
         path: parsed.path,
         input: parsed.input,
@@ -248,8 +250,8 @@ Cli.create("halo", {
           message: info.message,
         });
       }
-      const workspace = await connected.client
-        .getWorkspace()
+      const workspace = await connected.client.workspace
+        .get()
         .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
       if (workspace instanceof Error) {
         return c.error({

@@ -102,7 +102,7 @@ export function useWorkspaceQuery() {
 export function useChooseWorkspaceMutation() {
   const { api, queryClient } = useContext(ApiContext);
   return useMutation({
-    mutationFn: () => api.chooseWorkspace(),
+    mutationFn: () => api.workspace.choose(),
     onSuccess: (workspace) => {
       if (workspace !== undefined) {
         queryClient.setQueryData(workspaceQueryKey, readyWorkspace(workspace));
@@ -120,7 +120,7 @@ export function useSessionsQuery(workspace: WorkspaceState | undefined) {
 
   return useQuery({
     queryKey: ["sessions", workspaceRoot],
-    queryFn: () => api.listSessions(),
+    queryFn: () => api.sessions.list(),
     enabled: workspaceRoot !== undefined,
   });
 }
@@ -138,7 +138,7 @@ export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
 
   return useQuery({
     queryKey: workspacePathsQueryKey(workspaceRoot),
-    queryFn: () => api.listWorkspacePaths(),
+    queryFn: () => api.workspace.listPaths(),
     enabled: workspaceRoot !== undefined,
   });
 }
@@ -177,12 +177,12 @@ export function usePluginsQuery(
   return useQuery({
     queryKey: ["plugins", workspaceRoot],
     queryFn: async (): Promise<PluginsQueryData> => {
-      const list = await api.listPlugins();
+      const list = await api.plugins.list();
       const loaded = loadPluginViews(list);
       const servers: PluginServers = {};
       for (const plugin of list.plugins) {
         if (plugin.serverPath === undefined) continue;
-        const server = api.plugins[plugin.id];
+        const server = api.plugins.servers[plugin.id];
         if (server === undefined) continue;
         servers[plugin.id] = server;
       }
@@ -193,16 +193,16 @@ export function usePluginsQuery(
 }
 
 async function restoreWorkspace(api: HaloClient): Promise<WorkspaceState> {
-  const active = await api
-    .getWorkspace()
+  const active = await api.workspace
+    .get()
     .catch((e) => new WorkspaceRestoreError({ cause: e }));
   if (active instanceof Error) {
     return { status: "needs-workspace", message: active.message };
   }
   if (active !== undefined) return readyWorkspace(active);
 
-  const selected = await api
-    .chooseWorkspace()
+  const selected = await api.workspace
+    .choose()
     .catch((e) => new WorkspaceRestoreError({ cause: e }));
   if (selected instanceof Error) {
     return { status: "needs-workspace", message: selected.message };

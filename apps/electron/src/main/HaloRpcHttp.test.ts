@@ -70,7 +70,7 @@ const rpcHttpTest = test.extend<{
 
 describe("listenHaloRpcHttp", () => {
   rpcHttpTest(
-    "writes rpc.json and serves getWorkspace",
+    "writes rpc.json and serves workspace.get",
     async ({ rpc, userDataDir, workspaceRoot }) => {
       const file = await readHaloRpcFile(rpcFilePath(userDataDir));
       if (file instanceof Error) throw file;
@@ -80,7 +80,7 @@ describe("listenHaloRpcHttp", () => {
       expect(file.token).toBe(rpc.token);
 
       const client = createHaloRpcClient<HaloClient>(file);
-      const workspace = await client.getWorkspace();
+      const workspace = await client.workspace.get();
       const resolvedRoot = await realpath(workspaceRoot);
       expect(workspace).toEqual({
         name: basename(resolvedRoot),
@@ -91,7 +91,7 @@ describe("listenHaloRpcHttp", () => {
 
   rpcHttpTest("rejects a request without the token", async ({ rpc }) => {
     const response = await fetch(
-      `http://127.0.0.1:${rpc.port}/rpc/getWorkspace`,
+      `http://127.0.0.1:${rpc.port}/rpc/workspace/get`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -116,21 +116,21 @@ describe("listenHaloRpcHttp", () => {
       if (file instanceof Error) throw file;
       const client = createHaloRpcClient<HaloClient>(file);
 
-      const created = await client.plugin.create({ id: "notes" });
+      const created = await client.plugins.create({ id: "notes" });
       expect(created.id).toBe("notes");
 
-      const reserved = await client.plugin
+      const reserved = await client.plugins
         .create({ id: "new" })
         .catch((e) => (e instanceof Error ? e : new Error(String(e))));
       expect(reserved).toBeInstanceOf(Error);
 
-      const built = await client.plugin.build();
+      const built = await client.plugins.build();
       expect(built.built).toEqual(["notes"]);
       expect(built.errors).toEqual([]);
 
       const ping = await callPluginProcedure({
-        // SAFETY: HaloClient.plugins is the mounted oRPC plugin tree.
-        client: { plugins: client.plugins as PluginRouter },
+        // SAFETY: HaloClient.plugins.servers is the mounted oRPC plugin tree.
+        client: { plugins: client.plugins.servers as PluginRouter },
         id: "notes",
         path: ["ping"],
         input: undefined,

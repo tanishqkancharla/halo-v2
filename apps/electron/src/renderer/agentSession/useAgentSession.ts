@@ -46,11 +46,11 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
   useEffect(() => {
     let cancelled = false;
     let iterator:
-      | Awaited<ReturnType<HaloClient["agentSession"]["events"]>>
+      | Awaited<ReturnType<HaloClient["sessions"]["events"]>>
       | undefined;
 
     void (async () => {
-      const opened = await api.openAgentSession({ sessionId }).catch(
+      const opened = await api.sessions.open({ sessionId }).catch(
         (e) =>
           new PromptFailedError({
             reason: e instanceof Error ? e.message : String(e),
@@ -64,7 +64,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       if (cancelled) return;
       setState(opened.state);
       setReadySessionId(opened.sessionId);
-      iterator = await api.agentSession.events({ sessionId: opened.sessionId });
+      iterator = await api.sessions.events({ sessionId: opened.sessionId });
       for await (const event of iterator) {
         setState((current) => applyAgentSessionEvent(current, event));
       }
@@ -84,7 +84,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       return error;
     }
     setState((current) => ({ ...current, error: undefined }));
-    const result = await api.agentSession
+    const result = await api.sessions
       .prompt({ sessionId: readySessionId, text })
       .then(() => undefined)
       .catch(
@@ -110,7 +110,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
 
   async function abort() {
     if (readySessionId === undefined) return;
-    const result = await api.agentSession
+    const result = await api.sessions
       .abort({ sessionId: readySessionId })
       .then(() => undefined)
       .catch(
@@ -154,7 +154,7 @@ export function useDraftAgentSession(
   }, [onCreated]);
 
   async function prompt(text: string) {
-    const created = await api.newAgentSession().catch(
+    const created = await api.sessions.create().catch(
       (e) =>
         new PromptFailedError({
           reason: e instanceof Error ? e.message : String(e),
@@ -170,7 +170,7 @@ export function useDraftAgentSession(
     onCreatedRef.current(created.sessionId);
 
     setState((current) => ({ ...current, error: undefined }));
-    const result = await api.agentSession
+    const result = await api.sessions
       .prompt({ sessionId: created.sessionId, text })
       .then(() => undefined)
       .catch(
@@ -197,7 +197,7 @@ export function useDraftAgentSession(
   async function abort() {
     const createdSessionId = sessionIdRef.current;
     if (createdSessionId === undefined) return;
-    const result = await api.agentSession
+    const result = await api.sessions
       .abort({ sessionId: createdSessionId })
       .then(() => undefined)
       .catch(

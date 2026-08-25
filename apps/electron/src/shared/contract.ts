@@ -17,7 +17,13 @@ import type {
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const reservedPluginIds = ["new", "build", "types"] as const;
+export const reservedPluginIds = [
+  "new",
+  "servers",
+  "create",
+  "build",
+  "types",
+] as const;
 
 type PluginTypeDiagnostic = {
   id: string;
@@ -29,19 +35,18 @@ type PluginTypeDiagnostic = {
 export const contract = {
   getAppInfo: oc.output(type<AppInfo>()),
   installAppUpdate: oc,
-  getWorkspace: oc.output(type<WorkspaceInfo | undefined>()),
-  chooseWorkspace: oc.output(type<WorkspaceInfo | undefined>()),
-  listSessions: oc.output(type<SessionSummary[]>()),
-  listWorkspacePaths: oc.output(type<string[]>()),
-  listPlugins: oc.output(type<PluginList>()),
-  subscribeWorkspaceTree: oc.output(
-    asyncIteratorObject(type<WorkspaceTreeEvent[]>()),
-  ),
-  newAgentSession: oc.output(type<{ sessionId: string }>()),
-  openAgentSession: oc
-    .input(type<{ sessionId: string }>())
-    .output(type<{ sessionId: string; state: AgentSessionState }>()),
-  agentSession: {
+  workspace: {
+    get: oc.output(type<WorkspaceInfo | undefined>()),
+    choose: oc.output(type<WorkspaceInfo | undefined>()),
+    listPaths: oc.output(type<string[]>()),
+    events: oc.output(asyncIteratorObject(type<WorkspaceTreeEvent[]>())),
+  },
+  sessions: {
+    list: oc.output(type<SessionSummary[]>()),
+    create: oc.output(type<{ sessionId: string }>()),
+    open: oc
+      .input(type<{ sessionId: string }>())
+      .output(type<{ sessionId: string; state: AgentSessionState }>()),
     events: oc
       .input(type<{ sessionId: string }>())
       .output(asyncIteratorObject(type<AgentSessionEvent>())),
@@ -58,7 +63,8 @@ export const contract = {
       .output(type<IntegrationConnection>()),
     disconnect: oc.input(type<{ connectionId: string; sessionId: string }>()),
   },
-  plugin: {
+  plugins: {
+    list: oc.output(type<PluginList>()),
     create: oc
       .input(type<{ id: string }>())
       .output(type<{ id: string; directory: string }>()),
@@ -73,6 +79,10 @@ export const contract = {
   },
 };
 
-export type HaloClient = RouterContractClient<typeof contract> & {
-  plugins: Record<string, RouterClient<AnyRouter>>;
+type CoreHaloClient = RouterContractClient<typeof contract>;
+
+export type HaloClient = Omit<CoreHaloClient, "plugins"> & {
+  plugins: CoreHaloClient["plugins"] & {
+    servers: Record<string, RouterClient<AnyRouter>>;
+  };
 };
