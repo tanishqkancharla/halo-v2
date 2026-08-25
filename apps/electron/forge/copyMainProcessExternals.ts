@@ -66,7 +66,11 @@ async function copyPackage(
     ...packageName.split("/"),
   );
   await mkdir(path.dirname(destDir), { recursive: true });
-  await cp(sourceDir, destDir, { recursive: true, dereference: true });
+  await cp(sourceDir, destDir, {
+    recursive: true,
+    dereference: true,
+    filter: (source) => copyablePackagePath(sourceDir, source),
+  });
   copied.add(packageName);
   return packageJsonPath;
 }
@@ -111,6 +115,12 @@ async function copyPackageClosure(
       await copyPackageClosure(buildPath, dependencyName, copied);
     }
   }
+}
+
+function copyablePackagePath(packageDir: string, source: string) {
+  const relative = path.relative(packageDir, source);
+  if (relative.split(path.sep).includes("node_modules")) return false;
+  return existsSync(source);
 }
 
 function resolvePackageJson(packageName: string) {
