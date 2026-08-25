@@ -24,7 +24,12 @@ import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
-import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
+import {
+  checkForUpdates,
+  getAppInfo,
+  startAppUpdates,
+} from "./app/AppUpdate.js";
+import { HaloTandem } from "./HaloTandem.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -87,6 +92,14 @@ const piService = new PiService(
 );
 const pluginService = new PluginService(workspaceService);
 const agentSessionRegistry = new AgentSessionRegistry();
+const tandem = new HaloTandem(
+  workspaceService,
+  piService,
+  pluginService,
+  integrationService,
+  logger.scope("tandem"),
+  getAppInfo,
+);
 let mainWindow: BrowserWindow | undefined;
 let rpcHttp: HaloRpcHttp | undefined;
 
@@ -98,23 +111,11 @@ app.whenReady().then(async () => {
       logger.warn({ event: "plugin-startup-load-failed", error: listed });
     }
   }
+  await tandem.start();
   registerLogBridge();
   registerRpcBridge();
   const listening = await listenHaloRpcHttp({
-    context: {
-      workspace: workspaceService,
-      integrations: integrationService,
-      pi: piService,
-      plugins: pluginService,
-      sessions: agentSessionRegistry,
-      getWindow: () => {
-        if (mainWindow === undefined) {
-          throw new Error("Halo main window is not open.");
-        }
-        return mainWindow;
-      },
-      logger: rpcLogger,
-    },
+    context: createHaloContext(),
     userDataDir: applicationConfig.dataDir,
   });
   if (listening instanceof Error) {
@@ -140,6 +141,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", (event) => {
+  tandem.stop();
   if (rpcHttp === undefined) {
     logger.destroy();
     return;
@@ -214,20 +216,7 @@ function registerRpcBridge(): void {
       throw new Error("Halo rejected RPC without a sender frame.");
     }
     const { port1, port2 } = new MessageChannelMain();
-    const context: HaloContext = {
-      workspace: workspaceService,
-      integrations: integrationService,
-      pi: piService,
-      plugins: pluginService,
-      sessions: agentSessionRegistry,
-      getWindow: () => {
-        if (mainWindow === undefined) {
-          throw new Error("Halo main window is not open.");
-        }
-        return mainWindow;
-      },
-      logger: rpcLogger,
-    };
+    const context = createHaloContext();
     const handler = new RPCHandler<HaloContext>(haloRpcRouter, {
       interceptors: [
         onError((error) => {
@@ -374,7 +363,26 @@ async function switchWorkspace(): Promise<void> {
     return;
   }
 
+  await tandem.refresh();
   mainWindow.reload();
+}
+
+function createHaloContext(): HaloContext {
+  return {
+    workspace: workspaceService,
+    integrations: integrationService,
+    pi: piService,
+    plugins: pluginService,
+    sessions: agentSessionRegistry,
+    tandem,
+    getWindow: () => {
+      if (mainWindow === undefined) {
+        throw new Error("Halo main window is not open.");
+      }
+      return mainWindow;
+    },
+    logger: rpcLogger,
+  };
 }
 
 function configureUserDataPath(): void {

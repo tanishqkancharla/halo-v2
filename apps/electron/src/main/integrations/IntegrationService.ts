@@ -86,7 +86,16 @@ const haloDirectoryName = ".halo";
 const integrationsFileName = "integrations.json";
 
 export class IntegrationService {
+  private readonly changeListeners = new Set<() => void | Promise<void>>();
+
   constructor(private readonly workspace: WorkspaceService) {}
+
+  addChangeListener(listener: () => void | Promise<void>) {
+    this.changeListeners.add(listener);
+    return () => {
+      this.changeListeners.delete(listener);
+    };
+  }
 
   async list() {
     const store = await this.readStore();
@@ -141,6 +150,7 @@ export class IntegrationService {
           );
     const written = await this.writeStore({ connections });
     if (written instanceof Error) return written;
+    await this.notifyChange();
     return publicConnection(row);
   }
 
@@ -173,6 +183,7 @@ export class IntegrationService {
       ),
     });
     if (written instanceof Error) return written;
+    await this.notifyChange();
     return publicConnection(row);
   }
 
@@ -183,7 +194,9 @@ export class IntegrationService {
       (connection) => connection.id !== id,
     );
     if (connections.length === store.connections.length) return undefined;
-    return this.writeStore({ connections });
+    const written = await this.writeStore({ connections });
+    if (written instanceof Error) return written;
+    await this.notifyChange();
   }
 
   async getTokens(id: string) {
@@ -241,6 +254,10 @@ export class IntegrationService {
     const layout = this.workspace.getLayout();
     if (layout instanceof Error) return layout;
     return join(layout.root, haloDirectoryName, integrationsFileName);
+  }
+
+  private async notifyChange() {
+    for (const listener of this.changeListeners) await listener();
   }
 }
 

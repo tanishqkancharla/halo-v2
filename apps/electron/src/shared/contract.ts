@@ -5,13 +5,13 @@ import {
   type,
   type RouterContractClient,
 } from "@orpc/contract";
+import type { ClientId, RemoteApi } from "@tandem/types";
 import type { AgentSessionState } from "./AgentSessionState.js";
+import type { HaloSchema } from "./HaloTables.js";
 import type { IntegrationConnection } from "./integrations.js";
 import type {
   AppInfo,
-  PluginList,
   PluginLoadError,
-  SessionSummary,
   WorkspaceInfo,
   WorkspaceTreeEvent,
 } from "./rpc.js";
@@ -40,14 +40,21 @@ export type PluginInvocationInput = {
 export const contract = {
   getAppInfo: oc.output(type<AppInfo>()),
   installAppUpdate: oc,
+  sync: {
+    push: oc.input(type<Parameters<RemoteApi<HaloSchema>["push"]>[0]>()),
+    pull: oc
+      .input(type<Parameters<RemoteApi<HaloSchema>["pull"]>[0]>())
+      .output(type<Awaited<ReturnType<RemoteApi<HaloSchema>["pull"]>>>()),
+    connect: oc
+      .input(type<{ clientId: ClientId }>())
+      .output(asyncIteratorObject(type<{ type: "poke" }>())),
+  },
   workspace: {
     get: oc.output(type<WorkspaceInfo | undefined>()),
     choose: oc.output(type<WorkspaceInfo | undefined>()),
-    listPaths: oc.output(type<string[]>()),
     events: oc.output(asyncIteratorObject(type<WorkspaceTreeEvent[]>())),
   },
   sessions: {
-    list: oc.output(type<SessionSummary[]>()),
     create: oc.output(type<{ sessionId: string }>()),
     open: oc
       .input(type<{ sessionId: string }>())
@@ -60,16 +67,12 @@ export const contract = {
     close: oc.input(type<{ sessionId: string }>()),
   },
   integrations: {
-    get: oc
-      .input(type<{ connectionId: string }>())
-      .output(type<IntegrationConnection | undefined>()),
     startOAuth: oc
       .input(type<{ connectionId: string; sessionId: string }>())
       .output(type<IntegrationConnection>()),
     disconnect: oc.input(type<{ connectionId: string; sessionId: string }>()),
   },
   plugins: {
-    list: oc.output(type<PluginList>()),
     create: oc
       .input(type<{ id: string }>())
       .output(type<{ id: string; directory: string }>()),

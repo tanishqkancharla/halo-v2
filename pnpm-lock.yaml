@@ -85,6 +85,9 @@ importers:
       '@tandem/react':
         specifier: github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/react
         version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/react(patch_hash=79d22e9a4fd4f2aec3d52dadf61d8c5ac06f857e27e4de9c8de6644eec154688)(react@19.2.8)
+      '@tandem/server':
+        specifier: github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/server
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/server(patch_hash=afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1)(react@19.2.8)
       '@tandem/types':
         specifier: github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/types
         version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)

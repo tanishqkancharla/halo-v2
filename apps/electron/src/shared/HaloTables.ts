@@ -5,12 +5,14 @@ import {
   type Transaction,
 } from "@tandem/core";
 import type { CollectionName } from "@tandem/types";
-import type { IntegrationConnection } from "../../shared/integrations.js";
+import type { IntegrationConnection } from "./integrations.js";
+import type { PluginLoadError } from "./plugin.js";
 import type {
   AppInfo,
   SessionSummary,
   WorkspaceInfo,
-} from "../../shared/rpc.js";
+  WorkspaceTreeEvent,
+} from "./rpc.js";
 
 export type WorkspaceState =
   | { status: "needs-workspace"; message?: string }
@@ -46,24 +48,14 @@ type PluginRow = {
   hasServer: boolean;
 };
 
-type PluginErrorRow = {
+type PluginViewRow = {
   id: string;
-  message: string;
+  source: string;
 };
 
-type LoadRow = {
-  id: string;
-  ready: boolean;
-  error?: string;
-};
+type PluginErrorRow = PluginLoadError;
 
-type ActionRow = {
-  id: string;
-  pending: boolean;
-  error?: string;
-};
-
-const haloTables = defineSchema({
+export const haloTables = defineSchema({
   workspaces: collection<WorkspaceRow>({
     fields: ["id", "status", "message", "name", "workspaceRoot"],
   }),
@@ -82,14 +74,11 @@ const haloTables = defineSchema({
   plugins: collection<PluginRow>({
     fields: ["id", "hasServer"],
   }),
+  pluginViews: collection<PluginViewRow>({
+    fields: ["id", "source"],
+  }),
   pluginErrors: collection<PluginErrorRow>({
     fields: ["id", "message"],
-  }),
-  loads: collection<LoadRow>({
-    fields: ["id", "ready", "error"],
-  }),
-  actions: collection<ActionRow>({
-    fields: ["id", "pending", "error"],
   }),
 });
 
@@ -101,40 +90,21 @@ export type HaloSchema = {
   integrations: IntegrationConnection;
   plugins: PluginRow;
   pluginErrors: PluginErrorRow;
-  loads: LoadRow;
-  actions: ActionRow;
+  pluginViews: PluginViewRow;
 };
 
 export const currentId = "current";
-export const sessionsLoadId = "sessions";
-export const pluginsLoadId = "plugins";
-export const pathsLoadId = "paths";
-export const chooseWorkspaceActionId = "chooseWorkspace";
-export const installUpdateActionId = "installUpdate";
 
-export function integrationLoadId(connectionId: string) {
-  return `integration:${connectionId}`;
-}
-
-export function integrationActionId(connectionId: string) {
-  return `integration:${connectionId}`;
-}
-
-const silentLogger = {
+export const silentTandemLogger = {
   debug() {},
   info() {},
   warn() {},
   log() {},
   error() {},
   scope() {
-    return silentLogger;
+    return silentTandemLogger;
   },
 };
-
-export const haloDb = new TandemClient<HaloSchema>({
-  schema: haloTables,
-  logger: silentLogger,
-});
 
 export function commitWrites(
   client: TandemClient<HaloSchema>,
@@ -247,4 +217,17 @@ export function appInfoToRow(info: AppInfo): AppInfoRow {
 
 export function appInfoFromRow(row: AppInfoRow): AppInfo {
   return { version: row.version, update: row.update };
+}
+
+export function applyPathEvents(paths: string[], events: WorkspaceTreeEvent[]) {
+  return events.reduce((next, event) => {
+    if (event.type === "create") {
+      if (next.includes(event.path)) return next;
+      return [...next, event.path];
+    }
+    return next.filter((path) => {
+      if (path === event.path) return false;
+      return !path.startsWith(`${event.path}/`);
+    });
+  }, paths);
 }

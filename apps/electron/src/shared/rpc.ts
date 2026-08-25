@@ -1,7 +1,7 @@
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
 export type { AgentSessionEvent };
-export type { PluginList, PluginLoadError } from "./plugin.js";
+export type { PluginLoadError } from "./plugin.js";
 
 /** Pi agent message carried on session events and durable sessions. */
 export type AgentMessage = Extract<

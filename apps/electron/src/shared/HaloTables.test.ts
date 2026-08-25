@@ -1,20 +1,28 @@
+import { TandemClient } from "@tandem/core";
 import { describe, expect, test } from "vitest";
 import {
+  applyPathEvents,
   commitWrites,
-  haloDb,
+  haloTables,
   pathRows,
   pathsFromRows,
   replaceCollection,
   sessionFromRow,
   sessionToRow,
+  silentTandemLogger,
   workspaceFromRow,
   workspaceToRow,
+  type HaloSchema,
 } from "./HaloTables.ts";
 
 describe("HaloTables", () => {
   test("replaceCollection swaps every row in a collection", async () => {
-    await haloDb.ready;
-    await commitWrites(haloDb, (tx) => {
+    const client = new TandemClient<HaloSchema>({
+      schema: haloTables,
+      logger: silentTandemLogger,
+    });
+    await client.ready;
+    await commitWrites(client, (tx) => {
       replaceCollection(tx, "sessions", [
         {
           id: "a",
@@ -26,10 +34,10 @@ describe("HaloTables", () => {
       ]);
     });
     expect(
-      haloDb.query({ collection: "sessions" }).map((row) => row.id),
+      client.query({ collection: "sessions" }).map((row) => row.id),
     ).toEqual(["a"]);
 
-    await commitWrites(haloDb, (tx) => {
+    await commitWrites(client, (tx) => {
       replaceCollection(tx, "sessions", [
         {
           id: "b",
@@ -41,7 +49,7 @@ describe("HaloTables", () => {
       ]);
     });
     expect(
-      haloDb.query({ collection: "sessions" }).map((row) => row.id),
+      client.query({ collection: "sessions" }).map((row) => row.id),
     ).toEqual(["b"]);
   });
 
@@ -83,5 +91,19 @@ describe("HaloTables", () => {
   test("path rows round-trip the workspace path list", () => {
     const paths = ["src/App.tsx", "package.json"];
     expect(pathsFromRows(pathRows(paths))).toEqual(paths);
+  });
+
+  test("applyPathEvents adds files and removes directories recursively", () => {
+    const afterCreate = applyPathEvents(
+      ["src/App.tsx"],
+      [{ type: "create", path: "README.md" }],
+    );
+    expect(afterCreate).toEqual(["src/App.tsx", "README.md"]);
+
+    const afterDelete = applyPathEvents(
+      ["src/App.tsx", "src/api/Halo.ts", "README.md"],
+      [{ type: "delete", path: "src" }],
+    );
+    expect(afterDelete).toEqual(["README.md"]);
   });
 });

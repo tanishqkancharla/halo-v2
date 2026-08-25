@@ -8,13 +8,6 @@ import {
   useWorkspace,
   useWorkspacePaths,
 } from "../api/ApiProvider.tsx";
-import {
-  commitWrites,
-  haloDb,
-  pathRows,
-  pathsFromRows,
-  replaceCollection,
-} from "../api/HaloTables.ts";
 import { Filesystem } from "./Filesystem.tsx";
 
 type WorkspaceFilesystemProps = {
@@ -40,14 +33,6 @@ export function WorkspaceFilesystem({
 
     const stop = listenWorkspaceTree(api, (events) => {
       applyTreeEvents(modelRef.current, events);
-      void commitWrites(haloDb, (tx) => {
-        const current = pathsFromRows(tx.list("workspacePaths"));
-        const next = applyPathEvents(current, events);
-        const wasEmpty = current.length === 0;
-        const isEmpty = next.length === 0;
-        if (wasEmpty === isEmpty) return;
-        replaceCollection(tx, "workspacePaths", pathRows(next));
-      });
     });
 
     return () => {
@@ -96,19 +81,6 @@ function listenWorkspaceTree(
     if (iterator === undefined) return;
     void iterator.return();
   };
-}
-
-function applyPathEvents(paths: string[], events: WorkspaceTreeEvent[]) {
-  return events.reduce((next, event) => {
-    if (event.type === "create") {
-      if (next.includes(event.path)) return next;
-      return [...next, event.path];
-    }
-    return next.filter((path) => {
-      if (path === event.path) return false;
-      return !path.startsWith(`${event.path}/`);
-    });
-  }, paths);
 }
 
 function applyTreeEvents(

@@ -171,7 +171,7 @@ type WorkspaceServiceOptions = {
 
 export class WorkspaceService {
   private state: WorkspaceState = { status: "notStarted" };
-  private treeListener: TreeListener | undefined;
+  private readonly treeListeners = new Set<TreeListener>();
   private watchSubscription: watcher.AsyncSubscription | undefined;
   private directoryPaths = new Set<string>();
 
@@ -203,8 +203,11 @@ export class WorkspaceService {
     return paths;
   }
 
-  setTreeListener(listener: TreeListener | undefined) {
-    this.treeListener = listener;
+  addTreeListener(listener: TreeListener) {
+    this.treeListeners.add(listener);
+    return () => {
+      this.treeListeners.delete(listener);
+    };
   }
 
   async restore() {
@@ -325,9 +328,10 @@ export class WorkspaceService {
       this.directoryPaths,
     );
     if (mapped.length === 0) return;
-    const listener = this.treeListener;
-    if (listener === undefined) return;
-    listener(mapped);
+    if (this.treeListeners.size === 0) return;
+    for (const listener of this.treeListeners) {
+      listener(mapped);
+    }
   }
 }
 

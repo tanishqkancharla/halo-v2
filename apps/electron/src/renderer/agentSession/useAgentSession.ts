@@ -5,7 +5,7 @@ import {
   applyAgentSessionEvent,
   emptyAgentSessionState,
 } from "../../shared/AgentSessionState.js";
-import { reloadSessions, useApi } from "../api/ApiProvider.tsx";
+import { useApi } from "../api/ApiProvider.tsx";
 import type { HaloClient } from "../../shared/contract.js";
 
 class PromptFailedError extends errore.createTaggedError({
@@ -100,7 +100,6 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       }));
       return result;
     }
-    await reloadSessions(api);
   }
 
   async function abort() {
@@ -182,7 +181,6 @@ export function useDraftAgentSession(
       }));
       return result;
     }
-    await reloadSessions(api);
   }
 
   async function abort() {

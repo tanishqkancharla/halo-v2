@@ -6,6 +6,7 @@ import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
+import { HaloTandem } from "./HaloTandem.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -44,12 +45,31 @@ const rpcHttpTest = test.extend<{
     }
 
     const integrations = new IntegrationService(workspace);
+    const pi = new PiService(
+      workspace,
+      new UserService(userDataDir),
+      integrations,
+    );
+    const plugins = new PluginService(workspace);
+    const tandem = new HaloTandem(
+      workspace,
+      pi,
+      plugins,
+      integrations,
+      new Logger(),
+      () => ({
+        version: "0.0.0",
+        update: { state: "disabled", reason: "test" },
+      }),
+    );
+    await tandem.start();
     const context: HaloContext = {
       workspace,
       integrations,
-      pi: new PiService(workspace, new UserService(userDataDir), integrations),
-      plugins: new PluginService(workspace),
+      pi,
+      plugins,
       sessions: new AgentSessionRegistry(),
+      tandem,
       getWindow: () => {
         throw new Error("Halo main window is not open.");
       },
@@ -58,6 +78,7 @@ const rpcHttpTest = test.extend<{
     const rpc = await listenHaloRpcHttp({ context, userDataDir });
     if (rpc instanceof Error) throw rpc;
     await use(rpc);
+    tandem.stop();
     await rpc.close();
   },
 });

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnyRouter, RouterClient } from "@orpc/server";
-import { colors, spacing, text } from "maui";
+import { colors } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -21,13 +21,9 @@ import {
 export function App() {
   const workspace = useWorkspace();
   const chooseWorkspace = useChooseWorkspace();
-  const sessionsQuery = useSessions();
+  const sessions = useSessions();
   const appInfo = useAppInfo();
-  const pluginsQuery = usePlugins();
-  const sessions = sessionsQuery.sessions;
-  const pluginViews = pluginsQuery.views;
-  const pluginErrors = pluginsQuery.errors;
-  const pluginServers = pluginsQuery.servers;
+  const plugins = usePlugins();
 
   if (workspace === undefined) {
     return <LoadingPage />;
@@ -47,17 +43,12 @@ export function App() {
     );
   }
 
-  if (!sessionsQuery.ready || !pluginsQuery.ready) {
-    return <LoadingPage />;
-  }
-
   return (
     <WorkspaceShell
       sessions={sessions}
-      pluginViews={pluginViews}
-      pluginErrors={pluginErrors}
-      pluginServers={pluginServers}
-      alertMessage={sessionsQuery.error}
+      pluginViews={plugins.views}
+      pluginErrors={plugins.errors}
+      pluginServers={plugins.servers}
       appInfo={appInfo}
     />
   );
@@ -68,14 +59,12 @@ function WorkspaceShell({
   pluginViews,
   pluginErrors,
   pluginServers,
-  alertMessage,
   appInfo,
 }: {
   sessions: SessionSummary[];
   pluginViews: LoadedPluginView[];
   pluginErrors: PluginLoadError[];
   pluginServers: Record<string, RouterClient<AnyRouter>>;
-  alertMessage?: string;
   appInfo?: AppInfo;
 }) {
   const [{ hook }] = useState(() =>
@@ -83,15 +72,9 @@ function WorkspaceShell({
   );
   const readyApp = useStyles(styles.readyApp);
   const shell = useStyles(styles.shell);
-  const errorClassName = useStyles(styles.error);
 
   return (
     <div className={readyApp}>
-      {alertMessage && (
-        <div className={errorClassName} role="alert">
-          {alertMessage}
-        </div>
-      )}
       <Router hook={hook}>
         <div className={shell} data-testid="sessions-shell">
           <Sidebar
@@ -139,11 +122,5 @@ const styles = {
     "@media (max-width: 560px)": {
       gridTemplateColumns: "180px minmax(0, 1fr)",
     },
-  }),
-  error: style(text("xs", 500, "highContrast"), spacing.padding({ all: 4 }), {
-    position: "relative",
-    zIndex: 1,
-    color: "light-dark(#b42318, #ff9592)",
-    backgroundColor: "light-dark(#ffebe9, #3b1219)",
   }),
 };

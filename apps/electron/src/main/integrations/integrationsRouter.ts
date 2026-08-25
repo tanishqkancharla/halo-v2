@@ -32,15 +32,6 @@ const os = implement(
 ).$context<IntegrationsRouterContext>();
 
 export const integrationsRouter = os.router({
-  get: os.get.handler(async ({ input, context }) => {
-    context.logger.info({
-      event: "integrations.get",
-      connectionId: input.connectionId,
-    });
-    const connection = await context.integrations.get(input.connectionId);
-    if (connection instanceof Error) return orpcErrors.badRequest(connection);
-    return connection;
-  }),
   startOAuth: os.startOAuth.handler(async ({ input, context }) => {
     context.logger.info({
       event: "integrations.startOAuth",

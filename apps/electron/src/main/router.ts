@@ -15,15 +15,18 @@ import {
   workspaceRouter,
   type WorkspaceRouterContext,
 } from "./workspace/workspaceRouter.js";
+import { syncRouter, type SyncRouterContext } from "./syncRouter.js";
 
 export type HaloContext = AppRouterContext &
   WorkspaceRouterContext &
   SessionsRouterContext &
   IntegrationsRouterContext &
-  PluginsRouterContext;
+  PluginsRouterContext &
+  SyncRouterContext;
 
 export const haloRpcRouter = {
   ...appRouter,
+  sync: syncRouter,
   workspace: workspaceRouter,
   sessions: sessionsRouter,
   integrations: integrationsRouter,

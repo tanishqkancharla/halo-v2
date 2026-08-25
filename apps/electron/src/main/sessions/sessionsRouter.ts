@@ -10,29 +10,26 @@ import {
   EmptyPromptError,
   PromptFailedError,
 } from "./AgentSessionErrors.js";
+import type { HaloTandem } from "../HaloTandem.js";
 import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import type { PiService } from "./PiService.js";
 
 export type SessionsRouterContext = {
   pi: PiService;
   sessions: AgentSessionRegistry;
+  tandem: HaloTandem;
   logger: Logger;
 };
 
 const os = implement(contract.sessions).$context<SessionsRouterContext>();
 
 export const sessionsRouter = os.router({
-  list: os.list.handler(async ({ context }) => {
-    context.logger.info({ event: "listSessions" });
-    const sessions = await context.pi.listSessions();
-    if (sessions instanceof Error) return orpcErrors.badRequest(sessions);
-    return sessions;
-  }),
   create: os.create.handler(async ({ context }) => {
     context.logger.info({ event: "newAgentSession" });
     const session = await context.pi.newAgentSession();
     if (session instanceof Error) return orpcErrors.badRequest(session);
     context.sessions.add(session);
+    await context.tandem.refreshSessions();
     return { sessionId: session.sessionId };
   }),
   open: os.open.handler(async ({ input, context }) => {
@@ -100,6 +97,7 @@ export const sessionsRouter = os.router({
           }),
       );
     if (prompted instanceof Error) return orpcErrors.badRequest(prompted);
+    await context.tandem.refreshSessions();
   }),
   abort: os.abort.handler(async ({ input, context }) => {
     context.logger.info({
