@@ -64,7 +64,6 @@ export {
   fontFamily,
   grid,
   gridItem,
-  icon,
   iconSizeValues,
   labelText,
   monospace,

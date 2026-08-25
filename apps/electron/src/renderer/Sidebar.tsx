@@ -11,7 +11,6 @@ import {
   colors,
   flex,
   flexItem,
-  icon,
   shadow,
   spacing,
   text,
@@ -41,7 +40,6 @@ export function Sidebar({
   const sidebar = useStyles(styles.sidebar);
   const titleBar = useStyles(styles.titleBar);
   const newButton = useStyles(styles.newButton);
-  const newIcon = useStyles(icon("sm"));
   const filesSection = useStyles(styles.filesSection);
   const sessionList = useStyles(styles.sessionList);
   const footer = useStyles(styles.footer);
@@ -55,7 +53,7 @@ export function Sidebar({
     <nav className={sidebar} aria-label="Sessions">
       <div className={titleBar} aria-hidden="true" />
       <div className={newSessionPad}>
-        <NewSessionButton className={newButton} iconClassName={newIcon} />
+        <NewSessionButton className={newButton} />
       </div>
       <WorkspaceFilesystem
         maxHeight={filesTreeMaxHeightPx}
@@ -101,9 +99,6 @@ export function Sidebar({
           </div>
         );
       })}
-      <SidebarSection label="Develop">
-        <SidebarItem href="/uikit">UI kit</SidebarItem>
-      </SidebarSection>
       {appInfo !== undefined && (
         <div className={footer} data-testid="app-update-status">
           <div className={versionLabel}>Halo {appInfo.version}</div>
@@ -114,20 +109,14 @@ export function Sidebar({
   );
 }
 
-function NewSessionButton({
-  className,
-  iconClassName,
-}: {
-  className: string;
-  iconClassName: string;
-}) {
+function NewSessionButton({ className }: { className: string }) {
   const [, navigate] = useLocation();
   return (
     <Button
       className={className}
       onClick={() => navigate(`/draft/${crypto.randomUUID()}`)}
     >
-      <Icons.Plus className={iconClassName} aria-hidden="true" />
+      <Icons.Plus size="sm" aria-hidden="true" />
       New session
     </Button>
   );

@@ -19,7 +19,7 @@ export type SessionViewPart =
       kind: "tool";
       id: string;
       toolName: string;
-      args: unknown;
+      args: ToolArgs;
       resultText?: string;
     }
   | {
@@ -31,8 +31,17 @@ export type SessionViewPart =
       intent: ConnectionIntent | undefined;
     };
 
+/** Tool call arguments as parsed from JSON — values may be any JSON-representable scalar or composite. */
+type ToolArgValue =
+  | string
+  | number
+  | boolean
+  | ToolArgValue[]
+  | { [K in string]: ToolArgValue };
+type ToolArgs = { [K in string]: ToolArgValue };
+
 type ToolPartLabel = {
-  kind: "read" | "wrote" | "shell" | "other";
+  kind: "read" | "wrote" | "shell" | "exec" | "other";
   text: string;
 };
 
@@ -172,6 +181,10 @@ export function toolPartLabel(
   },
   workspaceRoot: string | undefined,
 ): ToolPartLabel {
+  if (part.toolName === "exec") {
+    return { kind: "exec", text: "Exec" };
+  }
+
   if (part.toolName === "read") {
     if (!Value.Check(pathArgsSchema, part.args)) {
       return { kind: "other", text: part.toolName };
@@ -218,6 +231,13 @@ export function toolPartLabel(
   }
 
   return { kind: "other", text: part.toolName };
+}
+
+const execArgsSchema = Type.Object({ js: Type.String() });
+
+export function execJsSource(args: ToolArgs): string | undefined {
+  if (!Value.Check(execArgsSchema, args)) return undefined;
+  return args.js;
 }
 
 function stripWorkspaceRootPrefix(

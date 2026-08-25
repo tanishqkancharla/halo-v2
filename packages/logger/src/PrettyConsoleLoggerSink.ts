@@ -36,8 +36,7 @@ function isStringValue(args: { value: LoggerValue | undefined }) {
 export class PrettyConsoleLoggerSink implements LoggerSinkApi {
   log(entry: LoggerEntry) {
     const scopeLabel = entry.scopes
-      .flatMap((scope) => Object.keys(scope))
-      .map((name) => `${colors.cyan}[${name}]${colors.reset}`)
+      .map((scope) => `${colors.cyan}[${scope.name}]${colors.reset}`)
       .join("");
     const eventField = entry.data.event;
     const event = (() => {
@@ -47,9 +46,7 @@ export class PrettyConsoleLoggerSink implements LoggerSinkApi {
     })();
     const data: { [key: string]: LoggerValue } = {};
     for (const scope of entry.scopes) {
-      for (const value of Object.values(scope)) {
-        Object.assign(data, value);
-      }
+      Object.assign(data, scope.data);
     }
     for (const [key, value] of Object.entries(entry.data)) {
       if (key === "event") continue;

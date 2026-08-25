@@ -16,11 +16,12 @@ allowBuilds:
   geckodriver: false
   koffi: false
   macos-alias: true
-  "@tanishqkancharla/maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/5a6e53d3b17cfb99068542ce048065f420f79175": true
+  "@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#cd929aee1dce3df8b8d1a19f18d8164505844d0b": true
   msgpackr-extract: false
   protobufjs: false
   sharp: false
   workerd: true
+  '@tanishqkancharla/maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/5a6e53d3b17cfb99068542ce048065f420f79175': set this to true or false
 # alchemy@2.0.0-beta.70 still uses Schema.TaggedErrorClass (removed in effect beta.104+)
 overrides:
   "@effect/platform-node": "4.0.0-beta.103"

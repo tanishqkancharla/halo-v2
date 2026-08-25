@@ -1,15 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Button,
-  Flex,
-  backgroundColor,
-  colors,
-  radius,
-  shadow,
-  spacing,
-  text,
-} from "maui";
-import { style, useStyles } from "purse-styles";
+import { Avatar, Button, Flex, Spacer, Text } from "maui";
 import { googleScopeLabel, googleService } from "../../shared/GoogleCatalog.js";
 import type { ConnectionIntent } from "../../shared/integrations.js";
 import { useApi } from "../api/ApiProvider.tsx";
@@ -87,55 +77,48 @@ export function IntegrationCard({
   const intent = live === undefined ? part.intent : live.intent;
   const status = live === undefined ? undefined : live.status;
   const scopes = live === undefined ? part.scopes : live.scopes;
-  const card = useStyles(styles.card);
-  const iconTile = useStyles(styles.iconTile);
-  const copy = useStyles(styles.copy);
-  const title = useStyles(styles.title);
-  const detail = useStyles(styles.detail);
-  const meta = useStyles(styles.meta);
-  const statusLabel = useStyles(styles.status);
-  const action = useStyles(styles.action);
 
-  const view = cardView({
-    disconnected,
-    status,
-    intent,
-    scopes,
-  });
+  const view = cardView({ disconnected, status, intent, scopes });
   const scopeLine = view.scopes
     .map((scopeId) => googleScopeLabel(scopeId))
     .join(" · ");
 
   return (
     <section
-      className={card}
       aria-label={`${serviceLabel} connection`}
       data-session-id={sessionId}
       data-connection-id={connectionId}
       data-intent={intent}
       data-testid="integration-card"
     >
-      <Flex row gap={4} alignItems="center">
-        <div className={iconTile}>
-          <GoogleServiceIcon serviceId={serviceId} />
-        </div>
-        <div className={copy}>
+      <Flex column gap={6} p={6} shadow="subtle" radius="lg">
+        <Flex row gap={4} alignItems="start">
+          <Avatar name={serviceLabel} size="lg" />
           <Flex column gap={1}>
-            <div className={title}>{serviceLabel}</div>
+            <Text size="md" fontWeight={600}>
+              {serviceLabel}
+            </Text>
             {description === undefined ? undefined : (
-              <div className={detail}>{description}</div>
+              <Text size="sm" color="lowContrast">
+                {description}
+              </Text>
             )}
             {scopeLine.length === 0 ? undefined : (
-              <div className={meta}>{scopeLine}</div>
+              <Text size="xs" color="lowContrast">
+                {scopeLine}
+              </Text>
+            )}
+            {view.statusText === undefined ? undefined : (
+              <Text size="sm" fontWeight={500}>
+                {view.statusText}
+              </Text>
             )}
           </Flex>
-        </div>
-        <div className={action}>
-          {view.statusText === undefined ? undefined : (
-            <div className={statusLabel}>{view.statusText}</div>
-          )}
+          <Spacer />
           {view.button === undefined ? undefined : (
             <Button
+              variant="primary"
+              variantColor="blue"
               disabled={
                 startOAuth.isPending ||
                 disconnect.isPending ||
@@ -152,10 +135,11 @@ export function IntegrationCard({
                 startOAuth.mutate();
               }}
             >
+              <GoogleServiceIcon serviceId={serviceId} />
               {view.button}
             </Button>
           )}
-        </div>
+        </Flex>
       </Flex>
     </section>
   );
@@ -184,36 +168,3 @@ function cardView(input: {
   }
   return { scopes: input.scopes, button: undefined, statusText: "Connected" };
 }
-
-const styles = {
-  card: style(shadow.subtle, radius.lg, spacing.padding({ all: 12 }), {
-    width: "100%",
-    minWidth: 0,
-    backgroundColor: backgroundColor.element,
-  }),
-  iconTile: style(radius.md, {
-    width: 40,
-    height: 40,
-    display: "grid",
-    placeItems: "center",
-    flexShrink: 0,
-    backgroundColor: "light-dark(#ffffff, #ffffff)",
-  }),
-  copy: style({
-    flex: 1,
-    minWidth: 0,
-  }),
-  title: style(text("md", 600, "highContrast")),
-  detail: style(text("sm", 400, "highContrast"), {
-    color: colors.gray[11],
-  }),
-  meta: style(text("xs", 400, "lowContrast")),
-  status: style(text("sm", 500, "highContrast")),
-  action: style({
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-end",
-    gap: spacing.value(1),
-    flexShrink: 0,
-  }),
-};

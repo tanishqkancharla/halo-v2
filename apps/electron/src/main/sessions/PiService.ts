@@ -1,6 +1,5 @@
 import {
   createAgentSession,
-  createCodingTools,
   SessionManager,
   type SessionInfo,
 } from "@mariozechner/pi-coding-agent";
@@ -14,6 +13,7 @@ import {
   WorkspaceService,
   type WorkspaceLayout,
 } from "../workspace/WorkspaceService.js";
+import { createExecTool } from "../exec/execTool.js";
 import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
@@ -71,8 +71,9 @@ export class PiService {
       cwd: layout.root,
       agentDir: layout.agentDir,
       sessionManager: manager,
-      tools: createCodingTools(layout.root),
+      tools: [],
       customTools: [
+        createExecTool(layout.root),
         ...createParallelSearchTools(user.id),
         ...createIntegrationTools(this.integrations),
       ],

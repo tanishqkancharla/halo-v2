@@ -1,6 +1,16 @@
-import { colors, monospace, prose } from "maui";
+import { useState } from "react";
+import {
+  CodeBlock,
+  colors,
+  flex,
+  monospace,
+  prose,
+  radius,
+  spacing,
+} from "maui";
 import { style, useStyles } from "purse-styles";
 import {
+  execJsSource,
   toolPartLabel,
   type SessionViewPart,
 } from "../agentSession/sessionView.ts";
@@ -15,8 +25,17 @@ export function ToolCall({ part }: { part: ToolPart }) {
       ? workspace.workspace.workspaceRoot
       : undefined;
   const label = toolPartLabel(part, workspaceRoot);
+  const [expanded, setExpanded] = useState(false);
+  const rootClassName = useStyles(
+    styles.root,
+    expanded ? styles.rootExpanded : undefined,
+  );
   const labelClassName = useStyles(styles.label);
+  const summaryClassName = useStyles(styles.summary);
   const shellClassName = useStyles(styles.shell);
+  const bodyClassName = useStyles(styles.body);
+  const js = label.kind === "exec" ? execJsSource(part.args) : undefined;
+  const expandable = label.kind === "exec" && js !== undefined;
 
   const summary =
     label.kind === "read" ? (
@@ -32,7 +51,31 @@ export function ToolCall({ part }: { part: ToolPart }) {
       <>{label.text}</>
     );
 
-  return <div className={labelClassName}>{summary}</div>;
+  if (!expandable) {
+    return <div className={labelClassName}>{summary}</div>;
+  }
+
+  return (
+    <div className={rootClassName}>
+      <button
+        type="button"
+        className={summaryClassName}
+        aria-expanded={expanded}
+        aria-label={label.text}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {summary}
+      </button>
+      {expanded ? (
+        <div className={bodyClassName}>
+          <CodeBlock lang="javascript">{js}</CodeBlock>
+          {part.resultText !== undefined ? (
+            <CodeBlock lang="text">{part.resultText}</CodeBlock>
+          ) : undefined}
+        </div>
+      ) : undefined}
+    </div>
+  );
 }
 
 const labelStyle = style(prose("sm").paragraph, {
@@ -44,6 +87,25 @@ const labelStyle = style(prose("sm").paragraph, {
 });
 
 const styles = {
+  root: style(flex({ direction: "column", gap: 2 }), radius.md, {
+    minWidth: 0,
+  }),
+  rootExpanded: style(spacing.padding({ x: 3, y: 2 }), {
+    backgroundColor: colors.gray[3],
+  }),
   label: labelStyle,
+  summary: style(labelStyle, {
+    textAlign: "left",
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    margin: 0,
+    cursor: "pointer",
+    width: "100%",
+    font: "inherit",
+  }),
   shell: style(monospace),
+  body: style(flex({ direction: "column", gap: 3 }), {
+    minWidth: 0,
+  }),
 };

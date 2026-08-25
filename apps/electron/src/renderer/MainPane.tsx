@@ -9,7 +9,6 @@ import {
   colors,
   flex,
   flexItem,
-  icon,
   radius,
   shadowVars,
   spacing,
@@ -195,7 +194,6 @@ function Composer({
   const composer = useStyles(styles.composer);
   const liveStatus = useStyles(styles.liveStatus);
   const sendButton = useStyles(styles.sendButton);
-  const sendIcon = useStyles(icon("sm"));
   const trimmedText = draft.trim();
   const showStop = isWorking && trimmedText.length === 0;
 
@@ -233,37 +231,13 @@ function Composer({
           onClick={showStop ? onStop : submit}
         >
           {showStop ? (
-            <StopIcon className={sendIcon} />
+            <Icons.Stop size="sm" />
           ) : (
-            <Icons.ArrowUp className={sendIcon} aria-hidden="true" />
+            <Icons.ArrowUp size="sm" aria-hidden="true" />
           )}
         </Button>
       }
     />
-  );
-}
-
-function StopIcon({ className }: { className: string }) {
-  return (
-    <svg
-      className={className}
-      focusable="false"
-      aria-hidden="true"
-      role="img"
-      width={24}
-      height={24}
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <rect
-        width="12.5"
-        height="12.5"
-        x="5.75"
-        y="5.75"
-        rx="1"
-        fill="currentColor"
-      />
-    </svg>
   );
 }
 

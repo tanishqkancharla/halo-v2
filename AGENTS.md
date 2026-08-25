@@ -33,6 +33,7 @@ Bump `apps/electron/package.json` `version`, commit, then create and push a git 
 - When working on issues that seem like they would be common (e.g. issues hooking up popular libraries to each other), do research into the Github issues of those repos or research code of projects that use the same libraries. Here's some reference projects you can look at:
   - Craft Agents: https://github.com/craft-ai-agents/craft-agents-oss. Uses Electron, Pi (`@mariozechner/pi-coding-agent`), Vite, and esbuild.
   - bb: https://github.com/get-bb/bb. Electron + Vite + React agent IDE with a plugin system (`package.json` + nested `halo`).
+  - Prime Agent: https://github.com/PrimeIntellect-ai/prime-agent
 
 ## Error handling (errore.org)
 
