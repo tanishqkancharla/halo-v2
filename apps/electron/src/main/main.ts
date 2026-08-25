@@ -194,13 +194,7 @@ function registerLogBridge(): void {
       },
     ) => {
       assertTrustedSender(event);
-      let log = rendererLogger;
-      for (const scope of payload.scopes) {
-        for (const [name, scopeData] of Object.entries(scope)) {
-          log = log.scope(name, scopeData);
-        }
-      }
-      log[payload.level](payload.data);
+      rendererLogger.write(payload, payload.scopes);
     },
   );
 }

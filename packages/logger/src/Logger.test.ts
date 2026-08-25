@@ -5,8 +5,8 @@ import { describe, expect, test } from "vitest";
 import { JsonlLoggerSink } from "./JsonlLoggerSink.js";
 import {
   Logger,
-  type LoggerData,
   type LoggerEntry,
+  type LoggerScope,
   type LoggerSinkApi,
 } from "./Logger.js";
 
@@ -42,8 +42,8 @@ describe("Logger", () => {
     logger.warn({ message: "slow render" });
 
     expect(sink.entries[0]!.scopes).toEqual([
-      { renderer: {} },
-      { ui: { route: "chat" } },
+      { name: "renderer", data: {} },
+      { name: "ui", data: { route: "chat" } },
     ]);
     expect(sink.entries[0]!.data).toEqual({
       message: "slow render",
@@ -57,9 +57,9 @@ describe("Logger", () => {
 
     logger.log({ event: "ready" });
 
-    expect(first.entries[0]!.scopes).toEqual([{ main: {} }]);
+    expect(first.entries[0]!.scopes).toEqual([{ name: "main", data: {} }]);
     expect(first.entries[0]!.data).toEqual({ event: "ready" });
-    expect(second.entries[0]!.scopes).toEqual([{ main: {} }]);
+    expect(second.entries[0]!.scopes).toEqual([{ name: "main", data: {} }]);
     expect(second.entries[0]!.data).toEqual({ event: "ready" });
   });
 
@@ -95,14 +95,14 @@ describe("JsonlLoggerSink", () => {
     // SAFETY: JsonlLoggerSink writes one JSON object per line with Error values serialized.
     const entry = parsed as {
       level: string;
-      scopes: readonly { readonly [key: string]: LoggerData }[];
+      scopes: readonly LoggerScope[];
       data: {
         message: string;
         error: { name: string; message: string; stack?: string };
       };
     };
     expect(entry.level).toBe("error");
-    expect(entry.scopes).toEqual([{ main: {} }]);
+    expect(entry.scopes).toEqual([{ name: "main", data: {} }]);
     expect(entry.data).toEqual({
       message: "failed",
       error: {

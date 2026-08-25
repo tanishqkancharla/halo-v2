@@ -14,7 +14,8 @@ export type LoggerData = {
 };
 
 export type LoggerScope = {
-  readonly [key: string]: LoggerData;
+  readonly name: string;
+  readonly data: LoggerData;
 };
 
 export type LoggerEntry = {
@@ -65,29 +66,29 @@ export class Logger implements LoggerApi {
   }
 
   debug(data: LoggerData) {
-    this.write("debug", data);
+    this.write({ level: "debug", data });
   }
 
   info(data: LoggerData) {
-    this.write("info", data);
+    this.write({ level: "info", data });
   }
 
   warn(data: LoggerData) {
-    this.write("warn", data);
+    this.write({ level: "warn", data });
   }
 
   log(data: LoggerData) {
-    this.write("log", data);
+    this.write({ level: "log", data });
   }
 
   error(data: LoggerData) {
-    this.write("error", data);
+    this.write({ level: "error", data });
   }
 
   scope(name: string, data: LoggerData = {}): Logger {
     return new Logger({
       sinks: this.sinks,
-      scopes: [...this.scopes, { [name]: data }],
+      scopes: [...this.scopes, { name, data }],
     });
   }
 
@@ -104,8 +105,15 @@ export class Logger implements LoggerApi {
     }
   }
 
-  private write(level: LogLevel, data: LoggerData) {
-    const entry = createLogEntry(level, this.scopes, data);
+  write(
+    payload: { level: LogLevel; data: LoggerData },
+    extraScopes?: readonly LoggerScope[],
+  ) {
+    const entry = createLogEntry(
+      payload.level,
+      extraScopes ? [...this.scopes, ...extraScopes] : this.scopes,
+      payload.data,
+    );
     for (const sink of this.sinks) {
       sink.log(entry);
     }

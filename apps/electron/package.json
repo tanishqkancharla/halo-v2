@@ -67,6 +67,7 @@
     "@electron-forge/publisher-github": "^7.11.2",
     "@electron-forge/shared-types": "^7.11.2",
     "@repo/typescript-config": "workspace:*",
+    "@types/electron-squirrel-startup": "^1.0.2",
     "@types/hast": "^3.0.5",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
