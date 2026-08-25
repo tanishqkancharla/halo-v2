@@ -24,16 +24,16 @@ import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
-import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
-import { checkForUpdates, startAppUpdates } from "./AppUpdate.js";
+import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
-import { IntegrationService } from "./IntegrationService.js";
-import { resolveHaloCliEntry } from "./installHaloCli.js";
-import { PiService } from "./pi-service.js";
+import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
+import { AgentSessionRegistry } from "./sessions/AgentSessionRegistry.js";
+import { PiService } from "./sessions/PiService.js";
 import { UserService } from "./UserService.js";
-import { WorkspaceService } from "./workspace-service.js";
+import { resolveHaloCliEntry } from "./workspace/installHaloCli.js";
+import { WorkspaceService } from "./workspace/WorkspaceService.js";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -221,7 +221,7 @@ function registerRpcBridge(): void {
       },
       logger: rpcLogger,
     };
-    const handler = new RPCHandler(haloRpcRouter(pluginService), {
+    const handler = new RPCHandler<HaloContext>(haloRpcRouter(pluginService), {
       interceptors: [
         onError((error) => {
           if (error instanceof Error) {

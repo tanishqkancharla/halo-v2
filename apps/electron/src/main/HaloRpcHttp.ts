@@ -29,7 +29,9 @@ export async function listenHaloRpcHttp(args: {
   userDataDir: string;
 }): Promise<HaloRpcHttp | HaloRpcHttpError> {
   const token = randomBytes(32).toString("base64url");
-  const handler = new RPCHandler(haloRpcRouter(args.context.plugins));
+  const handler = new RPCHandler<HaloContext>(
+    haloRpcRouter(args.context.plugins),
+  );
   const server = createServer((req, res) => {
     void handleRpcRequest({
       req,

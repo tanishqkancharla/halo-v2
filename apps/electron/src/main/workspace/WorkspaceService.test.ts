@@ -20,7 +20,7 @@ import {
   mapParcelEventsToTreeEvents,
   shouldSkipEntryName,
   toPosixRelative,
-} from "./workspace-service.js";
+} from "./WorkspaceService.js";
 
 async function testDirectory(name: string) {
   return mkdtemp(join(tmpdir(), `halo-${name}-`));

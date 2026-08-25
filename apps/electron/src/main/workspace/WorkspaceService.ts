@@ -13,9 +13,9 @@ import * as watcher from "@parcel/watcher";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
-import type { WorkspaceTreeEvent } from "../shared/rpc.js";
+import type { WorkspaceTreeEvent } from "../../shared/rpc.js";
 import { haloCliBinDir, installHaloCli } from "./installHaloCli.js";
-import { seedPluginWorkspace } from "./plugins/seedPluginWorkspace.js";
+import { seedPluginWorkspace } from "../plugins/seedPluginWorkspace.js";
 
 export type WorkspaceLayout = {
   root: string;

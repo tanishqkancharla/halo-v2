@@ -5,20 +5,20 @@ import { join } from "node:path";
 import { type Static, Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
-import type { GoogleServiceId } from "../shared/GoogleCatalog.js";
+import type { GoogleServiceId } from "../../shared/GoogleCatalog.js";
 import type {
   ConnectionIntent,
   ConnectionStatus,
   IntegrationConnection,
-} from "../shared/integrations.js";
-import type { WorkspaceService } from "./workspace-service.js";
+} from "../../shared/integrations.js";
+import type { WorkspaceService } from "../workspace/WorkspaceService.js";
 
 export type {
   ConnectionIntent,
   ConnectionStatus,
   IntegrationConnection,
-} from "../shared/integrations.js";
-export { defaultIntegrationProfile } from "../shared/integrations.js";
+} from "../../shared/integrations.js";
+export { defaultIntegrationProfile } from "../../shared/integrations.js";
 
 export type StoredTokens = {
   accessToken: string;

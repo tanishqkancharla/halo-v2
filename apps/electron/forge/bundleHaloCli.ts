@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
-import { haloCliResourceName } from "../src/main/installHaloCli.js";
+import { haloCliResourceName } from "../src/main/workspace/installHaloCli.js";
 
 const electronDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 

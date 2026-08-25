@@ -5,12 +5,15 @@ import {
   type SessionInfo,
 } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
-import type { SessionSummary } from "../shared/rpc.js";
-import type { IntegrationService } from "./IntegrationService.js";
-import { createIntegrationTools } from "./IntegrationTools.js";
+import type { SessionSummary } from "../../shared/rpc.js";
+import type { IntegrationService } from "../integrations/IntegrationService.js";
+import { createIntegrationTools } from "../integrations/IntegrationTools.js";
 import { createParallelSearchTools } from "./ParallelSearchTools.js";
-import type { UserService } from "./UserService.js";
-import { WorkspaceService, type WorkspaceLayout } from "./workspace-service.js";
+import type { UserService } from "../UserService.js";
+import {
+  WorkspaceService,
+  type WorkspaceLayout,
+} from "../workspace/WorkspaceService.js";
 import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({

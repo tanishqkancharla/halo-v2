@@ -6,11 +6,10 @@ import * as errore from "errore";
 import type { PluginList, PluginLoadError } from "../../shared/plugin.js";
 import type { PluginManifest } from "../../shared/pluginManifest.js";
 import { orpcErrors } from "../orpcErrors.js";
-import type { HaloContext } from "../router.js";
 import {
   WorkspaceNotReadyError,
   type WorkspaceService,
-} from "../workspace-service.js";
+} from "../workspace/WorkspaceService.js";
 import { compilePluginView, readPluginViewDist } from "./compilePluginView.js";
 import { loadPluginServer } from "./loadPluginServer.js";
 import { parsePluginId } from "./pluginId.js";
@@ -249,7 +248,7 @@ export class PluginService {
 
 function mountPluginRouter(args: { pluginId: string; router: AnyRouter }) {
   return orpc
-    .$context<HaloContext>()
+    .$context<{ workspace: WorkspaceService }>()
     .use(async ({ context, next }) => {
       const workspace = context.workspace.getWorkspace();
       if (workspace === undefined) {

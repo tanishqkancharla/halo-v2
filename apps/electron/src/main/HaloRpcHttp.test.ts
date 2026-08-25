@@ -12,14 +12,14 @@ import {
 import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
-import { AgentSessionRegistry } from "./AgentSessionRegistry.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
-import { IntegrationService } from "./IntegrationService.js";
-import { PiService } from "./pi-service.js";
+import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
 import type { HaloContext } from "./router.js";
+import { AgentSessionRegistry } from "./sessions/AgentSessionRegistry.js";
+import { PiService } from "./sessions/PiService.js";
 import { UserService } from "./UserService.js";
-import { WorkspaceService } from "./workspace-service.js";
+import { WorkspaceService } from "./workspace/WorkspaceService.js";
 
 const rpcHttpTest = test.extend<{
   userDataDir: string;

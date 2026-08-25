@@ -1,7 +1,7 @@
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import * as errore from "errore";
-import { googleService } from "../shared/GoogleCatalog.js";
-import type { IntegrationConnection } from "../shared/integrations.js";
+import { googleService } from "../../shared/GoogleCatalog.js";
+import type { IntegrationConnection } from "../../shared/integrations.js";
 
 export class NotifyIntegrationEventError extends errore.createTaggedError({
   name: "NotifyIntegrationEventError",

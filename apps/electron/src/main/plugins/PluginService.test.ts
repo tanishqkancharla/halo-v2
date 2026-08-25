@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parsePluginArgv } from "@halo/cli";
 import { describe, expect, test } from "vitest";
-import { WorkspaceService } from "../workspace-service.js";
+import { WorkspaceService } from "../workspace/WorkspaceService.js";
 import { PluginIdError } from "./pluginId.js";
 import { PluginExistsError, PluginService } from "./PluginService.js";
 

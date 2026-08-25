@@ -1,5 +1,5 @@
 import * as errore from "errore";
-import { googleService } from "../shared/GoogleCatalog.js";
+import { googleService } from "../../shared/GoogleCatalog.js";
 import type {
   IntegrationConnection,
   StoredTokens,

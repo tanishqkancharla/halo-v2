@@ -5,7 +5,7 @@ import {
   googleCatalog,
   googleService,
   type GoogleService,
-} from "../shared/GoogleCatalog.js";
+} from "../../shared/GoogleCatalog.js";
 import { googleApiRequest } from "./GoogleApiRequest.js";
 import { refreshGoogleAccessToken } from "./GoogleOAuth.js";
 import {

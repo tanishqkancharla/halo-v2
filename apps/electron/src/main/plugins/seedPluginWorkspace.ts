@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import * as errore from "errore";
 import haloPluginSkill from "./haloPluginSkill.md?raw";
 import mauiSkill from "../bundled/mauiSkill.md?raw";
-import type { WorkspaceLayout } from "../workspace-service.js";
+import type { WorkspaceLayout } from "../workspace/WorkspaceService.js";
 
 export class PluginSeedError extends errore.createTaggedError({
   name: "PluginSeedError",
