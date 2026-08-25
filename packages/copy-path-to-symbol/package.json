@@ -1,0 +1,39 @@
+{
+  "name": "halo-copy-path-to-symbol",
+  "displayName": "Copy Path to Symbol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Copy a workspace-relative file path and the selected symbol name.",
+  "categories": [
+    "Other"
+  ],
+  "license": "MIT",
+  "publisher": "halo",
+  "main": "./extension.js",
+  "scripts": {
+    "test": "node --test symbolPath.test.js"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "halo.copyPathToSymbol",
+        "title": "Copy Path to Symbol"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "halo.copyPathToSymbol",
+          "group": "navigation@20",
+          "when": "editorTextFocus"
+        }
+      ]
+    }
+  },
+  "activationEvents": [
+    "onCommand:halo.copyPathToSymbol"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  }
+}
