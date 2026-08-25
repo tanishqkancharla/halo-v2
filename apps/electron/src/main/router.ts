@@ -3,7 +3,6 @@ import {
   integrationsRouter,
   type IntegrationsRouterContext,
 } from "./integrations/integrationsRouter.js";
-import type { PluginService } from "./plugins/PluginService.js";
 import {
   pluginsRouter,
   type PluginsRouterContext,
@@ -23,12 +22,10 @@ export type HaloContext = AppRouterContext &
   IntegrationsRouterContext &
   PluginsRouterContext;
 
-export function haloRpcRouter(plugins: PluginService) {
-  return {
-    ...appRouter,
-    workspace: workspaceRouter,
-    sessions: sessionsRouter,
-    integrations: integrationsRouter,
-    plugins: { ...pluginsRouter, servers: plugins.lazyRouter },
-  };
-}
+export const haloRpcRouter = {
+  ...appRouter,
+  workspace: workspaceRouter,
+  sessions: sessionsRouter,
+  integrations: integrationsRouter,
+  plugins: pluginsRouter,
+};

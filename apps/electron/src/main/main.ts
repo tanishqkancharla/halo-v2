@@ -91,6 +91,12 @@ let rpcHttp: HaloRpcHttp | undefined;
 
 app.whenReady().then(async () => {
   await workspaceService.restore();
+  if (workspaceService.getWorkspace() !== undefined) {
+    const listed = await pluginService.list();
+    if (listed instanceof Error) {
+      logger.warn({ event: "plugin-startup-load-failed", error: listed });
+    }
+  }
   registerLogBridge();
   registerRpcBridge();
   const listening = await listenHaloRpcHttp({
@@ -221,7 +227,7 @@ function registerRpcBridge(): void {
       },
       logger: rpcLogger,
     };
-    const handler = new RPCHandler<HaloContext>(haloRpcRouter(pluginService), {
+    const handler = new RPCHandler<HaloContext>(haloRpcRouter, {
       interceptors: [
         onError((error) => {
           if (error instanceof Error) {

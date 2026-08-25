@@ -1,8 +1,3 @@
-export {
-  callPluginProcedure,
-  type PluginNode,
-  type PluginRouter,
-} from "./callPlugin.js";
 export { createHaloRpcClient } from "./haloRpcClient.js";
 export {
   cliVersion,

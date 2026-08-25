@@ -9,7 +9,10 @@ import {
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import * as errore from "errore";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import type { HaloClient } from "../../shared/contract.js";
+import type {
+  HaloClient,
+  PluginInvocationInput,
+} from "../../shared/contract.js";
 import type { WorkspaceInfo } from "../../shared/rpc.js";
 import {
   loadPluginViews,
@@ -182,14 +185,36 @@ export function usePluginsQuery(
       const servers: PluginServers = {};
       for (const plugin of list.plugins) {
         if (plugin.serverPath === undefined) continue;
-        const server = api.plugins.servers[plugin.id];
-        if (server === undefined) continue;
-        servers[plugin.id] = server;
+        servers[plugin.id] = pluginApiFacade(api, plugin.id);
       }
       return { ...loaded, servers };
     },
     enabled: workspaceRoot !== undefined,
   });
+}
+
+/**
+ * Preserves the plugin's typed router API over Halo's untyped invoke route.
+ * `server.todos.list(input)` becomes
+ * `plugins.invoke({ pluginId, path: ["todos", "list"], input })`.
+ */
+function pluginApiFacade(api: HaloClient, pluginId: string) {
+  function node(path: string[]): RouterClient<AnyRouter> {
+    const invoke = (
+      input: PluginInvocationInput["input"],
+      options?: { signal?: AbortSignal; lastEventId?: string },
+    ) => api.plugins.invoke({ pluginId, path, input }, options);
+    // SAFETY: each property appends a procedure path and each call delegates to plugins.invoke.
+    return new Proxy(invoke, {
+      get(_target, property) {
+        // Promise resolution reads `.then`; the facade must not be a thenable.
+        if (property === "then") return undefined;
+        return node([...path, property.toString()]);
+      },
+    }) as RouterClient<AnyRouter>;
+  }
+
+  return node([]);
 }
 
 async function restoreWorkspace(api: HaloClient): Promise<WorkspaceState> {

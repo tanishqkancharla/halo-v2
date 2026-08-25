@@ -2,13 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import {
-  callPluginProcedure,
-  createHaloRpcClient,
-  readHaloRpcFile,
-  rpcFilePath,
-  type PluginRouter,
-} from "@halo/cli";
+import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
@@ -119,6 +113,31 @@ describe("listenHaloRpcHttp", () => {
       const created = await client.plugins.create({ id: "notes" });
       expect(created.id).toBe("notes");
 
+      const beforeBuild = await client.plugins
+        .invoke({
+          pluginId: "notes",
+          path: ["ping"],
+          input: undefined,
+        })
+        .catch((e) => (e instanceof Error ? e : new Error(String(e))));
+      expect(beforeBuild).toBeInstanceOf(Error);
+
+      await writeFile(
+        join(created.directory, "server.ts"),
+        `import { pluginOs } from "@get-halo/plugin-sdk/server";
+
+export default {
+  ping: pluginOs.handler(async ({ context }) => ({
+    pluginId: context.pluginId,
+  })),
+  count: pluginOs.handler(() => (async function* () {
+    yield 1;
+    yield 2;
+  })()),
+};
+`,
+      );
+
       const reserved = await client.plugins
         .create({ id: "new" })
         .catch((e) => (e instanceof Error ? e : new Error(String(e))));
@@ -128,14 +147,45 @@ describe("listenHaloRpcHttp", () => {
       expect(built.built).toEqual(["notes"]);
       expect(built.errors).toEqual([]);
 
-      const ping = await callPluginProcedure({
-        // SAFETY: HaloClient.plugins.servers is the mounted oRPC plugin tree.
-        client: { plugins: client.plugins.servers as PluginRouter },
-        id: "notes",
+      const ping = await client.plugins.invoke({
+        pluginId: "notes",
         path: ["ping"],
         input: undefined,
       });
       expect(ping).toEqual({ pluginId: "notes" });
+
+      const count = await client.plugins.invoke({
+        pluginId: "notes",
+        path: ["count"],
+        input: undefined,
+      });
+      expect(count).toBeInstanceOf(Object);
+      // SAFETY: the test plugin's count procedure returns an async number iterator.
+      const stream = count as AsyncIterable<number>;
+      const values: unknown[] = [];
+      for await (const value of stream) values.push(value);
+      expect(values).toEqual([1, 2]);
+
+      await writeFile(
+        join(created.directory, "server.ts"),
+        `import { pluginOs } from "@get-halo/plugin-sdk/server";
+
+export default {
+  ping: pluginOs.handler(async ({ context }) => ({
+    pluginId: context.pluginId,
+    reloaded: true,
+  })),
+};
+`,
+      );
+      await client.plugins.build();
+
+      const reloaded = await client.plugins.invoke({
+        pluginId: "notes",
+        path: ["ping"],
+        input: undefined,
+      });
+      expect(reloaded).toEqual({ pluginId: "notes", reloaded: true });
     },
   );
 });

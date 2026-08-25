@@ -9,7 +9,7 @@ export type PluginJson =
   | PluginJson[]
   | { readonly [key: string]: PluginJson };
 
-export type PluginCallInput = PluginJson | undefined;
+type PluginCallInput = PluginJson | undefined;
 
 export type HaloPluginArgv =
   | { kind: "create"; id: string }

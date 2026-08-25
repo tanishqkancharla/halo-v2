@@ -5,7 +5,6 @@ import {
   type,
   type RouterContractClient,
 } from "@orpc/contract";
-import type { AnyRouter, RouterClient } from "@orpc/server";
 import type { AgentSessionState } from "./AgentSessionState.js";
 import type { IntegrationConnection } from "./integrations.js";
 import type {
@@ -30,6 +29,12 @@ type PluginTypeDiagnostic = {
   file: string;
   line: number;
   message: string;
+};
+
+export type PluginInvocationInput = {
+  pluginId: string;
+  path: string[];
+  input: unknown;
 };
 
 export const contract = {
@@ -76,13 +81,8 @@ export const contract = {
           diagnostics: PluginTypeDiagnostic[];
         }>(),
       ),
+    invoke: oc.input(type<PluginInvocationInput>()).output(type<unknown>()),
   },
 };
 
-type CoreHaloClient = RouterContractClient<typeof contract>;
-
-export type HaloClient = Omit<CoreHaloClient, "plugins"> & {
-  plugins: CoreHaloClient["plugins"] & {
-    servers: Record<string, RouterClient<AnyRouter>>;
-  };
-};
+export type HaloClient = RouterContractClient<typeof contract>;

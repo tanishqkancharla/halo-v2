@@ -137,10 +137,23 @@ describe("PluginService", () => {
   );
 
   pluginServiceTest(
-    "types is clean for a scaffold and reports a bad view",
+    "types accepts async iterators and reports a bad view",
     async ({ plugins, workspaceRoot }) => {
       const created = await plugins.create("notes");
       if (created instanceof Error) throw created;
+
+      await writeFile(
+        join(created.directory, "server.ts"),
+        `import { pluginOs } from "@get-halo/plugin-sdk/server";
+
+export default {
+  count: pluginOs.handler(() => (async function* () {
+    yield 1;
+    yield 2;
+  })()),
+};
+`,
+      );
 
       const clean = await plugins.types();
       if (clean instanceof Error) throw clean;

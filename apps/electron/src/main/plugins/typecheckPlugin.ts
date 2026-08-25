@@ -10,6 +10,7 @@ const pluginTsconfig = `${JSON.stringify(
       noEmit: true,
       allowImportingTsExtensions: true,
       jsx: "react-jsx",
+      target: "ES2022",
       module: "ESNext",
       moduleResolution: "bundler",
       skipLibCheck: true,

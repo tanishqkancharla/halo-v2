@@ -1,11 +1,11 @@
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { os as orpc, ORPCError, type AnyRouter } from "@orpc/server";
+import { call, getRouter, Procedure, type AnyRouter } from "@orpc/server";
 import * as errore from "errore";
+import type { PluginInvocationInput } from "../../shared/contract.js";
 import type { PluginList, PluginLoadError } from "../../shared/plugin.js";
 import type { PluginManifest } from "../../shared/pluginManifest.js";
-import { orpcErrors } from "../orpcErrors.js";
 import {
   WorkspaceNotReadyError,
   type WorkspaceService,
@@ -29,14 +29,28 @@ export class PluginExistsError extends errore.createTaggedError({
   message: "Plugin '$id' already exists",
 }) {}
 
+export class PluginNotMountedError extends errore.createTaggedError({
+  name: "PluginNotMountedError",
+  message: "Plugin '$id' is not mounted",
+}) {}
+
+export class PluginProcedureNotFoundError extends errore.createTaggedError({
+  name: "PluginProcedureNotFoundError",
+  message: "Plugin '$id' has no procedure at '$path'",
+}) {}
+
+export class PluginInvocationError extends errore.createTaggedError({
+  name: "PluginInvocationError",
+  message: "Plugin '$id' procedure '$path' failed",
+}) {}
+
 type PluginDirectory = {
   id: string;
   directory: string;
 };
 
 export class PluginService {
-  readonly router: Record<string, AnyRouter> = {};
-  readonly lazyRouter = orpc.lazy(async () => ({ default: this.router }));
+  private routers = new Map<string, AnyRouter>();
 
   constructor(private readonly workspace: WorkspaceService) {}
 
@@ -146,7 +160,7 @@ export class PluginService {
     const plugins: PluginList["plugins"] = [];
     const compiledViews: PluginList["compiledViews"] = [];
     const errors: PluginList["errors"] = [];
-    this.clearMounted();
+    const routers = new Map<string, AnyRouter>();
     for (const plugin of listed) {
       const manifest = await readPluginManifest(plugin);
       if (manifest instanceof Error) {
@@ -182,15 +196,13 @@ export class PluginService {
           errors.push({ id: plugin.id, message: server.message });
           continue;
         }
-        this.router[plugin.id] = mountPluginRouter({
-          pluginId: plugin.id,
-          router: server,
-        });
+        routers.set(plugin.id, server);
       }
 
       plugins.push(manifest);
       if (compiled !== undefined) compiledViews.push(compiled);
     }
+    this.routers = routers;
     return { plugins, compiledViews, errors };
   }
 
@@ -204,6 +216,47 @@ export class PluginService {
       manifests.push(manifest);
     }
     return manifests;
+  }
+
+  async invoke(args: {
+    pluginId: string;
+    path: string[];
+    input: PluginInvocationInput["input"];
+    signal?: AbortSignal;
+    lastEventId?: string;
+  }) {
+    const router = this.routers.get(args.pluginId);
+    if (router === undefined)
+      return new PluginNotMountedError({ id: args.pluginId });
+
+    const procedure = getRouter(router, args.path);
+    if (!(procedure instanceof Procedure)) {
+      return new PluginProcedureNotFoundError({
+        id: args.pluginId,
+        path: args.path.join("."),
+      });
+    }
+
+    const workspace = this.workspace.getWorkspace();
+    if (workspace === undefined) return new WorkspaceNotReadyError();
+
+    const result = await call(procedure, args.input, {
+      context: {
+        pluginId: args.pluginId,
+        workspaceRoot: workspace.workspaceRoot,
+      },
+      signal: args.signal,
+      lastEventId: args.lastEventId,
+    }).catch(
+      (e) =>
+        new PluginInvocationError({
+          id: args.pluginId,
+          path: args.path.join("."),
+          cause: e,
+        }),
+    );
+    if (result instanceof Error) return result;
+    return result;
   }
 
   private async listPluginDirectories() {
@@ -238,36 +291,4 @@ export class PluginService {
       appVersion: this.workspace.appVersion,
     });
   }
-
-  private clearMounted() {
-    for (const id of Object.keys(this.router)) {
-      delete this.router[id];
-    }
-  }
-}
-
-function mountPluginRouter(args: { pluginId: string; router: AnyRouter }) {
-  return orpc
-    .$context<{ workspace: WorkspaceService }>()
-    .use(async ({ context, next }) => {
-      const workspace = context.workspace.getWorkspace();
-      if (workspace === undefined) {
-        throw orpcErrors.badRequest(new WorkspaceNotReadyError());
-      }
-      const result = await next({
-        context: {
-          pluginId: args.pluginId,
-          workspaceRoot: workspace.workspaceRoot,
-        },
-      });
-      if (result.output instanceof ORPCError) return result;
-      if (result.output instanceof Error) {
-        throw new ORPCError("PLUGIN_ERROR", {
-          message: result.output.message,
-          cause: result.output,
-        });
-      }
-      return result;
-    })
-    .router(args.router);
 }

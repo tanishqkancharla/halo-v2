@@ -1,15 +1,22 @@
 #!/usr/bin/env node
 
 import { Cli, z } from "incur";
-import { callPluginProcedure, type PluginRouter } from "./callPlugin.js";
+import * as errore from "errore";
 import { cliVersion, connectHalo } from "./connectHalo.js";
 import { HaloRpcFileError } from "./rpcFile.js";
-import { parsePluginArgv } from "./parsePluginArgv.js";
+import { parsePluginArgv, type PluginJson } from "./parsePluginArgv.js";
 
 type WorkspaceInfo = {
   name: string;
   workspaceRoot: string;
 };
+
+type PluginProcedureOutput = PluginJson | undefined | AsyncIterable<PluginJson>;
+
+class PluginCallError extends errore.createTaggedError({
+  name: "PluginCallError",
+  message: "Plugin call failed: $detail",
+}) {}
 
 type HaloHost = {
   getAppInfo: () => Promise<{ version: string }>;
@@ -34,7 +41,11 @@ type HaloHost = {
         message: string;
       }>;
     }>;
-    servers: PluginRouter;
+    invoke: (input: {
+      pluginId: string;
+      path: string[];
+      input: unknown;
+    }) => Promise<PluginProcedureOutput>;
   };
 };
 
@@ -205,14 +216,35 @@ const plugin = Cli.create("plugin", {
         });
       }
 
-      const result = await callPluginProcedure({
-        client: { plugins: connected.client.plugins.servers },
-        id: parsed.id,
-        path: parsed.path,
-        input: parsed.input,
-      });
+      const result = await connected.client.plugins
+        .invoke({
+          pluginId: parsed.id,
+          path: parsed.path,
+          input: parsed.input,
+        })
+        .catch(
+          (e) =>
+            new PluginCallError({
+              detail: e instanceof Error ? e.message : String(e),
+              cause: e,
+            }),
+        );
       if (result instanceof Error) {
         return c.error({ code: "PLUGIN", message: result.message });
+      }
+      if (isAsyncIterable(result)) {
+        const closed = await result[Symbol.asyncIterator]()
+          .return?.()
+          .catch(
+            (e) => new PluginCallError({ detail: "close stream", cause: e }),
+          );
+        if (closed instanceof Error) {
+          return c.error({ code: "PLUGIN", message: closed.message });
+        }
+        return c.error({
+          code: "PLUGIN",
+          message: "streaming plugin procedures are not supported by the CLI",
+        });
       }
       return c.ok({ result });
     },
@@ -272,6 +304,14 @@ Cli.create("halo", {
 
 function connectHost(env: { HALO_RPC_FILE?: string; HALO_USER_DATA?: string }) {
   return connectHalo<HaloHost>(env);
+}
+
+function isAsyncIterable(
+  value: PluginProcedureOutput,
+): value is AsyncIterable<PluginJson> {
+  if (value === undefined || value === null) return false;
+  if (!(value instanceof Object)) return false;
+  return Symbol.asyncIterator in value;
 }
 
 function wrapRpc(error: { message: string }) {

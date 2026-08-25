@@ -1,4 +1,4 @@
-import { implement } from "@orpc/server";
+import { implement, ORPCError } from "@orpc/server";
 import type { Logger } from "@repo/logger";
 import { contract } from "../../shared/contract.js";
 import { orpcErrors } from "../orpcErrors.js";
@@ -43,5 +43,24 @@ export const pluginsRouter = os.router({
     const checked = await context.plugins.types();
     if (checked instanceof Error) return orpcErrors.badRequest(checked);
     return checked;
+  }),
+  invoke: os.invoke.handler(async ({ input, context, signal, lastEventId }) => {
+    context.logger.info({
+      event: "plugin.invoke",
+      pluginId: input.pluginId,
+      path: input.path,
+    });
+    const result = await context.plugins.invoke({
+      ...input,
+      signal,
+      lastEventId,
+    });
+    if (result instanceof Error) {
+      return new ORPCError("PLUGIN_ERROR", {
+        message: result.message,
+        cause: result,
+      });
+    }
+    return result;
   }),
 });

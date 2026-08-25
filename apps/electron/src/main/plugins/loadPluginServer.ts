@@ -17,6 +17,7 @@ type PluginModule = AnyRouter & {
 
 const requireFromThisFile = createRequire(import.meta.url);
 const jiti = createJiti(import.meta.url, {
+  moduleCache: false,
   alias: {
     "@get-halo/plugin-sdk/schema": sdkEntry("schema"),
     "@get-halo/plugin-sdk/server": sdkEntry("server"),
