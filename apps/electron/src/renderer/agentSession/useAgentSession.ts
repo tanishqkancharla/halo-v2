@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import * as errore from "errore";
-import { useQueryClient } from "@tanstack/react-query";
 import type { AgentSessionState } from "../../shared/AgentSessionState.js";
 import {
   applyAgentSessionEvent,
   emptyAgentSessionState,
 } from "../../shared/AgentSessionState.js";
-import { useApi } from "../api/ApiProvider.tsx";
+import { reloadSessions, useApi } from "../api/ApiProvider.tsx";
 import type { HaloClient } from "../../shared/contract.js";
 
 class PromptFailedError extends errore.createTaggedError({
@@ -30,7 +29,6 @@ type UseAgentSessionResult = {
  */
 export function useAgentSession(sessionId: string): UseAgentSessionResult {
   const api = useApi();
-  const queryClient = useQueryClient();
   const [readySessionId, setReadySessionId] = useState<string | undefined>(
     undefined,
   );
@@ -102,10 +100,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       }));
       return result;
     }
-    await queryClient.invalidateQueries({
-      queryKey: ["sessions"],
-      refetchType: "all",
-    });
+    await reloadSessions(api);
   }
 
   async function abort() {
@@ -143,7 +138,6 @@ export function useDraftAgentSession(
   onCreated: (sessionId: string) => void,
 ): UseDraftAgentSessionResult {
   const api = useApi();
-  const queryClient = useQueryClient();
   const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const sessionIdRef = useRef<string | undefined>(undefined);
@@ -188,10 +182,7 @@ export function useDraftAgentSession(
       }));
       return result;
     }
-    await queryClient.invalidateQueries({
-      queryKey: ["sessions"],
-      refetchType: "all",
-    });
+    await reloadSessions(api);
   }
 
   async function abort() {

@@ -1,4 +1,3 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   Flex,
@@ -12,7 +11,7 @@ import {
 import { style, useStyles } from "purse-styles";
 import { googleScopeLabel, googleService } from "../../shared/GoogleCatalog.js";
 import type { ConnectionIntent } from "../../shared/integrations.js";
-import { useApi } from "../api/ApiProvider.tsx";
+import { useIntegration } from "../api/ApiProvider.tsx";
 import type { SessionViewPart } from "../agentSession/sessionView.ts";
 import { GoogleServiceIcon } from "./GoogleServiceIcon.tsx";
 
@@ -28,58 +27,10 @@ export function IntegrationCard({
   sessionId: string | undefined;
   part: IntegrationConnectPart;
 }) {
-  const api = useApi();
-  const queryClient = useQueryClient();
   const connectionId = part.connectionId;
-  const query = useQuery({
-    queryKey: ["integrations", "get", connectionId],
-    queryFn: async () => {
-      // SAFETY: enabled is false until connectionId is a string.
-      const connection = await api.integrations.get({
-        connectionId: connectionId as string,
-      });
-      // React Query keeps the last value when queryFn returns undefined.
-      return { connection };
-    },
-    enabled: connectionId !== undefined,
-  });
-  const startOAuth = useMutation({
-    mutationFn: () => {
-      // SAFETY: the button is disabled until both ids are strings.
-      return api.integrations.startOAuth({
-        connectionId: connectionId as string,
-        sessionId: sessionId as string,
-      });
-    },
-    onSuccess: (connection) => {
-      queryClient.setQueryData(["integrations", "get", connectionId], {
-        connection,
-      });
-    },
-    onError: (error) => {
-      console.warn("Google OAuth failed:", error);
-    },
-  });
-  const disconnect = useMutation({
-    mutationFn: () => {
-      // SAFETY: the button is disabled until both ids are strings.
-      return api.integrations.disconnect({
-        connectionId: connectionId as string,
-        sessionId: sessionId as string,
-      });
-    },
-    onSuccess: () => {
-      queryClient.setQueryData(["integrations", "get", connectionId], {
-        connection: undefined,
-      });
-    },
-    onError: (error) => {
-      console.warn("Google disconnect failed:", error);
-    },
-  });
-
-  const disconnected = query.isSuccess && query.data.connection === undefined;
-  const live = query.data?.connection;
+  const query = useIntegration(connectionId);
+  const disconnected = query.disconnected;
+  const live = query.connection;
   const serviceId = live === undefined ? part.service : live.service;
   const catalog = googleService(serviceId);
   const serviceLabel = catalog === undefined ? serviceId : catalog.label;
@@ -137,8 +88,7 @@ export function IntegrationCard({
           {view.button === undefined ? undefined : (
             <Button
               disabled={
-                startOAuth.isPending ||
-                disconnect.isPending ||
+                query.isPending ||
                 connectionId === undefined ||
                 sessionId === undefined
               }
@@ -146,10 +96,10 @@ export function IntegrationCard({
                 if (connectionId === undefined) return;
                 if (sessionId === undefined) return;
                 if (view.button === "Disconnect") {
-                  disconnect.mutate();
+                  query.disconnect(sessionId);
                   return;
                 }
-                startOAuth.mutate();
+                query.startOAuth(sessionId);
               }}
             >
               {view.button}

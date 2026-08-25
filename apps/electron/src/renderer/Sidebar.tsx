@@ -20,7 +20,7 @@ import { style, useStyles } from "purse-styles";
 import { Router, useLocation } from "wouter";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
-import { useInstallAppUpdateMutation } from "./api/ApiProvider.tsx";
+import { useInstallAppUpdate } from "./api/ApiProvider.tsx";
 import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
 
 type SidebarProps = {
@@ -140,14 +140,14 @@ function UpdateFooter({
   appInfo: AppInfo;
   labelClassName: string;
 }) {
-  const install = useInstallAppUpdateMutation();
+  const install = useInstallAppUpdate();
   const restartButton = useStyles(styles.restartButton);
   if (appInfo.update.state === "downloaded") {
     return (
       <Button
         className={restartButton}
         data-testid="app-update-restart"
-        onClick={() => install.mutate()}
+        onClick={() => install.install()}
       >
         Restart to update
       </Button>

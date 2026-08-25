@@ -1,15 +1,20 @@
 import { SidebarSection } from "@halo/plugin-sdk/view";
 import type { FileTree as FileTreeModel } from "@pierre/trees";
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import type { WorkspaceTreeEvent } from "../../shared/rpc.js";
 import type { HaloClient } from "../../shared/contract.js";
 import {
   useApi,
-  useWorkspacePathsQuery,
-  useWorkspaceQuery,
-  workspacePathsQueryKey,
+  useWorkspace,
+  useWorkspacePaths,
 } from "../api/ApiProvider.tsx";
+import {
+  commitWrites,
+  haloDb,
+  pathRows,
+  pathsFromRows,
+  replaceCollection,
+} from "../api/HaloTables.ts";
 import { Filesystem } from "./Filesystem.tsx";
 
 type WorkspaceFilesystemProps = {
@@ -21,10 +26,8 @@ export function WorkspaceFilesystem({
   maxHeight,
   className,
 }: WorkspaceFilesystemProps) {
-  const workspaceQuery = useWorkspaceQuery();
-  const workspace = workspaceQuery.data;
-  const pathsQuery = useWorkspacePathsQuery(workspace);
-  const queryClient = useQueryClient();
+  const workspace = useWorkspace();
+  const paths = useWorkspacePaths();
   const api = useApi();
   const modelRef = useRef<FileTreeModel | undefined>(undefined);
   const workspaceRoot =
@@ -37,34 +40,31 @@ export function WorkspaceFilesystem({
 
     const stop = listenWorkspaceTree(api, (events) => {
       applyTreeEvents(modelRef.current, events);
-      queryClient.setQueryData(
-        workspacePathsQueryKey(workspaceRoot),
-        (current: string[] | undefined) => {
-          if (current === undefined) return current;
-          const next = applyPathEvents(current, events);
-          const wasEmpty = current.length === 0;
-          const isEmpty = next.length === 0;
-          if (wasEmpty === isEmpty) return current;
-          return next;
-        },
-      );
+      void commitWrites(haloDb, (tx) => {
+        const current = pathsFromRows(tx.list("workspacePaths"));
+        const next = applyPathEvents(current, events);
+        const wasEmpty = current.length === 0;
+        const isEmpty = next.length === 0;
+        if (wasEmpty === isEmpty) return;
+        replaceCollection(tx, "workspacePaths", pathRows(next));
+      });
     });
 
     return () => {
       stop();
       modelRef.current = undefined;
     };
-  }, [api, queryClient, workspaceRoot]);
+  }, [api, workspaceRoot]);
 
   if (workspaceRoot === undefined) return;
-  if (pathsQuery.data === undefined) return;
-  if (pathsQuery.data.length === 0) return;
+  if (paths === undefined) return;
+  if (paths.length === 0) return;
 
   return (
     <SidebarSection label="Files" role="none" className={className}>
       <Filesystem
         key={workspaceRoot}
-        paths={pathsQuery.data}
+        paths={paths}
         maxHeight={maxHeight}
         onModel={(model) => {
           modelRef.current = model;

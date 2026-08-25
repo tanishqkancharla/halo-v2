@@ -11,29 +11,25 @@ import { MainPane } from "./MainPane.tsx";
 import { Onboarding } from "./Onboarding.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import {
-  useSessionsQuery,
-  useChooseWorkspaceMutation,
-  useWorkspaceQuery,
-  useAppInfoQuery,
-  usePluginsQuery,
+  useSessions,
+  useChooseWorkspace,
+  useWorkspace,
+  useAppInfo,
+  usePlugins,
 } from "./api/ApiProvider.tsx";
 
 export function App() {
-  const workspaceQuery = useWorkspaceQuery();
-  const workspace = workspaceQuery.data;
-  const chooseWorkspace = useChooseWorkspaceMutation();
-  const sessionsQuery = useSessionsQuery(workspace);
-  const appInfoQuery = useAppInfoQuery();
-  const pluginsQuery = usePluginsQuery(workspace);
-  const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
-  const pluginViews =
-    pluginsQuery.data === undefined ? [] : pluginsQuery.data.views;
-  const pluginErrors =
-    pluginsQuery.data === undefined ? [] : pluginsQuery.data.errors;
-  const pluginServers =
-    pluginsQuery.data === undefined ? {} : pluginsQuery.data.servers;
+  const workspace = useWorkspace();
+  const chooseWorkspace = useChooseWorkspace();
+  const sessionsQuery = useSessions();
+  const appInfo = useAppInfo();
+  const pluginsQuery = usePlugins();
+  const sessions = sessionsQuery.sessions;
+  const pluginViews = pluginsQuery.views;
+  const pluginErrors = pluginsQuery.errors;
+  const pluginServers = pluginsQuery.servers;
 
-  if (workspaceQuery.isPending || workspace === undefined) {
+  if (workspace === undefined) {
     return <LoadingPage />;
   }
 
@@ -41,17 +37,17 @@ export function App() {
     return (
       <Onboarding
         message={
-          chooseWorkspace.error
-            ? String(chooseWorkspace.error)
-            : workspace.message
+          chooseWorkspace.error === undefined
+            ? workspace.message
+            : chooseWorkspace.error
         }
-        isChoosing={chooseWorkspace.isPending}
-        onChoose={() => chooseWorkspace.mutate()}
+        isChoosing={chooseWorkspace.isChoosing}
+        onChoose={() => chooseWorkspace.choose()}
       />
     );
   }
 
-  if (!sessionsQuery.isFetched || !pluginsQuery.isFetched) {
+  if (!sessionsQuery.ready || !pluginsQuery.ready) {
     return <LoadingPage />;
   }
 
@@ -61,10 +57,8 @@ export function App() {
       pluginViews={pluginViews}
       pluginErrors={pluginErrors}
       pluginServers={pluginServers}
-      alertMessage={
-        sessionsQuery.error ? String(sessionsQuery.error) : undefined
-      }
-      appInfo={appInfoQuery.data}
+      alertMessage={sessionsQuery.error}
+      appInfo={appInfo}
     />
   );
 }
