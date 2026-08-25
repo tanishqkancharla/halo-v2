@@ -86,6 +86,7 @@ const piService = new PiService(
   integrationService,
 );
 const pluginService = new PluginService(workspaceService);
+const agentSessionRegistry = new AgentSessionRegistry();
 let mainWindow: BrowserWindow | undefined;
 let rpcHttp: HaloRpcHttp | undefined;
 
@@ -105,7 +106,7 @@ app.whenReady().then(async () => {
       integrations: integrationService,
       pi: piService,
       plugins: pluginService,
-      sessions: new AgentSessionRegistry(),
+      sessions: agentSessionRegistry,
       getWindow: () => {
         if (mainWindow === undefined) {
           throw new Error("Halo main window is not open.");
@@ -218,7 +219,7 @@ function registerRpcBridge(): void {
       integrations: integrationService,
       pi: piService,
       plugins: pluginService,
-      sessions: new AgentSessionRegistry(),
+      sessions: agentSessionRegistry,
       getWindow: () => {
         if (mainWindow === undefined) {
           throw new Error("Halo main window is not open.");
@@ -240,9 +241,6 @@ function registerRpcBridge(): void {
     });
     handler.upgrade(port1, { context });
     port1.start();
-    port1.on("close", () => {
-      context.sessions.closeAll();
-    });
     // Electron's postMessage payload; the ports carry the RPC transport.
     // oxlint-disable-next-line unicorn/no-null
     frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);
