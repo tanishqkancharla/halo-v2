@@ -8,10 +8,13 @@ overrides:
   '@effect/platform-node': 4.0.0-beta.103
   '@effect/platform-node-shared': 4.0.0-beta.103
   effect: 4.0.0-beta.103
-  '@tandem/types': github:tanishqkancharla/tandem#path:packages/types
+  '@tandem/core': github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/core
+  '@tandem/server': github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/server
+  '@tandem/types': github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/types
 
 patchedDependencies:
-  '@tandem/core': 1050cb0b0f9ae409ece7327d0153528cdda024caeb23079f65fa70e5891ec315
+  '@tandem/core': 3989f86cf4f583328ea956644572234bc0de6f345f1e02a9e242028c0d8b4883
+  '@tandem/react': 79d22e9a4fd4f2aec3d52dadf61d8c5ac06f857e27e4de9c8de6644eec154688
   '@tandem/server': afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1
   '@tandem/types': cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c
 
@@ -76,9 +79,15 @@ importers:
       '@streamdown/code':
         specifier: ^1.1.1
         version: 1.1.1(react@19.2.8)
-      '@tanstack/react-query':
-        specifier: ^5.101.4
-        version: 5.101.4(react@19.2.8)
+      '@tandem/core':
+        specifier: github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/core
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/core(patch_hash=3989f86cf4f583328ea956644572234bc0de6f345f1e02a9e242028c0d8b4883)(react@19.2.8)
+      '@tandem/react':
+        specifier: github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/react
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/react(patch_hash=79d22e9a4fd4f2aec3d52dadf61d8c5ac06f857e27e4de9c8de6644eec154688)(react@19.2.8)
+      '@tandem/types':
+        specifier: github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/types
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
       '@tiptap/extension-placeholder':
         specifier: ^3.29.2
         version: 3.29.2(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))
@@ -308,14 +317,14 @@ importers:
         specifier: ^0.34.52
         version: 0.34.52
       '@tandem/core':
-        specifier: github:tanishqkancharla/tandem#path:packages/core
-        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/core(patch_hash=1050cb0b0f9ae409ece7327d0153528cdda024caeb23079f65fa70e5891ec315)(react@19.2.8)
+        specifier: github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/core
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/core(patch_hash=3989f86cf4f583328ea956644572234bc0de6f345f1e02a9e242028c0d8b4883)(react@19.2.8)
       '@tandem/server':
-        specifier: github:tanishqkancharla/tandem#path:packages/server
-        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/server(patch_hash=afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1)(react@19.2.8)
+        specifier: github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/server
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/server(patch_hash=afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1)(react@19.2.8)
       '@tandem/types':
-        specifier: github:tanishqkancharla/tandem#path:packages/types
-        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
+        specifier: github:tanishqkancharla/tandem#dc70f5f63df6aa480e7685c4132480e8129e97a5&path:packages/types
+        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
       errore:
         specifier: ^0.14.1
         version: 0.14.1
@@ -2693,12 +2702,18 @@ packages:
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
 
-  '@tandem/core@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/core':
-    resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/core, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
+  '@tandem/core@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/core':
+    resolution: {gitHosted: true, integrity: sha512-OI8x12I3k+ni9IfVm7TkbMdCuOyFAj1yzMJ/Gw96h4e0colTaAkA+mW7eKQK6uUJhsRBVdib8raRt6Ai8DRzIw==, path: packages/core, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5}
     version: 0.2.0
 
-  '@tandem/server@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/server':
-    resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/server, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
+  '@tandem/react@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/react':
+    resolution: {gitHosted: true, integrity: sha512-OI8x12I3k+ni9IfVm7TkbMdCuOyFAj1yzMJ/Gw96h4e0colTaAkA+mW7eKQK6uUJhsRBVdib8raRt6Ai8DRzIw==, path: packages/react, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5}
+    version: 0.2.0
+    peerDependencies:
+      react: '>=18'
+
+  '@tandem/server@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/server':
+    resolution: {gitHosted: true, integrity: sha512-OI8x12I3k+ni9IfVm7TkbMdCuOyFAj1yzMJ/Gw96h4e0colTaAkA+mW7eKQK6uUJhsRBVdib8raRt6Ai8DRzIw==, path: packages/server, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5}
     version: 0.2.0
     peerDependencies:
       drizzle-orm: ^0.44.0
@@ -2706,21 +2721,13 @@ packages:
       drizzle-orm:
         optional: true
 
-  '@tandem/types@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types':
-    resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/types, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
+  '@tandem/types@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/types':
+    resolution: {gitHosted: true, integrity: sha512-OI8x12I3k+ni9IfVm7TkbMdCuOyFAj1yzMJ/Gw96h4e0colTaAkA+mW7eKQK6uUJhsRBVdib8raRt6Ai8DRzIw==, path: packages/types, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5}
     version: 0.2.0
 
   '@tanishqkancharla/maui@https://codeload.github.com/tanishqkancharla/maui/tar.gz/5a6e53d3b17cfb99068542ce048065f420f79175':
     resolution: {gitHosted: true, integrity: sha512-Jy5lOHOOuo6Tp5jVLp5Jf/l3Oz7E++4PNoRbi2Hr0UtpVp3Npf69v8lxdp2t0ZgA2abNYRQFmX8OyVyceF4gug==, tarball: https://codeload.github.com/tanishqkancharla/maui/tar.gz/5a6e53d3b17cfb99068542ce048065f420f79175}
     version: 0.0.4
-
-  '@tanstack/query-core@5.101.4':
-    resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
-
-  '@tanstack/react-query@5.101.4':
-    resolution: {integrity: sha512-yRg2pfOCxIs4ZJW3XYYHU/WgtD04FHSnfHlpRT7h7pR77hwkdRG4wxbKe4aq6P0RvXUTBSQpQeadS1SUYUe+KA==}
-    peerDependencies:
-      react: ^18 || ^19
 
   '@tiptap/core@3.29.2':
     resolution: {integrity: sha512-oKUkiPUB7noilVYxI9lNzUD4rX17sHub+PYjMfHMWHG9A3nvIy+FdePIVIIhThKWF7ijhr3eIqHY51Bn+GAFtw==}
@@ -10049,9 +10056,9 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
-  '@tandem/core@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/core(patch_hash=1050cb0b0f9ae409ece7327d0153528cdda024caeb23079f65fa70e5891ec315)(react@19.2.8)':
+  '@tandem/core@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/core(patch_hash=3989f86cf4f583328ea956644572234bc0de6f345f1e02a9e242028c0d8b4883)(react@19.2.8)':
     dependencies:
-      '@tandem/types': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
+      '@tandem/types': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
       '@triplit/tuple-database': 2.2.33(react@19.2.8)
       '@types/lodash-es': 4.17.12
       idb: 8.0.3
@@ -10060,13 +10067,19 @@ snapshots:
     transitivePeerDependencies:
       - react
 
-  '@tandem/server@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/server(patch_hash=afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1)(react@19.2.8)':
+  '@tandem/react@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/react(patch_hash=79d22e9a4fd4f2aec3d52dadf61d8c5ac06f857e27e4de9c8de6644eec154688)(react@19.2.8)':
     dependencies:
-      '@tandem/types': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
+      '@tandem/core': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/core(patch_hash=3989f86cf4f583328ea956644572234bc0de6f345f1e02a9e242028c0d8b4883)(react@19.2.8)
+      '@tandem/types': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
+      react: 19.2.8
+
+  '@tandem/server@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/server(patch_hash=afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1)(react@19.2.8)':
+    dependencies:
+      '@tandem/types': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
     transitivePeerDependencies:
       - react
 
-  '@tandem/types@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)':
+  '@tandem/types@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/dc70f5f63df6aa480e7685c4132480e8129e97a5#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)':
     dependencies:
       tuple-database: 2.2.4(react@19.2.8)
     transitivePeerDependencies:
@@ -10139,13 +10152,6 @@ snapshots:
       - '@types/react-dom'
       - babel-plugin-macros
       - supports-color
-
-  '@tanstack/query-core@5.101.4': {}
-
-  '@tanstack/react-query@5.101.4(react@19.2.8)':
-    dependencies:
-      '@tanstack/query-core': 5.101.4
-      react: 19.2.8
 
   '@tiptap/core@3.29.2(@tiptap/pm@3.29.2)':
     dependencies:

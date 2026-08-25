@@ -66,7 +66,7 @@ function buildGraph(root: string): ProjectGraph {
 	const files = listSourceFiles(root);
 	const packages = publicModules(root);
 	for (const file of files) {
-		if (isToolingEntryFile(file) || file.endsWith(`${sep}emptyNodeFs.ts`)) {
+		if (isToolingEntryFile(file)) {
 			packages.entries.add(file);
 		}
 	}

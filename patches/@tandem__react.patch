@@ -1,8 +1,8 @@
 diff --git a/package.json b/package.json
 --- a/package.json
 +++ b/package.json
-@@ -2,18 +2,12 @@
- 	"name": "@tandem/core",
+@@ -2,8 +2,8 @@
+ 	"name": "@tandem/react",
  	"version": "0.2.0",
  	"type": "module",
 -	"main": "./dist/index.js",
@@ -10,17 +10,17 @@ diff --git a/package.json b/package.json
 +	"main": "./src/index.ts",
 +	"types": "./src/index.ts",
  	"source": "./src/index.ts",
+ 	"author": "Tanishq Kancharla <tanishqkancharla3@gmail.com>",
+ 	"description": "React bindings for Tandem",
+@@ -14,10 +14,7 @@
+ 		"src"
+ 	],
  	"exports": {
 -		".": {
 -			"types": "./dist/index.d.ts",
 -			"import": "./dist/index.js"
--		},
--		"./node": {
--			"types": "./dist/utils/Logger.node.d.ts",
--			"import": "./dist/utils/Logger.node.js"
 -		}
-+		".": "./src/index.ts",
-+		"./node": "./src/utils/Logger.node.ts"
++		".": "./src/index.ts"
  	},
- 	"author": "Tanishq Kancharla <tanishqkancharla3@gmail.com>",
- 	"description": "Core sync engine functionality for Tandem",
+ 	"scripts": {
+ 		"build": "tsc",
