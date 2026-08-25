@@ -1,44 +1,63 @@
 ---
 name: generate-spec-v2
-description: Create a code-based implementation spec in the specs/ directory for a significant feature, fix, or refactor. Use when the user asks to plan, spec, scope, or phase work before implementation and the plan should cover top-level Mermaid flows, per-phase call-stack diffs then code, commit-sized phases, and checks. After writing the spec, serve it with tkstack (`pnpm spec` or `pnpm exec tkstack`).
+description: Research and collaboratively design a significant feature, fix, or refactor, then write a phased implementation spec in specs/ and serve it with tkstack. Use when the user asks to plan, spec, scope, or phase work before implementation.
 ---
 
 # Generate an implementation spec
 
-Write a spec in `specs/` that an engineer can implement without repeating the research. Keep it lean, grounded in the current code, and focused on the requested result.
+Research first, settle the design with the user, then write a spec an engineer can implement without repeating that work. Do not write the spec while critical questions remain open.
 
-## Research the change
+## Workflow
 
-1. Read the request and repository instructions.
-2. Find the entry points, key types, state boundaries, callers, tests, and commands tied to the change. Trace each changed runtime path far enough to show an accurate diff.
-3. Read external docs only when a dependency or API affects the design. Prefer official docs and record the links used.
-4. Ask a question only when the answer would change the result and the code cannot answer it. Otherwise, make the narrowest sound assumption and record it.
+### 1. Research
 
-Use the amount of research the task needs. Do not impose a fixed research process.
+- Read the request, repository instructions, and relevant code.
+- Trace the current runtime paths from entry points through state, side effects, errors, and user-visible results. Find the key types, callers, tests, and commands.
+- Research external libraries, APIs, and prior art that affect the design. Prefer official docs and primary sources. Record useful links for the spec.
+- Separate facts found in code or docs from design choices that still need the user's input.
 
-## Choose the scope
+### 2. Establish the design with the user
 
-- Plan the smallest complete change that gives the requested result.
-- Do not add abstractions, config, infrastructure, migrations, or cleanup unless the result needs them.
-- State goals and non-goals from the request and code. Do not pause for confirmation when the scope is clear.
-- Make each phase fit one commit and leave the repository working.
-- Use as many phases as the work needs. Do not set a phase or line-count limit.
+- Ask critical guiding questions before drafting. Focus on product behavior, scope, ownership boundaries, tradeoffs, failure behavior, migration, and rollout.
+- Ask one focused question at a time. Give concrete options and explain the effect of each when useful.
+- Use each answer to research further or ask the next question. Do not ask the user for facts the code or docs can answer.
+- Continue until the goals, non-goals, behavior, and key technical choices are settled. State the agreed design briefly and resolve any correction before writing.
 
-## Write the file
+### 3. Write and serve the spec
 
-Choose a short kebab-case name and create `specs/<name>.md`. Use this structure. In each code phase, put the call-stack fence first, then the code (diffs, types, excerpts). Do not title those blocks. Walk through them in prose.
+Create `specs/<short-kebab-case-name>.md` with the format below. Then run, from the repository root:
+
+```sh
+pnpm spec specs/<name>.md
+# or: pnpm exec tkstack specs/<name>.md
+```
+
+Keep the server running and give the user the spec path and local URL. Do not write the spec to a temporary directory.
+
+## Spec format
 
 ````markdown
 # <Feature or fix name>
 
 ## System flow
 
-Put one or more Mermaid diagrams immediately after the title, before all prose. Show the main runtime flow and changed parts. Label current and proposed paths or use separate diagrams when that is clearer. Keep node text short and use valid Mermaid syntax.
+Put the main Mermaid flowcharts and sequence diagrams here, immediately after the title. Show current and proposed paths, boundaries, state changes, and important failure paths. Use multiple diagrams when they make the design easier to follow.
 
 ```mermaid
 flowchart TD
     A[Entry point] --> B[Service]
     B --> C[Observable result]
+```
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant E as Entry point
+    participant S as Service
+    U->>E: Action
+    E->>S: Request
+    S-->>E: Result or error
+    E-->>U: Observable result
 ```
 
 ## Problem overview
@@ -47,11 +66,11 @@ Explain the current problem and why it matters in a few plain sentences.
 
 ## Solution overview
 
-Explain the proposed change and its key design choice in a few plain sentences.
+Explain the agreed change and its key design choices in a few plain sentences.
 
 ## Goals
 
-- State the user-visible or system-level results that must hold.
+- State the results that must hold.
 
 ## Non-goals
 
@@ -59,7 +78,8 @@ Explain the proposed change and its key design choice in a few plain sentences.
 
 ## Important files, docs, and websites
 
-- [`path/to/file.ts`](../path/to/file.ts) — State what the implementer will change or learn here.
+- [`path/to/file.ts`](../path/to/file.ts) — Explain why it matters.
+- [External source](https://example.com) — Explain the decision it supports.
 
 List only sources that help implement the change.
 
@@ -67,31 +87,18 @@ List only sources that help implement the change.
 
 ### Phase 1: <Commit-sized outcome>
 
-The handler validates before it stores. The call path gains `validateInput`:
+Explain the outcome and how this phase changes the runtime path.
 
 ```callstack
  requestHandler
 -└── existingService
--    └── dataStore
 +└── validateInput
 +    └── existingService
-        └── dataStore
 ```
 
-`ImportantInput` is the contract. `validateInput` returns a tagged error. The handler returns that error.
+Walk through the call-stack change, then show short code previews of the main edits. Include paths and enough surrounding control flow to make the plan concrete; use `...` instead of writing a full patch.
 
-```ts
-// path/to/types.ts
-type ImportantInput = { id: string };
-type ImportantResult =
-  | { status: "ok"; value: Value }
-  | { status: "error"; reason: FailureReason };
-```
-
-The handler calls `validateInput`, then `existingService`. Keep the preview short. Use `...` for parts the implementer will fill in.
-
-```diff
- // path/to/handler.ts
+```diff:path/to/handler.ts
  async function requestHandler(input: ImportantInput) {
 -  return existingService(input);
 +  const valid = validateInput(input);
@@ -99,86 +106,25 @@ The handler calls `validateInput`, then `existingService`. Keep the preview shor
  }
 ```
 
-- [ ] Make one concrete implementation change, with file and symbol names.
-- [ ] Wire the change into its nearest caller or consumer.
-- [ ] Smoke the main failure case or boundary by hand. Use a throwaway harness if you need one. Delete it. Do not commit this check.
-- [ ] Run the exact command that proves the phase works.
+- [ ] Make the concrete change, naming files and symbols.
+- [ ] Wire it into its nearest caller or consumer.
+- [ ] Add or update the high-value test when this phase reaches a public behavior boundary.
+- [ ] Run `<exact focused check>`.
+- [ ] Run `<repository check command>`.
 ````
-
-Specs are markdown. Curly braces in prose are plain text. Put angle brackets in inline code or fences so markdown does not treat them as HTML. Fenced code uses the table below.
-
-| Fence info string | Viewer |
-| --- | --- |
-| `mermaid` | Beautiful Mermaid |
-| `callstack` or `diff` containing `└──` / `├──` | Pierre patch, no file header |
-| `diff` or `diff:path` with a file path | Pierre patch with Pierre’s file header |
-| `diff` with no path | Pierre patch, no file header |
-| `start:end:path` | Pierre file excerpt of current code |
-| `ts`, `rust`, and other langs | Maui `CodeBlock` for proposed types and sketches |
-| `html` | Trusted HTML from this spec. tkstack does not sanitize it. Only use it for local files you wrote. |
-
-See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for the fence contract and optional MDC `::file` / `::diff` forms.
-
-## Serve it
-
-This skill’s CLI is tkstack. It is the same local page as a code walkthrough. After the spec file exists, run it from the repo root:
-
-```sh
-pnpm exec tkstack specs/<name>.md
-```
-
-Halo alias:
-
-```sh
-pnpm spec specs/<name>.md
-```
-
-Options:
-
-- `--port <n>` — listen port (default `4177`)
-- `--root <dir>` — workspace root for file excerpts (default cwd)
-
-The command prints a local URL and keeps running. Open that URL. **Done** in the top right posts `/__tkstack/shutdown` and stops the server.
-
-Tell the user the spec path and the URL. Do not write specs into a temp directory.
 
 ## Phase rules
 
-- Give every phase four or five checklist steps, including checks.
-- Keep every phase small enough for one clear commit and leave the codebase working.
-- Make each phase produce visible or testable progress.
-- Name exact files, symbols, behavior, and commands when the codebase provides them.
-- In every code phase, include a call-stack fence, then the code (diff, types, excerpts). Put the call stack first. Do not title those blocks. Do not add a fixed set of subheadings. Keep them inside that phase.
-- Walk through the fences in prose. Put a sentence or two next to each one.
-- Show the inputs, outputs, state, events, errors, or unions that set the phase contract in the code that follows the call stack. Use the project language.
-- Make the call-stack diff start from the current path and mark the proposed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
-- Make the code a short preview of the main edit, not a full patch. Include a file path and preserve useful surrounding control flow.
-- Use `Not applicable — no code path changes` only for a true docs, data, or config phase. Do not invent types or call paths.
-- Follow [Testing](#testing) for what to check and when to commit tests.
-- Avoid setup-only or refactor-only phases unless later work cannot land safely without them. Fixture setup for package-export or end-user tests is allowed once that surface exists.
+- Use as many phases as needed. Each phase should be one working commit and about 200 changed lines or fewer, including tests. Split it when it grows beyond that.
+- Every phase must leave the repository working and produce visible or testable progress. Avoid setup-only phases unless later work cannot land safely without them.
+- Give each phase four or five concrete checklist steps with exact files, symbols, and commands where known.
+- Start every code phase with a unified-diff `callstack` fence, then explain it and show concise code diffs, types, or excerpts. Use more call stacks and sequence diagrams wherever they clarify control flow, async work, events, state, or errors.
+- Call stacks must show the current path with removed lines and the proposed path with added lines. A UI render or event-handler path counts as a call stack.
+- Show the contracts that matter: inputs, outputs, state, events, and errors. Use `Not applicable — no code path changes` only for a true docs, data, or config phase.
+- Test through a public package export or end-user surface when practical. For internal steps, use a focused smoke check rather than low-value tests or mocks.
 
-## Testing
-
-Commit tests only for package-level exports and end-user apps. Act and observe the way a user of that package or app would:
-
-- Electron / web UI: start the app separately when needed, drive the live renderer with Playwright through `pnpm halo-web`, and assert visible elements, roles, labels, and text.
-- Package exports: call the public methods, then read results through the same public API or another real collaborator a user of that package would use.
-
-Do not write unit tests for internal helpers, private modules, or other package internals unless the user asked for them. Check those yourself with temporary harness code. Delete the harness after you have tested by hand. Do not commit it.
-
-Do not use mocks such as `vi.fn`, `vi.mock`, or hand-rolled fake collaborators. Do not assert implementation details such as internal file layouts or exact formatting of private outputs. If a package-export or end-user test is hard to build and none already exist for the area, do not add a lower-level test instead.
-
-Committed tests must read like end-user code or interactions: short, easy to follow, and free of setup noise. Put shared setup and teardown in Vitest fixtures (`test.extend`), not ad-hoc helpers or manual cleanup. See the [Vitest fixtures documentation](https://vitest.dev/guide/test-context.html#test-extend).
-
-Until the feature is testable through a package export or the live app, each phase still includes a check. Write that check as a smoke step the implementer runs by hand. Use a throwaway harness if you need one. Do not commit the check or the harness:
-
-- [ ] Smoke the main failure case or boundary by hand. Delete any harness. Do not commit this check.
-
-Once the feature is testable through a package export or the live app, add the fixtures needed for those tests, then commit them. Make fixture setup its own phase when it is more than a small add-on; fold it into the phase that first makes that surface testable when it is small:
-
-- [ ] Add Vitest fixtures that set up the package or app the way a user would.
-- [ ] Commit a short high-level test that acts and observes through the public export or live UI.
+Use `mermaid`, `callstack`, `diff:path`, `start:end:path`, and language fences supported by tkstack. Follow [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for fence details.
 
 ## Final check
 
-Confirm that Mermaid diagrams appear only at the top and match the plan; each code phase has a call stack and then the code, with prose between the fences, no titles on those blocks, and four or five steps; links and commands are real; committed tests cover only package exports or the end-user app and earlier phases use uncommitted smoke checks; tkstack is serving the page; and the full plan covers every goal without pulling in a non-goal.
+Before serving, confirm that the spec reflects every user decision; diagrams and call stacks cover the important paths; each phase stays near the 200-line limit and can land alone; previews name real files and symbols; links and commands are valid; and the full plan covers every goal without pulling in a non-goal.
