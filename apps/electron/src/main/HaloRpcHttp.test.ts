@@ -6,6 +6,7 @@ import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
+import { ToolRuntimeService } from "./executor/ToolRuntimeService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -47,7 +48,12 @@ const rpcHttpTest = test.extend<{
     const context: HaloContext = {
       workspace,
       integrations,
-      pi: new PiService(workspace, new UserService(userDataDir), integrations),
+      pi: new PiService(
+        workspace,
+        new UserService(userDataDir),
+        integrations,
+        new ToolRuntimeService(),
+      ),
       plugins: new PluginService(workspace),
       sessions: new AgentSessionRegistry(),
       getWindow: () => {

@@ -7,6 +7,7 @@ import * as errore from "errore";
 import type { SessionSummary } from "../../shared/rpc.js";
 import type { IntegrationService } from "../integrations/IntegrationService.js";
 import { createIntegrationTools } from "../integrations/IntegrationTools.js";
+import type { ToolRuntimeService } from "../executor/ToolRuntimeService.js";
 import { createParallelSearchTools } from "./ParallelSearchTools.js";
 import type { UserService } from "../UserService.js";
 import {
@@ -35,6 +36,7 @@ export class PiService {
     private readonly workspace: WorkspaceService,
     private readonly user: UserService,
     private readonly integrations: IntegrationService,
+    private readonly toolRuntime: ToolRuntimeService,
   ) {}
 
   async newAgentSession() {
@@ -58,6 +60,11 @@ export class PiService {
   ) {
     const user = await this.user.getUser();
     if (user instanceof Error) return user;
+    const runtime = await this.toolRuntime.get({
+      workspaceRoot: layout.root,
+      userId: user.id,
+    });
+    if (runtime instanceof Error) return runtime;
 
     const resourceLoader = createWorkspaceResourceLoader(
       layout.root,
@@ -73,7 +80,7 @@ export class PiService {
       sessionManager: manager,
       tools: [],
       customTools: [
-        createExecTool(layout.root),
+        createExecTool(runtime),
         ...createParallelSearchTools(user.id),
         ...createIntegrationTools(this.integrations),
       ],

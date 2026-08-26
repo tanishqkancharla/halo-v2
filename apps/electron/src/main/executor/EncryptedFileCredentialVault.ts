@@ -66,8 +66,6 @@ class EncryptedFileCredentialVault implements CredentialVault {
   }
 }
 
-// Electron composition will consume this when the runtime joins app lifecycle.
-// oxlint-disable-next-line anti-slop/no-unused-exports
 export function createEncryptedFileCredentialVault(input: {
   workspaceRoot: string;
 }): CredentialVault | CredentialVaultError {

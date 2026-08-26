@@ -25,6 +25,7 @@ import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
+import { ToolRuntimeService } from "./executor/ToolRuntimeService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -80,15 +81,18 @@ const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
 });
 const userService = new UserService(applicationConfig.dataDir);
 const integrationService = new IntegrationService(workspaceService);
+const toolRuntimeService = new ToolRuntimeService();
 const piService = new PiService(
   workspaceService,
   userService,
   integrationService,
+  toolRuntimeService,
 );
 const pluginService = new PluginService(workspaceService);
 const agentSessionRegistry = new AgentSessionRegistry();
 let mainWindow: BrowserWindow | undefined;
 let rpcHttp: HaloRpcHttp | undefined;
+let shutdownStarted = false;
 
 app.whenReady().then(async () => {
   await workspaceService.restore();
@@ -140,18 +144,29 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", (event) => {
-  if (rpcHttp === undefined) {
-    logger.destroy();
-    return;
-  }
+  if (shutdownStarted) return;
   event.preventDefault();
+  shutdownStarted = true;
+  agentSessionRegistry.closeAll();
   const pending = rpcHttp;
   rpcHttp = undefined;
-  void pending.close().finally(() => {
+  void closeAppServices(pending).finally(() => {
     logger.destroy();
     app.quit();
   });
 });
+
+async function closeAppServices(http: HaloRpcHttp | undefined) {
+  if (http !== undefined) {
+    await http.close().catch((error) => {
+      logger.error({ event: "rpc-http-close-failed", error });
+    });
+  }
+  const runtimeClosed = await toolRuntimeService.close();
+  if (runtimeClosed instanceof Error) {
+    logger.error({ event: "executor-close-failed", error: runtimeClosed });
+  }
+}
 
 function openMainWindow(): void {
   const window = createWindow();
@@ -374,6 +389,14 @@ async function switchWorkspace(): Promise<void> {
     return;
   }
 
+  agentSessionRegistry.closeAll();
+  const runtimeClosed = await toolRuntimeService.close();
+  if (runtimeClosed instanceof Error) {
+    logger.error({
+      event: "executor-workspace-close-failed",
+      error: runtimeClosed,
+    });
+  }
   mainWindow.reload();
 }
 

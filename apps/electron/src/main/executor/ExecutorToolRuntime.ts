@@ -1,8 +1,17 @@
 import { createExecutionEngine } from "@executor-js/execution";
-import { makeQuickJsExecutor } from "@executor-js/runtime-quickjs";
+import {
+  makeQuickJsExecutor,
+  setQuickJSModule,
+} from "@executor-js/runtime-quickjs";
 import { createExecutor, type Executor, ToolAddress } from "@executor-js/sdk";
 import { definePlugin, tool } from "@executor-js/sdk/core";
+import quickJsVariant from "@jitl/quickjs-singlefile-cjs-release-sync";
 import { Effect, Schema } from "effect";
+import {
+  newQuickJSWASMModule,
+  type QuickJSWASMModule,
+} from "quickjs-emscripten";
+import { readFile } from "../exec/files/read.js";
 import {
   type ToolRuntime,
   ToolRuntimeError,
@@ -12,31 +21,39 @@ import type { CredentialVault } from "./CredentialVault.js";
 import { createExecutorCredentialProvider } from "./ExecutorCredentialProvider.js";
 import { openExecutorDatabase } from "./ExecutorDatabase.js";
 
-const haloRuntimePlugin = definePlugin(() => ({
-  id: "halo_runtime" as const,
-  storage: () => ({}),
-  staticIntegrations: () => [
-    {
-      id: "halo_runtime",
-      kind: "control",
-      name: "Halo runtime",
-      tools: [
-        tool({
-          name: "ping",
-          description: "Return a static Halo runtime response.",
-          inputSchema: Schema.toStandardSchemaV1(
-            Schema.toStandardJSONSchemaV1(
-              Schema.Struct({ message: Schema.String }),
+function createHaloRuntimePlugin(workspaceRoot: string) {
+  return definePlugin(() => ({
+    id: "halo_runtime" as const,
+    storage: () => ({}),
+    staticIntegrations: () => [
+      {
+        id: "files",
+        kind: "workspace",
+        name: "Workspace files",
+        tools: [
+          tool({
+            name: "read",
+            description: "Read a UTF-8 file in the active Halo workspace.",
+            inputSchema: Schema.toStandardSchemaV1(
+              Schema.toStandardJSONSchemaV1(Schema.String),
             ),
-          ),
-          execute: ({ message }) => Effect.succeed({ message }),
-        }),
-      ],
-    },
-  ],
-}));
+            execute: (path) =>
+              Effect.promise(() => readFile(workspaceRoot, { path })).pipe(
+                Effect.flatMap((result) =>
+                  result instanceof Error
+                    ? Effect.fail(result)
+                    : Effect.succeed(result),
+                ),
+              ),
+          }),
+        ],
+      },
+    ],
+  }))();
+}
 
-type HaloRuntimePlugins = readonly [ReturnType<typeof haloRuntimePlugin>];
+type HaloRuntimePlugins = readonly [ReturnType<typeof createHaloRuntimePlugin>];
+let quickJsModulePromise: Promise<QuickJSWASMModule> | undefined;
 
 class ExecutorToolRuntime implements ToolRuntime {
   constructor(
@@ -118,16 +135,25 @@ class ExecutorToolRuntime implements ToolRuntime {
   }
 }
 
-// Electron composition will consume this when the runtime joins app lifecycle.
-// oxlint-disable-next-line anti-slop/no-unused-exports
 export async function createExecutorToolRuntime(input: {
   workspaceRoot: string;
+  userId: string;
   credentialVault: CredentialVault;
 }): Promise<ToolRuntime | ToolRuntimeError> {
+  if (quickJsModulePromise === undefined) {
+    quickJsModulePromise = newQuickJSWASMModule(quickJsVariant);
+  }
+  const quickJsModule = await quickJsModulePromise.catch(
+    (cause) =>
+      new ToolRuntimeError({ operation: "QuickJS initialization", cause }),
+  );
+  if (quickJsModule instanceof Error) return quickJsModule;
+  setQuickJSModule(quickJsModule);
+
   const executor = await createExecutor({
     tenant: input.workspaceRoot,
-    subject: "local",
-    plugins: [haloRuntimePlugin()] as const,
+    subject: input.userId,
+    plugins: [createHaloRuntimePlugin(input.workspaceRoot)] as const,
     providers: [createExecutorCredentialProvider(input.credentialVault)],
     db: async ({ tables }) => {
       const database = await openExecutorDatabase({

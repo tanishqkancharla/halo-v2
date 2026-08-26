@@ -1,8 +1,7 @@
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import * as errore from "errore";
-import { createAgentTools } from "./agentTools.js";
-import { runJs } from "./runJs.js";
+import type { ToolRuntime } from "../executor/ToolRuntime.js";
 
 export class ExecToolError extends errore.createTaggedError({
   name: "ExecToolError",
@@ -25,34 +24,24 @@ function formatExecResult(value: string | undefined, logs: string[]) {
   return parts.join("\n\n");
 }
 
-export function createExecTool(cwd: string): ToolDefinition {
+export function createExecTool(runtime: ToolRuntime): ToolDefinition {
   return {
     name: "exec",
     label: "Exec",
     description:
-      "Run JavaScript with a tools argument. Use tools.files and tools.bash.run for all work.",
-    promptSnippet: "Run JavaScript that calls tools.files.* and tools.bash.run",
+      "Run JavaScript through Executor with read-only workspace file access.",
+    promptSnippet: "Run JavaScript that calls tools.files.read",
     promptGuidelines: [
-      "Use exec for all workspace file and shell work. Pass JavaScript in js; tools and console are in scope.",
-      "All methods are async and return Error on failure. Check `result instanceof Error` and return the error before using a successful result.",
-      "`tools.files.read(path: string, options?: { offset?: number; limit?: number }): { path: string; text: string } | Error`.",
-      "`tools.files.edit(path: string, oldText: string, newText: string, options?: { replaceAll?: boolean }): { path: string; replacements: number } | Error`.",
-      "`tools.files.patch(patchText: string): { added: string[]; modified: string[]; deleted: string[] } | Error`.",
-      "`tools.files.write(path: string, content: string): { path: string } | Error`.",
-      "`tools.files.delete(path: string): { path: string } | Error`.",
-      "`tools.bash.run(command: string, options?: { timeoutMs?: number }): { stdout: string; stderr: string; code: number | null } | Error`.",
-      "Combine related operations in one exec call when practical. Return a compact result needed to continue; do not return large file contents or raw error objects unless needed.",
-      'File example: `const file = await tools.files.read("src/app.ts"); if (file instanceof Error) return file; return file.text;`',
-      'Shell example: `const result = await tools.bash.run("git status --short && git diff --stat"); if (result instanceof Error) return result; return result.stdout;`',
+      "Use exec for read-only workspace file work. Pass JavaScript in js; tools and console are in scope.",
+      "`tools.files.read(path: string)` returns `{ ok: true, data: { path: string, text: string } }` or `{ ok: false, error: unknown }`.",
+      'File example: `const file = await tools.files.read("src/app.ts"); if (!file.ok) return file; return file.data.text;`',
+      "Combine related reads in one exec call when practical. Return only the compact result needed to continue.",
     ],
     parameters: execParameters,
-    async execute(_id, params, signal) {
+    async execute(_id, params) {
       // SAFETY: execParameters schema guarantees params has a string `js` property.
       const { js } = params as { js: string };
-      const tools = createAgentTools(cwd, signal);
-      const result = await runJs(js, tools).catch(
-        (e) => new ExecToolError({ cause: e }),
-      );
+      const result = await runWithToolRuntime(runtime, js);
       if (result instanceof Error) {
         return {
           content: [{ type: "text" as const, text: result.message }],
@@ -69,5 +58,20 @@ export function createExecTool(cwd: string): ToolDefinition {
         details: { value: result.value, logs: result.logs },
       };
     },
+  };
+}
+
+async function runWithToolRuntime(runtime: ToolRuntime, js: string) {
+  const execution = await runtime.executeCode({ code: js });
+  if (execution instanceof Error) return execution;
+  if (execution.error !== undefined) {
+    return new ExecToolError({ cause: new Error(execution.error) });
+  }
+  if (execution.value === undefined) {
+    return { value: undefined, logs: execution.logs };
+  }
+  return {
+    value: JSON.stringify(execution.value, undefined, 2),
+    logs: execution.logs,
   };
 }
