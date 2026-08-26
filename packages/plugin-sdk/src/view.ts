@@ -80,6 +80,7 @@ export {
   radius,
   shadow,
   shadowVars,
+  tintedSubtle,
   sizing,
   spacing,
   text,
