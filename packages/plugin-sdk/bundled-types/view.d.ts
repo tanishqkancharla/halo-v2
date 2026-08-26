@@ -115,6 +115,7 @@ export const proseStreamingMarkers: unknown;
 export const radius: unknown;
 export const shadow: unknown;
 export const shadowVars: unknown;
+export const tintedSubtle: unknown;
 export const sizing: unknown;
 export const spacing: unknown;
 export const text: unknown;

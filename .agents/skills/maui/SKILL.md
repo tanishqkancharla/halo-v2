@@ -95,7 +95,7 @@ import { Text as TextIcon } from "maui/icons"
 
 ### Form controls
 
-- `Button` — `variant` is `"default"` | `"quiet"` | `"primary"`; `variantColor` is a palette name. Primary fills step 9 (hover 10) with light text (`onAccent`, or step 12 on amber/lime/mint/sky/yellow); quiet + color uses a 3.5% wash of step 9 (hover 7%).
+- `Button` — `variant` is `"default"` | `"quiet"` | `"primary"`; `variantColor` is a palette name, or an opaque hex / `rgb()` string (`#${string}` or `rgb(`). Primary palettes fill step 9 (hover 10) with light text (`onAccent`, or step 12 on amber/lime/mint/sky/yellow). A CSS color is used as the fill (alpha is dropped; hover is `l - 0.04`; text is white or near-black from lightness). The edge is `tintedSubtle`. Quiet + color uses a 3.5% wash of the fill (hover 7%).
 - `TextField`, `SearchField`, `NumberField`, `QuietTextField`
 - `Checkbox`, `Switch`, `Slider`
 - `RadioOptionGroup` / `RadioOption`
