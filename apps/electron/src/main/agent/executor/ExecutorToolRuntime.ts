@@ -6,12 +6,15 @@ import {
 import { createExecutor, type Executor, ToolAddress } from "@executor-js/sdk";
 import { definePlugin, tool } from "@executor-js/sdk/core";
 import quickJsVariant from "@jitl/quickjs-singlefile-cjs-release-sync";
-import { Effect, Schema } from "effect";
+import { type TObject } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
+import { Effect } from "effect";
 import {
   newQuickJSWASMModule,
   type QuickJSWASMModule,
 } from "quickjs-emscripten";
-import { readFile } from "../tools/files/read.js";
+import type { AgentAuthority } from "../AgentAuthority.js";
+import type { HaloTool, HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import {
   type ToolRuntime,
   ToolRuntimeError,
@@ -21,47 +24,88 @@ import type { CredentialVault } from "./CredentialVault.js";
 import { createExecutorCredentialProvider } from "./ExecutorCredentialProvider.js";
 import { openExecutorDatabase } from "./ExecutorDatabase.js";
 
-type HaloRuntimePluginOptions = {
-  workspaceRoot: string;
+type HaloToolsPluginOptions = {
+  plugins: readonly HaloToolPlugin[];
+  authority: AgentAuthority;
 };
 
-const haloRuntimePlugin = definePlugin((options?: HaloRuntimePluginOptions) => {
+const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
   if (options === undefined) {
-    throw new Error("haloRuntimePlugin requires workspaceRoot");
+    throw new Error("haloToolsPlugin requires plugins and authority");
   }
-  const { workspaceRoot } = options;
   return {
-    id: "halo_runtime" as const,
+    id: "halo-tools" as const,
     storage: () => ({}),
-    staticIntegrations: () => [
-      {
-        id: "files",
-        kind: "workspace",
-        name: "Workspace files",
-        tools: [
-          tool({
-            name: "read",
-            description: "Read a UTF-8 file in the active Halo workspace.",
-            inputSchema: Schema.toStandardSchemaV1(
-              Schema.toStandardJSONSchemaV1(Schema.String),
-            ),
-            execute: (path) =>
-              Effect.promise(() => readFile(workspaceRoot, { path })).pipe(
-                Effect.flatMap((result) =>
-                  result instanceof Error
-                    ? Effect.fail(result)
-                    : Effect.succeed(result),
-                ),
-              ),
+    staticIntegrations: () =>
+      options.plugins.map((plugin) => ({
+        id: plugin.id,
+        kind: "halo",
+        name: plugin.name,
+        tools: plugin.tools.map((haloTool) =>
+          toExecutorTool({
+            pluginId: plugin.id,
+            haloTool,
+            authority: options.authority,
           }),
-        ],
-      },
-    ],
+        ),
+      })),
   };
 });
 
-type HaloRuntimePlugins = readonly [ReturnType<typeof haloRuntimePlugin>];
+type HaloRuntimePlugins = readonly [ReturnType<typeof haloToolsPlugin>];
 let quickJsModulePromise: Promise<QuickJSWASMModule> | undefined;
+
+function toExecutorTool(input: {
+  pluginId: string;
+  haloTool: HaloTool;
+  authority: AgentAuthority;
+}) {
+  return tool({
+    name: input.haloTool.name,
+    description: input.haloTool.description,
+    inputSchema: toExecutorSchema(input.haloTool.inputSchema),
+    execute: (args) =>
+      Effect.promise(async () => {
+        const authorization = await input.authority.authorize({
+          pluginId: input.pluginId,
+          toolName: input.haloTool.name,
+          requiredCapabilities: input.haloTool.requiredCapabilities,
+        });
+        if (authorization instanceof Error) return authorization;
+        return input.haloTool.execute(args);
+      }).pipe(
+        Effect.flatMap((result) =>
+          result instanceof Error
+            ? Effect.fail(result)
+            : Effect.succeed(result.value),
+        ),
+      ),
+  });
+}
+
+function toExecutorSchema(schema: TObject) {
+  const jsonSchema = { ...schema };
+  return {
+    "~standard": {
+      version: 1 as const,
+      vendor: "halo",
+      // Standard Schema validation is the Executor input boundary.
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters
+      validate: (value: unknown) => {
+        if (Value.Check(schema, value)) return { value };
+        return {
+          issues: [...Value.Errors(schema, value)].map((issue) => ({
+            message: issue.message,
+          })),
+        };
+      },
+      jsonSchema: {
+        input: () => jsonSchema,
+        output: () => jsonSchema,
+      },
+    },
+  };
+}
 
 class ExecutorToolRuntime implements ToolRuntime {
   constructor(
@@ -147,6 +191,8 @@ export async function createExecutorToolRuntime(input: {
   workspaceRoot: string;
   userId: string;
   credentialVault: CredentialVault;
+  toolPlugins: readonly HaloToolPlugin[];
+  authority: AgentAuthority;
 }): Promise<ToolRuntime | ToolRuntimeError> {
   if (quickJsModulePromise === undefined) {
     quickJsModulePromise = newQuickJSWASMModule(quickJsVariant);
@@ -162,7 +208,10 @@ export async function createExecutorToolRuntime(input: {
     tenant: input.workspaceRoot,
     subject: input.userId,
     plugins: [
-      haloRuntimePlugin({ workspaceRoot: input.workspaceRoot }),
+      haloToolsPlugin({
+        plugins: input.toolPlugins,
+        authority: input.authority,
+      }),
     ] as const,
     providers: [createExecutorCredentialProvider(input.credentialVault)],
     db: async ({ tables }) => {

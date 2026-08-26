@@ -7,6 +7,7 @@ import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
 import { Agent } from "./agent/Agent.js";
+import { StaticAgentAuthority } from "./agent/AgentAuthority.js";
 import { AgentSessionRegistry } from "./agent/AgentSessionRegistry.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { IntegrationService } from "./integrations/IntegrationService.js";
@@ -47,7 +48,13 @@ const rpcHttpTest = test.extend<{
     const context: HaloContext = {
       workspace,
       integrations,
-      agent: new Agent(workspace, new UserService(userDataDir), integrations),
+      agent: new Agent({
+        workspace,
+        user: new UserService(userDataDir),
+        integrations,
+        toolPluginFactories: [],
+        authority: new StaticAgentAuthority([]),
+      }),
       plugins: new PluginService(workspace),
       sessions: new AgentSessionRegistry(),
       getWindow: () => {

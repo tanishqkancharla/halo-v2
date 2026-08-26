@@ -12,9 +12,11 @@ import {
   WorkspaceService,
   type WorkspaceLayout,
 } from "../workspace/WorkspaceService.js";
+import type { AgentAuthority } from "./AgentAuthority.js";
 import { createExecTool } from "./execTool.js";
 import { ToolRuntimeService } from "./executor/ToolRuntimeService.js";
 import { createParallelSearchTools } from "./ParallelSearchTools.js";
+import type { HaloToolPluginFactory } from "./tools/HaloToolPlugin.js";
 import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
@@ -27,31 +29,35 @@ export class CreateAgentSessionError extends errore.createTaggedError({
   message: "Failed to create agent session",
 }) {}
 
+type AgentOptions = {
+  workspace: WorkspaceService;
+  user: UserService;
+  integrations: IntegrationService;
+  toolPluginFactories: readonly HaloToolPluginFactory[];
+  authority: AgentAuthority;
+};
+
 /**
  * Halo's agent façade. Pi and Executor remain private implementation details.
  */
 export class Agent {
   private readonly toolRuntime = new ToolRuntimeService();
 
-  constructor(
-    private readonly workspace: WorkspaceService,
-    private readonly user: UserService,
-    private readonly integrations: IntegrationService,
-  ) {}
+  constructor(private readonly options: AgentOptions) {}
 
   close() {
     return this.toolRuntime.close();
   }
 
   async newAgentSession() {
-    const layout = this.workspace.getLayout();
+    const layout = this.options.workspace.getLayout();
     if (layout instanceof Error) return layout;
     const manager = SessionManager.create(layout.root, layout.sessionDir);
     return this.createAgentSession(layout, manager);
   }
 
   async openAgentSession(sessionId: string) {
-    const layout = this.workspace.getLayout();
+    const layout = this.options.workspace.getLayout();
     if (layout instanceof Error) return layout;
     const manager = await this.openSessionManager(layout, sessionId);
     if (manager instanceof Error) return manager;
@@ -62,11 +68,16 @@ export class Agent {
     layout: WorkspaceLayout,
     manager: SessionManager,
   ) {
-    const user = await this.user.getUser();
+    const user = await this.options.user.getUser();
     if (user instanceof Error) return user;
+    const toolPlugins = this.options.toolPluginFactories.map((createPlugin) =>
+      createPlugin({ workspaceRoot: layout.root }),
+    );
     const runtime = await this.toolRuntime.get({
       workspaceRoot: layout.root,
       userId: user.id,
+      toolPlugins,
+      authority: this.options.authority,
     });
     if (runtime instanceof Error) return runtime;
 
@@ -86,7 +97,7 @@ export class Agent {
       customTools: [
         createExecTool(runtime),
         ...createParallelSearchTools(user.id),
-        ...createIntegrationTools(this.integrations),
+        ...createIntegrationTools(this.options.integrations),
       ],
       resourceLoader,
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
@@ -95,7 +106,7 @@ export class Agent {
   }
 
   async listSessions() {
-    const layout = this.workspace.getLayout();
+    const layout = this.options.workspace.getLayout();
     if (layout instanceof Error) return layout;
     const sessions = await SessionManager.list(layout.root, layout.sessionDir);
     return sessions

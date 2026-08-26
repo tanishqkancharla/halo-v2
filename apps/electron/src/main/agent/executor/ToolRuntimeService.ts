@@ -1,3 +1,5 @@
+import type { AgentAuthority } from "../AgentAuthority.js";
+import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
 import { createExecutorToolRuntime } from "./ExecutorToolRuntime.js";
 import type { ToolRuntime } from "./ToolRuntime.js";
@@ -7,7 +9,12 @@ export class ToolRuntimeService {
   private workspaceRoot: string | undefined;
   private userId: string | undefined;
 
-  async get(input: { workspaceRoot: string; userId: string }) {
+  async get(input: {
+    workspaceRoot: string;
+    userId: string;
+    toolPlugins: readonly HaloToolPlugin[];
+    authority: AgentAuthority;
+  }) {
     if (
       this.runtime !== undefined &&
       this.workspaceRoot === input.workspaceRoot &&
@@ -28,6 +35,8 @@ export class ToolRuntimeService {
       workspaceRoot: input.workspaceRoot,
       userId: input.userId,
       credentialVault,
+      toolPlugins: input.toolPlugins,
+      authority: input.authority,
     });
     if (runtime instanceof Error) return runtime;
     this.runtime = runtime;

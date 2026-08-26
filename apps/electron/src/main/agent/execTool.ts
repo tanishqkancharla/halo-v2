@@ -28,14 +28,18 @@ export function createExecTool(runtime: ToolRuntime): ToolDefinition {
   return {
     name: "exec",
     label: "Exec",
-    description:
-      "Run JavaScript through Executor with read-only workspace file access.",
-    promptSnippet: "Run JavaScript that calls tools.files.read",
+    description: "Run JavaScript through Executor with workspace file tools.",
+    promptSnippet: "Run JavaScript that calls tools.files.*",
     promptGuidelines: [
-      "Use exec for read-only workspace file work. Pass JavaScript in js; tools and console are in scope.",
-      "`tools.files.read(path: string)` returns `{ ok: true, data: { path: string, text: string } }` or `{ ok: false, error: unknown }`.",
-      'File example: `const file = await tools.files.read("src/app.ts"); if (!file.ok) return file; return file.data.text;`',
-      "Combine related reads in one exec call when practical. Return only the compact result needed to continue.",
+      "Use exec for workspace file work. Pass JavaScript in js; tools and console are in scope.",
+      "Every tool takes one object argument and returns `{ ok: true, data }` or `{ ok: false, error }`. Check `ok` before using `data`.",
+      "`tools.files.read({ path, offset?, limit? })` reads UTF-8 text.",
+      "`tools.files.edit({ path, oldText, newText, replaceAll? })` replaces exact text.",
+      "`tools.files.patch({ patchText })` applies a patch.",
+      "`tools.files.write({ path, content })` writes UTF-8 text.",
+      "`tools.files.delete({ path })` deletes a file.",
+      'File example: `const file = await tools.files.read({ path: "src/app.ts" }); if (!file.ok) return file; return file.data.text;`',
+      "Combine related operations in one exec call when practical. Return only the compact result needed to continue.",
     ],
     parameters: execParameters,
     async execute(_id, params) {

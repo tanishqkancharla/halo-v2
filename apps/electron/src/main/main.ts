@@ -25,7 +25,9 @@ import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { Agent } from "./agent/Agent.js";
+import { StaticAgentAuthority } from "./agent/AgentAuthority.js";
 import { AgentSessionRegistry } from "./agent/AgentSessionRegistry.js";
+import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { IntegrationService } from "./integrations/IntegrationService.js";
@@ -80,7 +82,16 @@ const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
 });
 const userService = new UserService(applicationConfig.dataDir);
 const integrationService = new IntegrationService(workspaceService);
-const agent = new Agent(workspaceService, userService, integrationService);
+const agent = new Agent({
+  workspace: workspaceService,
+  user: userService,
+  integrations: integrationService,
+  toolPluginFactories: [createWorkspaceFilesPlugin],
+  authority: new StaticAgentAuthority([
+    "workspace.files.read",
+    "workspace.files.write",
+  ]),
+});
 const pluginService = new PluginService(workspaceService);
 const agentSessionRegistry = new AgentSessionRegistry();
 let mainWindow: BrowserWindow | undefined;
