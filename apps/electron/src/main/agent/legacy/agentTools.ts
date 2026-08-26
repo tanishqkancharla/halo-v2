@@ -1,9 +1,9 @@
-import { runBash } from "./bash/run.js";
-import { deleteFile } from "./files/delete.js";
-import { editFile } from "./files/edit.js";
-import { patchFiles } from "./files/patch.js";
-import { readFile } from "./files/read.js";
-import { writeFile } from "./files/write.js";
+import { runBash } from "../tools/bash/run.js";
+import { deleteFile } from "../tools/files/delete.js";
+import { editFile } from "../tools/files/edit.js";
+import { patchFiles } from "../tools/files/patch.js";
+import { readFile } from "../tools/files/read.js";
+import { writeFile } from "../tools/files/write.js";
 
 export type AgentTools = {
   files: {

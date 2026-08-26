@@ -10,11 +10,11 @@ import {
   EmptyPromptError,
   PromptFailedError,
 } from "./AgentSessionErrors.js";
+import type { Agent } from "./Agent.js";
 import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
-import type { PiService } from "./PiService.js";
 
 export type SessionsRouterContext = {
-  pi: PiService;
+  agent: Agent;
   sessions: AgentSessionRegistry;
   logger: Logger;
 };
@@ -24,13 +24,13 @@ const os = implement(contract.sessions).$context<SessionsRouterContext>();
 export const sessionsRouter = os.router({
   list: os.list.handler(async ({ context }) => {
     context.logger.info({ event: "listSessions" });
-    const sessions = await context.pi.listSessions();
+    const sessions = await context.agent.listSessions();
     if (sessions instanceof Error) return orpcErrors.badRequest(sessions);
     return sessions;
   }),
   create: os.create.handler(async ({ context }) => {
     context.logger.info({ event: "newAgentSession" });
-    const session = await context.pi.newAgentSession();
+    const session = await context.agent.newAgentSession();
     if (session instanceof Error) return orpcErrors.badRequest(session);
     context.sessions.add(session);
     return { sessionId: session.sessionId };
@@ -42,7 +42,7 @@ export const sessionsRouter = os.router({
     });
     const live = context.sessions.get(input.sessionId);
     if (live instanceof Error) {
-      const session = await context.pi.openAgentSession(input.sessionId);
+      const session = await context.agent.openAgentSession(input.sessionId);
       if (session instanceof Error) return orpcErrors.badRequest(session);
       context.sessions.add(session);
       return {

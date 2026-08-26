@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import * as errore from "errore";
-import type { ToolRuntime } from "../executor/ToolRuntime.js";
+import type { ToolRuntime } from "./executor/ToolRuntime.js";
 
 export class ExecToolError extends errore.createTaggedError({
   name: "ExecToolError",

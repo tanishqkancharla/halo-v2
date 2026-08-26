@@ -11,7 +11,7 @@ import {
   newQuickJSWASMModule,
   type QuickJSWASMModule,
 } from "quickjs-emscripten";
-import { readFile } from "../exec/files/read.js";
+import { readFile } from "../tools/files/read.js";
 import {
   type ToolRuntime,
   ToolRuntimeError,
@@ -21,8 +21,16 @@ import type { CredentialVault } from "./CredentialVault.js";
 import { createExecutorCredentialProvider } from "./ExecutorCredentialProvider.js";
 import { openExecutorDatabase } from "./ExecutorDatabase.js";
 
-function createHaloRuntimePlugin(workspaceRoot: string) {
-  return definePlugin(() => ({
+type HaloRuntimePluginOptions = {
+  workspaceRoot: string;
+};
+
+const haloRuntimePlugin = definePlugin((options?: HaloRuntimePluginOptions) => {
+  if (options === undefined) {
+    throw new Error("haloRuntimePlugin requires workspaceRoot");
+  }
+  const { workspaceRoot } = options;
+  return {
     id: "halo_runtime" as const,
     storage: () => ({}),
     staticIntegrations: () => [
@@ -49,10 +57,10 @@ function createHaloRuntimePlugin(workspaceRoot: string) {
         ],
       },
     ],
-  }))();
-}
+  };
+});
 
-type HaloRuntimePlugins = readonly [ReturnType<typeof createHaloRuntimePlugin>];
+type HaloRuntimePlugins = readonly [ReturnType<typeof haloRuntimePlugin>];
 let quickJsModulePromise: Promise<QuickJSWASMModule> | undefined;
 
 class ExecutorToolRuntime implements ToolRuntime {
@@ -153,7 +161,9 @@ export async function createExecutorToolRuntime(input: {
   const executor = await createExecutor({
     tenant: input.workspaceRoot,
     subject: input.userId,
-    plugins: [createHaloRuntimePlugin(input.workspaceRoot)] as const,
+    plugins: [
+      haloRuntimePlugin({ workspaceRoot: input.workspaceRoot }),
+    ] as const,
     providers: [createExecutorCredentialProvider(input.credentialVault)],
     db: async ({ tables }) => {
       const database = await openExecutorDatabase({

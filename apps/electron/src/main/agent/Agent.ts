@@ -7,14 +7,14 @@ import * as errore from "errore";
 import type { SessionSummary } from "../../shared/rpc.js";
 import type { IntegrationService } from "../integrations/IntegrationService.js";
 import { createIntegrationTools } from "../integrations/IntegrationTools.js";
-import type { ToolRuntimeService } from "../executor/ToolRuntimeService.js";
-import { createParallelSearchTools } from "./ParallelSearchTools.js";
 import type { UserService } from "../UserService.js";
 import {
   WorkspaceService,
   type WorkspaceLayout,
 } from "../workspace/WorkspaceService.js";
-import { createExecTool } from "../exec/execTool.js";
+import { createExecTool } from "./execTool.js";
+import { ToolRuntimeService } from "./executor/ToolRuntimeService.js";
+import { createParallelSearchTools } from "./ParallelSearchTools.js";
 import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
 
 export class SessionNotFoundError extends errore.createTaggedError({
@@ -28,16 +28,20 @@ export class CreateAgentSessionError extends errore.createTaggedError({
 }) {}
 
 /**
- * Stateless Pi SDK proxy: SessionManager for durable list, createAgentSession
- * for live AgentSession. Callers own subscribe / prompt / dispose.
+ * Halo's agent façade. Pi and Executor remain private implementation details.
  */
-export class PiService {
+export class Agent {
+  private readonly toolRuntime = new ToolRuntimeService();
+
   constructor(
     private readonly workspace: WorkspaceService,
     private readonly user: UserService,
     private readonly integrations: IntegrationService,
-    private readonly toolRuntime: ToolRuntimeService,
   ) {}
+
+  close() {
+    return this.toolRuntime.close();
+  }
 
   async newAgentSession() {
     const layout = this.workspace.getLayout();

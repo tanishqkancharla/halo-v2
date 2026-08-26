@@ -10,7 +10,7 @@ import {
 import {
   sessionsRouter,
   type SessionsRouterContext,
-} from "./sessions/sessionsRouter.js";
+} from "./agent/sessionsRouter.js";
 import {
   workspaceRouter,
   type WorkspaceRouterContext,

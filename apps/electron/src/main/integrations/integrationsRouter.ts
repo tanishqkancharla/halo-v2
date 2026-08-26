@@ -2,9 +2,9 @@ import { shell } from "electron";
 import { implement } from "@orpc/server";
 import type { Logger } from "@repo/logger";
 import { contract } from "../../shared/contract.js";
+import type { Agent } from "../agent/Agent.js";
+import type { AgentSessionRegistry } from "../agent/AgentSessionRegistry.js";
 import { orpcErrors } from "../orpcErrors.js";
-import type { AgentSessionRegistry } from "../sessions/AgentSessionRegistry.js";
-import type { PiService } from "../sessions/PiService.js";
 import {
   GoogleOAuthError,
   revokeGoogleToken,
@@ -22,7 +22,7 @@ import {
 
 export type IntegrationsRouterContext = {
   integrations: IntegrationService;
-  pi: PiService;
+  agent: Agent;
   sessions: AgentSessionRegistry;
   logger: Logger;
 };
@@ -154,7 +154,7 @@ async function resolveLiveSession(
 ) {
   const live = context.sessions.get(sessionId);
   if (!(live instanceof Error)) return live;
-  const opened = await context.pi.openAgentSession(sessionId);
+  const opened = await context.agent.openAgentSession(sessionId);
   if (opened instanceof Error) return opened;
   context.sessions.add(opened);
   return opened;

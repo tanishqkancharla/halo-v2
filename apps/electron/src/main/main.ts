@@ -24,14 +24,13 @@ import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
+import { Agent } from "./agent/Agent.js";
+import { AgentSessionRegistry } from "./agent/AgentSessionRegistry.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
-import { ToolRuntimeService } from "./executor/ToolRuntimeService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
-import { AgentSessionRegistry } from "./sessions/AgentSessionRegistry.js";
-import { PiService } from "./sessions/PiService.js";
 import { UserService } from "./UserService.js";
 import { resolveHaloCliEntry } from "./workspace/installHaloCli.js";
 import { WorkspaceService } from "./workspace/WorkspaceService.js";
@@ -81,13 +80,7 @@ const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
 });
 const userService = new UserService(applicationConfig.dataDir);
 const integrationService = new IntegrationService(workspaceService);
-const toolRuntimeService = new ToolRuntimeService();
-const piService = new PiService(
-  workspaceService,
-  userService,
-  integrationService,
-  toolRuntimeService,
-);
+const agent = new Agent(workspaceService, userService, integrationService);
 const pluginService = new PluginService(workspaceService);
 const agentSessionRegistry = new AgentSessionRegistry();
 let mainWindow: BrowserWindow | undefined;
@@ -108,7 +101,7 @@ app.whenReady().then(async () => {
     context: {
       workspace: workspaceService,
       integrations: integrationService,
-      pi: piService,
+      agent,
       plugins: pluginService,
       sessions: agentSessionRegistry,
       getWindow: () => {
@@ -162,9 +155,9 @@ async function closeAppServices(http: HaloRpcHttp | undefined) {
       logger.error({ event: "rpc-http-close-failed", error });
     });
   }
-  const runtimeClosed = await toolRuntimeService.close();
-  if (runtimeClosed instanceof Error) {
-    logger.error({ event: "executor-close-failed", error: runtimeClosed });
+  const agentClosed = await agent.close();
+  if (agentClosed instanceof Error) {
+    logger.error({ event: "agent-close-failed", error: agentClosed });
   }
 }
 
@@ -232,7 +225,7 @@ function registerRpcBridge(): void {
     const context: HaloContext = {
       workspace: workspaceService,
       integrations: integrationService,
-      pi: piService,
+      agent,
       plugins: pluginService,
       sessions: agentSessionRegistry,
       getWindow: () => {
@@ -390,11 +383,11 @@ async function switchWorkspace(): Promise<void> {
   }
 
   agentSessionRegistry.closeAll();
-  const runtimeClosed = await toolRuntimeService.close();
-  if (runtimeClosed instanceof Error) {
+  const agentClosed = await agent.close();
+  if (agentClosed instanceof Error) {
     logger.error({
-      event: "executor-workspace-close-failed",
-      error: runtimeClosed,
+      event: "agent-workspace-close-failed",
+      error: agentClosed,
     });
   }
   mainWindow.reload();
