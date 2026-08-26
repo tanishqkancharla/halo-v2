@@ -58,3 +58,7 @@ minimumReleaseAgeExclude:
   - "@oxlint/binding-win32-x64-msvc@1.79.0"
   - "@oxlint/plugins@1.79.0"
   - oxlint@1.79.0
+  - "@executor-js/codemode-core@1.6.0"
+  - "@executor-js/execution@1.6.0"
+  - "@executor-js/runtime-quickjs@1.6.0"
+  - "@executor-js/sdk@1.6.0"
