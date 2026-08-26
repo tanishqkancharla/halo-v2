@@ -39,10 +39,12 @@ type ToolRuntimeToolDescription = {
 export interface ToolRuntime {
   executeCode(input: {
     code: string;
+    signal?: AbortSignal;
   }): Promise<ToolRuntimeCodeResult | ToolRuntimeError>;
   invokeTool(input: {
     path: string;
     args: unknown;
+    signal?: AbortSignal;
   }): Promise<ToolRuntimeInvocationResult | ToolRuntimeError>;
   search(input: {
     query: string;

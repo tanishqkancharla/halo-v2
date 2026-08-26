@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createExecutionEngine } from "@executor-js/execution";
 import {
   makeQuickJsExecutor,
@@ -14,7 +15,11 @@ import {
   type QuickJSWASMModule,
 } from "quickjs-emscripten";
 import type { AgentAuthority } from "../AgentAuthority.js";
-import type { HaloTool, HaloToolPlugin } from "../tools/HaloToolPlugin.js";
+import type {
+  HaloTool,
+  HaloToolContext,
+  HaloToolPlugin,
+} from "../tools/HaloToolPlugin.js";
 import {
   type ToolRuntime,
   ToolRuntimeError,
@@ -27,6 +32,7 @@ import { openExecutorDatabase } from "./ExecutorDatabase.js";
 type HaloToolsPluginOptions = {
   plugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
+  executionContext: AsyncLocalStorage<HaloToolContext>;
 };
 
 const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
@@ -46,6 +52,7 @@ const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
             pluginId: plugin.id,
             haloTool,
             authority: options.authority,
+            executionContext: options.executionContext,
           }),
         ),
       })),
@@ -59,6 +66,7 @@ function toExecutorTool(input: {
   pluginId: string;
   haloTool: HaloTool;
   authority: AgentAuthority;
+  executionContext: AsyncLocalStorage<HaloToolContext>;
 }) {
   return tool({
     name: input.haloTool.name,
@@ -72,7 +80,9 @@ function toExecutorTool(input: {
           requiredCapabilities: input.haloTool.requiredCapabilities,
         });
         if (authorization instanceof Error) return authorization;
-        return input.haloTool.execute(args);
+        return input.haloTool.execute(args, {
+          signal: input.executionContext.getStore()?.signal,
+        });
       }).pipe(
         Effect.flatMap((result) =>
           result instanceof Error
@@ -111,16 +121,22 @@ class ExecutorToolRuntime implements ToolRuntime {
   constructor(
     private readonly executor: Executor<HaloRuntimePlugins>,
     private readonly engine: ReturnType<typeof createExecutionEngine>,
+    private readonly executionContext: AsyncLocalStorage<HaloToolContext>,
   ) {}
 
-  async executeCode(input: { code: string }) {
-    const execution = await this.engine
-      .execute(input.code, {
-        onElicitation: async () => ({ action: "decline" as const }),
-      })
-      .catch(
-        (cause) => new ToolRuntimeError({ operation: "code execution", cause }),
-      );
+  async executeCode(input: { code: string; signal?: AbortSignal }) {
+    const execution = await this.executionContext.run(
+      { signal: input.signal },
+      () =>
+        this.engine
+          .execute(input.code, {
+            onElicitation: async () => ({ action: "decline" as const }),
+          })
+          .catch(
+            (cause) =>
+              new ToolRuntimeError({ operation: "code execution", cause }),
+          ),
+    );
     if (execution instanceof Error) return execution;
     return {
       value: execution.result,
@@ -129,14 +145,22 @@ class ExecutorToolRuntime implements ToolRuntime {
     };
   }
 
-  async invokeTool(input: { path: string; args: unknown }) {
-    const invocation = await this.executor
-      .execute(ToolAddress.make(input.path), input.args)
-      .then((value) => ({ value }))
-      .catch(
-        (cause) =>
-          new ToolRuntimeError({ operation: "tool invocation", cause }),
-      );
+  async invokeTool(input: {
+    path: string;
+    args: unknown;
+    signal?: AbortSignal;
+  }) {
+    const invocation = await this.executionContext.run(
+      { signal: input.signal },
+      () =>
+        this.executor
+          .execute(ToolAddress.make(input.path), input.args)
+          .then((value) => ({ value }))
+          .catch(
+            (cause) =>
+              new ToolRuntimeError({ operation: "tool invocation", cause }),
+          ),
+    );
     if (invocation instanceof Error) return invocation;
     return invocation;
   }
@@ -204,6 +228,7 @@ export async function createExecutorToolRuntime(input: {
   if (quickJsModule instanceof Error) return quickJsModule;
   setQuickJSModule(quickJsModule);
 
+  const executionContext = new AsyncLocalStorage<HaloToolContext>();
   const executor = await createExecutor({
     tenant: input.workspaceRoot,
     subject: input.userId,
@@ -211,6 +236,7 @@ export async function createExecutorToolRuntime(input: {
       haloToolsPlugin({
         plugins: input.toolPlugins,
         authority: input.authority,
+        executionContext,
       }),
     ] as const,
     providers: [createExecutorCredentialProvider(input.credentialVault)],
@@ -238,5 +264,5 @@ export async function createExecutorToolRuntime(input: {
       maxStackSizeBytes: 1024 * 1024,
     }),
   });
-  return new ExecutorToolRuntime(executor, engine);
+  return new ExecutorToolRuntime(executor, engine, executionContext);
 }

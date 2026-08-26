@@ -28,24 +28,26 @@ export function createExecTool(runtime: ToolRuntime): ToolDefinition {
   return {
     name: "exec",
     label: "Exec",
-    description: "Run JavaScript through Executor with workspace file tools.",
-    promptSnippet: "Run JavaScript that calls tools.files.*",
+    description:
+      "Run JavaScript through Executor with workspace file and shell tools.",
+    promptSnippet: "Run JavaScript that calls tools.files.* and tools.bash.run",
     promptGuidelines: [
-      "Use exec for workspace file work. Pass JavaScript in js; tools and console are in scope.",
+      "Use exec for workspace file and shell work. Pass JavaScript in js; tools and console are in scope.",
       "Every tool takes one object argument and returns `{ ok: true, data }` or `{ ok: false, error }`. Check `ok` before using `data`.",
       "`tools.files.read({ path, offset?, limit? })` reads UTF-8 text.",
       "`tools.files.edit({ path, oldText, newText, replaceAll? })` replaces exact text.",
       "`tools.files.patch({ patchText })` applies a patch.",
       "`tools.files.write({ path, content })` writes UTF-8 text.",
       "`tools.files.delete({ path })` deletes a file.",
+      "`tools.bash.run({ command, timeoutMs? })` runs Bash in the workspace and returns `{ stdout, stderr, code }`.",
       'File example: `const file = await tools.files.read({ path: "src/app.ts" }); if (!file.ok) return file; return file.data.text;`',
       "Combine related operations in one exec call when practical. Return only the compact result needed to continue.",
     ],
     parameters: execParameters,
-    async execute(_id, params) {
+    async execute(_id, params, signal) {
       // SAFETY: execParameters schema guarantees params has a string `js` property.
       const { js } = params as { js: string };
-      const result = await runWithToolRuntime(runtime, js);
+      const result = await runWithToolRuntime(runtime, js, signal);
       if (result instanceof Error) {
         return {
           content: [{ type: "text" as const, text: result.message }],
@@ -65,8 +67,12 @@ export function createExecTool(runtime: ToolRuntime): ToolDefinition {
   };
 }
 
-async function runWithToolRuntime(runtime: ToolRuntime, js: string) {
-  const execution = await runtime.executeCode({ code: js });
+async function runWithToolRuntime(
+  runtime: ToolRuntime,
+  js: string,
+  signal: AbortSignal | undefined,
+) {
+  const execution = await runtime.executeCode({ code: js, signal });
   if (execution instanceof Error) return execution;
   if (execution.error !== undefined) {
     return new ExecToolError({ cause: new Error(execution.error) });

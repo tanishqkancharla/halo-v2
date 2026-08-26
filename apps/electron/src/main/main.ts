@@ -27,6 +27,7 @@ import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { Agent } from "./agent/Agent.js";
 import { StaticAgentAuthority } from "./agent/AgentAuthority.js";
 import { AgentSessionRegistry } from "./agent/AgentSessionRegistry.js";
+import { createWorkspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
 import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
@@ -86,10 +87,11 @@ const agent = new Agent({
   workspace: workspaceService,
   user: userService,
   integrations: integrationService,
-  toolPluginFactories: [createWorkspaceFilesPlugin],
+  toolPluginFactories: [createWorkspaceFilesPlugin, createWorkspaceBashPlugin],
   authority: new StaticAgentAuthority([
     "workspace.files.read",
     "workspace.files.write",
+    "workspace.shell.execute",
   ]),
 });
 const pluginService = new PluginService(workspaceService);

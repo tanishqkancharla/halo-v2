@@ -27,12 +27,16 @@ export async function runBash(
   >((resolve) => {
     const child = spawn("bash", ["-lc", command], {
       cwd,
+      detached: true,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let timeout: NodeJS.Timeout | undefined;
+    let forceKill: NodeJS.Timeout | undefined;
+    let terminationError: BashRunError | undefined;
 
     const finish = (
       result:
@@ -41,29 +45,47 @@ export async function runBash(
     ) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      clearTimeout(timeout);
+      if (terminationError === undefined) clearTimeout(forceKill);
       signal?.removeEventListener("abort", onAbort);
       resolve(result);
     };
 
+    const killProcessGroup = (killSignal: NodeJS.Signals) => {
+      const pid = child.pid;
+      if (pid === undefined) return;
+      const killed = errore.try({
+        try: () => process.kill(-pid, killSignal),
+        catch: (e) => new BashRunError({ cause: e }),
+      });
+      // The process group can disappear between the close check and kill.
+      if (killed instanceof Error && child.exitCode === null) {
+        child.kill(killSignal);
+      }
+    };
+
+    const terminate = (error: BashRunError) => {
+      if (terminationError !== undefined) return;
+      terminationError = error;
+      killProcessGroup("SIGTERM");
+      forceKill = setTimeout(() => killProcessGroup("SIGKILL"), 250);
+    };
+
     const onAbort = () => {
-      child.kill("SIGTERM");
-      finish(new BashRunError({ cause: signal?.reason }));
+      terminate(new BashRunError({ cause: signal?.reason }));
     };
 
     signal?.addEventListener("abort", onAbort, { once: true });
 
-    const timer =
-      timeoutMs === undefined
-        ? undefined
-        : setTimeout(() => {
-            child.kill("SIGTERM");
-            finish(
-              new BashRunError({
-                cause: new Error(`Command timed out after ${timeoutMs}ms`),
-              }),
-            );
-          }, timeoutMs);
+    if (timeoutMs !== undefined) {
+      timeout = setTimeout(() => {
+        terminate(
+          new BashRunError({
+            cause: new Error(`Command timed out after ${timeoutMs}ms`),
+          }),
+        );
+      }, timeoutMs);
+    }
 
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf8");
@@ -77,6 +99,10 @@ export async function runBash(
     });
 
     child.on("close", (code) => {
+      if (terminationError !== undefined) {
+        finish(terminationError);
+        return;
+      }
       finish({ stdout, stderr, code });
     });
   });

@@ -11,14 +11,21 @@ export type HaloToolExecution = {
   value: unknown;
 };
 
+export type HaloToolContext = {
+  signal: AbortSignal | undefined;
+};
+
 export type HaloTool = {
   name: string;
   description: string;
   inputSchema: TObject;
   requiredCapabilities: readonly string[];
   // defineHaloTool validates this Executor boundary against inputSchema.
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters
-  execute(input: unknown): Promise<HaloToolExecution | Error>;
+  execute(
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters
+    input: unknown,
+    context: HaloToolContext,
+  ): Promise<HaloToolExecution | Error>;
 };
 
 export type HaloToolPlugin = {
@@ -40,15 +47,18 @@ export function defineHaloTool<TInputSchema extends TObject>(input: {
   description: string;
   inputSchema: TInputSchema;
   requiredCapabilities: readonly string[];
-  execute(input: Static<TInputSchema>): Promise<HaloToolExecution | Error>;
+  execute(
+    input: Static<TInputSchema>,
+    context: HaloToolContext,
+  ): Promise<HaloToolExecution | Error>;
 }): HaloTool {
   return {
     ...input,
-    execute: async (value) => {
+    execute: async (value, context) => {
       if (!Value.Check(input.inputSchema, value)) {
         return new HaloToolInputError({ tool: input.name });
       }
-      return input.execute(value);
+      return input.execute(value, context);
     },
   };
 }
