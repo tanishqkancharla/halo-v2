@@ -1,7 +1,10 @@
 {
   "name": "halo-v2",
   "install": "pnpm install && node node_modules/electron/install.js",
-  "repositoryDependencies": ["github.com/tanishqkancharla/tandem"],
+  "repositoryDependencies": [
+    "github.com/tanishqkancharla/tandem",
+    "github.com/tanishqkancharla/maui"
+  ],
   "terminals": [
     {
       "name": "halo-dev",
