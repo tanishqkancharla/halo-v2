@@ -80,6 +80,15 @@ export async function startServer(input: StartServerInput) {
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
             const url = req.url;
+            if (
+              url !== undefined &&
+              req.method === "GET" &&
+              new URL(url, "http://127.0.0.1").pathname === "/" &&
+              acceptsMarkdown(req.headers.accept)
+            ) {
+              void serveMarkdown({ filePath, res });
+              return;
+            }
             if (url === undefined || !url.startsWith("/__tkstack")) {
               next();
               return;
@@ -125,6 +134,40 @@ type TkstackResponse = {
   setHeader: (name: string, value: string) => void;
   end: (chunk: string) => void;
 };
+
+function acceptsMarkdown(accept: string | undefined) {
+  if (accept === undefined) return false;
+  return accept
+    .split(",")
+    .some(
+      (mediaRange) =>
+        mediaRange.trim().split(";", 1)[0]?.trim() === "text/markdown",
+    );
+}
+
+async function serveMarkdown(input: {
+  filePath: string;
+  res: TkstackResponse;
+}) {
+  const source = await fs.readFile(input.filePath, "utf8").catch(
+    (cause) =>
+      new TkstackFileError({
+        path: input.filePath,
+        reason: "read",
+        cause,
+      }),
+  );
+  if (source instanceof Error) {
+    input.res.statusCode = 500;
+    input.res.setHeader("content-type", "text/plain; charset=utf-8");
+    input.res.end(source.message);
+    return;
+  }
+  input.res.statusCode = 200;
+  input.res.setHeader("content-type", "text/markdown; charset=utf-8");
+  input.res.setHeader("vary", "Accept");
+  input.res.end(source);
+}
 
 async function handleTkstackRequest(input: {
   url: string;
