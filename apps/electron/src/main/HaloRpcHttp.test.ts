@@ -9,7 +9,6 @@ import type { HaloClient } from "../shared/contract.js";
 import { StaticAgentAuthority } from "./agent/AgentAuthority.js";
 import { SessionRegistry } from "./agent/SessionRegistry.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
-import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
 import type { HaloContext } from "./router.js";
 import { UserService } from "./UserService.js";
@@ -43,14 +42,11 @@ const rpcHttpTest = test.extend<{
       throw new Error("workspace restore returned undefined");
     }
 
-    const integrations = new IntegrationService(workspace);
     const context: HaloContext = {
       workspace,
-      integrations,
       sessions: new SessionRegistry({
         workspace,
         user: new UserService(userDataDir),
-        integrations,
         toolPluginFactories: [],
         authority: new StaticAgentAuthority([]),
       }),

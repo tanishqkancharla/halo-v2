@@ -1,9 +1,5 @@
 import { appRouter, type AppRouterContext } from "./app/appRouter.js";
 import {
-  integrationsRouter,
-  type IntegrationsRouterContext,
-} from "./integrations/integrationsRouter.js";
-import {
   pluginsRouter,
   type PluginsRouterContext,
 } from "./plugins/pluginsRouter.js";
@@ -19,13 +15,11 @@ import {
 export type HaloContext = AppRouterContext &
   WorkspaceRouterContext &
   SessionsRouterContext &
-  IntegrationsRouterContext &
   PluginsRouterContext;
 
 export const haloRpcRouter = {
   ...appRouter,
   workspace: workspaceRouter,
   sessions: sessionsRouter,
-  integrations: integrationsRouter,
   plugins: pluginsRouter,
 };

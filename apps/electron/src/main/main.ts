@@ -30,7 +30,6 @@ import { createWorkspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugi
 import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
-import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
 import { UserService } from "./UserService.js";
@@ -81,11 +80,9 @@ const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
   isDevelopment,
 });
 const userService = new UserService(applicationConfig.dataDir);
-const integrationService = new IntegrationService(workspaceService);
 const sessionRegistry = new SessionRegistry({
   workspace: workspaceService,
   user: userService,
-  integrations: integrationService,
   toolPluginFactories: [createWorkspaceFilesPlugin, createWorkspaceBashPlugin],
   authority: new StaticAgentAuthority([
     "workspace.files.read",
@@ -111,7 +108,6 @@ app.whenReady().then(async () => {
   const listening = await listenHaloRpcHttp({
     context: {
       workspace: workspaceService,
-      integrations: integrationService,
       plugins: pluginService,
       sessions: sessionRegistry,
       getWindow: () => {
@@ -237,7 +233,6 @@ function registerRpcBridge(): void {
     const { port1, port2 } = new MessageChannelMain();
     const context: HaloContext = {
       workspace: workspaceService,
-      integrations: integrationService,
       plugins: pluginService,
       sessions: sessionRegistry,
       getWindow: () => {

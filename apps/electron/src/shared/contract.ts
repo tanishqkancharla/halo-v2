@@ -7,7 +7,6 @@ import {
 } from "@orpc/contract";
 import type { AgentSessionState } from "./AgentSessionState.js";
 import type { ConnectionRequest } from "./connectionRequests.js";
-import type { IntegrationConnection } from "./integrations.js";
 import type {
   AppInfo,
   PluginList,
@@ -61,15 +60,6 @@ export const contract = {
       oc.input(type<{ sessionId: string; request: ConnectionRequest }>()),
     abort: oc.input(type<{ sessionId: string }>()),
     close: oc.input(type<{ sessionId: string }>()),
-  },
-  integrations: {
-    get: oc
-      .input(type<{ connectionId: string }>())
-      .output(type<IntegrationConnection | undefined>()),
-    startOAuth: oc
-      .input(type<{ connectionId: string; sessionId: string }>())
-      .output(type<IntegrationConnection>()),
-    disconnect: oc.input(type<{ connectionId: string; sessionId: string }>()),
   },
   plugins: {
     list: oc.output(type<PluginList>()),

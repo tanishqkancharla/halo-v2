@@ -10,8 +10,6 @@ import {
   type AgentSessionState,
 } from "../../shared/AgentSessionState.js";
 import type { AgentSessionEvent, SessionSummary } from "../../shared/rpc.js";
-import type { IntegrationService } from "../integrations/IntegrationService.js";
-import { createIntegrationTools } from "../integrations/IntegrationTools.js";
 import type { UserService } from "../UserService.js";
 import type {
   WorkspaceLayout,
@@ -55,14 +53,13 @@ export class NotifyIntegrationEventError extends errore.createTaggedError({
 }) {}
 
 type SessionNotification = {
-  customType: "halo.integration.connected" | "halo.integration.disconnected";
+  customType: "halo.integration.connected";
   content: string;
 };
 
 export type HaloAgentSessionOptions = {
   workspace: WorkspaceService;
   user: UserService;
-  integrations: IntegrationService;
   toolRuntime: ToolRuntimeService;
   toolPluginFactories: readonly HaloToolPluginFactory[];
   authority: AgentAuthority;
@@ -157,7 +154,6 @@ export class HaloAgentSession {
       customTools: [
         createExecTool(runtime),
         ...createParallelSearchTools(user.id),
-        ...createIntegrationTools(options.integrations),
       ],
       resourceLoader,
     }).catch((e) => new CreateAgentSessionError({ cause: e }));

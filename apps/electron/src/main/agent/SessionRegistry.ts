@@ -3,7 +3,6 @@ import {
   connectionRequestLabel,
   type ConnectionRequest,
 } from "../../shared/connectionRequests.js";
-import type { IntegrationService } from "../integrations/IntegrationService.js";
 import type { UserService } from "../UserService.js";
 import type { WorkspaceService } from "../workspace/WorkspaceService.js";
 import type { AgentAuthority } from "./AgentAuthority.js";
@@ -22,7 +21,6 @@ export class SessionNotOpenError extends errore.createTaggedError({
 type SessionRegistryOptions = {
   workspace: WorkspaceService;
   user: UserService;
-  integrations: IntegrationService;
   toolPluginFactories: readonly HaloToolPluginFactory[];
   authority: AgentAuthority;
 };

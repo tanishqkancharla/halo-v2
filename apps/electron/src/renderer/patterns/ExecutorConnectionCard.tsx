@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Avatar, Button, Flex, Spacer, Text } from "maui";
+import { Button, Flex, Spacer, Text } from "maui";
+import { style, useStyles } from "purse-styles";
 import { connectionRequestLabel } from "../../shared/connectionRequests.js";
 import { useApi } from "../api/ApiProvider.tsx";
 import type { SessionViewPart } from "../agentSession/sessionView.ts";
-import { GoogleServiceIcon } from "./GoogleServiceIcon.tsx";
+import { integrationBrands } from "../IntegrationBrands.ts";
 
 type ExecutorConnectionPart = Extract<
   SessionViewPart,
@@ -11,6 +12,16 @@ type ExecutorConnectionPart = Extract<
 >;
 type ConnectionStatus = "idle" | "connecting" | "connected";
 const idleStatus: ConnectionStatus = "idle";
+const card = style({ width: "100%", maxWidth: "400px" });
+const brandLogo = style({
+  width: "24px",
+  height: "24px",
+  objectFit: "contain",
+  flexShrink: 0,
+});
+const brandButton = style({
+  flexShrink: 0,
+});
 
 export function ExecutorConnectionCard({
   sessionId,
@@ -20,6 +31,9 @@ export function ExecutorConnectionCard({
   part: ExecutorConnectionPart;
 }) {
   const api = useApi();
+  const cardClassName = useStyles(card);
+  const brandLogoClassName = useStyles(brandLogo);
+  const brandButtonClassName = useStyles(brandButton);
   const queryClient = useQueryClient();
   const statusKey = [
     "executorConnection",
@@ -52,7 +66,7 @@ export function ExecutorConnectionCard({
     },
   });
   const label = connectionRequestLabel(part.request);
-  const serviceId = part.request.integration.replace(/^google_/, "");
+  const brand = integrationBrands.google;
 
   return (
     <section
@@ -60,10 +74,13 @@ export function ExecutorConnectionCard({
       data-session-id={sessionId}
       data-integration={part.request.integration}
       data-testid="executor-connection-card"
+      className={cardClassName}
     >
       <Flex column gap={6} p={6} shadow="subtle" radius="lg">
         <Flex row gap={4} alignItems="start">
-          <Avatar name={label} size="lg" />
+          {/* Electron has no Next.js image component; this logo is a local build asset. */}
+          {/* oxlint-disable-next-line next/no-img-element */}
+          <img src={brand.logoUrl} alt="" className={brandLogoClassName} />
           <Flex column gap={1}>
             <Text size="md" fontWeight={600}>
               {label}
@@ -79,11 +96,12 @@ export function ExecutorConnectionCard({
           <Spacer />
           <Button
             variant="primary"
-            variantColor="blue"
+            variantColor={brand.buttonColor}
+            style={{ color: brand.buttonForeground }}
+            className={brandButtonClassName}
             disabled={sessionId === undefined || status !== "idle"}
             onClick={() => connect.mutate()}
           >
-            <GoogleServiceIcon serviceId={serviceId} />
             {status === "connected"
               ? "Connected"
               : status === "connecting"
