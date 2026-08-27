@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   backgroundColor,
+  border,
   colors,
   flex,
   flexItem,
@@ -11,7 +12,6 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { viewerDocument } from "virtual:tkstack";
-import { codeFontFamily } from "../codeFont.js";
 import { ComarkView } from "./ComarkView.tsx";
 import { DoneButton } from "./DoneButton.tsx";
 
@@ -27,7 +27,6 @@ export function ViewerApp() {
   const header = useStyles(styles.header);
   const heading = useStyles(styles.heading);
   const titleClass = useStyles(styles.title);
-  const agentHint = useStyles(styles.agentHint);
   const article = useStyles(styles.article);
   const prose = useStyles(styles.prose, proseHtml("md"));
   const closed = useStyles(styles.closed);
@@ -46,11 +45,6 @@ export function ViewerApp() {
       <header className={header}>
         <div className={heading}>
           <div className={titleClass}>{title}</div>
-          <div className={agentHint}>
-            AI agents: run <code>npx tkstack &lt;file&gt;</code> to serve local
-            Markdown, then request its URL with{" "}
-            <code>Accept: text/markdown</code>.
-          </div>
         </div>
         <DoneButton
           onClick={() => {
@@ -98,12 +92,13 @@ const styles = {
     flex({ direction: "row", align: "center", justify: "between" }),
     spacing.padding({ x: 6, y: 3 }),
     flexItem({ size: "hug" }),
+    border(["bottom"], "border"),
     {
       minWidth: 0,
       backgroundColor: backgroundColor.app,
     },
   ),
-  heading: style(flex({ direction: "column", gap: 1 }), {
+  heading: style(flex({ direction: "column" }), {
     minWidth: 0,
   }),
   title: style(text("md", 600, "highContrast"), {
@@ -111,15 +106,6 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
-  }),
-  agentHint: style(text("xs", 400, "lowContrast"), {
-    minWidth: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    "& code": {
-      fontFamily: codeFontFamily,
-    },
   }),
   article: style(spacing.padding({ x: 12, y: 12 }), {
     flex: "1 1 auto",
@@ -136,16 +122,24 @@ const styles = {
     "& ul > li[data-task]::before, & ol > li[data-task]::before": {
       content: "none",
     },
-    "& ul > li[data-task] > input[type=checkbox], & ol > li[data-task] > input[type=checkbox]":
+    "& ul > li[data-task] > .tkstack-task-checkbox, & ol > li[data-task] > .tkstack-task-checkbox":
       {
         // Maui proseHtml md listPadding.
         position: "absolute",
-        left: "-26px",
-        width: "26px",
-        height: "28px",
-        margin: 0,
-        accentColor: colors.accent[9],
+        left: "-20px",
+        top: "6px",
       },
+    "& .tkstack-task-checkbox label > span:last-child": {
+      position: "absolute",
+      width: "1px",
+      height: "1px",
+      padding: 0,
+      margin: "-1px",
+      overflow: "hidden",
+      clip: "rect(0, 0, 0, 0)",
+      whiteSpace: "nowrap",
+      border: 0,
+    },
   }),
   closed: style(text("md", 500, "highContrast"), spacing.padding({ all: 12 }), {
     minHeight: "100vh",

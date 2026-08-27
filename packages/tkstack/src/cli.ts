@@ -2,9 +2,10 @@
 
 import { Cli, z } from "incur";
 import { resolveFromInvokeCwd } from "./invokeCwd.js";
+import { listRunningTkstacks } from "./registry.js";
 import { startServer } from "./serve.js";
 
-Cli.create("tkstack", {
+const cli = Cli.create("tkstack", {
   description: "Serve a spec or code walkthrough as a local page",
   version: "0.1.0",
   args: z.object({
@@ -37,4 +38,28 @@ Cli.create("tkstack", {
     await started.closed;
     return { url: started.url, file: started.filePath };
   },
-}).serve();
+}).command("list", {
+  description: "List running tkstack viewers",
+  output: z.object({
+    instances: z.array(
+      z.object({
+        pid: z.number(),
+        title: z.string(),
+        url: z.string(),
+        file: z.string(),
+      }),
+    ),
+  }),
+  async run(c) {
+    const instances = await listRunningTkstacks();
+    if (instances instanceof Error) {
+      return c.error({
+        code: "TKSTACK",
+        message: instances.message,
+      });
+    }
+    return c.ok({ instances });
+  },
+});
+
+cli.serve();

@@ -1,5 +1,5 @@
-import { createElement, type ReactNode } from "react";
-import { colors, monospace, radius, spacing } from "maui";
+import { createElement, type ReactNode, useState } from "react";
+import { Checkbox, colors, monospace, radius, spacing } from "maui";
 import { style, useStyles } from "purse-styles";
 import type {
   ViewerDocument,
@@ -45,19 +45,9 @@ function renderElement(node: ViewerElement, key: number): ReactNode {
   }
   if (node.tag === "li" && node.attrs.task === true) {
     return (
-      <li
-        key={key}
-        id={node.attrs.id}
-        className={node.attrs.className}
-        data-task=""
-      >
-        <input
-          type="checkbox"
-          disabled
-          defaultChecked={node.attrs.checked === true}
-        />
+      <TaskListItem key={key} node={node}>
         {children}
-      </li>
+      </TaskListItem>
     );
   }
   if (node.tag === "code") {
@@ -67,6 +57,32 @@ function renderElement(node: ViewerElement, key: number): ReactNode {
     return createElement(node.tag, { key, ...domAttrs(node) });
   }
   return createElement(node.tag, { key, ...domAttrs(node) }, children);
+}
+
+function TaskListItem(props: { node: ViewerElement; children: ReactNode }) {
+  const [checked, setChecked] = useState(props.node.attrs.checked === true);
+  return (
+    <li
+      id={props.node.attrs.id}
+      className={props.node.attrs.className}
+      data-task=""
+    >
+      <span className="tkstack-task-checkbox">
+        <Checkbox
+          label={nodeText(props.node)}
+          checked={checked}
+          setChecked={setChecked}
+        />
+      </span>
+      {props.children}
+    </li>
+  );
+}
+
+function nodeText(node: ViewerNode): string {
+  if (node.type === "text") return node.value;
+  if (node.type !== "element") return "";
+  return node.children.map(nodeText).join("");
 }
 
 function domAttrs(node: ViewerElement) {

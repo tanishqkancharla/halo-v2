@@ -15,6 +15,12 @@ Options:
 
 **Done** in the top right stops the server.
 
+List every running viewer, including viewers using custom ports:
+
+```sh
+npx tkstack list
+```
+
 Request the page with `Accept: text/markdown` to read the current source file
 instead of the rendered HTML:
 

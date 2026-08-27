@@ -10,6 +10,11 @@ export class TkstackFileError extends errore.createTaggedError({
   message: "tkstack could not read $path: $reason",
 }) {}
 
+export class TkstackRegistryError extends errore.createTaggedError({
+  name: "TkstackRegistryError",
+  message: "tkstack registry failed: $reason",
+}) {}
+
 export class TkstackMermaidError extends errore.createTaggedError({
   name: "TkstackMermaidError",
   message: "tkstack could not render mermaid",

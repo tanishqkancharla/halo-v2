@@ -5,6 +5,10 @@ import { createServer, type ViteDevServer } from "vite";
 import { tkstackContentPlugin } from "./contentPlugin.js";
 import { TkstackFileError, TkstackServeError } from "./errors.js";
 import { extractTitle } from "./extractDocument.js";
+import {
+  registerRunningTkstack,
+  unregisterRunningTkstack,
+} from "./registry.js";
 
 export type TkstackServer = {
   url: string;
@@ -52,6 +56,7 @@ export async function startServer(input: StartServerInput) {
   const title = extractTitle(source);
 
   let vite: ViteDevServer | undefined;
+  let registryPath: string | undefined;
   const closedBarrier = createClosedBarrier();
   let shuttingDown = false;
 
@@ -59,6 +64,10 @@ export async function startServer(input: StartServerInput) {
     if (shuttingDown) return;
     shuttingDown = true;
     if (vite !== undefined) await vite.close();
+    if (registryPath !== undefined) {
+      const removed = await unregisterRunningTkstack(registryPath);
+      if (removed instanceof Error) console.error(removed.message);
+    }
     closedBarrier.resolve();
   }
 
@@ -98,6 +107,7 @@ export async function startServer(input: StartServerInput) {
               method: req.method === undefined ? "GET" : req.method,
               workspaceRoot,
               title,
+              filePath,
               shutdown,
               res,
             });
@@ -113,6 +123,18 @@ export async function startServer(input: StartServerInput) {
     await shutdown();
     return new TkstackServeError({ reason: "no listen url" });
   }
+  const url = localUrl.replace(/\/$/, "");
+  const registered = await registerRunningTkstack({
+    pid: process.pid,
+    title,
+    url,
+    file: filePath,
+  });
+  if (registered instanceof Error) {
+    await shutdown();
+    return registered;
+  }
+  registryPath = registered;
 
   process.once("SIGINT", () => {
     void shutdown();
@@ -122,7 +144,7 @@ export async function startServer(input: StartServerInput) {
   });
 
   return {
-    url: localUrl.replace(/\/$/, ""),
+    url,
     filePath,
     shutdown,
     closed: closedBarrier.closed,
@@ -174,6 +196,7 @@ async function handleTkstackRequest(input: {
   method: string;
   workspaceRoot: string;
   title: string;
+  filePath: string;
   shutdown: () => Promise<void>;
   res: TkstackResponse;
 }) {
@@ -190,7 +213,13 @@ async function handleTkstackRequest(input: {
   if (parsed.pathname === "/__tkstack/meta" && input.method === "GET") {
     input.res.statusCode = 200;
     input.res.setHeader("content-type", "application/json; charset=utf-8");
-    input.res.end(JSON.stringify({ title: input.title }));
+    input.res.end(
+      JSON.stringify({
+        title: input.title,
+        file: input.filePath,
+        pid: process.pid,
+      }),
+    );
     return;
   }
   if (parsed.pathname === "/__tkstack/file" && input.method === "GET") {
