@@ -30,7 +30,7 @@
     "@tandem/server": "github:tanishqkancharla/tandem#path:packages/server",
     "@tandem/types": "github:tanishqkancharla/tandem#path:packages/types",
     "errore": "^0.14.1",
-    "maui": "github:tanishqkancharla/maui#5b5a450900317e7f04a33bd4c2ac8a592442e6f0",
+    "maui": "github:tanishqkancharla/maui#v0.0.5",
     "purse-styles": "^0.2.1",
     "wouter": "^3.10.0"
   },

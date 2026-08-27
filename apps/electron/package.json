@@ -1,6 +1,6 @@
 {
   "name": "@halo/desktop",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "private": true,
   "description": "Halo desktop app",
   "license": "MIT",
@@ -54,7 +54,7 @@
     "errore": "^0.14.1",
     "esbuild": "^0.28.1",
     "jiti": "2.7.0",
-    "maui": "github:tanishqkancharla/maui#5b5a450900317e7f04a33bd4c2ac8a592442e6f0",
+    "maui": "github:tanishqkancharla/maui#v0.0.5",
     "purse-styles": "^0.2.1",
     "quickjs-emscripten": "0.31.0",
     "react": "^19.2.8",

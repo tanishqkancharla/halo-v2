@@ -16,7 +16,7 @@ allowBuilds:
   geckodriver: false
   koffi: false
   macos-alias: true
-  "@tanishqkancharla/maui@git+ssh://git@github.com/tanishqkancharla/maui.git#5b5a450900317e7f04a33bd4c2ac8a592442e6f0": true
+  "@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc": true
   msgpackr-extract: false
   protobufjs: false
   sharp: false
