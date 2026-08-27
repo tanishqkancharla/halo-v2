@@ -15,6 +15,13 @@ Options:
 
 **Done** in the top right stops the server.
 
+Request the page with `Accept: text/markdown` to read the current source file
+instead of the rendered HTML:
+
+```sh
+curl -H 'Accept: text/markdown' http://127.0.0.1:4177/
+```
+
 ## Library
 
 ```ts

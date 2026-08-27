@@ -11,6 +11,7 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { viewerDocument } from "virtual:tkstack";
+import { codeFontFamily } from "../codeFont.js";
 import { ComarkView } from "./ComarkView.tsx";
 import { DoneButton } from "./DoneButton.tsx";
 
@@ -24,7 +25,9 @@ export function ViewerApp() {
   const title = meta === undefined ? document.title : meta.title;
   const shell = useStyles(styles.shell);
   const header = useStyles(styles.header);
+  const heading = useStyles(styles.heading);
   const titleClass = useStyles(styles.title);
+  const agentHint = useStyles(styles.agentHint);
   const article = useStyles(styles.article);
   const prose = useStyles(styles.prose, proseHtml("md"));
   const closed = useStyles(styles.closed);
@@ -41,7 +44,14 @@ export function ViewerApp() {
   return (
     <div className={shell}>
       <header className={header}>
-        <div className={titleClass}>{title}</div>
+        <div className={heading}>
+          <div className={titleClass}>{title}</div>
+          <div className={agentHint}>
+            AI agents: run <code>npx tkstack &lt;file&gt;</code> to serve local
+            Markdown, then request its URL with{" "}
+            <code>Accept: text/markdown</code>.
+          </div>
+        </div>
         <DoneButton
           onClick={() => {
             setShutDown(true);
@@ -93,11 +103,23 @@ const styles = {
       backgroundColor: backgroundColor.app,
     },
   ),
+  heading: style(flex({ direction: "column", gap: 1 }), {
+    minWidth: 0,
+  }),
   title: style(text("md", 600, "highContrast"), {
     minWidth: 0,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  }),
+  agentHint: style(text("xs", 400, "lowContrast"), {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    "& code": {
+      fontFamily: codeFontFamily,
+    },
   }),
   article: style(spacing.padding({ x: 12, y: 12 }), {
     flex: "1 1 auto",
