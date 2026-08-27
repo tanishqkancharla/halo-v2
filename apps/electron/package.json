@@ -26,6 +26,7 @@
   "dependencies": {
     "@executor-js/execution": "1.6.0",
     "@executor-js/fumadb": "1.5.7",
+    "@executor-js/plugin-openapi": "1.6.0",
     "@executor-js/runtime-quickjs": "1.6.0",
     "@executor-js/sdk": "1.6.0",
     "@halo/cli": "workspace:*",

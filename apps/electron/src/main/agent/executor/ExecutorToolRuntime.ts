@@ -1,5 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createExecutionEngine } from "@executor-js/execution/core";
+import { openApiPlugin } from "@executor-js/plugin-openapi/core";
+import {
+  googleCatalog,
+  googleDiscoveryAdapter,
+} from "@executor-js/plugin-openapi/providers/google";
 import {
   makeQuickJsExecutor,
   setQuickJSModule,
@@ -9,6 +14,8 @@ import {
   definePlugin,
   Effect,
   type Executor,
+  type IntegrationPreset,
+  IntegrationSlug,
   StorageError,
   Subject,
   Tenant,
@@ -67,8 +74,35 @@ const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
   };
 });
 
-type HaloRuntimePlugins = readonly [ReturnType<typeof haloToolsPlugin>];
 let quickJsModulePromise: Promise<QuickJSWASMModule> | undefined;
+
+type InstallableGooglePreset = IntegrationPreset & {
+  defaultSlug: string;
+  specFormat: string;
+  url: string;
+};
+
+// Executor 1.6 rewrites Meet's service-hosted Discovery URL to a legacy endpoint that returns 404.
+const googlePresets = googleCatalog.filter(
+  (preset) => preset.id !== "google-meet",
+);
+
+const installableGooglePresets = googlePresets.filter(
+  (preset): preset is InstallableGooglePreset =>
+    preset.defaultSlug !== undefined &&
+    preset.specFormat !== undefined &&
+    preset.url !== undefined,
+);
+
+const googleOpenApiPlugin = openApiPlugin({
+  presets: googlePresets,
+  specFormats: [googleDiscoveryAdapter],
+});
+
+type HaloRuntimePlugins = readonly [
+  ReturnType<typeof haloToolsPlugin>,
+  typeof googleOpenApiPlugin,
+];
 
 function toExecutorTool(input: {
   pluginId: string;
@@ -247,6 +281,7 @@ export async function createExecutorToolRuntime(input: {
           authority: input.authority,
           executionContext,
         }),
+        googleOpenApiPlugin,
       ] as const,
       providers: [createExecutorCredentialProvider(input.credentialVault)],
       db: ({ tables }) =>
@@ -273,6 +308,17 @@ export async function createExecutorToolRuntime(input: {
   ).catch((cause) => new ToolRuntimeError({ operation: "startup", cause }));
   if (executor instanceof Error) return executor;
 
+  const installed = await installGooglePresets(executor);
+  if (installed instanceof Error) {
+    const closed = await Effect.runPromise(executor.close()).catch(
+      (cause) => new ToolRuntimeError({ operation: "close", cause }),
+    );
+    if (closed instanceof Error) {
+      console.warn("Failed to close Executor after Google setup:", closed);
+    }
+    return installed;
+  }
+
   const engine = createExecutionEngine({
     executor,
     codeExecutor: makeQuickJsExecutor({
@@ -282,4 +328,50 @@ export async function createExecutorToolRuntime(input: {
     }),
   });
   return new ExecutorToolRuntime(executor, engine, executionContext);
+}
+
+async function installGooglePresets(executor: Executor<HaloRuntimePlugins>) {
+  if (installableGooglePresets.length !== googlePresets.length) {
+    return new ToolRuntimeError({
+      operation: "Google integration catalog",
+      cause: new Error("Executor has a Google preset that cannot be installed"),
+    });
+  }
+
+  for (const preset of installableGooglePresets) {
+    const existing = await Effect.runPromise(
+      executor.integrations.get(IntegrationSlug.make(preset.defaultSlug)),
+    ).catch(
+      (cause) =>
+        new ToolRuntimeError({
+          operation: `Google integration lookup (${preset.id})`,
+          cause,
+        }),
+    );
+    if (existing instanceof Error) return existing;
+    if (existing !== null) continue;
+
+    const authenticationTemplate = preset.authTemplate?.flatMap((method) =>
+      method.kind === "oauth2" ? [method] : [],
+    );
+    const added = await Effect.runPromise(
+      executor.openapi.addSpec({
+        spec: { kind: "url", url: preset.url },
+        slug: preset.defaultSlug,
+        name: preset.name,
+        description: preset.summary,
+        specFormat: preset.specFormat,
+        family: preset.family,
+        authenticationTemplate,
+        healthCheck: preset.healthCheck,
+      }),
+    ).catch(
+      (cause) =>
+        new ToolRuntimeError({
+          operation: `Google integration setup (${preset.id})`,
+          cause,
+        }),
+    );
+    if (added instanceof Error) return added;
+  }
 }
