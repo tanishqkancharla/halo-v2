@@ -1,15 +1,23 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { createExecutionEngine } from "@executor-js/execution";
+import { createExecutionEngine } from "@executor-js/execution/core";
 import {
   makeQuickJsExecutor,
   setQuickJSModule,
 } from "@executor-js/runtime-quickjs";
-import { createExecutor, type Executor, ToolAddress } from "@executor-js/sdk";
-import { definePlugin, tool } from "@executor-js/sdk/core";
+import {
+  createExecutor,
+  definePlugin,
+  Effect,
+  type Executor,
+  StorageError,
+  Subject,
+  Tenant,
+  tool,
+  ToolAddress,
+} from "@executor-js/sdk/core";
 import quickJsVariant from "@jitl/quickjs-singlefile-cjs-release-sync";
 import { type TObject } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import { Effect } from "effect";
 import {
   newQuickJSWASMModule,
   type QuickJSWASMModule,
@@ -128,14 +136,14 @@ class ExecutorToolRuntime implements ToolRuntime {
     const execution = await this.executionContext.run(
       { signal: input.signal },
       () =>
-        this.engine
-          .execute(input.code, {
-            onElicitation: async () => ({ action: "decline" as const }),
-          })
-          .catch(
-            (cause) =>
-              new ToolRuntimeError({ operation: "code execution", cause }),
-          ),
+        Effect.runPromise(
+          this.engine.execute(input.code, {
+            onElicitation: () => Effect.succeed({ action: "decline" }),
+          }),
+        ).catch(
+          (cause) =>
+            new ToolRuntimeError({ operation: "code execution", cause }),
+        ),
     );
     if (execution instanceof Error) return execution;
     return {
@@ -153,8 +161,9 @@ class ExecutorToolRuntime implements ToolRuntime {
     const invocation = await this.executionContext.run(
       { signal: input.signal },
       () =>
-        this.executor
-          .execute(ToolAddress.make(input.path), input.args)
+        Effect.runPromise(
+          this.executor.execute(ToolAddress.make(input.path), input.args),
+        )
           .then((value) => ({ value }))
           .catch(
             (cause) =>
@@ -166,11 +175,11 @@ class ExecutorToolRuntime implements ToolRuntime {
   }
 
   async search(input: { query: string; limit?: number }) {
-    const tools = await this.executor.tools
-      .list({ query: input.query })
-      .catch(
-        (cause) => new ToolRuntimeError({ operation: "tool search", cause }),
-      );
+    const tools = await Effect.runPromise(
+      this.executor.tools.list({ query: input.query }),
+    ).catch(
+      (cause) => new ToolRuntimeError({ operation: "tool search", cause }),
+    );
     if (tools instanceof Error) return tools;
     const items = tools.map((catalogTool) => ({
       path: catalogTool.address,
@@ -182,12 +191,11 @@ class ExecutorToolRuntime implements ToolRuntime {
   }
 
   async describe(input: { path: string }) {
-    const description = await this.executor.tools
-      .schema(ToolAddress.make(input.path))
-      .catch(
-        (cause) =>
-          new ToolRuntimeError({ operation: "tool description", cause }),
-      );
+    const description = await Effect.runPromise(
+      this.executor.tools.schema(ToolAddress.make(input.path)),
+    ).catch(
+      (cause) => new ToolRuntimeError({ operation: "tool description", cause }),
+    );
     if (description instanceof Error) return description;
     if (description === null) {
       return new ToolRuntimeToolNotFoundError({ path: input.path });
@@ -204,9 +212,9 @@ class ExecutorToolRuntime implements ToolRuntime {
   }
 
   async close() {
-    const closed = await this.executor
-      .close()
-      .catch((cause) => new ToolRuntimeError({ operation: "close", cause }));
+    const closed = await Effect.runPromise(this.executor.close()).catch(
+      (cause) => new ToolRuntimeError({ operation: "close", cause }),
+    );
     if (closed instanceof Error) return closed;
   }
 }
@@ -229,31 +237,40 @@ export async function createExecutorToolRuntime(input: {
   setQuickJSModule(quickJsModule);
 
   const executionContext = new AsyncLocalStorage<HaloToolContext>();
-  const executor = await createExecutor({
-    tenant: input.workspaceRoot,
-    subject: input.userId,
-    plugins: [
-      haloToolsPlugin({
-        plugins: input.toolPlugins,
-        authority: input.authority,
-        executionContext,
-      }),
-    ] as const,
-    providers: [createExecutorCredentialProvider(input.credentialVault)],
-    db: async ({ tables }) => {
-      const database = await openExecutorDatabase({
-        workspaceRoot: input.workspaceRoot,
-        tables,
-      });
-      if (database instanceof Error) {
-        throw new Error("Failed to open Executor database", {
-          cause: database,
-        });
-      }
-      return database;
-    },
-    onElicitation: "accept-all",
-  }).catch((cause) => new ToolRuntimeError({ operation: "startup", cause }));
+  const executor = await Effect.runPromise(
+    createExecutor({
+      tenant: Tenant.make(input.workspaceRoot),
+      subject: Subject.make(input.userId),
+      plugins: [
+        haloToolsPlugin({
+          plugins: input.toolPlugins,
+          authority: input.authority,
+          executionContext,
+        }),
+      ] as const,
+      providers: [createExecutorCredentialProvider(input.credentialVault)],
+      db: ({ tables }) =>
+        Effect.promise(() =>
+          openExecutorDatabase({
+            workspaceRoot: input.workspaceRoot,
+            tables,
+          }),
+        ).pipe(
+          Effect.flatMap((database) => {
+            if (database instanceof Error) {
+              return Effect.fail(
+                new StorageError({
+                  message: "Failed to open Executor database",
+                  cause: database,
+                }),
+              );
+            }
+            return Effect.succeed(database);
+          }),
+        ),
+      onElicitation: "accept-all",
+    }),
+  ).catch((cause) => new ToolRuntimeError({ operation: "startup", cause }));
   if (executor instanceof Error) return executor;
 
   const engine = createExecutionEngine({
