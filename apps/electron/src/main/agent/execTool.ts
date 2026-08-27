@@ -34,6 +34,8 @@ export function createExecTool(runtime: ToolRuntime): ToolDefinition {
     promptGuidelines: [
       "Use exec for workspace file and shell work. Pass JavaScript in js; tools and console are in scope.",
       "Every tool takes one object argument and returns `{ ok: true, data }` or `{ ok: false, error }`. Check `ok` before using `data`.",
+      "Use `tools.search({ query, limit? })` and `tools.describe.tool({ path })` to discover unfamiliar tools. Invoke a discovered path with `tools[path](args)`.",
+      "Use `tools.executor.coreTools.integrations.list({})` to list available integrations and `tools.executor.coreTools.connections.list({ integration?, owner?, verbose? })` to list connected accounts.",
       "`tools.files.read({ path, offset?, limit? })` reads UTF-8 text.",
       "`tools.files.edit({ path, oldText, newText, replaceAll? })` replaces exact text.",
       "`tools.files.patch({ patchText })` applies a patch.",

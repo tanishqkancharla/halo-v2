@@ -284,6 +284,7 @@ export async function createExecutorToolRuntime(input: {
         googleOpenApiPlugin,
       ] as const,
       providers: [createExecutorCredentialProvider(input.credentialVault)],
+      coreTools: { includeProviders: true },
       db: ({ tables }) =>
         Effect.promise(() =>
           openExecutorDatabase({
