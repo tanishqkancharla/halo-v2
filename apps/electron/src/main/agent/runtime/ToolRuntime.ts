@@ -1,5 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { createExecutionEngine } from "@executor-js/execution/core";
+import {
+  createExecutionEngine,
+  INTEGRATION_INVENTORY_HEADER,
+} from "@executor-js/execution/core";
 import { openApiPlugin } from "@executor-js/plugin-openapi/core";
 import {
   googleCatalog,
@@ -247,7 +250,56 @@ export class ToolRuntime {
     private readonly engine: ReturnType<typeof createExecutionEngine>,
     private readonly executionContext: AsyncLocalStorage<HaloToolContext>,
     private readonly toolPlugins: readonly HaloToolPlugin[],
+    private readonly authority: AgentAuthority,
   ) {}
+
+  async getAgentDescription() {
+    const executorDescription = await Effect.runPromise(
+      this.engine.getDescription,
+    ).catch(
+      (cause) =>
+        new ToolRuntimeError({ operation: "agent description", cause }),
+    );
+    if (executorDescription instanceof Error) return executorDescription;
+
+    const inventoryStart = executorDescription.indexOf(
+      INTEGRATION_INVENTORY_HEADER,
+    );
+    const integrationInventory =
+      inventoryStart === -1
+        ? "## Connected integrations\n\nNo integrations are connected."
+        : executorDescription.slice(inventoryStart);
+    const toolStatuses = await Promise.all(
+      this.toolPlugins.flatMap((plugin) =>
+        plugin.tools.map(async (haloTool) => {
+          const authorization = await this.authority.authorize({
+            pluginId: plugin.id,
+            toolName: haloTool.name,
+            requiredCapabilities: haloTool.requiredCapabilities,
+          });
+          return {
+            path: `${plugin.id}.${haloTool.name}`,
+            status: authorization instanceof Error ? "blocked" : "granted",
+          };
+        }),
+      ),
+    );
+    const haloTools = [
+      "## Halo tools",
+      "",
+      "Tools configured for this session:",
+      ...toolStatuses.map(
+        (status) => `- \`${status.path}\` — ${status.status}`,
+      ),
+    ].join("\n");
+
+    return [
+      "Run JavaScript in Halo's sandbox with the tools available below.",
+      haloTools,
+      integrationInventory,
+      "Other integrations can be discovered and connected when needed.",
+    ].join("\n\n");
+  }
 
   async executeCode(input: {
     code: string;
@@ -488,7 +540,13 @@ async function createToolRuntime(
       maxStackSizeBytes: 1024 * 1024,
     }),
   });
-  return new ToolRuntime(executor, engine, executionContext, input.toolPlugins);
+  return new ToolRuntime(
+    executor,
+    engine,
+    executionContext,
+    input.toolPlugins,
+    input.authority,
+  );
 }
 
 function connectionInput(

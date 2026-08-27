@@ -146,6 +146,8 @@ export class HaloAgentSession {
       authority: options.authority,
     });
     if (runtime instanceof Error) return runtime;
+    const runtimeDescription = await runtime.getAgentDescription();
+    if (runtimeDescription instanceof Error) return runtimeDescription;
 
     const resourceLoader = createWorkspaceResourceLoader(
       layout.root,
@@ -160,7 +162,7 @@ export class HaloAgentSession {
       agentDir: layout.agentDir,
       sessionManager: manager,
       tools: [],
-      customTools: [createExecTool(runtime)],
+      customTools: [createExecTool({ runtime, runtimeDescription })],
       resourceLoader,
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;

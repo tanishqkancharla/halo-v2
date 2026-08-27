@@ -21,19 +21,22 @@ function formatExecResult(value: string | undefined, logs: string[]) {
   return parts.join("\n\n");
 }
 
-export function createExecTool(runtime: ToolRuntime): ToolDefinition {
+export function createExecTool(input: {
+  runtime: ToolRuntime;
+  runtimeDescription: string;
+}): ToolDefinition {
   return {
     name: "exec",
     label: "Exec",
-    description:
-      "Run JavaScript with workspace, shell, web, and integration tools.",
+    description: input.runtimeDescription,
     promptSnippet:
-      "Run JavaScript that calls tools.files.*, tools.bash.run, tools.web.*, and discovered integrations",
+      "Run JavaScript with the granted Halo tools and connected integrations listed in the exec description",
     promptGuidelines: [
-      "Use exec for workspace file and shell work. Pass JavaScript in js; tools and console are in scope.",
-      "Runtime tools take one object argument and return `{ ok: true, data }` or `{ ok: false, error }`. Check `ok` before using `data`.",
-      "Use `tools.search({ query, limit? })` and `tools.describe.tool({ path })` to discover unfamiliar tools. These discovery helpers return their data directly, without an `ok` wrapper. Invoke a discovered path with `tools[path](args)`.",
-      "Use `tools.executor.coreTools.integrations.list({})` to list available integrations and `tools.executor.coreTools.connections.list({ integration?, owner?, verbose? })` to list connected accounts.",
+      "Pass JavaScript in `js`; `tools` and `console` are in scope.",
+      'Scoped discovery example: `const { items } = await tools.search({ namespace: "integration_slug", query: "operation in a few words", limit: 5 }); const match = items[0]; return { match, schema: match === undefined ? undefined : await tools.describe.tool({ path: match.path }) };`',
+      "Search paths are canonical. Invocation example: `const result = await tools[path](args); if (!result.ok) return result; return result.data;`",
+      "Discovery helpers return data directly. Runtime tools return `{ ok: true, data }` or `{ ok: false, error }`.",
+      'Connection example when account identity matters: `await tools.executor.coreTools.connections.list({ integration: "integration_slug" })`.',
       "`tools.files.read({ path, offset?, limit? })` reads UTF-8 text.",
       "`tools.files.edit({ path, oldText, newText, replaceAll? })` replaces exact text.",
       "`tools.files.patch({ patchText })` applies a patch.",
@@ -50,7 +53,7 @@ export function createExecTool(runtime: ToolRuntime): ToolDefinition {
       // SAFETY: execParameters schema guarantees params has a string `js` property.
       const { js } = params as { js: string };
       const result = await runWithToolRuntime(
-        runtime,
+        input.runtime,
         js,
         signal,
         context.model?.id,
