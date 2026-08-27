@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { shell } from "electron";
 import { createExecutionEngine } from "@executor-js/execution/core";
 import { openApiPlugin } from "@executor-js/plugin-openapi/core";
 import {
@@ -331,19 +330,22 @@ class ExecutorToolRuntime implements ToolRuntime {
       (cause) => new ToolRuntimeError({ operation: "OAuth start", cause }),
     );
     if (started instanceof Error) return started;
-    if (started.status === "connected") return;
+    if (started.status === "connected") return { status: "connected" as const };
+    return {
+      status: "redirect" as const,
+      authorizationUrl: started.authorizationUrl,
+      state: started.state,
+    };
+  }
 
-    const opened = await shell
-      .openExternal(started.authorizationUrl)
-      .then(() => undefined)
-      .catch(
-        (cause) =>
-          new ToolRuntimeError({
-            operation: "opening OAuth authorization",
-            cause,
-          }),
-      );
-    if (opened instanceof Error) return opened;
+  async cancelOAuth(state: string) {
+    const cancelled = await Effect.runPromise(
+      this.executor.oauth.cancel(OAuthState.make(state)),
+    ).catch(
+      (cause) =>
+        new ToolRuntimeError({ operation: "OAuth cancellation", cause }),
+    );
+    if (cancelled instanceof Error) return cancelled;
   }
 
   async close() {

@@ -1,5 +1,8 @@
 import * as errore from "errore";
-import type { ConnectionRequest } from "../../shared/connectionRequests.js";
+import {
+  connectionRequestLabel,
+  type ConnectionRequest,
+} from "../../shared/connectionRequests.js";
 import type { IntegrationService } from "../integrations/IntegrationService.js";
 import type { UserService } from "../UserService.js";
 import type { WorkspaceService } from "../workspace/WorkspaceService.js";
@@ -42,8 +45,22 @@ export class SessionRegistry {
     return this.toolRuntime.completeOAuth(input);
   }
 
-  startConnection(request: ConnectionRequest) {
-    return this.toolRuntime.startConnection(request);
+  cancelOAuth(state: string) {
+    return this.toolRuntime.cancelOAuth(state);
+  }
+
+  async startConnection(input: {
+    sessionId: string;
+    request: ConnectionRequest;
+  }) {
+    const connected = await this.toolRuntime.startConnection(input.request);
+    if (connected instanceof Error) return connected;
+    const session = await this.open(input.sessionId);
+    if (session instanceof Error) return session;
+    return session.notify({
+      customType: "halo.integration.connected",
+      content: `[System] The user connected ${connectionRequestLabel(input.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
+    });
   }
 
   list() {

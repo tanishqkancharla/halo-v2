@@ -56,6 +56,10 @@ type ToolRuntimeToolDescription = {
   outputTypeScript: string | undefined;
 };
 
+type OAuthStartResult =
+  | { status: "connected" }
+  | { status: "redirect"; authorizationUrl: string; state: string };
+
 export interface ToolRuntime {
   executeCode(input: {
     code: string;
@@ -84,6 +88,9 @@ export interface ToolRuntime {
     state: string;
     code: string;
   }): Promise<void | ToolRuntimeError>;
-  startOAuth(input: ConnectionRequest): Promise<void | ToolRuntimeError>;
+  startOAuth(
+    input: ConnectionRequest,
+  ): Promise<OAuthStartResult | ToolRuntimeError>;
+  cancelOAuth(state: string): Promise<void | ToolRuntimeError>;
   close(): Promise<void | ToolRuntimeError>;
 }

@@ -1,3 +1,5 @@
+import { shell } from "electron";
+import * as errore from "errore";
 import type { AgentAuthority } from "../AgentAuthority.js";
 import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
@@ -5,11 +7,21 @@ import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVau
 import { createExecutorToolRuntime } from "./ExecutorToolRuntime.js";
 import { type ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
 
+export class ConnectionCancelledError extends errore.createTaggedError({
+  name: "ConnectionCancelledError",
+  message: "The connection was not completed.",
+}) {}
+
+type PendingConnection = {
+  complete: (result: Error | undefined) => void;
+};
+
 export class ToolRuntimeService {
   private runtime: ToolRuntime | undefined;
   private workspaceRoot: string | undefined;
   private userId: string | undefined;
   private oauthRedirectUri: string | undefined;
+  private readonly pendingConnections = new Map<string, PendingConnection>();
 
   setOAuthRedirectUri(oauthRedirectUri: string) {
     this.oauthRedirectUri = oauthRedirectUri;
@@ -57,6 +69,14 @@ export class ToolRuntimeService {
     this.runtime = undefined;
     this.workspaceRoot = undefined;
     this.userId = undefined;
+    const closedError = new ToolRuntimeError({
+      operation: "OAuth connection",
+      cause: new Error("Executor runtime closed"),
+    });
+    for (const pending of this.pendingConnections.values()) {
+      pending.complete(closedError);
+    }
+    this.pendingConnections.clear();
     if (runtime === undefined) return;
     return runtime.close();
   }
@@ -71,6 +91,29 @@ export class ToolRuntimeService {
 
     const started = await this.runtime.startOAuth(request);
     if (started instanceof Error) return started;
+    if (started.status === "connected") return;
+
+    const completed = new Promise<Error | undefined>((resolve) => {
+      this.pendingConnections.set(started.state, { complete: resolve });
+    });
+    const opened = await shell
+      .openExternal(started.authorizationUrl)
+      .then(() => undefined)
+      .catch(
+        (cause) =>
+          new ToolRuntimeError({
+            operation: "opening OAuth authorization",
+            cause,
+          }),
+      );
+    if (opened instanceof Error) {
+      this.pendingConnections.delete(started.state);
+      const cancelled = await this.runtime.cancelOAuth(started.state);
+      if (cancelled instanceof Error)
+        console.warn("OAuth cleanup failed:", cancelled);
+      return opened;
+    }
+    return completed;
   }
 
   async completeOAuth(input: { state: string; code: string }) {
@@ -80,6 +123,28 @@ export class ToolRuntimeService {
         cause: new Error("Executor runtime is not open"),
       });
     }
-    return this.runtime.completeOAuth(input);
+    const completed = await this.runtime.completeOAuth(input);
+    const pending = this.pendingConnections.get(input.state);
+    if (pending !== undefined) {
+      this.pendingConnections.delete(input.state);
+      pending.complete(completed instanceof Error ? completed : undefined);
+    }
+    return completed;
+  }
+
+  async cancelOAuth(state: string) {
+    if (this.runtime === undefined) {
+      return new ToolRuntimeError({
+        operation: "OAuth cancellation",
+        cause: new Error("Executor runtime is not open"),
+      });
+    }
+    const cancelled = await this.runtime.cancelOAuth(state);
+    const pending = this.pendingConnections.get(state);
+    if (pending !== undefined) {
+      this.pendingConnections.delete(state);
+      pending.complete(new ConnectionCancelledError());
+    }
+    if (cancelled instanceof Error) return cancelled;
   }
 }

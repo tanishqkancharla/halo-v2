@@ -6,6 +6,7 @@ import {
   type RouterContractClient,
 } from "@orpc/contract";
 import type { AgentSessionState } from "./AgentSessionState.js";
+import type { ConnectionRequest } from "./connectionRequests.js";
 import type { IntegrationConnection } from "./integrations.js";
 import type {
   AppInfo,
@@ -56,6 +57,8 @@ export const contract = {
       .input(type<{ sessionId: string }>())
       .output(asyncIteratorObject(type<AgentSessionEvent>())),
     prompt: oc.input(type<{ sessionId: string; text: string }>()),
+    startConnection:
+      oc.input(type<{ sessionId: string; request: ConnectionRequest }>()),
     abort: oc.input(type<{ sessionId: string }>()),
     close: oc.input(type<{ sessionId: string }>()),
   },

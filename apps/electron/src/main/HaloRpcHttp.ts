@@ -149,6 +149,16 @@ async function handleOAuthCallback(args: {
 
   const providerError = args.url.searchParams.get("error");
   if (providerError !== null) {
+    const state = args.url.searchParams.get("state");
+    if (state !== null) {
+      const cancelled = await args.context.sessions.cancelOAuth(state);
+      if (cancelled instanceof Error) {
+        args.context.logger.warn({
+          event: "oauth-cancel-failed",
+          error: cancelled,
+        });
+      }
+    }
     args.res.statusCode = 400;
     args.res.end("Authorization was not completed.");
     return;

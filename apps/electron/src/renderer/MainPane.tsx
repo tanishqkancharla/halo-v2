@@ -29,6 +29,7 @@ import {
 } from "../shared/AgentSessionState.ts";
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
+import { ExecutorConnectionCard } from "./patterns/ExecutorConnectionCard.tsx";
 import { Loader } from "./patterns/Loader.tsx";
 import { IntegrationCard } from "./patterns/IntegrationCard.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
@@ -326,6 +327,15 @@ function SessionViewRow({
         if (part.kind === "integrationConnect") {
           return (
             <IntegrationCard key={part.id} sessionId={sessionId} part={part} />
+          );
+        }
+        if (part.kind === "executorConnection") {
+          return (
+            <ExecutorConnectionCard
+              key={part.id}
+              sessionId={sessionId}
+              part={part}
+            />
           );
         }
         return (

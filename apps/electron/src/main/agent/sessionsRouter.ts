@@ -68,6 +68,15 @@ export const sessionsRouter = os.router({
     const prompted = await session.prompt(input.text);
     if (prompted instanceof Error) return orpcErrors.badRequest(prompted);
   }),
+  startConnection: os.startConnection.handler(async ({ input, context }) => {
+    context.logger.info({
+      event: "agentSession.startConnection",
+      sessionId: input.sessionId,
+      integration: input.request.integration,
+    });
+    const connected = await context.sessions.startConnection(input);
+    if (connected instanceof Error) return orpcErrors.badRequest(connected);
+  }),
   abort: os.abort.handler(async ({ input, context }) => {
     context.logger.info({
       event: "abort",

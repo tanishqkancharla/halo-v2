@@ -3,6 +3,10 @@ import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import type { AgentMessage } from "../../shared/rpc.js";
 import type { AgentSessionState } from "../../shared/AgentSessionState.js";
+import {
+  connectionRequestSchema,
+  type ConnectionRequest,
+} from "../../shared/connectionRequests.js";
 import type { ConnectionIntent } from "../../shared/integrations.js";
 
 export type SessionViewItem =
@@ -29,6 +33,11 @@ export type SessionViewPart =
       service: string;
       scopes: string[];
       intent: ConnectionIntent | undefined;
+    }
+  | {
+      kind: "executorConnection";
+      id: string;
+      request: ConnectionRequest;
     };
 
 /** Tool call arguments as parsed from JSON — values may be any JSON-representable scalar or composite. */
@@ -64,6 +73,10 @@ const connectResultSchema = Type.Object({
   profile: Type.Optional(Type.String()),
   scopes: Type.Optional(Type.Array(Type.String())),
   error: Type.Optional(Type.String()),
+});
+
+const connectionDetailsSchema = Type.Object({
+  connectionRequests: Type.Array(connectionRequestSchema),
 });
 
 const pathArgsSchema = Type.Object({
@@ -123,7 +136,8 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
       if (part.type !== "toolCall") continue;
       if (emittedTools.has(part.id)) continue;
       emittedTools.add(part.id);
-      const resultText = toolResults.get(part.id);
+      const toolResult = toolResults.get(part.id);
+      const resultText = toolResult?.text;
       const connectArgs = Value.Check(connectArgsSchema, part.arguments)
         ? part.arguments
         : undefined;
@@ -136,6 +150,19 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
       if (connectPart !== undefined) {
         assistantParts.push(connectPart);
         continue;
+      }
+      if (part.name === "exec" && toolResult !== undefined) {
+        for (const [
+          index,
+          request,
+        ] of toolResult.connectionRequests.entries()) {
+          assistantParts.push({
+            kind: "executorConnection",
+            id: `${part.id}-connection-${index}`,
+            request,
+          });
+        }
+        if (toolResult.connectionRequests.length > 0) continue;
       }
       const toolPart: Extract<SessionViewPart, { kind: "tool" }> = {
         kind: "tool",
@@ -162,6 +189,7 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
     }
     if (message.role === "assistant") {
       pushAssistantMessage(message, false);
+      if (message.stopReason !== "toolUse") flushAssistant();
     }
   }
 
@@ -328,11 +356,23 @@ function parseConnectResult(resultText: string | undefined) {
   return parsed;
 }
 
-function toolResultsByCallId(state: AgentSessionState): Map<string, string> {
-  const map = new Map<string, string>();
+function toolResultsByCallId(state: AgentSessionState) {
+  const map = new Map<
+    string,
+    { text: string; connectionRequests: ConnectionRequest[] }
+  >();
   for (const message of state.messages) {
     if (message.role !== "toolResult") continue;
-    map.set(message.toolCallId, toolResultText(message));
+    const connectionRequests = Value.Check(
+      connectionDetailsSchema,
+      message.details,
+    )
+      ? message.details.connectionRequests
+      : [];
+    map.set(message.toolCallId, {
+      text: toolResultText(message),
+      connectionRequests,
+    });
   }
   return map;
 }
