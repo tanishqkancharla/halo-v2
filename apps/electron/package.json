@@ -16,12 +16,12 @@
     "dev": "electron-forge start",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "format": "oxfmt src forge index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "format:check": "oxfmt --check src forge index.html package.json tsconfig.json tsconfig.main.json forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "format": "oxfmt src forge index.html package.json tsconfig.json forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "format:check": "oxfmt --check src forge index.html package.json tsconfig.json forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
     "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src forge forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
     "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src forge forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
     "test": "vitest run src/main src/shared src/renderer/agentSession forge",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.main.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json"
   },
   "dependencies": {
     "@executor-js/execution": "1.6.0",

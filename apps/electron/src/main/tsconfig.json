@@ -10,15 +10,15 @@
     "types": ["node", "vitest"]
   },
   "include": [
-    "src/main/**/*.ts",
-    "src/main/**/*.d.ts",
-    "src/shared/**/*.ts",
-    "forge/**/*.ts",
-    "forge.config.ts",
-    "vite.main.config.ts",
-    "vite.preload.config.ts",
-    "vite.renderer.config.ts",
-    "src/renderer/api/SystemApi.ts",
-    "src/renderer/evaluatePluginView.ts"
+    "**/*.ts",
+    "**/*.d.ts",
+    "../shared/**/*.ts",
+    "../../forge/**/*.ts",
+    "../../forge.config.ts",
+    "../../vite.main.config.ts",
+    "../../vite.preload.config.ts",
+    "../../vite.renderer.config.ts",
+    "../renderer/api/SystemApi.ts",
+    "../renderer/evaluatePluginView.ts"
   ]
 }
