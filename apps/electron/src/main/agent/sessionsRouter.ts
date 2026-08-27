@@ -1,21 +1,13 @@
 import { implement } from "@orpc/server";
 import { AsyncEventQueue } from "@halo/plugin-sdk/shared";
 import type { Logger } from "@repo/logger";
-import { agentSessionStateFromSession } from "../../shared/AgentSessionState.js";
 import { contract } from "../../shared/contract.js";
 import type { AgentSessionEvent } from "../../shared/rpc.js";
 import { orpcErrors } from "../orpcErrors.js";
-import {
-  AbortFailedError,
-  EmptyPromptError,
-  PromptFailedError,
-} from "./AgentSessionErrors.js";
-import type { Agent } from "./Agent.js";
-import type { AgentSessionRegistry } from "./AgentSessionRegistry.js";
+import type { SessionRegistry } from "./SessionRegistry.js";
 
 export type SessionsRouterContext = {
-  agent: Agent;
-  sessions: AgentSessionRegistry;
+  sessions: SessionRegistry;
   logger: Logger;
 };
 
@@ -24,15 +16,14 @@ const os = implement(contract.sessions).$context<SessionsRouterContext>();
 export const sessionsRouter = os.router({
   list: os.list.handler(async ({ context }) => {
     context.logger.info({ event: "listSessions" });
-    const sessions = await context.agent.listSessions();
+    const sessions = await context.sessions.list();
     if (sessions instanceof Error) return orpcErrors.badRequest(sessions);
     return sessions;
   }),
   create: os.create.handler(async ({ context }) => {
     context.logger.info({ event: "newAgentSession" });
-    const session = await context.agent.newAgentSession();
+    const session = await context.sessions.create();
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    context.sessions.add(session);
     return { sessionId: session.sessionId };
   }),
   open: os.open.handler(async ({ input, context }) => {
@@ -40,33 +31,19 @@ export const sessionsRouter = os.router({
       event: "openAgentSession",
       sessionId: input.sessionId,
     });
-    const live = context.sessions.get(input.sessionId);
-    if (live instanceof Error) {
-      const session = await context.agent.openAgentSession(input.sessionId);
-      if (session instanceof Error) return orpcErrors.badRequest(session);
-      context.sessions.add(session);
-      return {
-        sessionId: session.sessionId,
-        state: agentSessionStateFromSession({
-          messages: session.messages,
-          isStreaming: session.isStreaming,
-        }),
-      };
-    }
+    const session = await context.sessions.open(input.sessionId);
+    if (session instanceof Error) return orpcErrors.badRequest(session);
     return {
-      sessionId: live.sessionId,
-      state: agentSessionStateFromSession({
-        messages: live.messages,
-        isStreaming: live.isStreaming,
-      }),
+      sessionId: session.sessionId,
+      state: session.getState(),
     };
   }),
-  events: os.events.handler(({ input, context, signal }) => {
+  events: os.events.handler(async ({ input, context, signal }) => {
     context.logger.info({
       event: "agentSession.events",
       sessionId: input.sessionId,
     });
-    const session = context.sessions.get(input.sessionId);
+    const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
     const queue = new AsyncEventQueue<AgentSessionEvent>();
     const unsubscribe = session.subscribe((event) => {
@@ -86,19 +63,9 @@ export const sessionsRouter = os.router({
       sessionId: input.sessionId,
       textLength: input.text.length,
     });
-    const session = context.sessions.get(input.sessionId);
+    const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    if (input.text.trim().length === 0)
-      return orpcErrors.badRequest(new EmptyPromptError());
-    const prompted = await session
-      .prompt(input.text, { streamingBehavior: "steer" })
-      .catch(
-        (e) =>
-          new PromptFailedError({
-            reason: e instanceof Error ? e.message : String(e),
-            cause: e,
-          }),
-      );
+    const prompted = await session.prompt(input.text);
     if (prompted instanceof Error) return orpcErrors.badRequest(prompted);
   }),
   abort: os.abort.handler(async ({ input, context }) => {
@@ -106,23 +73,17 @@ export const sessionsRouter = os.router({
       event: "abort",
       sessionId: input.sessionId,
     });
-    const session = context.sessions.get(input.sessionId);
+    const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    const aborted = await session.abort().catch(
-      (e) =>
-        new AbortFailedError({
-          reason: e instanceof Error ? e.message : String(e),
-          cause: e,
-        }),
-    );
+    const aborted = await session.abort();
     if (aborted instanceof Error) return orpcErrors.badRequest(aborted);
   }),
-  close: os.close.handler(({ input, context }) => {
+  close: os.close.handler(async ({ input, context }) => {
     context.logger.info({
       event: "agentSession.close",
       sessionId: input.sessionId,
     });
-    const closed = context.sessions.close(input.sessionId);
+    const closed = await context.sessions.close(input.sessionId);
     if (closed instanceof Error) return orpcErrors.badRequest(closed);
   }),
 });

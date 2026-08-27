@@ -24,9 +24,8 @@ import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
-import { Agent } from "./agent/Agent.js";
 import { StaticAgentAuthority } from "./agent/AgentAuthority.js";
-import { AgentSessionRegistry } from "./agent/AgentSessionRegistry.js";
+import { SessionRegistry } from "./agent/SessionRegistry.js";
 import { createWorkspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
 import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
@@ -83,7 +82,7 @@ const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
 });
 const userService = new UserService(applicationConfig.dataDir);
 const integrationService = new IntegrationService(workspaceService);
-const agent = new Agent({
+const sessionRegistry = new SessionRegistry({
   workspace: workspaceService,
   user: userService,
   integrations: integrationService,
@@ -95,7 +94,6 @@ const agent = new Agent({
   ]),
 });
 const pluginService = new PluginService(workspaceService);
-const agentSessionRegistry = new AgentSessionRegistry();
 let mainWindow: BrowserWindow | undefined;
 let rpcHttp: HaloRpcHttp | undefined;
 let shutdownStarted = false;
@@ -114,9 +112,8 @@ app.whenReady().then(async () => {
     context: {
       workspace: workspaceService,
       integrations: integrationService,
-      agent,
       plugins: pluginService,
-      sessions: agentSessionRegistry,
+      sessions: sessionRegistry,
       getWindow: () => {
         if (mainWindow === undefined) {
           throw new Error("Halo main window is not open.");
@@ -153,7 +150,6 @@ app.on("will-quit", (event) => {
   if (shutdownStarted) return;
   event.preventDefault();
   shutdownStarted = true;
-  agentSessionRegistry.closeAll();
   const pending = rpcHttp;
   rpcHttp = undefined;
   void closeAppServices(pending).finally(() => {
@@ -163,14 +159,17 @@ app.on("will-quit", (event) => {
 });
 
 async function closeAppServices(http: HaloRpcHttp | undefined) {
+  const sessionsClosed = await sessionRegistry.shutdown();
+  if (sessionsClosed instanceof Error) {
+    logger.error({
+      event: "session-registry-close-failed",
+      error: sessionsClosed,
+    });
+  }
   if (http !== undefined) {
     await http.close().catch((error) => {
       logger.error({ event: "rpc-http-close-failed", error });
     });
-  }
-  const agentClosed = await agent.close();
-  if (agentClosed instanceof Error) {
-    logger.error({ event: "agent-close-failed", error: agentClosed });
   }
 }
 
@@ -238,9 +237,8 @@ function registerRpcBridge(): void {
     const context: HaloContext = {
       workspace: workspaceService,
       integrations: integrationService,
-      agent,
       plugins: pluginService,
-      sessions: agentSessionRegistry,
+      sessions: sessionRegistry,
       getWindow: () => {
         if (mainWindow === undefined) {
           throw new Error("Halo main window is not open.");
@@ -395,12 +393,11 @@ async function switchWorkspace(): Promise<void> {
     return;
   }
 
-  agentSessionRegistry.closeAll();
-  const agentClosed = await agent.close();
-  if (agentClosed instanceof Error) {
+  const sessionsClosed = await sessionRegistry.shutdown();
+  if (sessionsClosed instanceof Error) {
     logger.error({
-      event: "agent-workspace-close-failed",
-      error: agentClosed,
+      event: "session-registry-workspace-close-failed",
+      error: sessionsClosed,
     });
   }
   mainWindow.reload();

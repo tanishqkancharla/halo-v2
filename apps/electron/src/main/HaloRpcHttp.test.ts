@@ -6,9 +6,8 @@ import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
-import { Agent } from "./agent/Agent.js";
 import { StaticAgentAuthority } from "./agent/AgentAuthority.js";
-import { AgentSessionRegistry } from "./agent/AgentSessionRegistry.js";
+import { SessionRegistry } from "./agent/SessionRegistry.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { IntegrationService } from "./integrations/IntegrationService.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -48,7 +47,7 @@ const rpcHttpTest = test.extend<{
     const context: HaloContext = {
       workspace,
       integrations,
-      agent: new Agent({
+      sessions: new SessionRegistry({
         workspace,
         user: new UserService(userDataDir),
         integrations,
@@ -56,7 +55,6 @@ const rpcHttpTest = test.extend<{
         authority: new StaticAgentAuthority([]),
       }),
       plugins: new PluginService(workspace),
-      sessions: new AgentSessionRegistry(),
       getWindow: () => {
         throw new Error("Halo main window is not open.");
       },

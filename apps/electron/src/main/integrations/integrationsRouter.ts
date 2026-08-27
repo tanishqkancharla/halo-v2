@@ -2,8 +2,7 @@ import { shell } from "electron";
 import { implement } from "@orpc/server";
 import type { Logger } from "@repo/logger";
 import { contract } from "../../shared/contract.js";
-import type { Agent } from "../agent/Agent.js";
-import type { AgentSessionRegistry } from "../agent/AgentSessionRegistry.js";
+import type { SessionRegistry } from "../agent/SessionRegistry.js";
 import { orpcErrors } from "../orpcErrors.js";
 import {
   GoogleOAuthError,
@@ -17,13 +16,11 @@ import {
 import {
   integrationConnectedEventText,
   integrationDisconnectedEventText,
-  notifyIntegrationEvent,
 } from "./notifyIntegrationConnected.js";
 
 export type IntegrationsRouterContext = {
   integrations: IntegrationService;
-  agent: Agent;
-  sessions: AgentSessionRegistry;
+  sessions: SessionRegistry;
   logger: Logger;
 };
 
@@ -148,18 +145,6 @@ export const integrationsRouter = os.router({
   }),
 });
 
-async function resolveLiveSession(
-  context: IntegrationsRouterContext,
-  sessionId: string,
-) {
-  const live = context.sessions.get(sessionId);
-  if (!(live instanceof Error)) return live;
-  const opened = await context.agent.openAgentSession(sessionId);
-  if (opened instanceof Error) return opened;
-  context.sessions.add(opened);
-  return opened;
-}
-
 function notifySession(input: {
   context: IntegrationsRouterContext;
   sessionId: string;
@@ -167,19 +152,20 @@ function notifySession(input: {
   content: string;
   failed: string;
 }) {
-  void resolveLiveSession(input.context, input.sessionId).then((session) => {
+  void input.context.sessions.open(input.sessionId).then((session) => {
     if (session instanceof Error) {
       console.warn(input.failed, session.message);
       return;
     }
-    void notifyIntegrationEvent({
-      session,
-      customType: input.customType,
-      content: input.content,
-    }).then((notified) => {
-      if (notified instanceof Error) {
-        console.warn(input.failed, notified);
-      }
-    });
+    void session
+      .notify({
+        customType: input.customType,
+        content: input.content,
+      })
+      .then((notified) => {
+        if (notified instanceof Error) {
+          console.warn(input.failed, notified);
+        }
+      });
   });
 }
