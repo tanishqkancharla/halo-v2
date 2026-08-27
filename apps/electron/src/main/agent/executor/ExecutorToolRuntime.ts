@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { shell } from "electron";
 import { createExecutionEngine } from "@executor-js/execution/core";
 import { openApiPlugin } from "@executor-js/plugin-openapi/core";
 import {
@@ -11,14 +12,19 @@ import {
   setQuickJSModule,
 } from "@executor-js/runtime-quickjs";
 import {
+  AuthTemplateSlug,
+  ConnectionName,
   createExecutor,
   definePlugin,
   Effect,
+  type ElicitationContext,
   type Executor,
   type FirstPartyOAuthClientConfig,
   type IntegrationPreset,
   IntegrationSlug,
+  OAuthClientSlug,
   OAuthState,
+  Owner,
   StorageError,
   Subject,
   Tenant,
@@ -26,19 +32,22 @@ import {
   ToolAddress,
 } from "@executor-js/sdk/core";
 import quickJsVariant from "@jitl/quickjs-singlefile-cjs-release-sync";
-import { type TObject } from "@sinclair/typebox";
+import { type Static, type TObject, Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import {
   newQuickJSWASMModule,
   type QuickJSWASMModule,
 } from "quickjs-emscripten";
 import type { AgentAuthority } from "../AgentAuthority.js";
+import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
 import type {
   HaloTool,
   HaloToolContext,
   HaloToolPlugin,
 } from "../tools/HaloToolPlugin.js";
 import {
+  CodeExecutionError,
+  ConnectionRequiredError,
   type ToolRuntime,
   ToolRuntimeError,
   ToolRuntimeToolNotFoundError,
@@ -122,6 +131,18 @@ const googleOAuthClient: FirstPartyOAuthClientConfig = {
   ],
 };
 
+const oauthStartAddress = "executor.coreTools.oauth.start";
+const oauthStartInputSchema = Type.Object({
+  client: Type.String(),
+  clientOwner: Type.Union([Type.Literal("org"), Type.Literal("user")]),
+  owner: Type.Union([Type.Literal("org"), Type.Literal("user")]),
+  name: Type.String(),
+  integration: Type.String(),
+  template: Type.String(),
+  identityLabel: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  newConnection: Type.Optional(Type.Boolean()),
+});
+
 type HaloRuntimePlugins = readonly [
   ReturnType<typeof haloToolsPlugin>,
   typeof googleOpenApiPlugin,
@@ -190,12 +211,19 @@ class ExecutorToolRuntime implements ToolRuntime {
   ) {}
 
   async executeCode(input: { code: string; signal?: AbortSignal }) {
+    const connectionRequests: ConnectionRequest[] = [];
     const execution = await this.executionContext.run(
       { signal: input.signal },
       () =>
         Effect.runPromise(
           this.engine.execute(input.code, {
-            onElicitation: () => Effect.succeed({ action: "decline" }),
+            onElicitation: (context) => {
+              const connection = connectionInput(context);
+              if (connection !== undefined) {
+                connectionRequests.push(connection);
+              }
+              return Effect.succeed({ action: "decline" });
+            },
           }),
         ).catch(
           (cause) =>
@@ -203,10 +231,17 @@ class ExecutorToolRuntime implements ToolRuntime {
         ),
     );
     if (execution instanceof Error) return execution;
+    const cause =
+      execution.error === undefined ? undefined : new Error(execution.error);
+    if (connectionRequests.length > 0) {
+      return new ConnectionRequiredError({ connectionRequests, cause });
+    }
+    if (execution.error !== undefined) {
+      return new CodeExecutionError({ message: execution.error, cause });
+    }
     return {
       value: execution.result,
       logs: execution.logs === undefined ? [] : [...execution.logs],
-      error: execution.error,
     };
   }
 
@@ -278,6 +313,37 @@ class ExecutorToolRuntime implements ToolRuntime {
       (cause) => new ToolRuntimeError({ operation: "OAuth completion", cause }),
     );
     if (completed instanceof Error) return completed;
+  }
+
+  async startOAuth(input: ConnectionRequest) {
+    const started = await Effect.runPromise(
+      this.executor.oauth.start({
+        client: OAuthClientSlug.make(input.client),
+        clientOwner: Owner.make(input.clientOwner),
+        owner: Owner.make(input.owner),
+        name: ConnectionName.make(input.connectionName),
+        integration: IntegrationSlug.make(input.integration),
+        template: AuthTemplateSlug.make(input.template),
+        identityLabel: input.identityLabel,
+        newConnection: input.newConnection,
+      }),
+    ).catch(
+      (cause) => new ToolRuntimeError({ operation: "OAuth start", cause }),
+    );
+    if (started instanceof Error) return started;
+    if (started.status === "connected") return;
+
+    const opened = await shell
+      .openExternal(started.authorizationUrl)
+      .then(() => undefined)
+      .catch(
+        (cause) =>
+          new ToolRuntimeError({
+            operation: "opening OAuth authorization",
+            cause,
+          }),
+      );
+    if (opened instanceof Error) return opened;
   }
 
   async close() {
@@ -367,6 +433,24 @@ export async function createExecutorToolRuntime(input: {
     }),
   });
   return new ExecutorToolRuntime(executor, engine, executionContext);
+}
+
+function connectionInput(
+  context: ElicitationContext,
+): ConnectionRequest | undefined {
+  if (context.address !== oauthStartAddress) return undefined;
+  if (!Value.Check(oauthStartInputSchema, context.args)) return undefined;
+  const args: Static<typeof oauthStartInputSchema> = context.args;
+  return {
+    client: args.client,
+    clientOwner: args.clientOwner,
+    owner: args.owner,
+    connectionName: args.name,
+    integration: args.integration,
+    template: args.template,
+    identityLabel: args.identityLabel === null ? undefined : args.identityLabel,
+    newConnection: args.newConnection,
+  };
 }
 
 async function installGooglePresets(executor: Executor<HaloRuntimePlugins>) {

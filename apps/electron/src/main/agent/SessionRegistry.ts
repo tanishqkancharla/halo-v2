@@ -1,4 +1,5 @@
 import * as errore from "errore";
+import type { ConnectionRequest } from "../../shared/connectionRequests.js";
 import type { IntegrationService } from "../integrations/IntegrationService.js";
 import type { UserService } from "../UserService.js";
 import type { WorkspaceService } from "../workspace/WorkspaceService.js";
@@ -39,6 +40,10 @@ export class SessionRegistry {
 
   completeOAuth(input: { state: string; code: string }) {
     return this.toolRuntime.completeOAuth(input);
+  }
+
+  startConnection(request: ConnectionRequest) {
+    return this.toolRuntime.startConnection(request);
   }
 
   list() {

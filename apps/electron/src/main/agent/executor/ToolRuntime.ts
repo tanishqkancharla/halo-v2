@@ -1,4 +1,5 @@
 import * as errore from "errore";
+import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
 
 export class ToolRuntimeError extends errore.createTaggedError({
   name: "ToolRuntimeError",
@@ -10,10 +11,29 @@ export class ToolRuntimeToolNotFoundError extends errore.createTaggedError({
   message: 'Tool "$path" was not found',
 }) {}
 
+export class CodeExecutionError extends errore.createTaggedError({
+  name: "CodeExecutionError",
+}) {}
+
+export class ConnectionRequiredError extends errore.createTaggedError({
+  name: "ConnectionRequiredError",
+  message:
+    "A connection is required before this code can run. A connection card has been shown to the user. Tell them to use it to connect their account. You will be notified once they've finished connecting.",
+}) {
+  readonly connectionRequests: ConnectionRequest[];
+
+  constructor(input: {
+    connectionRequests: ConnectionRequest[];
+    cause: Error | undefined;
+  }) {
+    super({ cause: input.cause });
+    this.connectionRequests = input.connectionRequests;
+  }
+}
+
 type ToolRuntimeCodeResult = {
   value: unknown;
   logs: string[];
-  error: string | undefined;
 };
 
 type ToolRuntimeSearchItem = {
@@ -40,7 +60,12 @@ export interface ToolRuntime {
   executeCode(input: {
     code: string;
     signal?: AbortSignal;
-  }): Promise<ToolRuntimeCodeResult | ToolRuntimeError>;
+  }): Promise<
+    | ToolRuntimeCodeResult
+    | CodeExecutionError
+    | ConnectionRequiredError
+    | ToolRuntimeError
+  >;
   invokeTool(input: {
     path: string;
     args: unknown;
@@ -59,5 +84,6 @@ export interface ToolRuntime {
     state: string;
     code: string;
   }): Promise<void | ToolRuntimeError>;
+  startOAuth(input: ConnectionRequest): Promise<void | ToolRuntimeError>;
   close(): Promise<void | ToolRuntimeError>;
 }

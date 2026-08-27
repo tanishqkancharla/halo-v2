@@ -1,12 +1,9 @@
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import * as errore from "errore";
-import type { ToolRuntime } from "./executor/ToolRuntime.js";
-
-export class ExecToolError extends errore.createTaggedError({
-  name: "ExecToolError",
-  message: "exec failed",
-}) {}
+import {
+  ConnectionRequiredError,
+  type ToolRuntime,
+} from "./executor/ToolRuntime.js";
 
 const execParameters = Type.Object({
   js: Type.String({ description: "JavaScript to run. tools is in scope." }),
@@ -50,6 +47,15 @@ export function createExecTool(runtime: ToolRuntime): ToolDefinition {
       // SAFETY: execParameters schema guarantees params has a string `js` property.
       const { js } = params as { js: string };
       const result = await runWithToolRuntime(runtime, js, signal);
+      if (result instanceof ConnectionRequiredError) {
+        return {
+          content: [{ type: "text" as const, text: result.message }],
+          details: {
+            error: result.message,
+            connectionRequests: result.connectionRequests,
+          },
+        };
+      }
       if (result instanceof Error) {
         return {
           content: [{ type: "text" as const, text: result.message }],
@@ -63,7 +69,10 @@ export function createExecTool(runtime: ToolRuntime): ToolDefinition {
             text: formatExecResult(result.value, result.logs),
           },
         ],
-        details: { value: result.value, logs: result.logs },
+        details: {
+          value: result.value,
+          logs: result.logs,
+        },
       };
     },
   };
@@ -76,11 +85,11 @@ async function runWithToolRuntime(
 ) {
   const execution = await runtime.executeCode({ code: js, signal });
   if (execution instanceof Error) return execution;
-  if (execution.error !== undefined) {
-    return new ExecToolError({ cause: new Error(execution.error) });
-  }
   if (execution.value === undefined) {
-    return { value: undefined, logs: execution.logs };
+    return {
+      value: undefined,
+      logs: execution.logs,
+    };
   }
   return {
     value: JSON.stringify(execution.value, undefined, 2),

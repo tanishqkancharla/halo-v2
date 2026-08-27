@@ -1,5 +1,6 @@
 import type { AgentAuthority } from "../AgentAuthority.js";
 import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
+import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
 import { createExecutorToolRuntime } from "./ExecutorToolRuntime.js";
 import { type ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
@@ -58,6 +59,18 @@ export class ToolRuntimeService {
     this.userId = undefined;
     if (runtime === undefined) return;
     return runtime.close();
+  }
+
+  async startConnection(request: ConnectionRequest) {
+    if (this.runtime === undefined) {
+      return new ToolRuntimeError({
+        operation: "OAuth start",
+        cause: new Error("Executor runtime is not open"),
+      });
+    }
+
+    const started = await this.runtime.startOAuth(request);
+    if (started instanceof Error) return started;
   }
 
   async completeOAuth(input: { state: string; code: string }) {
