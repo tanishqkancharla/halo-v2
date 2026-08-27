@@ -77,6 +77,9 @@ describe("listenHaloRpcHttp", () => {
       expect(file.host).toBe("127.0.0.1");
       expect(file.port).toBe(rpc.port);
       expect(file.token).toBe(rpc.token);
+      expect(rpc.oauthRedirectUri).toBe(
+        `http://127.0.0.1:${rpc.port}/oauth/callback`,
+      );
 
       const client = createHaloRpcClient<HaloClient>(file);
       const workspace = await client.workspace.get();
@@ -99,6 +102,21 @@ describe("listenHaloRpcHttp", () => {
     );
     expect(response.status).toBe(401);
   });
+
+  rpcHttpTest(
+    "accepts OAuth callbacks without the RPC token",
+    async ({ rpc }) => {
+      const missing = await fetch(rpc.oauthRedirectUri);
+      expect(missing.status).toBe(400);
+      expect(await missing.text()).toBe("Missing OAuth callback parameters.");
+
+      const unknown = await fetch(`${rpc.oauthRedirectUri}?state=x&code=y`);
+      expect(unknown.status).toBe(400);
+      expect(await unknown.text()).toBe(
+        "Authorization could not be completed.",
+      );
+    },
+  );
 
   rpcHttpTest("unlinks rpc.json on close", async ({ rpc, userDataDir }) => {
     const path = rpcFilePath(userDataDir);

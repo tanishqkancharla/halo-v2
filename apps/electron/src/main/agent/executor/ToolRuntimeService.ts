@@ -2,12 +2,17 @@ import type { AgentAuthority } from "../AgentAuthority.js";
 import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
 import { createExecutorToolRuntime } from "./ExecutorToolRuntime.js";
-import type { ToolRuntime } from "./ToolRuntime.js";
+import { type ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
 
 export class ToolRuntimeService {
   private runtime: ToolRuntime | undefined;
   private workspaceRoot: string | undefined;
   private userId: string | undefined;
+  private oauthRedirectUri: string | undefined;
+
+  setOAuthRedirectUri(oauthRedirectUri: string) {
+    this.oauthRedirectUri = oauthRedirectUri;
+  }
 
   async get(input: {
     workspaceRoot: string;
@@ -37,6 +42,7 @@ export class ToolRuntimeService {
       credentialVault,
       toolPlugins: input.toolPlugins,
       authority: input.authority,
+      oauthRedirectUri: this.oauthRedirectUri,
     });
     if (runtime instanceof Error) return runtime;
     this.runtime = runtime;
@@ -52,5 +58,15 @@ export class ToolRuntimeService {
     this.userId = undefined;
     if (runtime === undefined) return;
     return runtime.close();
+  }
+
+  async completeOAuth(input: { state: string; code: string }) {
+    if (this.runtime === undefined) {
+      return new ToolRuntimeError({
+        operation: "OAuth completion",
+        cause: new Error("Executor runtime is not open"),
+      });
+    }
+    return this.runtime.completeOAuth(input);
   }
 }

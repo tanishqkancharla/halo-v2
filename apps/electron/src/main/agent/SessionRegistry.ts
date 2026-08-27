@@ -33,6 +33,14 @@ export class SessionRegistry {
 
   constructor(private readonly options: SessionRegistryOptions) {}
 
+  setOAuthRedirectUri(oauthRedirectUri: string) {
+    this.toolRuntime.setOAuthRedirectUri(oauthRedirectUri);
+  }
+
+  completeOAuth(input: { state: string; code: string }) {
+    return this.toolRuntime.completeOAuth(input);
+  }
+
   list() {
     return HaloAgentSession.list(this.sessionOptions());
   }

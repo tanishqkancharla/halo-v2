@@ -55,5 +55,9 @@ export interface ToolRuntime {
   }): Promise<
     ToolRuntimeToolDescription | ToolRuntimeError | ToolRuntimeToolNotFoundError
   >;
+  completeOAuth(input: {
+    state: string;
+    code: string;
+  }): Promise<void | ToolRuntimeError>;
   close(): Promise<void | ToolRuntimeError>;
 }

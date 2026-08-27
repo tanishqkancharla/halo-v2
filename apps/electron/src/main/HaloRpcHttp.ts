@@ -16,6 +16,7 @@ export type HaloRpcHttp = {
   host: "127.0.0.1";
   port: number;
   token: string;
+  oauthRedirectUri: string;
   close: () => Promise<void>;
 };
 
@@ -69,6 +70,7 @@ export async function listenHaloRpcHttp(args: {
     host: file.host,
     port: file.port,
     token,
+    oauthRedirectUri: `http://${file.host}:${file.port}/oauth/callback`,
     close: async () => {
       if (closed) return;
       closed = true;
@@ -94,6 +96,20 @@ async function handleRpcRequest(args: {
   context: HaloContext;
   token: string;
 }) {
+  const url = new URL(
+    args.req.url === undefined ? "/" : args.req.url,
+    "http://127.0.0.1",
+  );
+  if (url.pathname === "/oauth/callback") {
+    await handleOAuthCallback({
+      url,
+      req: args.req,
+      res: args.res,
+      context: args.context,
+    });
+    return;
+  }
+
   if (args.req.headers.authorization !== `Bearer ${args.token}`) {
     args.res.statusCode = 401;
     args.res.end();
@@ -117,6 +133,50 @@ async function handleRpcRequest(args: {
   if (handled.matched) return;
   args.res.statusCode = 404;
   args.res.end();
+}
+
+async function handleOAuthCallback(args: {
+  url: URL;
+  req: IncomingMessage;
+  res: ServerResponse;
+  context: HaloContext;
+}) {
+  if (args.req.method !== "GET") {
+    args.res.statusCode = 405;
+    args.res.end();
+    return;
+  }
+
+  const providerError = args.url.searchParams.get("error");
+  if (providerError !== null) {
+    args.res.statusCode = 400;
+    args.res.end("Authorization was not completed.");
+    return;
+  }
+
+  const state = args.url.searchParams.get("state");
+  const code = args.url.searchParams.get("code");
+  if (state === null || code === null) {
+    args.res.statusCode = 400;
+    args.res.end("Missing OAuth callback parameters.");
+    return;
+  }
+
+  const completed = await args.context.sessions.completeOAuth({ state, code });
+  if (completed instanceof Error) {
+    args.context.logger.warn({
+      event: "oauth-callback-failed",
+      error: completed,
+    });
+    args.res.statusCode = 400;
+    args.res.end("Authorization could not be completed.");
+    return;
+  }
+
+  args.res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  args.res.end(
+    '<!doctype html><html><head><meta charset="utf-8"><title>Halo</title></head><body>You can close this tab.</body></html>',
+  );
 }
 
 function listenPort(address: string | AddressInfo | null) {

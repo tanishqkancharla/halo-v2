@@ -128,6 +128,7 @@ app.whenReady().then(async () => {
     logger.error({ event: "rpc-http-listen-failed", error: listening });
   } else {
     rpcHttp = listening;
+    sessionRegistry.setOAuthRedirectUri(listening.oauthRedirectUri);
   }
   installMenu();
   openMainWindow();

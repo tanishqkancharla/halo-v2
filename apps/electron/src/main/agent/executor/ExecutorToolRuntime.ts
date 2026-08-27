@@ -3,6 +3,7 @@ import { createExecutionEngine } from "@executor-js/execution/core";
 import { openApiPlugin } from "@executor-js/plugin-openapi/core";
 import {
   googleCatalog,
+  googleCatalogOAuthScopesForPreset,
   googleDiscoveryAdapter,
 } from "@executor-js/plugin-openapi/providers/google";
 import {
@@ -14,8 +15,10 @@ import {
   definePlugin,
   Effect,
   type Executor,
+  type FirstPartyOAuthClientConfig,
   type IntegrationPreset,
   IntegrationSlug,
+  OAuthState,
   StorageError,
   Subject,
   Tenant,
@@ -98,6 +101,26 @@ const googleOpenApiPlugin = openApiPlugin({
   presets: googlePresets,
   specFormats: [googleDiscoveryAdapter],
 });
+
+const googleOAuthClient: FirstPartyOAuthClientConfig = {
+  name: "google",
+  authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenUrl: "https://oauth2.googleapis.com/token",
+  clientId:
+    "536106843012-1gteqlblqk8pkr1ov4dgd6m867otjrdo.apps.googleusercontent.com",
+  // Google desktop apps receive a secret, but Google does not treat it as confidential.
+  clientSecret: "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",
+  integrations: installableGooglePresets.map((preset) =>
+    IntegrationSlug.make(preset.defaultSlug),
+  ),
+  allowedScopes: [
+    ...new Set(
+      googlePresets.flatMap((preset) =>
+        googleCatalogOAuthScopesForPreset(preset.id),
+      ),
+    ),
+  ],
+};
 
 type HaloRuntimePlugins = readonly [
   ReturnType<typeof haloToolsPlugin>,
@@ -245,6 +268,18 @@ class ExecutorToolRuntime implements ToolRuntime {
     };
   }
 
+  async completeOAuth(input: { state: string; code: string }) {
+    const completed = await Effect.runPromise(
+      this.executor.oauth.complete({
+        state: OAuthState.make(input.state),
+        code: input.code,
+      }),
+    ).catch(
+      (cause) => new ToolRuntimeError({ operation: "OAuth completion", cause }),
+    );
+    if (completed instanceof Error) return completed;
+  }
+
   async close() {
     const closed = await Effect.runPromise(this.executor.close()).catch(
       (cause) => new ToolRuntimeError({ operation: "close", cause }),
@@ -259,6 +294,7 @@ export async function createExecutorToolRuntime(input: {
   credentialVault: CredentialVault;
   toolPlugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
+  oauthRedirectUri: string | undefined;
 }): Promise<ToolRuntime | ToolRuntimeError> {
   if (quickJsModulePromise === undefined) {
     quickJsModulePromise = newQuickJSWASMModule(quickJsVariant);
@@ -285,6 +321,8 @@ export async function createExecutorToolRuntime(input: {
       ] as const,
       providers: [createExecutorCredentialProvider(input.credentialVault)],
       coreTools: { includeProviders: true },
+      redirectUri: input.oauthRedirectUri,
+      firstPartyOAuthClients: [googleOAuthClient],
       db: ({ tables }) =>
         Effect.promise(() =>
           openExecutorDatabase({
