@@ -5,13 +5,13 @@ import {
 } from "../../shared/connectionRequests.js";
 import type { UserService } from "../UserService.js";
 import type { WorkspaceService } from "../workspace/WorkspaceService.js";
-import type { AgentAuthority } from "./AgentAuthority.js";
+import type { AgentAuthority } from "../agent/runtime/AgentAuthority.js";
+import { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import {
   HaloAgentSession,
   type HaloAgentSessionOptions,
-} from "./HaloAgentSession.js";
-import { ToolRuntimeService } from "./executor/ToolRuntimeService.js";
-import type { HaloToolPluginFactory } from "./tools/HaloToolPlugin.js";
+} from "../agent/HaloAgentSession.js";
+import type { HaloToolPluginFactory } from "../agent/tools/HaloToolPlugin.js";
 
 export class SessionNotOpenError extends errore.createTaggedError({
   name: "SessionNotOpenError",

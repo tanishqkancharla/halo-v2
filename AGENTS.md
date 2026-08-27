@@ -30,6 +30,7 @@ Bump `apps/electron/package.json` `version`, commit, then create and push a git 
 
 ## Working Style
 
+- Garden as you go. When the current work exposes small, clear friction—such as incorrect guidance, stale docs, misleading comments, dead code, or a confusing local API—fix it in the same change and verify the fix. If the issue is too large, risky, or separate to finish well in the current session, do not derail the main task; note it and discuss or scope it as follow-up work.
 - If straightforward code seems to need surprising guards, wrappers, assertions, or other ceremony, stop and research how the dependency's own code and reference projects handle the same case before keeping that shape.
 - When working on issues that seem like they would be common (e.g. issues hooking up popular libraries to each other), do research into the Github issues of those repos or research code of projects that use the same libraries. Here's some reference projects you can look at:
   - Craft Agents: https://github.com/craft-ai-agents/craft-agents-oss. Uses Electron, Pi (`@mariozechner/pi-coding-agent`), Vite, and esbuild.

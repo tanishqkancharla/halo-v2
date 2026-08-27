@@ -56,14 +56,6 @@ const bashArgsSchema = Type.Object({
   command: Type.String(),
 });
 
-const webSearchArgsSchema = Type.Object({
-  objective: Type.String(),
-});
-
-const webFetchArgsSchema = Type.Object({
-  urls: Type.Array(Type.String()),
-});
-
 /**
  * Project AgentSessionState into view rows: one user bubble per user message,
  * one assistant column per stretch of assistant activity (Pi TUI shape).
@@ -194,24 +186,6 @@ export function toolPartLabel(
       return { kind: "other", text: part.toolName };
     }
     return { kind: "shell", text: part.args.command };
-  }
-
-  if (part.toolName === "web_search") {
-    if (!Value.Check(webSearchArgsSchema, part.args)) {
-      return { kind: "other", text: part.toolName };
-    }
-    return { kind: "other", text: `Search ${part.args.objective}` };
-  }
-
-  if (part.toolName === "web_fetch") {
-    if (!Value.Check(webFetchArgsSchema, part.args)) {
-      return { kind: "other", text: part.toolName };
-    }
-    const url = part.args.urls[0];
-    if (url === undefined) {
-      return { kind: "other", text: part.toolName };
-    }
-    return { kind: "other", text: `Fetch ${url}` };
   }
 
   return { kind: "other", text: part.toolName };

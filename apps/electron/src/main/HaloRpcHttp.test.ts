@@ -6,11 +6,11 @@ import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
-import { StaticAgentAuthority } from "./agent/AgentAuthority.js";
-import { SessionRegistry } from "./agent/SessionRegistry.js";
+import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
 import type { HaloContext } from "./router.js";
+import { SessionRegistry } from "./sessions/SessionRegistry.js";
 import { UserService } from "./UserService.js";
 import { WorkspaceService } from "./workspace/WorkspaceService.js";
 

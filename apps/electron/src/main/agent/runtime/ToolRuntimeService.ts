@@ -1,11 +1,10 @@
 import { shell } from "electron";
 import * as errore from "errore";
-import type { AgentAuthority } from "../AgentAuthority.js";
-import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
+import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
+import type { AgentAuthority } from "./AgentAuthority.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
-import { createExecutorToolRuntime } from "./ExecutorToolRuntime.js";
-import { type ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
+import { ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
 
 export class ConnectionCancelledError extends errore.createTaggedError({
   name: "ConnectionCancelledError",
@@ -49,7 +48,7 @@ export class ToolRuntimeService {
     });
     if (credentialVault instanceof Error) return credentialVault;
 
-    const runtime = await createExecutorToolRuntime({
+    const runtime = await ToolRuntime.create({
       workspaceRoot: input.workspaceRoot,
       userId: input.userId,
       credentialVault,

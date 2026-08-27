@@ -37,23 +37,47 @@ import {
   newQuickJSWASMModule,
   type QuickJSWASMModule,
 } from "quickjs-emscripten";
-import type { AgentAuthority } from "../AgentAuthority.js";
+import * as errore from "errore";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
 import type {
   HaloTool,
   HaloToolContext,
   HaloToolPlugin,
 } from "../tools/HaloToolPlugin.js";
-import {
-  CodeExecutionError,
-  ConnectionRequiredError,
-  type ToolRuntime,
-  ToolRuntimeError,
-  ToolRuntimeToolNotFoundError,
-} from "./ToolRuntime.js";
+import type { AgentAuthority } from "./AgentAuthority.js";
 import type { CredentialVault } from "./CredentialVault.js";
 import { createExecutorCredentialProvider } from "./ExecutorCredentialProvider.js";
 import { openExecutorDatabase } from "./ExecutorDatabase.js";
+
+export class ToolRuntimeError extends errore.createTaggedError({
+  name: "ToolRuntimeError",
+  message: "Tool runtime failed during $operation",
+}) {}
+
+export class ToolRuntimeToolNotFoundError extends errore.createTaggedError({
+  name: "ToolRuntimeToolNotFoundError",
+  message: 'Tool "$path" was not found',
+}) {}
+
+export class CodeExecutionError extends errore.createTaggedError({
+  name: "CodeExecutionError",
+}) {}
+
+export class ConnectionRequiredError extends errore.createTaggedError({
+  name: "ConnectionRequiredError",
+  message:
+    "A connection is required before this code can run. A connection card has been shown to the user. Tell them to use it to connect their account. You will be notified once they've finished connecting.",
+}) {
+  readonly connectionRequests: ConnectionRequest[];
+
+  constructor(input: {
+    connectionRequests: ConnectionRequest[];
+    cause: Error | undefined;
+  }) {
+    super({ cause: input.cause });
+    this.connectionRequests = input.connectionRequests;
+  }
+}
 
 type HaloToolsPluginOptions = {
   plugins: readonly HaloToolPlugin[];
@@ -165,8 +189,10 @@ function toExecutorTool(input: {
           requiredCapabilities: input.haloTool.requiredCapabilities,
         });
         if (authorization instanceof Error) return authorization;
+        const context = input.executionContext.getStore();
         return input.haloTool.execute(args, {
-          signal: input.executionContext.getStore()?.signal,
+          signal: context?.signal,
+          modelId: context?.modelId,
         });
       }).pipe(
         Effect.flatMap((result) =>
@@ -202,17 +228,35 @@ function toExecutorSchema(schema: TObject) {
   };
 }
 
-class ExecutorToolRuntime implements ToolRuntime {
+type ToolRuntimeOptions = {
+  workspaceRoot: string;
+  userId: string;
+  credentialVault: CredentialVault;
+  toolPlugins: readonly HaloToolPlugin[];
+  authority: AgentAuthority;
+  oauthRedirectUri: string | undefined;
+};
+
+export class ToolRuntime {
+  static create(input: ToolRuntimeOptions) {
+    return createToolRuntime(input);
+  }
+
   constructor(
     private readonly executor: Executor<HaloRuntimePlugins>,
     private readonly engine: ReturnType<typeof createExecutionEngine>,
     private readonly executionContext: AsyncLocalStorage<HaloToolContext>,
+    private readonly toolPlugins: readonly HaloToolPlugin[],
   ) {}
 
-  async executeCode(input: { code: string; signal?: AbortSignal }) {
+  async executeCode(input: {
+    code: string;
+    signal?: AbortSignal;
+    modelId?: string;
+  }) {
     const connectionRequests: ConnectionRequest[] = [];
     const execution = await this.executionContext.run(
-      { signal: input.signal },
+      { signal: input.signal, modelId: input.modelId },
       () =>
         Effect.runPromise(
           this.engine.execute(input.code, {
@@ -248,9 +292,10 @@ class ExecutorToolRuntime implements ToolRuntime {
     path: string;
     args: unknown;
     signal?: AbortSignal;
+    modelId?: string;
   }) {
     const invocation = await this.executionContext.run(
-      { signal: input.signal },
+      { signal: input.signal, modelId: input.modelId },
       () =>
         Effect.runPromise(
           this.executor.execute(ToolAddress.make(input.path), input.args),
@@ -349,21 +394,30 @@ class ExecutorToolRuntime implements ToolRuntime {
   }
 
   async close() {
-    const closed = await Effect.runPromise(this.executor.close()).catch(
-      (cause) => new ToolRuntimeError({ operation: "close", cause }),
-    );
-    if (closed instanceof Error) return closed;
+    const [executorClosed, pluginResults] = await Promise.all([
+      Effect.runPromise(this.executor.close()).catch(
+        (cause) => new ToolRuntimeError({ operation: "close", cause }),
+      ),
+      Promise.all(
+        this.toolPlugins.map((plugin) =>
+          plugin.close === undefined ? undefined : plugin.close(),
+        ),
+      ),
+    ]);
+    if (executorClosed instanceof Error) return executorClosed;
+    const pluginError = pluginResults.find((result) => result instanceof Error);
+    if (pluginError instanceof Error) {
+      return new ToolRuntimeError({
+        operation: "tool shutdown",
+        cause: pluginError,
+      });
+    }
   }
 }
 
-export async function createExecutorToolRuntime(input: {
-  workspaceRoot: string;
-  userId: string;
-  credentialVault: CredentialVault;
-  toolPlugins: readonly HaloToolPlugin[];
-  authority: AgentAuthority;
-  oauthRedirectUri: string | undefined;
-}): Promise<ToolRuntime | ToolRuntimeError> {
+async function createToolRuntime(
+  input: ToolRuntimeOptions,
+): Promise<ToolRuntime | ToolRuntimeError> {
   if (quickJsModulePromise === undefined) {
     quickJsModulePromise = newQuickJSWASMModule(quickJsVariant);
   }
@@ -434,7 +488,7 @@ export async function createExecutorToolRuntime(input: {
       maxStackSizeBytes: 1024 * 1024,
     }),
   });
-  return new ExecutorToolRuntime(executor, engine, executionContext);
+  return new ToolRuntime(executor, engine, executionContext, input.toolPlugins);
 }
 
 function connectionInput(

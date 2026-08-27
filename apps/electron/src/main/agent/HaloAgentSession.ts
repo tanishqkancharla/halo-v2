@@ -15,17 +15,26 @@ import type {
   WorkspaceLayout,
   WorkspaceService,
 } from "../workspace/WorkspaceService.js";
-import type { AgentAuthority } from "./AgentAuthority.js";
-import {
-  AbortFailedError,
-  EmptyPromptError,
-  PromptFailedError,
-} from "./AgentSessionErrors.js";
-import { createExecTool } from "./execTool.js";
-import type { ToolRuntimeService } from "./executor/ToolRuntimeService.js";
-import { createParallelSearchTools } from "./ParallelSearchTools.js";
+import type { AgentAuthority } from "./runtime/AgentAuthority.js";
+import type { ToolRuntimeService } from "./runtime/ToolRuntimeService.js";
+import { createExecTool } from "./tools/execTool.js";
 import type { HaloToolPluginFactory } from "./tools/HaloToolPlugin.js";
 import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
+
+export class EmptyPromptError extends errore.createTaggedError({
+  name: "EmptyPromptError",
+  message: "Enter a prompt first.",
+}) {}
+
+export class PromptFailedError extends errore.createTaggedError({
+  name: "PromptFailedError",
+  message: "$reason",
+}) {}
+
+export class AbortFailedError extends errore.createTaggedError({
+  name: "AbortFailedError",
+  message: "$reason",
+}) {}
 
 export class SessionNotFoundError extends errore.createTaggedError({
   name: "SessionNotFoundError",
@@ -128,7 +137,7 @@ export class HaloAgentSession {
     const user = await options.user.getUser();
     if (user instanceof Error) return user;
     const toolPlugins = options.toolPluginFactories.map((createPlugin) =>
-      createPlugin({ workspaceRoot: layout.root }),
+      createPlugin({ workspaceRoot: layout.root, userId: user.id }),
     );
     const runtime = await options.toolRuntime.get({
       workspaceRoot: layout.root,
@@ -151,10 +160,7 @@ export class HaloAgentSession {
       agentDir: layout.agentDir,
       sessionManager: manager,
       tools: [],
-      customTools: [
-        createExecTool(runtime),
-        ...createParallelSearchTools(user.id),
-      ],
+      customTools: [createExecTool(runtime)],
       resourceLoader,
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;

@@ -97,7 +97,7 @@ Add `{workspace}/.halo/plugins/<id>/` packages. Each plugin has `package.json` w
 - [`apps/electron/src/main/plugins/compilePluginView.ts`](../apps/electron/src/main/plugins/compilePluginView.ts) — esbuild the view to CJS.
 - [`apps/electron/src/main/test/fixtures.ts`](../apps/electron/src/main/test/fixtures.ts) — Shared e2e helpers, including `src`.
 - [`apps/electron/src/main/workspace-service.ts`](../apps/electron/src/main/workspace-service.ts) — Today's `JSON.parse` + field checks. Do not change yet; the new helper is what new parsers call.
-- [`apps/electron/src/main/ParallelSearchTools.ts`](../apps/electron/src/main/ParallelSearchTools.ts) — Existing TypeBox `Type.Object` usage to match.
+- [`apps/electron/src/main/agent/tools/web/ParallelSearchPlugin.ts`](../apps/electron/src/main/agent/tools/web/ParallelSearchPlugin.ts) — Existing TypeBox `Type.Object` usage to match.
 - [`packages/logger/package.json`](../packages/logger/package.json) — Package export layout to copy for `@halo/plugin-sdk`.
 - [`@sinclair/typebox` Value](https://github.com/sinclairzx81/typebox) — `Value.Check` / `Value.Errors` (no throw). Wrap `Value.Parse` with `errore.try` if used.
 - [Cap'n Web](https://github.com/cloudflare/capnweb) — `RpcTarget` nested on HaloApi, same port as sessions.

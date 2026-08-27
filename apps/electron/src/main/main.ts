@@ -24,14 +24,15 @@ import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
-import { StaticAgentAuthority } from "./agent/AgentAuthority.js";
-import { SessionRegistry } from "./agent/SessionRegistry.js";
+import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { createWorkspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
 import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
+import { createParallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
+import { SessionRegistry } from "./sessions/SessionRegistry.js";
 import { UserService } from "./UserService.js";
 import { resolveHaloCliEntry } from "./workspace/installHaloCli.js";
 import { WorkspaceService } from "./workspace/WorkspaceService.js";
@@ -83,11 +84,16 @@ const userService = new UserService(applicationConfig.dataDir);
 const sessionRegistry = new SessionRegistry({
   workspace: workspaceService,
   user: userService,
-  toolPluginFactories: [createWorkspaceFilesPlugin, createWorkspaceBashPlugin],
+  toolPluginFactories: [
+    createWorkspaceFilesPlugin,
+    createWorkspaceBashPlugin,
+    createParallelSearchPlugin,
+  ],
   authority: new StaticAgentAuthority([
     "workspace.files.read",
     "workspace.files.write",
     "workspace.shell.execute",
+    "network.web.search",
   ]),
 });
 const pluginService = new PluginService(workspaceService);

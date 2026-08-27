@@ -6,7 +6,7 @@ import {
 import {
   sessionsRouter,
   type SessionsRouterContext,
-} from "./agent/sessionsRouter.js";
+} from "./sessions/sessionsRouter.js";
 import {
   workspaceRouter,
   type WorkspaceRouterContext,

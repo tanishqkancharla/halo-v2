@@ -3,7 +3,7 @@ import { Type } from "@sinclair/typebox";
 import {
   ConnectionRequiredError,
   type ToolRuntime,
-} from "./executor/ToolRuntime.js";
+} from "../runtime/ToolRuntime.js";
 
 const execParameters = Type.Object({
   js: Type.String({ description: "JavaScript to run. tools is in scope." }),
@@ -26,12 +26,13 @@ export function createExecTool(runtime: ToolRuntime): ToolDefinition {
     name: "exec",
     label: "Exec",
     description:
-      "Run JavaScript through Executor with workspace file and shell tools.",
-    promptSnippet: "Run JavaScript that calls tools.files.* and tools.bash.run",
+      "Run JavaScript with workspace, shell, web, and integration tools.",
+    promptSnippet:
+      "Run JavaScript that calls tools.files.*, tools.bash.run, tools.web.*, and discovered integrations",
     promptGuidelines: [
       "Use exec for workspace file and shell work. Pass JavaScript in js; tools and console are in scope.",
-      "Every tool takes one object argument and returns `{ ok: true, data }` or `{ ok: false, error }`. Check `ok` before using `data`.",
-      "Use `tools.search({ query, limit? })` and `tools.describe.tool({ path })` to discover unfamiliar tools. Invoke a discovered path with `tools[path](args)`.",
+      "Runtime tools take one object argument and return `{ ok: true, data }` or `{ ok: false, error }`. Check `ok` before using `data`.",
+      "Use `tools.search({ query, limit? })` and `tools.describe.tool({ path })` to discover unfamiliar tools. These discovery helpers return their data directly, without an `ok` wrapper. Invoke a discovered path with `tools[path](args)`.",
       "Use `tools.executor.coreTools.integrations.list({})` to list available integrations and `tools.executor.coreTools.connections.list({ integration?, owner?, verbose? })` to list connected accounts.",
       "`tools.files.read({ path, offset?, limit? })` reads UTF-8 text.",
       "`tools.files.edit({ path, oldText, newText, replaceAll? })` replaces exact text.",
@@ -39,14 +40,21 @@ export function createExecTool(runtime: ToolRuntime): ToolDefinition {
       "`tools.files.write({ path, content })` writes UTF-8 text.",
       "`tools.files.delete({ path })` deletes a file.",
       "`tools.bash.run({ command, timeoutMs? })` runs Bash in the workspace and returns `{ stdout, stderr, code }`.",
+      "`tools.web.search({ objective, search_queries })` searches the live web. Search excerpts are usually enough to answer.",
+      "`tools.web.fetch({ urls, objective?, search_queries?, full_content? })` extracts content from known URLs when search excerpts are insufficient.",
       'File example: `const file = await tools.files.read({ path: "src/app.ts" }); if (!file.ok) return file; return file.data.text;`',
       "Combine related operations in one exec call when practical. Return only the compact result needed to continue.",
     ],
     parameters: execParameters,
-    async execute(_id, params, signal) {
+    async execute(_id, params, signal, _onUpdate, context) {
       // SAFETY: execParameters schema guarantees params has a string `js` property.
       const { js } = params as { js: string };
-      const result = await runWithToolRuntime(runtime, js, signal);
+      const result = await runWithToolRuntime(
+        runtime,
+        js,
+        signal,
+        context.model?.id,
+      );
       if (result instanceof ConnectionRequiredError) {
         return {
           content: [{ type: "text" as const, text: result.message }],
@@ -82,8 +90,9 @@ async function runWithToolRuntime(
   runtime: ToolRuntime,
   js: string,
   signal: AbortSignal | undefined,
+  modelId: string | undefined,
 ) {
-  const execution = await runtime.executeCode({ code: js, signal });
+  const execution = await runtime.executeCode({ code: js, signal, modelId });
   if (execution instanceof Error) return execution;
   if (execution.value === undefined) {
     return {

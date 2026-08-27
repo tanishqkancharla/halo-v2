@@ -13,6 +13,7 @@ export type HaloToolExecution = {
 
 export type HaloToolContext = {
   signal: AbortSignal | undefined;
+  modelId: string | undefined;
 };
 
 export type HaloTool = {
@@ -32,10 +33,12 @@ export type HaloToolPlugin = {
   id: string;
   name: string;
   tools: readonly HaloTool[];
+  close?: () => Promise<void | Error>;
 };
 
 type HaloToolPluginContext = {
   workspaceRoot: string;
+  userId: string;
 };
 
 export type HaloToolPluginFactory = (
