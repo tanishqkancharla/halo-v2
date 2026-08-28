@@ -1,6 +1,7 @@
 // Packages left as require() in main (native addons, etc.). Forge Vite only
 // packs `/.vite`, so packaging must copy these and their runtime closure.
 export const mainProcessExternals = [
+  "@libsql/client",
   "@parcel/watcher",
   "esbuild",
   "jiti",
@@ -28,5 +29,7 @@ export function viteMainExternals(): Array<string | RegExp> {
     ...mainProcessExternals,
     // @parcel/watcher loads `@parcel/watcher-<platform>-<arch>` at runtime.
     /^@parcel\/watcher-/,
+    // libsql loads `@libsql/<os>-<arch>` at runtime.
+    /^@libsql\//,
   ];
 }
