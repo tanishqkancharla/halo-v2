@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "==> Activating pnpm 11.17.0"
+time corepack install --global pnpm@11.17.0
+
+echo "==> Installing workspace dependencies"
+time pnpm install --frozen-lockfile

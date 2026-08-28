@@ -53,5 +53,8 @@ packages/plugin-sdk/contract/
 .alchemy/
 infra/.alchemy/
 
+# Amp orb portal metadata
+.amp/portals/*
+
 # Riptide artifacts (cloud-synced)
 .humanlayer/tasks/
