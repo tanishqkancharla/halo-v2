@@ -25,6 +25,7 @@ import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
+import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
 import { createWorkspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
 import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
 import { createParallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
@@ -81,20 +82,26 @@ const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
   isDevelopment,
 });
 const userService = new UserService(applicationConfig.dataDir);
-const sessionRegistry = new SessionRegistry({
+const toolPluginFactories = [
+  createWorkspaceFilesPlugin,
+  createWorkspaceBashPlugin,
+  createParallelSearchPlugin,
+];
+const authority = new StaticAgentAuthority([
+  "workspace.files.read",
+  "workspace.files.write",
+  "workspace.shell.execute",
+  "network.web.search",
+]);
+const toolRuntime = new ToolRuntimeService({
   workspace: workspaceService,
   user: userService,
-  toolPluginFactories: [
-    createWorkspaceFilesPlugin,
-    createWorkspaceBashPlugin,
-    createParallelSearchPlugin,
-  ],
-  authority: new StaticAgentAuthority([
-    "workspace.files.read",
-    "workspace.files.write",
-    "workspace.shell.execute",
-    "network.web.search",
-  ]),
+  toolPluginFactories,
+  authority,
+});
+const sessionRegistry = new SessionRegistry({
+  workspace: workspaceService,
+  toolRuntime,
 });
 const pluginService = new PluginService(workspaceService);
 let mainWindow: BrowserWindow | undefined;
@@ -116,6 +123,7 @@ app.whenReady().then(async () => {
       workspace: workspaceService,
       plugins: pluginService,
       sessions: sessionRegistry,
+      toolRuntime,
       getWindow: () => {
         if (mainWindow === undefined) {
           throw new Error("Halo main window is not open.");
@@ -130,7 +138,7 @@ app.whenReady().then(async () => {
     logger.error({ event: "rpc-http-listen-failed", error: listening });
   } else {
     rpcHttp = listening;
-    sessionRegistry.setOAuthRedirectUri(listening.oauthRedirectUri);
+    toolRuntime.setOAuthRedirectUri(listening.oauthRedirectUri);
   }
   installMenu();
   openMainWindow();
@@ -168,6 +176,10 @@ async function closeAppServices(http: HaloRpcHttp | undefined) {
       event: "session-registry-close-failed",
       error: sessionsClosed,
     });
+  }
+  const runtimeClosed = await toolRuntime.close();
+  if (runtimeClosed instanceof Error) {
+    logger.error({ event: "tool-runtime-close-failed", error: runtimeClosed });
   }
   if (http !== undefined) {
     await http.close().catch((error) => {
@@ -241,6 +253,7 @@ function registerRpcBridge(): void {
       workspace: workspaceService,
       plugins: pluginService,
       sessions: sessionRegistry,
+      toolRuntime,
       getWindow: () => {
         if (mainWindow === undefined) {
           throw new Error("Halo main window is not open.");
@@ -400,6 +413,13 @@ async function switchWorkspace(): Promise<void> {
     logger.error({
       event: "session-registry-workspace-close-failed",
       error: sessionsClosed,
+    });
+  }
+  const runtimeClosed = await toolRuntime.close();
+  if (runtimeClosed instanceof Error) {
+    logger.error({
+      event: "tool-runtime-workspace-close-failed",
+      error: runtimeClosed,
     });
   }
   mainWindow.reload();

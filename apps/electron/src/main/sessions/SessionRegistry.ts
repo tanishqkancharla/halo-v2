@@ -1,29 +1,13 @@
 import * as errore from "errore";
 import {
-  connectionRequestLabel,
-  type ConnectionRequest,
-} from "../../shared/connectionRequests.js";
-import type { UserService } from "../UserService.js";
-import type { WorkspaceService } from "../workspace/WorkspaceService.js";
-import type { AgentAuthority } from "../agent/runtime/AgentAuthority.js";
-import { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
-import {
   HaloAgentSession,
   type HaloAgentSessionOptions,
 } from "../agent/HaloAgentSession.js";
-import type { HaloToolPluginFactory } from "../agent/tools/HaloToolPlugin.js";
 
 export class SessionNotOpenError extends errore.createTaggedError({
   name: "SessionNotOpenError",
   message: "Agent session '$sessionId' is not open.",
 }) {}
-
-type SessionRegistryOptions = {
-  workspace: WorkspaceService;
-  user: UserService;
-  toolPluginFactories: readonly HaloToolPluginFactory[];
-  authority: AgentAuthority;
-};
 
 export class SessionRegistry {
   private readonly sessions = new Map<string, HaloAgentSession>();
@@ -31,42 +15,14 @@ export class SessionRegistry {
     string,
     Promise<Error | HaloAgentSession>
   >();
-  private readonly toolRuntime = new ToolRuntimeService();
-
-  constructor(private readonly options: SessionRegistryOptions) {}
-
-  setOAuthRedirectUri(oauthRedirectUri: string) {
-    this.toolRuntime.setOAuthRedirectUri(oauthRedirectUri);
-  }
-
-  completeOAuth(input: { state: string; code: string }) {
-    return this.toolRuntime.completeOAuth(input);
-  }
-
-  cancelOAuth(state: string) {
-    return this.toolRuntime.cancelOAuth(state);
-  }
-
-  async startConnection(input: {
-    sessionId: string;
-    request: ConnectionRequest;
-  }) {
-    const connected = await this.toolRuntime.startConnection(input.request);
-    if (connected instanceof Error) return connected;
-    const session = await this.open(input.sessionId);
-    if (session instanceof Error) return session;
-    return session.notify({
-      customType: "halo.integration.connected",
-      content: `[System] The user connected ${connectionRequestLabel(input.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
-    });
-  }
+  constructor(private readonly options: HaloAgentSessionOptions) {}
 
   list() {
-    return HaloAgentSession.list(this.sessionOptions());
+    return HaloAgentSession.list(this.options);
   }
 
   async create() {
-    const session = await HaloAgentSession.create(this.sessionOptions());
+    const session = await HaloAgentSession.create(this.options);
     if (session instanceof Error) return session;
     this.register(session);
     return session;
@@ -103,14 +59,12 @@ export class SessionRegistry {
       sessions.map((session) => session.close()),
     );
     const sessionError = closed.find((result) => result instanceof Error);
-    const runtimeClosed = await this.toolRuntime.close();
     if (sessionError instanceof Error) return sessionError;
-    if (runtimeClosed instanceof Error) return runtimeClosed;
   }
 
   private async openAndRegister(sessionId: string) {
     const session = await HaloAgentSession.open({
-      ...this.sessionOptions(),
+      ...this.options,
       sessionId,
     });
     if (session instanceof Error) return session;
@@ -120,12 +74,5 @@ export class SessionRegistry {
 
   private register(session: HaloAgentSession) {
     this.sessions.set(session.sessionId, session);
-  }
-
-  private sessionOptions(): HaloAgentSessionOptions {
-    return {
-      ...this.options,
-      toolRuntime: this.toolRuntime,
-    };
   }
 }

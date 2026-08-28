@@ -10,15 +10,12 @@ import {
   type AgentSessionState,
 } from "../../shared/AgentSessionState.js";
 import type { AgentSessionEvent, SessionSummary } from "../../shared/rpc.js";
-import type { UserService } from "../UserService.js";
 import type {
   WorkspaceLayout,
   WorkspaceService,
 } from "../workspace/WorkspaceService.js";
-import type { AgentAuthority } from "./runtime/AgentAuthority.js";
 import type { ToolRuntimeService } from "./runtime/ToolRuntimeService.js";
 import { createExecTool } from "./tools/execTool.js";
-import type { HaloToolPluginFactory } from "./tools/HaloToolPlugin.js";
 import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
 
 export class EmptyPromptError extends errore.createTaggedError({
@@ -68,10 +65,7 @@ type SessionNotification = {
 
 export type HaloAgentSessionOptions = {
   workspace: WorkspaceService;
-  user: UserService;
   toolRuntime: ToolRuntimeService;
-  toolPluginFactories: readonly HaloToolPluginFactory[];
-  authority: AgentAuthority;
 };
 
 type SessionListener = (event: AgentSessionEvent) => void;
@@ -134,17 +128,7 @@ export class HaloAgentSession {
     layout: WorkspaceLayout,
     manager: SessionManager,
   ) {
-    const user = await options.user.getUser();
-    if (user instanceof Error) return user;
-    const toolPlugins = options.toolPluginFactories.map((createPlugin) =>
-      createPlugin({ workspaceRoot: layout.root, userId: user.id }),
-    );
-    const runtime = await options.toolRuntime.get({
-      workspaceRoot: layout.root,
-      userId: user.id,
-      toolPlugins,
-      authority: options.authority,
-    });
+    const runtime = await options.toolRuntime.get();
     if (runtime instanceof Error) return runtime;
     const runtimeDescription = await runtime.getAgentDescription();
     if (runtimeDescription instanceof Error) return runtimeDescription;

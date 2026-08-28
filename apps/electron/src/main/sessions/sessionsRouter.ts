@@ -2,12 +2,15 @@ import { implement } from "@orpc/server";
 import { AsyncEventQueue } from "@halo/plugin-sdk/shared";
 import type { Logger } from "@repo/logger";
 import { contract } from "../../shared/contract.js";
+import { connectionRequestLabel } from "../../shared/connectionRequests.js";
 import type { AgentSessionEvent } from "../../shared/rpc.js";
+import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { SessionRegistry } from "./SessionRegistry.js";
 
 export type SessionsRouterContext = {
   sessions: SessionRegistry;
+  toolRuntime: ToolRuntimeService;
   logger: Logger;
 };
 
@@ -74,8 +77,15 @@ export const sessionsRouter = os.router({
       sessionId: input.sessionId,
       integration: input.request.integration,
     });
-    const connected = await context.sessions.startConnection(input);
+    const connected = await context.toolRuntime.startConnection(input.request);
     if (connected instanceof Error) return orpcErrors.badRequest(connected);
+    const session = await context.sessions.open(input.sessionId);
+    if (session instanceof Error) return orpcErrors.badRequest(session);
+    const notified = await session.notify({
+      customType: "halo.integration.connected",
+      content: `[System] The user connected ${connectionRequestLabel(input.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
+    });
+    if (notified instanceof Error) return orpcErrors.badRequest(notified);
   }),
   abort: os.abort.handler(async ({ input, context }) => {
     context.logger.info({

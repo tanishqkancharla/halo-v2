@@ -1,7 +1,9 @@
 import { shell } from "electron";
 import * as errore from "errore";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
-import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
+import type { UserService } from "../../UserService.js";
+import type { WorkspaceService } from "../../workspace/WorkspaceService.js";
+import type { HaloToolPluginFactory } from "../tools/HaloToolPlugin.js";
 import type { AgentAuthority } from "./AgentAuthority.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
 import { ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
@@ -15,6 +17,13 @@ type PendingConnection = {
   complete: (result: Error | undefined) => void;
 };
 
+type ToolRuntimeServiceOptions = {
+  workspace: WorkspaceService;
+  user: UserService;
+  toolPluginFactories: readonly HaloToolPluginFactory[];
+  authority: AgentAuthority;
+};
+
 export class ToolRuntimeService {
   private runtime: ToolRuntime | undefined;
   private workspaceRoot: string | undefined;
@@ -22,20 +31,22 @@ export class ToolRuntimeService {
   private oauthRedirectUri: string | undefined;
   private readonly pendingConnections = new Map<string, PendingConnection>();
 
+  constructor(private readonly options: ToolRuntimeServiceOptions) {}
+
   setOAuthRedirectUri(oauthRedirectUri: string) {
     this.oauthRedirectUri = oauthRedirectUri;
   }
 
-  async get(input: {
-    workspaceRoot: string;
-    userId: string;
-    toolPlugins: readonly HaloToolPlugin[];
-    authority: AgentAuthority;
-  }) {
+  async get() {
+    const layout = this.options.workspace.getLayout();
+    if (layout instanceof Error) return layout;
+    const user = await this.options.user.getUser();
+    if (user instanceof Error) return user;
+
     if (
       this.runtime !== undefined &&
-      this.workspaceRoot === input.workspaceRoot &&
-      this.userId === input.userId
+      this.workspaceRoot === layout.root &&
+      this.userId === user.id
     ) {
       return this.runtime;
     }
@@ -44,22 +55,24 @@ export class ToolRuntimeService {
     if (closed instanceof Error) return closed;
 
     const credentialVault = createEncryptedFileCredentialVault({
-      workspaceRoot: input.workspaceRoot,
+      workspaceRoot: layout.root,
     });
     if (credentialVault instanceof Error) return credentialVault;
 
     const runtime = await ToolRuntime.create({
-      workspaceRoot: input.workspaceRoot,
-      userId: input.userId,
+      workspaceRoot: layout.root,
+      userId: user.id,
       credentialVault,
-      toolPlugins: input.toolPlugins,
-      authority: input.authority,
+      toolPlugins: this.options.toolPluginFactories.map((createPlugin) =>
+        createPlugin({ workspaceRoot: layout.root, userId: user.id }),
+      ),
+      authority: this.options.authority,
       oauthRedirectUri: this.oauthRedirectUri,
     });
     if (runtime instanceof Error) return runtime;
     this.runtime = runtime;
-    this.workspaceRoot = input.workspaceRoot;
-    this.userId = input.userId;
+    this.workspaceRoot = layout.root;
+    this.userId = user.id;
     return runtime;
   }
 

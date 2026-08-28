@@ -151,7 +151,7 @@ async function handleOAuthCallback(args: {
   if (providerError !== null) {
     const state = args.url.searchParams.get("state");
     if (state !== null) {
-      const cancelled = await args.context.sessions.cancelOAuth(state);
+      const cancelled = await args.context.toolRuntime.cancelOAuth(state);
       if (cancelled instanceof Error) {
         args.context.logger.warn({
           event: "oauth-cancel-failed",
@@ -172,7 +172,10 @@ async function handleOAuthCallback(args: {
     return;
   }
 
-  const completed = await args.context.sessions.completeOAuth({ state, code });
+  const completed = await args.context.toolRuntime.completeOAuth({
+    state,
+    code,
+  });
   if (completed instanceof Error) {
     args.context.logger.warn({
       event: "oauth-callback-failed",

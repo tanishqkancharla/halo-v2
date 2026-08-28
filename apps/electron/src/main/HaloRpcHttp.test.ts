@@ -7,6 +7,7 @@ import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
 import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
+import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
 import type { HaloContext } from "./router.js";
@@ -42,14 +43,18 @@ const rpcHttpTest = test.extend<{
       throw new Error("workspace restore returned undefined");
     }
 
+    const user = new UserService(userDataDir);
+    const toolRuntime = new ToolRuntimeService({
+      workspace,
+      user,
+      toolPluginFactories: [],
+      authority: new StaticAgentAuthority([]),
+    });
+    const sessions = new SessionRegistry({ workspace, toolRuntime });
     const context: HaloContext = {
       workspace,
-      sessions: new SessionRegistry({
-        workspace,
-        user: new UserService(userDataDir),
-        toolPluginFactories: [],
-        authority: new StaticAgentAuthority([]),
-      }),
+      sessions,
+      toolRuntime,
       plugins: new PluginService(workspace),
       getWindow: () => {
         throw new Error("Halo main window is not open.");
@@ -60,6 +65,10 @@ const rpcHttpTest = test.extend<{
     if (rpc instanceof Error) throw rpc;
     await use(rpc);
     await rpc.close();
+    const sessionsClosed = await sessions.shutdown();
+    if (sessionsClosed instanceof Error) throw sessionsClosed;
+    const runtimeClosed = await toolRuntime.close();
+    if (runtimeClosed instanceof Error) throw runtimeClosed;
   },
 });
 
