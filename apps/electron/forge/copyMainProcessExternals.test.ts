@@ -46,4 +46,28 @@ describe("copyMainProcessExternals", () => {
       expect(isCallable({ value: loaded.pluginOs.handler })).toBe(true);
     },
   );
+
+  copyTest(
+    "lets packaged main load @libsql/client native bindings",
+    async ({ buildPath }) => {
+      await copyMainProcessExternals(buildPath);
+      const mainPath = join(buildPath, ".vite", "build", "main.cjs");
+      await mkdir(join(buildPath, ".vite", "build"), { recursive: true });
+      await writeFile(mainPath, "");
+      const requireFromMain = createRequire(mainPath);
+      // SAFETY: createRequire is untyped; @libsql/client's CJS export is createClient.
+      const { createClient } = requireFromMain("@libsql/client") as {
+        createClient: (config: { url: string }) => {
+          execute: (sql: string) => Promise<{ rows: Array<{ n: number }> }>;
+          close: () => void;
+        };
+      };
+      const client = createClient({
+        url: `file:${join(buildPath, "metadata.sqlite")}`,
+      });
+      const result = await client.execute("SELECT 1 AS n");
+      expect(result.rows).toEqual([{ n: 1 }]);
+      client.close();
+    },
+  );
 });
