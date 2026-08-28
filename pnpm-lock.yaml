@@ -131,8 +131,8 @@ importers:
         specifier: 2.7.0
         version: 2.7.0
       maui:
-        specifier: github:tanishqkancharla/maui#v0.0.5
-        version: '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)(supports-color@8.1.1)'
+        specifier: npm:@tanishqkancharla/maui@0.0.8
+        version: '@tanishqkancharla/maui@0.0.8(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
       purse-styles:
         specifier: ^0.2.1
         version: 0.2.1(react@19.2.8)
@@ -350,8 +350,8 @@ importers:
         specifier: ^0.14.1
         version: 0.14.1
       maui:
-        specifier: github:tanishqkancharla/maui#v0.0.5
-        version: '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)'
+        specifier: npm:@tanishqkancharla/maui@0.0.8
+        version: '@tanishqkancharla/maui@0.0.8(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)'
       purse-styles:
         specifier: ^0.2.1
         version: 0.2.1(react@19.2.8)
@@ -393,8 +393,8 @@ importers:
         specifier: ^0.4.20
         version: 0.4.20
       maui:
-        specifier: github:tanishqkancharla/maui#v0.0.5
-        version: '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)(supports-color@8.1.1)'
+        specifier: npm:@tanishqkancharla/maui@0.0.8
+        version: '@tanishqkancharla/maui@0.0.8(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
       md4x:
         specifier: ^0.0.29
         version: 0.0.29
@@ -2883,9 +2883,11 @@ packages:
     resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/types, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
     version: 0.2.0
 
-  '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc':
-    resolution: {commit: e210358873e86609ae494defa67582fefd9877cc, repo: https://github.com/tanishqkancharla/maui.git, type: git}
-    version: 0.0.5
+  '@tanishqkancharla/maui@0.0.8':
+    resolution: {integrity: sha512-BjavRTCIM4D7PwQR5esX4/I5UTVLwJUIEVDu5aWiE+hn3i2HDGZr0Lns2PU1n94ROrd9n5PSsai67qpKt+Rw/Q==, tarball: https://npm.pkg.github.com/download/@tanishqkancharla/maui/0.0.8/596acfe04667dd661022c6b8512263e73ffe02ac}
+    peerDependencies:
+      react: ^19.0.0
+      react-dom: ^19.0.0
 
   '@tanstack/query-core@5.101.4':
     resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
@@ -10794,7 +10796,7 @@ snapshots:
     transitivePeerDependencies:
       - react
 
-  '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)(supports-color@8.1.1)':
+  '@tanishqkancharla/maui@0.0.8(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)':
     dependencies:
       '@codemirror/autocomplete': 6.20.3
       '@codemirror/commands': 6.11.0
@@ -10844,7 +10846,7 @@ snapshots:
       - codemirror
       - supports-color
 
-  '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)':
+  '@tanishqkancharla/maui@0.0.8(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@codemirror/autocomplete': 6.20.3
       '@codemirror/commands': 6.11.0
