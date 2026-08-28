@@ -61,3 +61,4 @@ minimumReleaseAgeExclude:
   - "@executor-js/execution@1.6.0"
   - "@executor-js/runtime-quickjs@1.6.0"
   - "@executor-js/sdk@1.6.0"
+  - '@tanishqkancharla/maui@0.0.8'
