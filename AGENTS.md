@@ -9,7 +9,19 @@ Halo is an open-source self-modifiable desktop app built with Electron and Pi. I
 
 ## Releasing
 
-Bump `apps/electron/package.json` `version`, commit, then create and push a git tag with that exact same version string (no `v` prefix). Example: version `0.1.1` → tag `0.1.1`. That tag push runs `Publish Electron`, which builds installers and uploads them to a non-draft GitHub Release. Packaged apps check for updates via `update.electronjs.org`.
+Bump `apps/electron/package.json` `version`, commit, then create and push a git tag with that exact same version string (no `v` prefix). Example: version `0.1.1` → tag `0.1.1`. That tag push runs `Publish Electron`, which builds installers and uploads them to a non-draft GitHub Release. The release is marked latest only after Linux, macOS, Windows, and plugin-sdk succeed. Packaged apps check for updates via `update.electronjs.org`.
+
+## Maui (GitHub Packages)
+
+Halo depends on `maui@npm:@tanishqkancharla/maui` from `https://npm.pkg.github.com`, not a Git URL. `.npmrc` scopes `@tanishqkancharla` to that registry. Do not commit a token. pnpm 11 ignores auth tokens in the project `.npmrc`, so set the token in the user npmrc:
+
+```sh
+export NODE_AUTH_TOKEN="$(gh auth token)"  # or a PAT with read:packages
+pnpm config set "//npm.pkg.github.com/:_authToken" '${NODE_AUTH_TOKEN}' --location user
+pnpm install
+```
+
+CI: `packages: read` plus `actions/setup-node` `registry-url` / `scope` for GitHub Packages. A workflow step writes the token with `pnpm config set` from `GITHUB_TOKEN`. That works only after the Halo repo is granted read access on the Maui package. Forks need their own token and grant.
 
 ## Code Style
 

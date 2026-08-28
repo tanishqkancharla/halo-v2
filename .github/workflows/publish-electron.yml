@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: write
+  packages: read
 
 jobs:
   prepare:
@@ -39,8 +40,7 @@ jobs:
         run: |
           gh release create "${{ steps.version.outputs.version }}" \
             --title "${{ steps.version.outputs.version }}" \
-            --generate-notes \
-            --latest
+            --generate-notes
 
   publish:
     name: Publish ${{ matrix.platform }}
@@ -69,6 +69,8 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: "@tanishqkancharla"
 
       - name: Install Linux packaging tools
         if: matrix.platform == 'linux'
@@ -96,15 +98,14 @@ jobs:
           fi
           echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Allow private Maui git dependency
+      - name: Authenticate GitHub Packages
         env:
-          MAUI_READ_TOKEN: ${{ secrets.MAUI_READ_TOKEN }}
-        shell: bash
-        run: |
-          git config --global url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
-          git config --global --add url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "git@github.com:"
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm config set "//npm.pkg.github.com/:_authToken" "${NODE_AUTH_TOKEN}"
 
       - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile
 
       - name: Publish to GitHub Releases
@@ -124,6 +125,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      packages: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -136,16 +138,17 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          registry-url: https://registry.npmjs.org
+          registry-url: https://npm.pkg.github.com
+          scope: "@tanishqkancharla"
 
-      - name: Allow private Maui git dependency
+      - name: Authenticate GitHub Packages
         env:
-          MAUI_READ_TOKEN: ${{ secrets.MAUI_READ_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
-          git config --global --add url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "git@github.com:"
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm config set "//npm.pkg.github.com/:_authToken" "${NODE_AUTH_TOKEN}"
 
       - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile
 
       - name: Pack contract
@@ -153,4 +156,17 @@ jobs:
 
       - name: Publish contract
         working-directory: packages/plugin-sdk/contract
-        run: npm publish --access public
+        run: npm publish --access public --registry https://registry.npmjs.org
+
+  finalize:
+    name: Mark release latest
+    needs: [prepare, publish, publish-plugin-sdk]
+    if: success()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Mark GitHub Release as latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ needs.prepare.outputs.version }}" --latest --repo "${{ github.repository }}"

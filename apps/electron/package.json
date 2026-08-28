@@ -54,7 +54,7 @@
     "errore": "^0.14.1",
     "esbuild": "^0.28.1",
     "jiti": "2.7.0",
-    "maui": "github:tanishqkancharla/maui#v0.0.5",
+    "maui": "npm:@tanishqkancharla/maui@0.0.8",
     "purse-styles": "^0.2.1",
     "quickjs-emscripten": "0.31.0",
     "react": "^19.2.8",

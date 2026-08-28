@@ -13,10 +13,24 @@ Halo is an Electron desktop app with a React renderer and Pi in the main process
 
 ## Local development
 
-Install dependencies, then start Halo from the repository root:
+Halo installs Maui from GitHub Packages as `maui@npm:@tanishqkancharla/maui`. The repository `.npmrc` points the `@tanishqkancharla` scope at `https://npm.pkg.github.com`. pnpm 11 will not expand `${NODE_AUTH_TOKEN}` from a committed project `.npmrc`, so put the token in your user npmrc (never commit it):
 
 ```sh
+export NODE_AUTH_TOKEN="$(gh auth token)"
+pnpm config set "//npm.pkg.github.com/:_authToken" '${NODE_AUTH_TOKEN}' --location user
 pnpm install
+pnpm dev
+```
+
+`NODE_AUTH_TOKEN` must be a GitHub token with `read:packages`. `gh auth token` works if that account can read `@tanishqkancharla/maui`. A classic PAT or fine-grained token with Packages read is the usual local choice.
+
+Forks and other GitHub Actions repositories do not inherit package access. Grant `tanishqkancharla/halo-v2` read access on the package (GitHub → the `@tanishqkancharla/maui` package → Package settings → Manage Actions access), then CI can use `GITHUB_TOKEN` with `packages: read`. A fork needs its own token and package grant.
+
+Installs must not compile Maui. The published tarball already contains `dist/`.
+
+Then start Halo from the repository root:
+
+```sh
 pnpm dev
 ```
 
@@ -94,7 +108,7 @@ Electron Forge writes packaged apps to `apps/electron/out`.
 
 ## Publishing
 
-`Publish Electron` (`.github/workflows/publish-electron.yml`) builds installers on a version tag and uploads them to a GitHub Release. The tag name must equal `apps/electron/package.json` `version` (for example version `0.1.1` → tag `0.1.1`).
+`Publish Electron` (`.github/workflows/publish-electron.yml`) builds installers on a version tag and uploads them to a GitHub Release. The tag name must equal `apps/electron/package.json` `version` (for example version `0.1.1` → tag `0.1.1`). The workflow creates the release first, then marks it latest only after Linux, macOS, Windows, and plugin-sdk all succeed.
 
 Packaged macOS and Windows builds check for updates through [update.electronjs.org](https://update.electronjs.org), which reads those GitHub Releases. macOS builds are signed and notarized in CI.
 
