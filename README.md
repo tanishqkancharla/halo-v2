@@ -24,7 +24,7 @@ pnpm dev
 
 `NODE_AUTH_TOKEN` must be a GitHub token with `read:packages`. `gh auth token` works if that account can read `@tanishqkancharla/maui`. A classic PAT or fine-grained token with Packages read is the usual local choice.
 
-Forks and other GitHub Actions repositories do not inherit package access. Grant `tanishqkancharla/halo-v2` read access on the package (GitHub → the `@tanishqkancharla/maui` package → Package settings → Manage Actions access), then CI can use `GITHUB_TOKEN` with `packages: read`. A fork needs its own token and package grant.
+Forks and other GitHub Actions repositories do not inherit package access. Grant `tanishqkancharla/halo-v2` read access on the package (GitHub → the `@tanishqkancharla/maui` package → Package settings → Manage Actions access), then CI can use `GITHUB_TOKEN` with `packages: read`. Until that grant exists, the `Release` workflow uses the repo secret `NODE_AUTH_TOKEN` (a token with `read:packages`). A fork needs its own token and package grant.
 
 Installs must not compile Maui. The published tarball already contains `dist/`.
 

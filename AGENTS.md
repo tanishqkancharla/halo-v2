@@ -21,7 +21,7 @@ pnpm config set "//npm.pkg.github.com/:_authToken" '${NODE_AUTH_TOKEN}' --locati
 pnpm install
 ```
 
-CI: `packages: read` plus `actions/setup-node` `registry-url` / `scope` for GitHub Packages. A workflow step writes the token with `pnpm config set` from `GITHUB_TOKEN`. That works only after the Halo repo is granted read access on the Maui package. Forks need their own token and grant.
+CI: `packages: read` plus `actions/setup-node` `registry-url` / `scope` for GitHub Packages. A workflow step writes the token with `pnpm config set` from `NODE_AUTH_TOKEN` (repo secret with `read:packages`) or `GITHUB_TOKEN`. `GITHUB_TOKEN` works only after the Halo repo is granted read access on the Maui package. Forks need their own token and grant.
 
 ## Code Style
 
