@@ -86,7 +86,13 @@ export async function readPluginManifest(args: {
     id: args.id,
     directory: args.directory,
     packageName: packageJson.name,
-    halo: packageJson.halo,
+    halo: {
+      ...packageJson.halo,
+      capabilities:
+        packageJson.halo.capabilities === undefined
+          ? []
+          : packageJson.halo.capabilities,
+    },
     viewPath,
     serverPath,
   };

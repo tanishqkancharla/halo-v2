@@ -17,7 +17,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     Catalog[Executor live tool catalog] --> Agent[Agent tools proxy]
-    Agent -->|writes exact paths| Manifest[Plugin manifest v2]
+    Agent -->|writes exact paths| Manifest[Plugin manifest]
     Agent -->|tools.plugins.grant| Grants[Versioned workspace grant]
     Manifest --> Effective[Effective paths]
     Grants --> Effective
@@ -79,7 +79,7 @@ One app-owned `ToolRuntimeService` supplies the catalog and invoker to sessions,
 ## Goals
 
 - Use Executor sandbox paths as dynamic plugin capability IDs, with no Halo enum of integrations or tools.
-- Add manifest v2 with exact requested tool paths while continuing to read manifest v1.
+- Add optional exact requested tool paths to manifest v1 without invalidating existing plugins.
 - Add `tools.plugins.list`, `create`, `build`, `types`, `check`, `grant`, and non-streaming `invoke` to the agent's Executor surface.
 - Make each explicit grant add the manifest's currently declared paths without replacing other active grants.
 - Revoke and prune a path when it leaves the manifest; adding it again requires another explicit grant after reconciliation.
@@ -107,9 +107,9 @@ One app-owned `ToolRuntimeService` supplies the catalog and invoker to sessions,
 - [`apps/electron/src/main/agent/tools/HaloToolPlugin.ts`](../apps/electron/src/main/agent/tools/HaloToolPlugin.ts) — Defines host tools and the execution context used by `tools.plugins`.
 - [`apps/electron/src/main/plugins/PluginService.ts`](../apps/electron/src/main/plugins/PluginService.ts) — Existing plugin create, build, typecheck, list, server load, and invoke paths.
 - [`apps/electron/src/main/plugins/loadPluginServer.ts`](../apps/electron/src/main/plugins/loadPluginServer.ts) — Loads trusted server routers through Jiti.
-- [`apps/electron/src/main/plugins/readPluginManifest.ts`](../apps/electron/src/main/plugins/readPluginManifest.ts) — Parses versioned manifests and resolves entries.
+- [`apps/electron/src/main/plugins/readPluginManifest.ts`](../apps/electron/src/main/plugins/readPluginManifest.ts) — Parses manifests and resolves entries.
 - [`apps/electron/src/main/plugins/haloPluginSkill.md`](../apps/electron/src/main/plugins/haloPluginSkill.md) — Agent authoring workflow to update after the direct management tools exist.
-- [`packages/plugin-sdk/src/schema.ts`](../packages/plugin-sdk/src/schema.ts) — Owns manifest schemas and version unions.
+- [`packages/plugin-sdk/src/schema.ts`](../packages/plugin-sdk/src/schema.ts) — Owns the manifest schema.
 - [`packages/plugin-sdk/src/server.ts`](../packages/plugin-sdk/src/server.ts) — Owns the public plugin server context and must type the lazy tools proxy.
 - [`apps/electron/src/main/plugins/PluginService.test.ts`](../apps/electron/src/main/plugins/PluginService.test.ts) — Public service tests for manifests, builds, types, and server invocation.
 - [`apps/electron/src/main/HaloRpcHttp.test.ts`](../apps/electron/src/main/HaloRpcHttp.test.ts) — Real oRPC boundary for plugin lifecycle and procedure invocation.
@@ -174,39 +174,32 @@ Move `ToolRuntimeService` ownership to the main composition root and inject it i
 - [ ] Update real `HaloRpcHttp` fixtures and session tests for the new construction path, then run `pnpm --filter @halo/desktop test`.
 - [ ] Run `pnpm run check-affected`.
 
-### Phase 2: Add manifest v2 and versioned incremental grants
+### Phase 2: Add optional manifest capabilities and versioned incremental grants
 
-Add manifest v2 with `capabilities: string[]`. Paths omit the root `tools.` because that is how Executor search results and sandbox dispatch identify them. V1 normalizes to an empty request; newly scaffolded plugins use v2.
+Add optional `capabilities: string[]` to manifest v1. Paths omit the root `tools.` because that is how Executor search results and sandbox dispatch identify them. A missing field normalizes to an empty request, so existing and newly scaffolded plugins remain unchanged.
 
 Add `PluginToolGrants` as the one owner of `{workspace}/.halo/pluginGrants.json`. Store both the last observed manifest paths and saved grants. Reconciliation removes grants for paths no longer declared before checks or calls. `grant(pluginId)` unions all currently declared paths into the saved set.
 
 ```callstack
  PluginService manifest read
 -└── haloManifestV1
-+├── haloManifestV1 → capabilities: []
-+├── haloManifestV2 → capabilities: string[]
++├── haloManifestV1 → capabilities ?? []
 +└── PluginToolGrants.reconcile(pluginId, currentPaths)
 +    ├── remove no-longer-declared paths
 +    └── persist observed and granted sets
 ```
 
 ```diff:packages/plugin-sdk/src/schema.ts
-+export const haloManifestV2 = Type.Object({
-+  version: Type.Literal(2),
-+  name: Type.String({ minLength: 1 }),
-+  description: Type.Optional(Type.String()),
-+  view: Type.Optional(Type.String({ minLength: 1 })),
-+  server: Type.Optional(Type.String({ minLength: 1 })),
-+  capabilities: Type.Array(Type.String({ minLength: 1 }), {
-+    uniqueItems: true,
-+  }),
-+});
-+
--export const haloManifestSchema = Type.Union([haloManifestV1]);
-+export const haloManifestSchema = Type.Union([
-+  haloManifestV1,
-+  haloManifestV2,
-+]);
+ export const haloManifestV1 = Type.Object({
+   version: Type.Literal(1),
+   name: Type.String({ minLength: 1 }),
+   description: Type.Optional(Type.String()),
+   view: Type.Optional(Type.String({ minLength: 1 })),
+   server: Type.Optional(Type.String({ minLength: 1 })),
++  capabilities: Type.Optional(
++    Type.Array(Type.String({ minLength: 1 }), { uniqueItems: true }),
++  ),
+ });
 ```
 
 ```ts
@@ -223,11 +216,10 @@ export type PluginToolGrantState = {
 };
 ```
 
-- [ ] Add `haloManifestV2`, update the manifest union type, and normalize a v1 manifest to no requested paths in `packages/plugin-sdk/src/schema.ts` and `readPluginManifest.ts`.
-- [ ] Scaffold v2 manifests with an empty capability array in `apps/electron/src/main/plugins/scaffoldPlugin.ts`.
-- [ ] Add `PluginToolGrants.ts` with versioned TypeBox parsing, ENOENT-as-empty handling, incremental `grant`, reconciliation, and tagged file/parse errors.
-- [ ] Test v1, v2, duplicate paths, incremental grants, removal pruning, and remove-then-readd requiring a new grant through public grant methods.
-- [ ] Run `pnpm --filter @halo/plugin-sdk test` and `pnpm --filter @halo/desktop test`.
+- [x] Add optional `capabilities` to `haloManifestV1` and normalize a missing field to no requested paths in `packages/plugin-sdk/src/schema.ts` and `readPluginManifest.ts`.
+- [x] Add `PluginToolGrants.ts` with versioned TypeBox parsing, ENOENT-as-empty handling, incremental `grant`, reconciliation, and tagged file/parse errors.
+- [x] Test manifests with missing and declared capabilities, duplicate paths, incremental grants, removal pruning, and remove-then-readd requiring a new grant through public grant methods.
+- [x] Run `pnpm --filter @halo/plugin-sdk test` and `pnpm --filter @halo/desktop test`.
 
 ### Phase 3: Add Executor-equivalent host invocation and proxy
 
@@ -385,7 +377,7 @@ tools.plugins.invoke({
 
 ### Phase 6: Update agent guidance and prove the complete flow
 
-Update the seeded Halo plugin skill to prefer `tools.plugins` over shelling out to the CLI during agent work. Show exact Executor discovery paths in v2 manifests and the same path under `context.tools`. Keep the CLI documented for humans and fallback debugging.
+Update the seeded Halo plugin skill to prefer `tools.plugins` over shelling out to the CLI during agent work. Show exact Executor discovery paths in manifest capabilities and the same path under `context.tools`. Keep the CLI documented for humans and fallback debugging.
 
 Run one live flow against the Halo app: create a plugin, add `files.read` plus one connected Google Calendar read path, typecheck, check, grant, build, invoke its procedure, reload, and invoke from the renderer. Also prove a manifest removal revokes the path and re-adding it does not restore access before another explicit grant.
 
@@ -393,7 +385,7 @@ Run one live flow against the Halo app: create a plugin, add `files.read` plus o
  Agent plugin authoring loop
 -halo plugin new/types/build + hand-written server without tools
 +tools.plugins.create
-+└── edit manifest v2 and server
++└── edit manifest capabilities and server
 +    ├── tools.plugins.types
 +    ├── tools.plugins.check
 +    ├── tools.plugins.grant
@@ -415,7 +407,7 @@ Run one live flow against the Halo app: create a plugin, add `files.read` plus o
 +7. `tools.plugins.invoke(...)` for a non-streaming server check
 ```
 
-- [ ] Update `apps/electron/src/main/plugins/haloPluginSkill.md`, its seeded copy test, and scaffold examples to manifest v2 and `context.tools`.
+- [ ] Update `apps/electron/src/main/plugins/haloPluginSkill.md`, its seeded copy test, and examples to manifest capabilities and `context.tools`.
 - [ ] Run the end-to-end authoring flow in a fresh workspace through live `exec`; use real files and the existing Google connection without mocks.
 - [ ] Verify grant addition, removal pruning, exact-path denial, normal plugin invocation, renderer invocation, session reload, workspace switch, and app restart.
 - [ ] Run `pnpm run check-affected`, `pnpm --filter @halo/desktop build`, and `git diff --check`.

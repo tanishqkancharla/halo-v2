@@ -31,6 +31,9 @@ export const haloManifestV1 = Type.Object({
   description: Type.Optional(Type.String()),
   view: Type.Optional(Type.String({ minLength: 1 })),
   server: Type.Optional(Type.String({ minLength: 1 })),
+  capabilities: Type.Optional(
+    Type.Array(Type.String({ minLength: 1 }), { uniqueItems: true }),
+  ),
 });
 
 // A later version is a new object in this union. Add an `up` only when the

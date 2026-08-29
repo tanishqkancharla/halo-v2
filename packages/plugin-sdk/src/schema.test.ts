@@ -112,4 +112,41 @@ describe("parseVersioned", () => {
       server: "./server.ts",
     });
   });
+
+  test("accepts unique capabilities", () => {
+    const parsed = parseVersioned({
+      name: "halo",
+      schema: haloManifestSchema,
+      value: {
+        version: 1,
+        name: "Calendar",
+        capabilities: ["files.read", "google_calendar.user.events.list"],
+      },
+    });
+    if (parsed instanceof Error) throw parsed;
+    expect(parsed.capabilities).toEqual([
+      "files.read",
+      "google_calendar.user.events.list",
+    ]);
+  });
+
+  test("rejects duplicate or empty capabilities", () => {
+    const duplicate = parseVersioned({
+      name: "halo",
+      schema: haloManifestSchema,
+      value: {
+        version: 1,
+        name: "Calendar",
+        capabilities: ["files.read", "files.read"],
+      },
+    });
+    expect(duplicate).toBeInstanceOf(SchemaParseError);
+
+    const empty = parseVersioned({
+      name: "halo",
+      schema: haloManifestSchema,
+      value: { version: 1, name: "Calendar", capabilities: [""] },
+    });
+    expect(empty).toBeInstanceOf(SchemaParseError);
+  });
 });

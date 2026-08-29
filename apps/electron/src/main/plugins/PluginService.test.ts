@@ -63,6 +63,7 @@ describe("PluginService", () => {
       if (listed instanceof Error) throw listed;
       expect(listed.errors).toEqual([]);
       expect(listed.plugins.map((plugin) => plugin.id)).toEqual(["notes"]);
+      expect(listed.plugins[0]?.halo.capabilities).toEqual([]);
       expect(listed.compiledViews[0]?.source).toContain("Notes");
     },
   );
