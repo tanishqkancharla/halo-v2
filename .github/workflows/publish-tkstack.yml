@@ -1,0 +1,49 @@
+name: Publish tkstack
+
+on:
+  push:
+    tags:
+      - "tkstack-*"
+
+concurrency:
+  group: publish-tkstack-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish tkstack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Check tag matches package.json
+        run: |
+          VERSION="$(node -p "require('./packages/tkstack/package.json').version")"
+          TAG="${GITHUB_REF_NAME#tkstack-}"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Tag '$GITHUB_REF_NAME' must equal packages/tkstack package.json version '$VERSION'"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish to npm
+        working-directory: packages/tkstack
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish --access public --no-git-checks

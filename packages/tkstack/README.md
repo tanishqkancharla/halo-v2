@@ -3,10 +3,16 @@
 Serve a spec or code walkthrough as a local page.
 
 ```sh
-pnpm exec tkstack path/to/file.md
+npx tkstack path/to/file.md
 ```
 
-Halo aliases: `pnpm spec` and `pnpm walkthrough`. After publish: `npx tkstack path/to/file.md`.
+Halo aliases: `pnpm spec` and `pnpm walkthrough`. In this repo: `pnpm exec tkstack path/to/file.md`.
+
+Publish from this package directory, not the repo root:
+
+```sh
+pnpm release
+```
 
 Options:
 
