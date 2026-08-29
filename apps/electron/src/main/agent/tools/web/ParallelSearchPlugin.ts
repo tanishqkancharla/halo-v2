@@ -67,105 +67,100 @@ type ParallelMcpCall = {
   model_name?: string;
 };
 
-export function createParallelSearchPlugin(input: {
-  userId: string;
-}): HaloToolPlugin {
-  const client = new Client({ name: "halo", version: "1" });
-  let connectPromise: Promise<void | ParallelMcpError> | undefined;
-  let connected = false;
+let clientPromise: Promise<Client | ParallelMcpError> | undefined;
 
-  function ensureConnected() {
-    if (connectPromise === undefined) {
-      connectPromise = client
-        .connect(
-          new StreamableHTTPClientTransport(new URL(parallelSearchMcpUrl)),
-        )
-        .catch((e) => new ParallelMcpError({ cause: e }))
-        .then((result) => {
-          if (result instanceof Error) {
-            connectPromise = undefined;
-            return result;
-          }
-          connected = true;
+function getClient() {
+  if (clientPromise === undefined) {
+    const client = new Client({ name: "halo", version: "1" });
+    clientPromise = client
+      .connect(new StreamableHTTPClientTransport(new URL(parallelSearchMcpUrl)))
+      .catch((e) => new ParallelMcpError({ cause: e }))
+      .then((result) => {
+        if (result instanceof Error) {
+          clientPromise = undefined;
           return result;
-        });
-    }
-    return connectPromise;
+        }
+        return client;
+      });
+  }
+  return clientPromise;
+}
+
+async function callParallelTool(args: {
+  name: string;
+  arguments: ParallelSearchArgs | ParallelFetchArgs;
+  context: HaloToolContext;
+}) {
+  const client = await getClient();
+  if (client instanceof Error) return client;
+
+  const toolArguments: ParallelMcpCall = {
+    ...args.arguments,
+    // Parallel free-tier rate limits by session_id; Halo's user id is that key.
+    session_id: args.context.userId,
+  };
+  if (args.context.modelId !== undefined) {
+    toolArguments.model_name = args.context.modelId;
   }
 
-  async function callParallelTool(args: {
-    name: string;
-    arguments: ParallelSearchArgs | ParallelFetchArgs;
-    context: HaloToolContext;
-  }) {
-    const connection = await ensureConnected();
-    if (connection instanceof Error) return connection;
+  const result = await client
+    .callTool(
+      { name: args.name, arguments: toolArguments },
+      CallToolResultSchema,
+      { signal: args.context.signal },
+    )
+    .catch((e) => new ParallelMcpError({ cause: e }));
+  if (result instanceof Error) return result;
 
-    const toolArguments: ParallelMcpCall = {
-      ...args.arguments,
-      // Parallel free-tier rate limits by session_id; Halo's user id is that key.
-      session_id: input.userId,
-    };
-    if (args.context.modelId !== undefined) {
-      toolArguments.model_name = args.context.modelId;
-    }
-
-    const result = await client
-      .callTool(
-        { name: args.name, arguments: toolArguments },
-        CallToolResultSchema,
-        { signal: args.context.signal },
-      )
-      .catch((e) => new ParallelMcpError({ cause: e }));
-    if (result instanceof Error) return result;
-
-    // SAFETY: callTool was invoked with CallToolResultSchema, so the payload is CallToolResult.
-    const callResult = result as CallToolResult;
-    return {
-      value: callResult.content
-        .flatMap((part) => (part.type === "text" ? [part.text] : []))
-        .join("\n"),
-    };
-  }
-
+  // SAFETY: callTool was invoked with CallToolResultSchema, so the payload is CallToolResult.
+  const callResult = result as CallToolResult;
   return {
-    id: "web",
-    name: "Web",
-    tools: [
-      defineHaloTool({
-        name: "search",
-        description:
-          "Search the live web and return relevant excerpts. Search excerpts are usually enough to answer without fetching each result.",
-        inputSchema: webSearchParameters,
-        requiredCapabilities: ["network.web.search"],
-        execute: (args, context) =>
-          callParallelTool({
-            name: "web_search",
-            arguments: args,
-            context,
-          }),
-      }),
-      defineHaloTool({
-        name: "fetch",
-        description:
-          "Fetch and extract content from specific web URLs when search excerpts are insufficient or the user named a URL.",
-        inputSchema: webFetchParameters,
-        requiredCapabilities: ["network.web.search"],
-        execute: (args, context) =>
-          callParallelTool({
-            name: "web_fetch",
-            arguments: args,
-            context,
-          }),
-      }),
-    ],
-    close: async () => {
-      if (!connected) return;
-      connected = false;
-      return client
-        .close()
-        .then(() => undefined)
-        .catch((e) => new ParallelMcpError({ cause: e }));
-    },
+    value: callResult.content
+      .flatMap((part) => (part.type === "text" ? [part.text] : []))
+      .join("\n"),
   };
 }
+
+export const parallelSearchPlugin: HaloToolPlugin = {
+  id: "web",
+  name: "Web",
+  tools: [
+    defineHaloTool({
+      name: "search",
+      description:
+        "Search the live web and return relevant excerpts. Search excerpts are usually enough to answer without fetching each result.",
+      inputSchema: webSearchParameters,
+      requiredCapabilities: ["network.web.search"],
+      execute: (args, context) =>
+        callParallelTool({
+          name: "web_search",
+          arguments: args,
+          context,
+        }),
+    }),
+    defineHaloTool({
+      name: "fetch",
+      description:
+        "Fetch and extract content from specific web URLs when search excerpts are insufficient or the user named a URL.",
+      inputSchema: webFetchParameters,
+      requiredCapabilities: ["network.web.search"],
+      execute: (args, context) =>
+        callParallelTool({
+          name: "web_fetch",
+          arguments: args,
+          context,
+        }),
+    }),
+  ],
+  close: async () => {
+    const pendingClient = clientPromise;
+    clientPromise = undefined;
+    if (pendingClient === undefined) return;
+    const client = await pendingClient;
+    if (client instanceof Error) return client;
+    return client
+      .close()
+      .then(() => undefined)
+      .catch((e) => new ParallelMcpError({ cause: e }));
+  },
+};

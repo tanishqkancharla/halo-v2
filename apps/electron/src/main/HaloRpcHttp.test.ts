@@ -47,7 +47,7 @@ const rpcHttpTest = test.extend<{
     const toolRuntime = new ToolRuntimeService({
       workspace,
       user,
-      toolPluginFactories: [],
+      toolPlugins: [],
       authority: new StaticAgentAuthority([]),
     });
     const sessions = new SessionRegistry({ workspace, toolRuntime });

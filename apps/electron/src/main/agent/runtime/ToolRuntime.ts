@@ -85,7 +85,10 @@ export class ConnectionRequiredError extends errore.createTaggedError({
 type HaloToolsPluginOptions = {
   plugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
-  executionContext: AsyncLocalStorage<HaloToolContext>;
+  executionContext: AsyncLocalStorage<
+    Pick<HaloToolContext, "signal" | "modelId">
+  >;
+  context: Pick<HaloToolContext, "workspaceRoot" | "userId">;
 };
 
 const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
@@ -106,6 +109,7 @@ const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
             haloTool,
             authority: options.authority,
             executionContext: options.executionContext,
+            context: options.context,
           }),
         ),
       })),
@@ -178,7 +182,10 @@ function toExecutorTool(input: {
   pluginId: string;
   haloTool: HaloTool;
   authority: AgentAuthority;
-  executionContext: AsyncLocalStorage<HaloToolContext>;
+  executionContext: AsyncLocalStorage<
+    Pick<HaloToolContext, "signal" | "modelId">
+  >;
+  context: Pick<HaloToolContext, "workspaceRoot" | "userId">;
 }) {
   return tool({
     name: input.haloTool.name,
@@ -194,6 +201,7 @@ function toExecutorTool(input: {
         if (authorization instanceof Error) return authorization;
         const context = input.executionContext.getStore();
         return input.haloTool.execute(args, {
+          ...input.context,
           signal: context?.signal,
           modelId: context?.modelId,
         });
@@ -248,7 +256,9 @@ export class ToolRuntime {
   constructor(
     private readonly executor: Executor<HaloRuntimePlugins>,
     private readonly engine: ReturnType<typeof createExecutionEngine>,
-    private readonly executionContext: AsyncLocalStorage<HaloToolContext>,
+    private readonly executionContext: AsyncLocalStorage<
+      Pick<HaloToolContext, "signal" | "modelId">
+    >,
     private readonly toolPlugins: readonly HaloToolPlugin[],
     private readonly authority: AgentAuthority,
   ) {}
@@ -480,7 +490,9 @@ async function createToolRuntime(
   if (quickJsModule instanceof Error) return quickJsModule;
   setQuickJSModule(quickJsModule);
 
-  const executionContext = new AsyncLocalStorage<HaloToolContext>();
+  const executionContext = new AsyncLocalStorage<
+    Pick<HaloToolContext, "signal" | "modelId">
+  >();
   const executor = await Effect.runPromise(
     createExecutor({
       tenant: Tenant.make(input.workspaceRoot),
@@ -490,6 +502,10 @@ async function createToolRuntime(
           plugins: input.toolPlugins,
           authority: input.authority,
           executionContext,
+          context: {
+            workspaceRoot: input.workspaceRoot,
+            userId: input.userId,
+          },
         }),
         googleOpenApiPlugin,
       ] as const,

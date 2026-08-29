@@ -3,7 +3,7 @@ import * as errore from "errore";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
 import type { UserService } from "../../UserService.js";
 import type { WorkspaceService } from "../../workspace/WorkspaceService.js";
-import type { HaloToolPluginFactory } from "../tools/HaloToolPlugin.js";
+import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import type { AgentAuthority } from "./AgentAuthority.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
 import { ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
@@ -20,7 +20,7 @@ type PendingConnection = {
 type ToolRuntimeServiceOptions = {
   workspace: WorkspaceService;
   user: UserService;
-  toolPluginFactories: readonly HaloToolPluginFactory[];
+  toolPlugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
 };
 
@@ -63,9 +63,7 @@ export class ToolRuntimeService {
       workspaceRoot: layout.root,
       userId: user.id,
       credentialVault,
-      toolPlugins: this.options.toolPluginFactories.map((createPlugin) =>
-        createPlugin({ workspaceRoot: layout.root, userId: user.id }),
-      ),
+      toolPlugins: this.options.toolPlugins,
       authority: this.options.authority,
       oauthRedirectUri: this.oauthRedirectUri,
     });

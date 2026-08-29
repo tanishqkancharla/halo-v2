@@ -26,9 +26,9 @@ import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
-import { createWorkspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
-import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
-import { createParallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
+import { workspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
+import { workspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
+import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -82,10 +82,10 @@ const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
   isDevelopment,
 });
 const userService = new UserService(applicationConfig.dataDir);
-const toolPluginFactories = [
-  createWorkspaceFilesPlugin,
-  createWorkspaceBashPlugin,
-  createParallelSearchPlugin,
+const toolPlugins = [
+  workspaceFilesPlugin,
+  workspaceBashPlugin,
+  parallelSearchPlugin,
 ];
 const authority = new StaticAgentAuthority([
   "workspace.files.read",
@@ -96,7 +96,7 @@ const authority = new StaticAgentAuthority([
 const toolRuntime = new ToolRuntimeService({
   workspace: workspaceService,
   user: userService,
-  toolPluginFactories,
+  toolPlugins,
   authority,
 });
 const sessionRegistry = new SessionRegistry({

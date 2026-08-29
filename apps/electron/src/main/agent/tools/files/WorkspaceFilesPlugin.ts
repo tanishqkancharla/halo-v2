@@ -2,7 +2,7 @@ import { Type } from "@sinclair/typebox";
 import {
   defineHaloTool,
   type HaloToolExecution,
-  type HaloToolPluginFactory,
+  type HaloToolPlugin,
 } from "../HaloToolPlugin.js";
 import { deleteFile } from "./delete.js";
 import { editFile } from "./edit.js";
@@ -36,9 +36,7 @@ const deleteInput = Type.Object({
   path: Type.String(),
 });
 
-export const createWorkspaceFilesPlugin: HaloToolPluginFactory = ({
-  workspaceRoot,
-}) => ({
+export const workspaceFilesPlugin: HaloToolPlugin = {
   id: "files",
   name: "Workspace files",
   tools: [
@@ -47,38 +45,43 @@ export const createWorkspaceFilesPlugin: HaloToolPluginFactory = ({
       description: "Read a UTF-8 file in the active Halo workspace.",
       inputSchema: readInput,
       requiredCapabilities: ["workspace.files.read"],
-      execute: (input) => execution(readFile(workspaceRoot, input)),
+      execute: (input, context) =>
+        execution(readFile(context.workspaceRoot, input)),
     }),
     defineHaloTool({
       name: "edit",
       description: "Replace exact text in a workspace file.",
       inputSchema: editInput,
       requiredCapabilities: ["workspace.files.write"],
-      execute: (input) => execution(editFile(workspaceRoot, input)),
+      execute: (input, context) =>
+        execution(editFile(context.workspaceRoot, input)),
     }),
     defineHaloTool({
       name: "patch",
       description: "Apply a patch to workspace files.",
       inputSchema: patchInput,
       requiredCapabilities: ["workspace.files.write"],
-      execute: (input) => execution(patchFiles(workspaceRoot, input)),
+      execute: (input, context) =>
+        execution(patchFiles(context.workspaceRoot, input)),
     }),
     defineHaloTool({
       name: "write",
       description: "Write a UTF-8 workspace file.",
       inputSchema: writeInput,
       requiredCapabilities: ["workspace.files.write"],
-      execute: (input) => execution(writeFile(workspaceRoot, input)),
+      execute: (input, context) =>
+        execution(writeFile(context.workspaceRoot, input)),
     }),
     defineHaloTool({
       name: "delete",
       description: "Delete a workspace file.",
       inputSchema: deleteInput,
       requiredCapabilities: ["workspace.files.write"],
-      execute: (input) => execution(deleteFile(workspaceRoot, input)),
+      execute: (input, context) =>
+        execution(deleteFile(context.workspaceRoot, input)),
     }),
   ],
-});
+};
 
 async function execution<T>(resultPromise: Promise<T | Error>) {
   const result = await resultPromise;

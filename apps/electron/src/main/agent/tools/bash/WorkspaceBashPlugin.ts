@@ -1,8 +1,5 @@
 import { Type } from "@sinclair/typebox";
-import {
-  defineHaloTool,
-  type HaloToolPluginFactory,
-} from "../HaloToolPlugin.js";
+import { defineHaloTool, type HaloToolPlugin } from "../HaloToolPlugin.js";
 import { runBash } from "./run.js";
 
 const runInput = Type.Object({
@@ -10,9 +7,7 @@ const runInput = Type.Object({
   timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 
-export const createWorkspaceBashPlugin: HaloToolPluginFactory = ({
-  workspaceRoot,
-}) => ({
+export const workspaceBashPlugin: HaloToolPlugin = {
   id: "bash",
   name: "Workspace shell",
   tools: [
@@ -22,7 +17,7 @@ export const createWorkspaceBashPlugin: HaloToolPluginFactory = ({
       inputSchema: runInput,
       requiredCapabilities: ["workspace.shell.execute"],
       execute: async (input, context) => {
-        const result = await runBash(workspaceRoot, {
+        const result = await runBash(context.workspaceRoot, {
           ...input,
           signal: context.signal,
         });
@@ -31,4 +26,4 @@ export const createWorkspaceBashPlugin: HaloToolPluginFactory = ({
       },
     }),
   ],
-});
+};

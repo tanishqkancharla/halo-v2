@@ -12,6 +12,8 @@ export type HaloToolExecution = {
 };
 
 export type HaloToolContext = {
+  workspaceRoot: string;
+  userId: string;
   signal: AbortSignal | undefined;
   modelId: string | undefined;
 };
@@ -35,15 +37,6 @@ export type HaloToolPlugin = {
   tools: readonly HaloTool[];
   close?: () => Promise<void | Error>;
 };
-
-type HaloToolPluginContext = {
-  workspaceRoot: string;
-  userId: string;
-};
-
-export type HaloToolPluginFactory = (
-  context: HaloToolPluginContext,
-) => HaloToolPlugin;
 
 export function defineHaloTool<TInputSchema extends TObject>(input: {
   name: string;
