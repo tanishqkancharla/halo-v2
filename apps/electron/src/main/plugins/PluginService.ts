@@ -273,12 +273,10 @@ export class PluginService {
 
     return entries
       .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
-      .map(
-        (entry): PluginDirectory => ({
-          id: entry.name,
-          directory: join(pluginsRoot, entry.name),
-        }),
-      )
+      .map((entry): PluginDirectory => ({
+        id: entry.name,
+        directory: join(pluginsRoot, entry.name),
+      }))
       .toSorted((left, right) => left.id.localeCompare(right.id));
   }
 
