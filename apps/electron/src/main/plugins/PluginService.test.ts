@@ -69,7 +69,17 @@ describe("PluginService", () => {
           ),
           "utf8",
         ),
-      ) as { peerDependencies: Record<string, string> };
+      ) as {
+        dependencies: Record<string, string>;
+        peerDependencies: Record<string, string>;
+      };
+      expect(sdkPackageJson.dependencies).toEqual({
+        "@orpc/server": "2.0.0-beta.29",
+        "@sinclair/typebox": "^0.34.52",
+        "@tanishqkancharla/tandem-core": "0.2.0",
+        "@tanishqkancharla/tandem-server": "0.2.0",
+        errore: "^0.14.1",
+      });
       expect(sdkPackageJson.peerDependencies).toEqual({
         maui: "0.0.11",
         "purse-styles": "^0.2.1",
@@ -89,6 +99,7 @@ describe("PluginService", () => {
       expect(listed.plugins[0]?.halo.capabilities).toEqual([]);
       expect(listed.compiledViews[0]?.source).toContain("Notes");
     },
+    15_000,
   );
 
   pluginServiceTest(

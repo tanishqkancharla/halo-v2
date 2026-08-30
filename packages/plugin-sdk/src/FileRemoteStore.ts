@@ -11,8 +11,8 @@ import type {
   Mutation,
   Patch,
   PatchSetOp,
-} from "@tandem/types";
-import type { RemoteStore } from "@tandem/server";
+} from "@tanishqkancharla/tandem-core";
+import type { RemoteStore } from "@tanishqkancharla/tandem-server";
 import * as errore from "errore";
 
 export class PluginStorageStoreError extends errore.createTaggedError({

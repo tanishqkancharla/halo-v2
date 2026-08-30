@@ -1,10 +1,2 @@
-export function collection(fields: Record<string, unknown>): unknown;
-export function defineSchema(collections: Record<string, unknown>): unknown;
-export function defineRelations(relations: Record<string, unknown>): unknown;
-
-export const t: {
-  id: () => unknown;
-  string: () => unknown;
-  number: () => unknown;
-  boolean: () => unknown;
-};
+export { collection, defineSchema, defineRelations, t, } from "@tanishqkancharla/tandem-core";
+export type { RelationalQuery, RelationalQueryResult, } from "@tanishqkancharla/tandem-core";

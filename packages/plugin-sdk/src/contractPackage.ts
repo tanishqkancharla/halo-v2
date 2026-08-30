@@ -10,7 +10,7 @@ export class ContractPackageError extends errore.createTaggedError({
 export const contractPackageName = "@get-halo/plugin-sdk";
 
 export const contractTypeFiles = [
-  "sdk/view.d.ts",
+  "view.d.ts",
   "server.d.ts",
   "schema.d.ts",
   "storage.d.ts",
@@ -21,6 +21,14 @@ export const contractPeerDependencies = {
   "purse-styles": "^0.2.1",
   react: "^19.2.8",
   wouter: "^3.10.0",
+} as const;
+
+export const contractDependencies = {
+  "@orpc/server": "2.0.0-beta.29",
+  "@sinclair/typebox": "^0.34.52",
+  "@tanishqkancharla/tandem-core": "0.2.0",
+  "@tanishqkancharla/tandem-server": "0.2.0",
+  errore: "^0.14.1",
 } as const;
 
 export const mauiPackage = "npm:@tanishqkancharla/maui@0.0.11";
@@ -37,9 +45,10 @@ export function contractPackageJson(version: string) {
     publishConfig: {
       access: "public",
     },
+    dependencies: contractDependencies,
     peerDependencies: contractPeerDependencies,
     exports: {
-      "./view": { types: "./dist/sdk/view.d.ts" },
+      "./view": { types: "./dist/view.d.ts" },
       "./server": { types: "./dist/server.d.ts" },
       "./schema": { types: "./dist/schema.d.ts" },
       "./storage": { types: "./dist/storage.d.ts" },

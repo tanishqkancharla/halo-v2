@@ -1,11 +1,15 @@
-import { TandemClient, type Transaction } from "@tandem/core";
+import { TandemClient, type Transaction } from "@tanishqkancharla/tandem-core";
 import type {
   RelationalQuery,
   RelationalQueryResult,
   RuntimeRelationsDefinition,
   RuntimeSchemaDefinition,
-} from "@tandem/core";
-import type { AnySchema, CollectionName, RemoteApi } from "@tandem/types";
+} from "@tanishqkancharla/tandem-core";
+import type {
+  AnySchema,
+  CollectionName,
+  RemoteApi,
+} from "@tanishqkancharla/tandem-core";
 import * as errore from "errore";
 import {
   createContext,

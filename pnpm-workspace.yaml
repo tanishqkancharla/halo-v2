@@ -26,13 +26,6 @@ overrides:
   "@effect/platform-node": "4.0.0-beta.103"
   "@effect/platform-node-shared": "4.0.0-beta.103"
   effect: "4.0.0-beta.103"
-  # Tandem packages declare @tandem/types as workspace:*. Point that at the git subpath.
-  "@tandem/types": "github:tanishqkancharla/tandem#path:packages/types"
-# pnpm packageExtensions cannot set main/types. Tandem git packages have no dist, so patch entry onto src.
-patchedDependencies:
-  "@tandem/core": patches/@tandem__core.patch
-  "@tandem/server": patches/@tandem__server.patch
-  "@tandem/types": patches/@tandem__types.patch
 minimumReleaseAgeExclude:
   - "@effect/platform-node-shared@4.0.0-beta.103"
   - "@effect/platform-node@4.0.0-beta.103"
@@ -83,4 +76,6 @@ minimumReleaseAgeExclude:
   - "@executor-js/runtime-quickjs@1.6.0"
   - "@executor-js/sdk@1.6.0"
   - tsx@4.23.13
-  - '@tanishqkancharla/maui@0.0.9 || 0.0.10 || 0.0.11'
+  - "@tanishqkancharla/maui@0.0.9 || 0.0.10 || 0.0.11"
+  - "@tanishqkancharla/tandem-core@0.2.0"
+  - "@tanishqkancharla/tandem-server@0.2.0"

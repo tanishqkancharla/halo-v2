@@ -27,6 +27,16 @@ const pluginTsconfig = `${JSON.stringify(
       moduleResolution: "bundler",
       skipLibCheck: true,
       paths: {
+        "@orpc/server": [packageDirectory(require.resolve("@orpc/server"))],
+        "@sinclair/typebox": [
+          packageDirectory(require.resolve("@sinclair/typebox")),
+        ],
+        "@tanishqkancharla/tandem-core": [
+          packageDirectory(require.resolve("@tanishqkancharla/tandem-core")),
+        ],
+        "@tanishqkancharla/tandem-server": [
+          packageDirectory(require.resolve("@tanishqkancharla/tandem-server")),
+        ],
         csstype: [dirname(require.resolve("csstype/index.d.ts"))],
         maui: [dirname(require.resolve("maui/package.json"))],
         "purse-styles": [dirname(require.resolve("purse-styles/package.json"))],

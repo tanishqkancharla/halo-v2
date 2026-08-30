@@ -1,6 +1,6 @@
-import { type Transaction } from "@tandem/core";
-import type { RelationalQuery, RelationalQueryResult, RuntimeRelationsDefinition, RuntimeSchemaDefinition } from "@tandem/core";
-import type { AnySchema, CollectionName, RemoteApi } from "@tandem/types";
+import { type Transaction } from "@tanishqkancharla/tandem-core";
+import type { RelationalQuery, RelationalQueryResult, RuntimeRelationsDefinition, RuntimeSchemaDefinition } from "@tanishqkancharla/tandem-core";
+import type { AnySchema, CollectionName, RemoteApi } from "@tanishqkancharla/tandem-core";
 import * as errore from "errore";
 import { type ReactNode } from "react";
 declare const PluginStorageMissingError_base: errore.FactoryTaggedErrorClass<"PluginStorageMissingError", "usePluginQuery must run inside PluginStorageProvider", Error>;

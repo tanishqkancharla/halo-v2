@@ -139,13 +139,6 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Allow private Maui git dependency
-        env:
-          MAUI_READ_TOKEN: ${{ secrets.MAUI_READ_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
-          git config --global --add url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "git@github.com:"
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

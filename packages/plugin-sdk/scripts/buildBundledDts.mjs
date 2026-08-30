@@ -22,7 +22,9 @@ const config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, root, {
   rootDir: join(root, "src"),
 });
 const program = ts.createProgram({
-  rootNames: [join(root, "src", "view.ts")],
+  rootNames: ["view.ts", "server.ts", "schema.ts", "storage.ts"].map((file) =>
+    join(root, "src", file),
+  ),
   options: config.options,
 });
 const emitted = program.emit();
@@ -39,12 +41,12 @@ if (diagnostics.length > 0) {
     }),
   );
 }
-const sdkTypesDirectory = join(root, "dist", "sdk");
-rmSync(sdkTypesDirectory, { recursive: true, force: true });
-cpSync(declarationDirectory, sdkTypesDirectory, { recursive: true });
+const distDirectory = join(root, "dist");
+rmSync(distDirectory, { recursive: true, force: true });
+cpSync(declarationDirectory, distDirectory, { recursive: true });
 rmSync(declarationDirectory, { recursive: true, force: true });
 
-const files = ["server.d.ts", "schema.d.ts", "storage.d.ts", "sdk/view.d.ts"];
+const files = ["server.d.ts", "schema.d.ts", "storage.d.ts", "view.d.ts"];
 for (const file of files) {
   const path = join(root, "dist", file);
   if (!existsSync(path)) {

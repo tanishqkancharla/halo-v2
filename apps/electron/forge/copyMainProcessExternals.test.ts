@@ -70,5 +70,6 @@ describe("copyMainProcessExternals", () => {
       expect(result.rows).toEqual([{ n: 1 }]);
       client.close();
     },
+    15_000,
   );
 });

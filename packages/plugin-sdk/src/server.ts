@@ -1,7 +1,11 @@
 import { os, type } from "@orpc/server";
-import { RemoteServer } from "@tandem/server";
-import type { RuntimeSchemaDefinition } from "@tandem/core";
-import type { AnySchema, ClientId, RemoteApi } from "@tandem/types";
+import { RemoteServer } from "@tanishqkancharla/tandem-server";
+import type { RuntimeSchemaDefinition } from "@tanishqkancharla/tandem-core";
+import type {
+  AnySchema,
+  ClientId,
+  RemoteApi,
+} from "@tanishqkancharla/tandem-core";
 import { AsyncEventQueue } from "./AsyncEventQueue.js";
 import { FileRemoteStore, PluginStorageStoreError } from "./FileRemoteStore.js";
 import type { PluginToolsFacade } from "./PluginToolsFacade.js";

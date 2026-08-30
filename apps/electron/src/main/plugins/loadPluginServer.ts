@@ -23,9 +23,12 @@ const jiti = createJiti(import.meta.url, {
     "@get-halo/plugin-sdk/server": sdkEntry("server"),
     "@get-halo/plugin-sdk/storage": sdkEntry("storage"),
     "@get-halo/plugin-sdk/view": sdkEntry("view"),
-    "@tandem/core": requireFromThisFile.resolve("@tandem/core"),
-    "@tandem/server": requireFromThisFile.resolve("@tandem/server"),
-    "@tandem/types": requireFromThisFile.resolve("@tandem/types"),
+    "@tanishqkancharla/tandem-core": requireFromThisFile.resolve(
+      "@tanishqkancharla/tandem-core",
+    ),
+    "@tanishqkancharla/tandem-server": requireFromThisFile.resolve(
+      "@tanishqkancharla/tandem-server",
+    ),
   },
 });
 

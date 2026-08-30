@@ -10,7 +10,11 @@ export default defineConfig({
     minify: false,
   },
   optimizeDeps: {
-    include: ["@tandem/core", "@tandem/types", "@halo/plugin-sdk/storage"],
+    include: [
+      "@tanishqkancharla/tandem-core",
+      "@tanishqkancharla/tandem-core",
+      "@halo/plugin-sdk/storage",
+    ],
   },
   resolve: {
     alias: {

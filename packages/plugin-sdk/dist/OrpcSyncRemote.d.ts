@@ -1,4 +1,4 @@
-import type { AnySchema, ClientId, RemoteApi } from "@tandem/types";
+import type { AnySchema, ClientId, RemoteApi } from "@tanishqkancharla/tandem-core";
 type PokeEvent = {
     type: "poke";
 };
