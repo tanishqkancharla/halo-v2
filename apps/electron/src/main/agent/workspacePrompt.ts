@@ -1,4 +1,7 @@
-import { DefaultResourceLoader } from "@mariozechner/pi-coding-agent";
+import {
+  DefaultResourceLoader,
+  formatSkillsForPrompt,
+} from "@mariozechner/pi-coding-agent";
 
 function haloSystemPrompt(workspaceRoot: string) {
   const path = workspaceRoot.replaceAll("\\", "/");
@@ -54,7 +57,7 @@ Do not expose secrets in commands, logs, or responses.
 
 ## Skills
 
-Skills contain extra instructions for specific kinds of work. When the user names a skill, or project instructions require one, read its SKILL.md completely before acting and follow it for that turn. Resolve relative references from the skill's folder and read only the supporting material needed for the task.
+Skills contain extra instructions for specific kinds of work. When a task matches a skill's description, use exec to read its SKILL.md completely before acting and follow it for that turn. Resolve relative references from the skill's folder and read only the supporting material needed for the task.
 
 ## Workspace
 
@@ -69,9 +72,18 @@ Pi documentation paths in this prompt live outside the workspace. Open them only
 }
 
 export function createWorkspaceResourceLoader(cwd: string, agentDir: string) {
+  const skillCatalog = { prompt: "" };
   return new DefaultResourceLoader({
     cwd,
     agentDir,
     systemPromptOverride: () => haloSystemPrompt(cwd),
+    skillsOverride: (result) => {
+      skillCatalog.prompt = formatSkillsForPrompt(result.skills).replace(
+        "Use the read tool to load a skill's file when the task matches its description.",
+        'Use exec to call tools.files.read({ path: "<location from the skill catalog>" }) when the task matches a skill\'s description, then follow that skill.',
+      );
+      return result;
+    },
+    appendSystemPromptOverride: (base) => [...base, skillCatalog.prompt],
   });
 }

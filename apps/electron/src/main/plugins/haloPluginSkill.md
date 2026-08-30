@@ -15,14 +15,20 @@ Always read the maui skill before writing view code. Use Maui components and Rea
 
 If the plugin keeps data, add `storage.ts` and `syncRoutes`. Do not use `localStorage`, `sessionStorage`, cookies, or files you invent.
 
-Halo must be running. Use the `halo` CLI (on PATH in the app, or `pnpm halo` in the Halo repo). `new`, `build`, and `types` are reserved ids.
+Halo must be running. During agent work, use the following exact calls through exec:
 
-1. `halo plugin new <id>` — scaffold the plugin folder, pin `@get-halo/plugin-sdk` to this Halo version, and install that contract
-2. Edit sources in that folder
-3. `halo plugin types` — typecheck. The pin must equal this Halo version. Fix errors here.
-4. `halo plugin build` — write `dist/view.js`
-5. Reload (View → Reload, or Cmd-R / Ctrl-R)
-6. `halo plugin <id> <endpoint>` — call the plugin server (example: `halo plugin notes ping`)
+1. `tools.plugins.create({ id })` — scaffold the plugin folder, pin `@get-halo/plugin-sdk` to this Halo version, and install that contract
+2. Edit sources in the returned directory with `tools.files`
+3. `tools.plugins.types({})` — typecheck every plugin. Fix all reported diagnostics.
+4. `tools.plugins.check({ pluginId: id })` — compare requested capabilities with saved grants and the live tool catalog
+5. `tools.plugins.grant({ pluginId: id })` — grant the currently declared paths that exist in the catalog
+6. `tools.plugins.build({})` — build every plugin and remount its server
+7. `tools.plugins.invoke({ pluginId: id, path: ["ping"], input: {} })` — check a non-streaming server procedure
+8. Reload (View → Reload, or Cmd-R / Ctrl-R) to render view changes
+
+Check every `{ ok, data/error }` result before continuing. `types` and `build` currently operate on every workspace plugin, so report unrelated plugin errors instead of changing those plugins.
+
+The `halo` CLI remains available for humans and fallback debugging: `halo plugin new <id>`, `halo plugin types`, `halo plugin build`, and `halo plugin <id> <endpoint>`. `new`, `build`, and `types` are reserved ids.
 
 Do not compile the view yourself. Halo reads `dist/view.js` on load. A missing file is a load error for that plugin only. A pin that is missing or not this Halo version is a load error for that plugin only.
 
@@ -36,6 +42,7 @@ Required:
 
 Optional:
 
+- `halo.capabilities` with exact Executor paths such as `files.read`
 - `view.tsx` (or `view/index.tsx`, `view.ts`, `view/index.ts`) with named exports `Sidebar` and `Routes`
 - `server.ts` (or `server/index.ts`) with a default oRPC router
 - `storage.ts` with Tandem collections from `@get-halo/plugin-sdk/storage`
@@ -59,6 +66,7 @@ Import `pluginOs` and `syncRoutes` from `@get-halo/plugin-sdk/server`. Import `c
     "version": 1,
     "name": "Notes",
     "description": "Scratch notes.",
+    "capabilities": ["files.read"],
     "view": "./view.tsx"
   },
   "devDependencies": {
@@ -127,7 +135,7 @@ import { usePluginServer } from "@get-halo/plugin-sdk/view";
 
 ## Server
 
-Export a default oRPC router. Handlers read `{ pluginId, workspaceRoot }` from context. Return an `Error` from a handler to fail the RPC call.
+Export a default oRPC router. Handlers read `{ pluginId, workspaceRoot, tools }` from context. A declared and granted `files.read` path is called as `context.tools.files.read(input)`. Return an `Error` from a handler to fail the RPC call.
 
 ```ts
 import { pluginOs } from "@get-halo/plugin-sdk/server";
@@ -138,6 +146,9 @@ export default {
   ping: plugin.handler(async ({ context }) => ({
     pluginId: context.pluginId,
   })),
+  read: plugin.handler(({ context }) =>
+    context.tools.files.read({ path: "notes.md" }),
+  ),
 };
 ```
 
