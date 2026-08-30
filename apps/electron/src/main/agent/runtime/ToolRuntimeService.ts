@@ -3,6 +3,8 @@ import * as errore from "errore";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
 import type { UserService } from "../../UserService.js";
 import type { WorkspaceService } from "../../workspace/WorkspaceService.js";
+import type { PluginService } from "../../plugins/PluginService.js";
+import type { PluginToolGrants } from "../../plugins/PluginToolGrants.js";
 import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import type { AgentAuthority } from "./AgentAuthority.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
@@ -22,6 +24,8 @@ type ToolRuntimeServiceOptions = {
   user: UserService;
   toolPlugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
+  plugins: PluginService;
+  pluginToolGrants: PluginToolGrants;
 };
 
 export class ToolRuntimeService {
@@ -64,6 +68,8 @@ export class ToolRuntimeService {
       credentialVault,
       toolPlugins: this.options.toolPlugins,
       authority: this.options.authority,
+      plugins: this.options.plugins,
+      pluginToolGrants: this.options.pluginToolGrants,
       oauthRedirectUri: this.oauthRedirectUri,
     });
     if (runtime instanceof Error) return runtime;

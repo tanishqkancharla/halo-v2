@@ -51,7 +51,7 @@ export class PluginToolGrants {
     return { declared, granted, revoked };
   }
 
-  async grant(input: DeclaredPathsInput) {
+  async grant(input: DeclaredPathsInput & { grantPaths: readonly string[] }) {
     const state = await this.read();
     if (state instanceof Error) return state;
 
@@ -61,7 +61,9 @@ export class PluginToolGrants {
     const previousGranted = previous === undefined ? [] : previous.granted;
     const active = previousGranted.filter((path) => declaredSet.has(path));
     const activeSet = new Set(active);
-    const added = declared.filter((path) => !activeSet.has(path));
+    const added = uniqueSorted(input.grantPaths).filter(
+      (path) => declaredSet.has(path) && !activeSet.has(path),
+    );
     const granted = uniqueSorted([...active, ...added]);
     state.plugins[input.pluginId] = { observed: declared, granted };
 

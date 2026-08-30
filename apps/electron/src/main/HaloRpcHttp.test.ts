@@ -45,20 +45,23 @@ const rpcHttpTest = test.extend<{
     }
 
     const user = new UserService(userDataDir);
+    const plugins = new PluginService(workspace);
+    const pluginToolGrants = new PluginToolGrants(workspace);
     const toolRuntime = new ToolRuntimeService({
       workspace,
       user,
       toolPlugins: [],
       authority: new StaticAgentAuthority([]),
+      plugins,
+      pluginToolGrants,
     });
     const sessions = new SessionRegistry({ workspace, toolRuntime });
-    const pluginToolGrants = new PluginToolGrants(workspace);
     const context: HaloContext = {
       workspace,
       sessions,
       toolRuntime,
       pluginToolGrants,
-      plugins: new PluginService(workspace),
+      plugins,
       getWindow: () => {
         throw new Error("Halo main window is not open.");
       },

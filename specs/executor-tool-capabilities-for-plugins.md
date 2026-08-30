@@ -317,7 +317,7 @@ Keep ordinary and streaming plugin procedure behavior unchanged at the existing 
 ```
 
 - [x] Extend the SDK server context without changing existing handler APIs.
-- [ ] Pass a plugin-bound proxy into `PluginService.invoke` from both `pluginsRouter` and the later management tool path.
+- [x] Pass a plugin-bound proxy into `PluginService.invoke` from both `pluginsRouter` and the management tool path.
 - [x] Preserve abort signals for Halo static tools called by plugins and let Executor remain the owner of integration transport behavior.
 - [x] Add a real service/RPC test in which a granted test plugin calls `files.read`; prove an undeclared or ungranted exact path returns `tool_not_granted`.
 - [x] Run `pnpm --filter @halo/desktop test` and `pnpm run check-affected`.
@@ -369,11 +369,11 @@ tools.plugins.invoke({
 });
 ```
 
-- [ ] Add `PluginManagementPlugin.ts` with narrow TypeBox inputs and direct delegation to existing services.
-- [ ] Add `PluginService.check` and `grant` outputs that report requested, existing, granted, newly granted, and missing paths without dumping schemas unless requested later.
-- [ ] Detect `AsyncIterable` results in `tools.plugins.invoke` and return the tagged unsupported error; preserve streams through renderer/CLI oRPC.
-- [ ] Register the plugin factory and its internal agent management capability in `apps/electron/src/main/main.ts`.
-- [ ] Exercise all seven operations through the public Halo tool plugin or a live `exec` session, then run `pnpm run check-affected`.
+- [x] Add `PluginManagementPlugin.ts` with narrow TypeBox inputs and direct delegation to existing services.
+- [x] Add `check` and `grant` outputs that report requested, existing, granted, newly granted, and missing paths without dumping schemas.
+- [x] Detect `AsyncIterable` results in `tools.plugins.invoke` and return the tagged unsupported error; preserve streams through renderer/CLI oRPC.
+- [x] Register the plugin and its internal agent management capability in `apps/electron/src/main/main.ts`.
+- [x] Exercise all seven operations through the public Halo tool plugin, then run `pnpm run check-affected`.
 
 ### Phase 6: Update agent guidance and prove the complete flow
 

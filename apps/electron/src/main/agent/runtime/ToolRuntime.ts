@@ -51,6 +51,8 @@ import {
 } from "quickjs-emscripten";
 import * as errore from "errore";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
+import type { PluginService } from "../../plugins/PluginService.js";
+import type { PluginToolGrants } from "../../plugins/PluginToolGrants.js";
 import type {
   HaloTool,
   HaloToolContext,
@@ -94,11 +96,17 @@ export class ConnectionRequiredError extends errore.createTaggedError({
 type HaloToolsPluginOptions = {
   plugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
-  executionContext: AsyncLocalStorage<
-    Pick<HaloToolContext, "signal" | "modelId">
+  executionContext: AsyncLocalStorage<ToolExecutionContext>;
+  context: Pick<
+    HaloToolContext,
+    "workspaceRoot" | "userId" | "plugins" | "pluginToolGrants"
   >;
-  context: Pick<HaloToolContext, "workspaceRoot" | "userId">;
 };
+
+type ToolExecutionContext = Pick<
+  HaloToolContext,
+  "signal" | "modelId" | "runtime"
+>;
 
 const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
   if (options === undefined) {
@@ -191,10 +199,11 @@ function toExecutorTool(input: {
   pluginId: string;
   haloTool: HaloTool;
   authority: AgentAuthority;
-  executionContext: AsyncLocalStorage<
-    Pick<HaloToolContext, "signal" | "modelId">
+  executionContext: AsyncLocalStorage<ToolExecutionContext>;
+  context: Pick<
+    HaloToolContext,
+    "workspaceRoot" | "userId" | "plugins" | "pluginToolGrants"
   >;
-  context: Pick<HaloToolContext, "workspaceRoot" | "userId">;
 }) {
   return tool({
     name: input.haloTool.name,
@@ -208,11 +217,12 @@ function toExecutorTool(input: {
           requiredCapabilities: input.haloTool.requiredCapabilities,
         });
         if (authorization instanceof Error) return authorization;
-        const context = input.executionContext.getStore();
+        // SAFETY: ToolRuntime runs every Executor invocation inside executionContext.
+        const context =
+          input.executionContext.getStore() as ToolExecutionContext;
         return input.haloTool.execute(args, {
           ...input.context,
-          signal: context?.signal,
-          modelId: context?.modelId,
+          ...context,
         });
       }).pipe(
         Effect.flatMap((result) =>
@@ -254,6 +264,8 @@ type ToolRuntimeOptions = {
   credentialVault: CredentialVault;
   toolPlugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
+  plugins: PluginService;
+  pluginToolGrants: PluginToolGrants;
   oauthRedirectUri: string | undefined;
 };
 
@@ -266,9 +278,7 @@ export class ToolRuntime {
     private readonly executor: Executor<HaloRuntimePlugins>,
     private readonly engine: ExecutionEngine<Cause.YieldableError>,
     private readonly toolInvoker: SandboxToolInvoker,
-    private readonly executionContext: AsyncLocalStorage<
-      Pick<HaloToolContext, "signal" | "modelId">
-    >,
+    private readonly executionContext: AsyncLocalStorage<ToolExecutionContext>,
     private readonly toolPlugins: readonly HaloToolPlugin[],
     private readonly authority: AgentAuthority,
   ) {}
@@ -328,7 +338,7 @@ export class ToolRuntime {
   }) {
     const connectionRequests: ConnectionRequest[] = [];
     const execution = await this.executionContext.run(
-      { signal: input.signal, modelId: input.modelId },
+      { signal: input.signal, modelId: input.modelId, runtime: this },
       () =>
         Effect.runPromise(
           this.engine.execute(input.code, {
@@ -367,7 +377,7 @@ export class ToolRuntime {
     modelId?: string;
   }) {
     const invocation = await this.executionContext.run(
-      { signal: input.signal, modelId: input.modelId },
+      { signal: input.signal, modelId: input.modelId, runtime: this },
       () =>
         Effect.runPromise(
           this.executor.execute(ToolAddress.make(input.path), input.args),
@@ -396,7 +406,7 @@ export class ToolRuntime {
     signal?: AbortSignal;
   }): Promise<ToolResult<unknown> | ToolRuntimeError> {
     const result = await this.executionContext.run(
-      { signal: input.signal, modelId: undefined },
+      { signal: input.signal, modelId: undefined, runtime: this },
       () =>
         Effect.runPromise(this.toolInvoker.invoke(input))
           .then((value) => {
@@ -530,9 +540,7 @@ async function createToolRuntime(
   if (quickJsModule instanceof Error) return quickJsModule;
   setQuickJSModule(quickJsModule);
 
-  const executionContext = new AsyncLocalStorage<
-    Pick<HaloToolContext, "signal" | "modelId">
-  >();
+  const executionContext = new AsyncLocalStorage<ToolExecutionContext>();
   const executor = await Effect.runPromise(
     createExecutor({
       tenant: Tenant.make(input.workspaceRoot),
@@ -545,6 +553,8 @@ async function createToolRuntime(
           context: {
             workspaceRoot: input.workspaceRoot,
             userId: input.userId,
+            plugins: input.plugins,
+            pluginToolGrants: input.pluginToolGrants,
           },
         }),
         googleOpenApiPlugin,

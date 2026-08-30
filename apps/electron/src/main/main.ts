@@ -28,6 +28,7 @@ import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
 import { workspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
 import { workspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
+import { pluginManagementPlugin } from "./agent/tools/plugins/PluginManagementPlugin.js";
 import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
@@ -87,25 +88,29 @@ const toolPlugins = [
   workspaceFilesPlugin,
   workspaceBashPlugin,
   parallelSearchPlugin,
+  pluginManagementPlugin,
 ];
 const authority = new StaticAgentAuthority([
   "workspace.files.read",
   "workspace.files.write",
   "workspace.shell.execute",
   "network.web.search",
+  "halo.plugins.manage",
 ]);
+const pluginService = new PluginService(workspaceService);
+const pluginToolGrants = new PluginToolGrants(workspaceService);
 const toolRuntime = new ToolRuntimeService({
   workspace: workspaceService,
   user: userService,
   toolPlugins,
   authority,
+  plugins: pluginService,
+  pluginToolGrants,
 });
 const sessionRegistry = new SessionRegistry({
   workspace: workspaceService,
   toolRuntime,
 });
-const pluginService = new PluginService(workspaceService);
-const pluginToolGrants = new PluginToolGrants(workspaceService);
 let mainWindow: BrowserWindow | undefined;
 let rpcHttp: HaloRpcHttp | undefined;
 let shutdownStarted = false;
