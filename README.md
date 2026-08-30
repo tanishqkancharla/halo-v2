@@ -13,9 +13,10 @@ Halo is an Electron desktop app with a React renderer and Pi in the main process
 
 ## Local development
 
-Install dependencies, then start Halo from the repository root:
+Install [pnpm 12](https://pnpm.io/installation) with the standalone script, not Corepack. `latest` on npm still points at pnpm 11, so pass the 12 line explicitly:
 
 ```sh
+curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=12.1.0 sh -
 pnpm install
 pnpm dev
 ```

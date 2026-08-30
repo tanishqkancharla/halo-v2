@@ -10,6 +10,7 @@ allowBuilds:
   better-sqlite3: false
   edgedriver: false
   electron: true
+  pnpm: true
   electron-winstaller: true
   esbuild: true
   fs-xattr: true

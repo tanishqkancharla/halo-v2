@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "==> Activating pnpm 11.17.0"
-time corepack install --global pnpm@11.17.0
+# Corepack wraps pnpm in a Node shim and does not install pnpm 12's native binary.
+PNPM_VERSION="$(node -p "require('./package.json').packageManager.slice('pnpm@'.length)")"
+export PNPM_HOME="${PNPM_HOME:-$HOME/.local/share/pnpm}"
+export PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+
+echo "==> Installing pnpm ${PNPM_VERSION}"
+curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION="$PNPM_VERSION" PNPM_HOME="$PNPM_HOME" sh -
+hash -r
+pnpm --version
 
 echo "==> Installing workspace dependencies"
 time pnpm install --frozen-lockfile
