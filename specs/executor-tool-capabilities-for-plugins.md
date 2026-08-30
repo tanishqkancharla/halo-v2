@@ -228,7 +228,7 @@ Expose Executor's sandbox path view from `ToolRuntime`: list paths by stripping 
 Add a host-side recursive proxy that mirrors QuickJS property accumulation. It authorizes the complete path through `PluginToolGrants` before invoking. It must handle symbol and `then` reads the same way as Executor's runtimes so a namespace is not treated as a Promise.
 
 ```callstack
- PluginToolProxy.apply(path, input)
+ PluginToolsFacade.apply(path, input)
 +├── PluginToolGrants.authorize({ pluginId, path })
 +│   ├── reconcile current manifest paths
 +│   └── exact granted-path membership
@@ -275,11 +275,11 @@ export type PluginTools = {
 } & ((input: unknown) => Promise<PluginToolResult>);
 ```
 
-- [ ] Add `listToolPaths` and `invokePath` to `ToolRuntime`, using Executor's exported invoker rather than duplicating its error conversion.
-- [ ] Add the public `PluginTools` and `PluginToolResult` contracts to `packages/plugin-sdk/src/server.ts`.
-- [ ] Add a host proxy beside plugin runtime code that collects exact segments and accepts one object argument.
-- [ ] Return a safe `tool_not_granted` envelope before Executor sees a denied path; do not expose raw causes, tokens, URLs, or headers.
-- [ ] Add focused tests for path accumulation, exact-path denial, direct result shape, symbol/`then` handling, then run `pnpm run check-affected`.
+- [x] Add `listToolPaths` and `invokePath` to `ToolRuntime`, using Executor's exported invoker rather than duplicating its error conversion.
+- [x] Add the public `PluginTools` and `PluginToolResult` contracts to `packages/plugin-sdk/src/server.ts`.
+- [x] Add a host proxy beside plugin runtime code that collects exact segments and accepts one object argument.
+- [x] Return a safe `tool_not_granted` envelope before Executor sees a denied path; do not expose raw causes, tokens, URLs, or headers.
+- [ ] Prove path accumulation, exact-path denial, direct result shape, and symbol/`then` handling through the real plugin invocation flow added in phase 4.
 
 ### Phase 4: Give plugin server handlers their granted tools
 

@@ -20,6 +20,7 @@ Bump `apps/electron/package.json` `version`, commit, then create and push a git 
 - Don't over-worry. Avoid guard clauses, `if`/`throw`, retries, fallback values, and defensive checks unless the user asked for them or you know a specific error can happen and this layer is responsible for handling it. When handling a known external quirk, add a short comment that names the source of the behavior.
 - Local code should have local worries. Do not compensate in one place for sub-optimal behavior in another place when the link is not direct. Step back, identify the ownership boundary, and consider a cleaner design instead.
 - Prefer explicit types; avoid `any`.
+- Put types in the same file as the implementation that owns them.
 - Prefer TypeScript `private` / `private readonly` over `#` private fields, matching the rest of the codebase.
 - TypeScript uses strict mode with `noUncheckedIndexedAccess` enabled.
 - ESM imports use `.js` extensions even for TypeScript files.

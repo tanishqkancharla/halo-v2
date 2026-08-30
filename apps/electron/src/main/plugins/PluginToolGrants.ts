@@ -31,7 +31,6 @@ type DeclaredPathsInput = {
   declaredPaths: readonly string[];
 };
 
-// oxlint-disable-next-line anti-slop/no-unused-exports -- Phase 3 will consume the grant store.
 export class PluginToolGrants {
   constructor(private readonly workspace: WorkspaceService) {}
 
@@ -69,6 +68,12 @@ export class PluginToolGrants {
     const written = await this.write(state);
     if (written instanceof Error) return written;
     return { declared, granted, added };
+  }
+
+  async authorize(input: DeclaredPathsInput & { path: string }) {
+    const reconciled = await this.reconcile(input);
+    if (reconciled instanceof Error) return reconciled;
+    return reconciled.granted.includes(input.path);
   }
 
   private async read() {

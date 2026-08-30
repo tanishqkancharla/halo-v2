@@ -1,9 +1,16 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import type * as Cause from "effect/Cause";
 import {
   createExecutionEngine,
+  type ExecutionEngine,
   INTEGRATION_INVENTORY_HEADER,
+  makeExecutorToolInvoker,
 } from "@executor-js/execution/core";
-import { openApiPlugin } from "@executor-js/plugin-openapi/core";
+import type { SandboxToolInvoker } from "@executor-js/codemode-core";
+import {
+  openApiPlugin,
+  type OpenApiPluginExtension,
+} from "@executor-js/plugin-openapi/core";
 import {
   googleCatalog,
   googleCatalogOAuthScopesForPreset,
@@ -27,11 +34,13 @@ import {
   OAuthClientSlug,
   OAuthState,
   Owner,
+  type Plugin,
   StorageError,
   Subject,
   Tenant,
   tool,
   ToolAddress,
+  type ToolResult,
 } from "@executor-js/sdk/core";
 import quickJsVariant from "@jitl/quickjs-singlefile-cjs-release-sync";
 import { type Static, type TObject, Type } from "@sinclair/typebox";
@@ -174,8 +183,8 @@ const oauthStartInputSchema = Type.Object({
 });
 
 type HaloRuntimePlugins = readonly [
-  ReturnType<typeof haloToolsPlugin>,
-  typeof googleOpenApiPlugin,
+  Plugin<"halo-tools", object>,
+  Plugin<"openapi", OpenApiPluginExtension>,
 ];
 
 function toExecutorTool(input: {
@@ -255,7 +264,8 @@ export class ToolRuntime {
 
   constructor(
     private readonly executor: Executor<HaloRuntimePlugins>,
-    private readonly engine: ReturnType<typeof createExecutionEngine>,
+    private readonly engine: ExecutionEngine<Cause.YieldableError>,
+    private readonly toolInvoker: SandboxToolInvoker,
     private readonly executionContext: AsyncLocalStorage<
       Pick<HaloToolContext, "signal" | "modelId">
     >,
@@ -370,6 +380,36 @@ export class ToolRuntime {
     );
     if (invocation instanceof Error) return invocation;
     return invocation;
+  }
+
+  async listToolPaths() {
+    const tools = await Effect.runPromise(this.executor.tools.list()).catch(
+      (cause) => new ToolRuntimeError({ operation: "tool listing", cause }),
+    );
+    if (tools instanceof Error) return tools;
+    return tools.map((catalogTool) => sandboxPath(String(catalogTool.address)));
+  }
+
+  async invokePath(input: {
+    path: string;
+    args: unknown;
+    signal?: AbortSignal;
+  }): Promise<ToolResult<unknown> | ToolRuntimeError> {
+    const result = await this.executionContext.run(
+      { signal: input.signal, modelId: undefined },
+      () =>
+        Effect.runPromise(this.toolInvoker.invoke(input))
+          .then((value) => {
+            // SAFETY: makeExecutorToolInvoker normalizes every successful invocation to ToolResult.
+            return value as ToolResult<unknown>;
+          })
+          .catch(
+            (cause) =>
+              new ToolRuntimeError({ operation: "tool invocation", cause }),
+          ),
+    );
+    if (result instanceof Error) return result;
+    return result;
   }
 
   async search(input: { query: string; limit?: number }) {
@@ -559,10 +599,17 @@ async function createToolRuntime(
   return new ToolRuntime(
     executor,
     engine,
+    makeExecutorToolInvoker(executor, { invokeOptions: {} }),
     executionContext,
     input.toolPlugins,
     input.authority,
   );
+}
+
+function sandboxPath(address: string) {
+  return address.startsWith("tools.")
+    ? address.slice("tools.".length)
+    : address;
 }
 
 function connectionInput(

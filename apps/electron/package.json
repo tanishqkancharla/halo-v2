@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json"
   },
   "dependencies": {
+    "@executor-js/codemode-core": "1.6.0",
     "@executor-js/execution": "1.6.0",
     "@executor-js/fumadb": "1.5.7",
     "@executor-js/plugin-openapi": "1.6.0",
