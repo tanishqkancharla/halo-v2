@@ -5,6 +5,7 @@ import { style, useStyles } from "purse-styles";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
+import { SidebarNavigationProvider } from "@halo/plugin-sdk/view";
 import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
 import { LoadingPage } from "./LoadingPage.tsx";
 import { MainPane } from "./MainPane.tsx";
@@ -99,20 +100,22 @@ function WorkspaceShell({
         </div>
       )}
       <Router hook={hook}>
-        <div className={shell} data-testid="sessions-shell">
-          <Sidebar
-            sessions={sessions}
-            pluginViews={pluginViews}
-            pluginErrors={pluginErrors}
-            pluginServers={pluginServers}
-            appInfo={appInfo}
-          />
-          <MainPane
-            sessions={sessions}
-            pluginViews={pluginViews}
-            pluginServers={pluginServers}
-          />
-        </div>
+        <SidebarNavigationProvider>
+          <div className={shell} data-testid="sessions-shell">
+            <Sidebar
+              sessions={sessions}
+              pluginViews={pluginViews}
+              pluginErrors={pluginErrors}
+              pluginServers={pluginServers}
+              appInfo={appInfo}
+            />
+            <MainPane
+              sessions={sessions}
+              pluginViews={pluginViews}
+              pluginServers={pluginServers}
+            />
+          </div>
+        </SidebarNavigationProvider>
       </Router>
     </div>
   );

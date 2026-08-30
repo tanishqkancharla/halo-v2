@@ -29,6 +29,8 @@ out/
 build
 dist
 /tmp/
+!packages/plugin-sdk/dist/
+!packages/plugin-sdk/dist/**
 
 
 # Debug

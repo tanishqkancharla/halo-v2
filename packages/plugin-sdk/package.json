@@ -31,7 +31,7 @@
     "@tandem/server": "github:tanishqkancharla/tandem#path:packages/server",
     "@tandem/types": "github:tanishqkancharla/tandem#path:packages/types",
     "errore": "^0.14.1",
-    "maui": "github:tanishqkancharla/maui#v0.0.5",
+    "maui": "npm:@tanishqkancharla/maui@0.0.11",
     "purse-styles": "^0.2.1",
     "wouter": "^3.10.0"
   },
@@ -39,7 +39,6 @@
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.20.1",
     "@types/react": "19.2.18",
-    "dts-bundle-generator": "9.5.1",
     "react": "^19.2.8",
     "typescript": "7.0.2",
     "typescript6": "npm:typescript@5.9.3",

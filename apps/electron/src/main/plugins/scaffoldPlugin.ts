@@ -1,6 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import * as errore from "errore";
+import {
+  contractPeerDependencies,
+  mauiPackage,
+} from "@halo/plugin-sdk/contract";
 import { installPluginSdkContract } from "./installPluginSdk.js";
 import { writePluginTsconfig } from "./typecheckPlugin.js";
 
@@ -59,6 +63,9 @@ function packageJsonSource(id: string, appVersion: string) {
       },
       devDependencies: {
         "@get-halo/plugin-sdk": appVersion,
+        "@types/react": "19.2.2",
+        ...contractPeerDependencies,
+        maui: mauiPackage,
       },
     },
     undefined,
@@ -68,19 +75,17 @@ function packageJsonSource(id: string, appVersion: string) {
 
 function viewSource(id: string) {
   const name = pluginDisplayName(id);
-  return `import {
-  Flex,
-  H1,
-  Route,
+  return `import { Flex, H1 } from "maui";
+import { Route, Switch } from "wouter";
+import {
   SidebarItem,
   SidebarSection,
-  Switch,
 } from "@get-halo/plugin-sdk/view";
 
 export function Sidebar() {
   return (
     <SidebarSection label="${name}">
-      <SidebarItem href="/">Home</SidebarItem>
+      <SidebarItem href="/" pageTitle="Home">Home</SidebarItem>
     </SidebarSection>
   );
 }

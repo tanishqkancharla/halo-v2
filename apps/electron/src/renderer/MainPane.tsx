@@ -1,4 +1,7 @@
-import { PluginServerProvider } from "@halo/plugin-sdk/view";
+import {
+  PluginServerProvider,
+  useSidebarNavigation,
+} from "@halo/plugin-sdk/view";
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Route, Switch, useLocation } from "wouter";
@@ -87,13 +90,18 @@ function PluginRoutesPane({
   server: RouterClient<AnyRouter> | undefined;
 }) {
   const pane = useStyles(styles.pluginPane);
+  const body = useStyles(styles.pluginBody);
+  const navigation = useSidebarNavigation();
   const Routes = plugin.Routes;
   if (Routes === undefined) return <MissingPlugin pluginId={plugin.id} />;
   return (
     <main className={pane} aria-label={plugin.id}>
-      <PluginServerProvider pluginId={plugin.id} server={server}>
-        <Routes />
-      </PluginServerProvider>
+      <ThreadHeader section={navigation?.section} title={navigation?.page} />
+      <div className={body}>
+        <PluginServerProvider pluginId={plugin.id} server={server}>
+          <Routes />
+        </PluginServerProvider>
+      </div>
     </main>
   );
 }
@@ -360,8 +368,14 @@ const styles = {
     width: "100%",
     minWidth: 0,
     minHeight: 0,
-    overflow: "auto",
+    overflow: "hidden",
     backgroundColor: backgroundColor.app,
+  }),
+  pluginBody: style({
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "auto",
   }),
   body: style(
     flex({ direction: "column" }),

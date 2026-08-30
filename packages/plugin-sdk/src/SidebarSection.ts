@@ -8,6 +8,7 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
+import { SidebarSectionContext } from "./SidebarNavigationProvider.js";
 
 export const sidebarPadding = style(spacing.padding({ x: 4 }));
 
@@ -52,7 +53,11 @@ export function SidebarSection(props: SidebarSectionProps) {
     createElement(
       "div",
       { className: bodyClassName, role, "aria-labelledby": labelId },
-      props.children,
+      createElement(
+        SidebarSectionContext.Provider,
+        { value: props.label },
+        props.children,
+      ),
     ),
   );
 }

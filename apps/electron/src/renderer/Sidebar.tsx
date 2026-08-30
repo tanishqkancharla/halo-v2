@@ -64,6 +64,7 @@ export function Sidebar({
           <SidebarItem
             key={session.sessionId}
             href={`/sessions/${session.sessionId}`}
+            pageTitle={session.title ? session.title : session.sessionId}
           >
             {session.title ? session.title : session.sessionId}
           </SidebarItem>
@@ -186,8 +187,9 @@ const styles = {
     backgroundColor: `light-dark(${colors.gray[1]}, ${colors.gray[2]})`,
   }),
   titleBar: style({
-    minHeight: "42px",
+    minHeight: "36px",
     flexShrink: 0,
+    WebkitAppRegion: "drag",
   }),
   newButton: style(flex({ align: "center", gap: 3 }), {
     alignSelf: "stretch",

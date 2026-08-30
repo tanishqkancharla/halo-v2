@@ -12,7 +12,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const written = await writeContractPackage({
   directory: join(root, "contract"),
   version,
-  bundledTypesDir: join(root, "bundled-types"),
+  distDir: join(root, "dist"),
 });
 if (written instanceof Error) {
   console.error(written.message);

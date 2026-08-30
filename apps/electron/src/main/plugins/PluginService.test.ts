@@ -49,10 +49,33 @@ describe("PluginService", () => {
         await readFile(join(created.directory, "package.json"), "utf8"),
       ) as {
         halo: { name: string };
-        devDependencies: { "@get-halo/plugin-sdk": string };
+        devDependencies: Record<string, string>;
       };
       expect(packageJson.halo.name).toBe("Notes");
       expect(packageJson.devDependencies["@get-halo/plugin-sdk"]).toBe("1.2.3");
+      expect(packageJson.devDependencies.maui).toBe(
+        "npm:@tanishqkancharla/maui@0.0.11",
+      );
+      expect(packageJson.devDependencies.react).toBe("^19.2.8");
+      // SAFETY: the installed SDK package JSON is written by contractPackageJson.
+      const sdkPackageJson = JSON.parse(
+        await readFile(
+          join(
+            created.directory,
+            "node_modules",
+            "@get-halo",
+            "plugin-sdk",
+            "package.json",
+          ),
+          "utf8",
+        ),
+      ) as { peerDependencies: Record<string, string> };
+      expect(sdkPackageJson.peerDependencies).toEqual({
+        maui: "0.0.11",
+        "purse-styles": "^0.2.1",
+        react: "^19.2.8",
+        wouter: "^3.10.0",
+      });
 
       const built = await plugins.build();
       if (built instanceof Error) throw built;
@@ -163,7 +186,7 @@ export default {
 
       await writeFile(
         join(workspaceRoot, ".halo", "plugins", "notes", "view.tsx"),
-        `import { Flex } from "@get-halo/plugin-sdk/view";
+        `import { Flex } from "maui";
 export function Routes() {
   return <Flex noSuchProp />;
 }
@@ -211,23 +234,23 @@ export default {
       );
       await writeFile(
         join(directory, "view.tsx"),
-        `import {
+        `import { useState } from "react";
+import { style, useStyles } from "purse-styles";
+import { Route, Switch } from "wouter";
+import {
   Button,
   Checkbox,
   Flex,
   H1,
-  PluginStorageProvider,
-  Route,
-  Switch,
   TextField,
   backgroundColor,
   radius,
   shadow,
-  style,
-  useStyles,
+} from "maui";
+import {
+  PluginStorageProvider,
   usePluginQuery,
   usePluginTransaction,
-  useState,
 } from "@get-halo/plugin-sdk/view";
 import { todoTables } from "./storage.ts";
 

@@ -2,6 +2,7 @@ import { type ComponentType, type ReactNode, type SVGProps } from "react";
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 type SidebarItemProps = {
     href: string;
+    pageTitle: string;
     children: ReactNode;
     icon?: IconComponent;
     trailing?: ReactNode;

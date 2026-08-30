@@ -4,7 +4,6 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import * as errore from "errore";
 import haloPluginSkill from "./haloPluginSkill.md?raw";
-import mauiSkill from "../bundled/mauiSkill.md?raw";
 import type { WorkspaceLayout } from "../workspace/WorkspaceService.js";
 
 const require = createRequire(import.meta.url);
@@ -25,6 +24,12 @@ export async function seedPluginWorkspace(
     "SKILL.md",
   );
   const mauiSkillPath = join(layout.agentDir, "skills", "maui", "SKILL.md");
+  const mauiRoot = dirname(require.resolve("maui/package.json"));
+  const mauiSkill = await readFile(
+    join(mauiRoot, "skills", "maui", "SKILL.md"),
+    "utf8",
+  ).catch((e) => new PluginSeedError({ cause: e }));
+  if (mauiSkill instanceof Error) return mauiSkill;
   const pluginSkill = await writeIfStale({
     path: pluginSkillPath,
     contents: haloPluginSkill,
@@ -39,8 +44,7 @@ export async function seedPluginWorkspace(
     alwaysWrite: args.alwaysWrite,
   });
   if (mauiSkillWritten instanceof Error) return mauiSkillWritten;
-  const mauiRoot = dirname(require.resolve("maui/package.json"));
-  const referencesRoot = join(dirname(mauiSkillPath), "references");
+  const referencesRoot = join(dirname(mauiSkillPath), "src");
   for (const directory of ["apps", "patterns"]) {
     const copied = await cp(
       join(mauiRoot, "src", directory),

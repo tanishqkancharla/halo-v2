@@ -1,7 +1,19 @@
+import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { basename, join, relative } from "node:path";
+import { createRequire } from "node:module";
+import { basename, dirname, join, relative } from "node:path";
 import * as errore from "errore";
 import ts from "typescript6";
+
+const require = createRequire(import.meta.url);
+
+function packageDirectory(entryPath: string) {
+  let directory = dirname(entryPath);
+  while (!existsSync(join(directory, "package.json"))) {
+    directory = dirname(directory);
+  }
+  return directory;
+}
 
 const pluginTsconfig = `${JSON.stringify(
   {
@@ -15,16 +27,14 @@ const pluginTsconfig = `${JSON.stringify(
       moduleResolution: "bundler",
       skipLibCheck: true,
       paths: {
-        csstype: [
-          "./node_modules/@get-halo/plugin-sdk/bundled-types/csstype.d.ts",
+        csstype: [dirname(require.resolve("csstype/index.d.ts"))],
+        maui: [dirname(require.resolve("maui/package.json"))],
+        "purse-styles": [dirname(require.resolve("purse-styles/package.json"))],
+        react: [dirname(require.resolve("@types/react/package.json"))],
+        "react/*": [
+          `${dirname(require.resolve("@types/react/package.json"))}/*`,
         ],
-        react: ["./node_modules/@get-halo/plugin-sdk/bundled-types/index.d.ts"],
-        "react/jsx-runtime": [
-          "./node_modules/@get-halo/plugin-sdk/bundled-types/jsx-runtime.d.ts",
-        ],
-        "react/jsx-dev-runtime": [
-          "./node_modules/@get-halo/plugin-sdk/bundled-types/jsx-runtime.d.ts",
-        ],
+        wouter: [packageDirectory(require.resolve("wouter"))],
       },
     },
     include: ["*.ts", "*.tsx", "view/**/*", "server/**/*"],

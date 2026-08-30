@@ -9,7 +9,7 @@ const skipDirectoryNames = new Set([
 	".turbo",
 	".vite",
 	"build",
-	"bundled-types",
+	"dist",
 	"contract",
 	"coverage",
 	"dist",

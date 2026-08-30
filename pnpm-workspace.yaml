@@ -17,14 +17,12 @@ allowBuilds:
   geckodriver: false
   koffi: false
   macos-alias: true
-  "@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc": true
   msgpackr-extract: false
   protobufjs: false
   sharp: false
   workerd: true
 # alchemy@2.0.0-beta.70 still uses Schema.TaggedErrorClass (removed in effect beta.104+)
 overrides:
-  "dts-bundle-generator>typescript": "5.9.3"
   "@effect/platform-node": "4.0.0-beta.103"
   "@effect/platform-node-shared": "4.0.0-beta.103"
   effect: "4.0.0-beta.103"
@@ -85,3 +83,4 @@ minimumReleaseAgeExclude:
   - "@executor-js/runtime-quickjs@1.6.0"
   - "@executor-js/sdk@1.6.0"
   - tsx@4.23.13
+  - '@tanishqkancharla/maui@0.0.9 || 0.0.10 || 0.0.11'

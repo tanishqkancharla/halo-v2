@@ -1,4 +1,4 @@
-import { cp, mkdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import * as errore from "errore";
 
@@ -14,11 +14,16 @@ export const contractTypeFiles = [
   "server.d.ts",
   "schema.d.ts",
   "storage.d.ts",
-  "global.d.ts",
-  "index.d.ts",
-  "csstype.d.ts",
-  "jsx-runtime.d.ts",
 ] as const;
+
+export const contractPeerDependencies = {
+  maui: "0.0.11",
+  "purse-styles": "^0.2.1",
+  react: "^19.2.8",
+  wouter: "^3.10.0",
+} as const;
+
+export const mauiPackage = "npm:@tanishqkancharla/maui@0.0.11";
 
 export function contractPackageJson(version: string) {
   return {
@@ -32,11 +37,12 @@ export function contractPackageJson(version: string) {
     publishConfig: {
       access: "public",
     },
+    peerDependencies: contractPeerDependencies,
     exports: {
-      "./view": { types: "./bundled-types/sdk/view.d.ts" },
-      "./server": { types: "./bundled-types/server.d.ts" },
-      "./schema": { types: "./bundled-types/schema.d.ts" },
-      "./storage": { types: "./bundled-types/storage.d.ts" },
+      "./view": { types: "./dist/sdk/view.d.ts" },
+      "./server": { types: "./dist/server.d.ts" },
+      "./schema": { types: "./dist/schema.d.ts" },
+      "./storage": { types: "./dist/storage.d.ts" },
       "./package.json": "./package.json",
     },
   };
@@ -45,20 +51,25 @@ export function contractPackageJson(version: string) {
 export async function writeContractPackage(args: {
   directory: string;
   version: string;
-  bundledTypesDir: string;
+  distDir: string;
 }) {
   const created = await mkdir(args.directory, { recursive: true }).catch(
     (e) => new ContractPackageError({ detail: "create directory", cause: e }),
   );
   if (created instanceof Error) return created;
 
-  const copied = await cp(
-    args.bundledTypesDir,
-    join(args.directory, "bundled-types"),
-    { recursive: true },
-  ).catch(
-    (e) => new ContractPackageError({ detail: "copy bundled-types", cause: e }),
+  const distDirectory = join(args.directory, "dist");
+  const removed = await rm(distDirectory, {
+    recursive: true,
+    force: true,
+  }).catch(
+    (e) => new ContractPackageError({ detail: "remove dist", cause: e }),
   );
+  if (removed instanceof Error) return removed;
+
+  const copied = await cp(args.distDir, distDirectory, {
+    recursive: true,
+  }).catch((e) => new ContractPackageError({ detail: "copy dist", cause: e }));
   if (copied instanceof Error) return copied;
 
   return writeFile(

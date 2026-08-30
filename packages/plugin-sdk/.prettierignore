@@ -1,6 +1,1 @@
-bundled-types/csstype.d.ts
-bundled-types/global.d.ts
-bundled-types/index.d.ts
-bundled-types/jsx-dev-runtime.d.ts
-bundled-types/jsx-runtime.d.ts
-bundled-types/sdk/
+dist/sdk/

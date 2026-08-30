@@ -11,7 +11,9 @@ Plugins live in `{workspace}/.halo/plugins/<id>/`. The folder name is the plugin
 
 Write plugin code only in that folder. Do not edit Halo app source.
 
-Always read the maui skill before writing view code. Use Maui components and React hooks from `@get-halo/plugin-sdk/view`. Do not use raw HTML controls. Do not import from `"react"`, `"maui"`, or `"purse-styles"`.
+Always read the maui skill before writing view code. Import Maui components and tokens from `"maui"`, styles from `"purse-styles"`, hooks from `"react"`, routing from `"wouter"`, and only Halo-owned APIs from `@get-halo/plugin-sdk/view`. Do not use raw HTML controls.
+
+The Maui skill also covers standalone apps. Halo already provides `MauiProvider`, so a plugin must not add another one.
 
 If the plugin keeps data, add `storage.ts` and `syncRoutes`. Do not use `localStorage`, `sessionStorage`, cookies, or files you invent.
 
@@ -51,9 +53,9 @@ Optional:
 
 ## View bundle
 
-Pin `@get-halo/plugin-sdk` in `devDependencies` to the exact Halo app version, with no caret. A mismatch fails types, build, and load. Halo copies this app's contract into the plugin `node_modules`. A clone without Halo runs `npm install` for the same pin, then `tsc`. Run and rebuild still need Halo.
+Pin `@get-halo/plugin-sdk` in `devDependencies` to the exact Halo app version, with no caret. A mismatch fails types, build, and load. Keep the React, Maui, purse-styles, and wouter packages written by `tools.plugins.create`; plugin views import them directly. Halo copies its own contract into the plugin `node_modules` and resolves those packages from the host while running `types`. A clone without Halo runs `npm install`, then `tsc`. Run and rebuild still need Halo.
 
-`halo plugin build` compiles the view with esbuild. Packages Halo already ships are external: `react`, `maui`, `purse-styles`, `wouter`, `@get-halo/plugin-sdk/view`. Import UI and hooks from `@get-halo/plugin-sdk/view`. That module is Maui, purse-styles (`style`, `useStyles`), wouter, and React hooks. Follow the maui skill. Do not wrap `MauiProvider`. Do not `npm install` `react`, `maui`, `purse-styles`, or `wouter`.
+`halo plugin build` compiles the view with esbuild. Packages Halo already ships are external: `react`, `maui`, `purse-styles`, `wouter`, `@get-halo/plugin-sdk/view`. Import each public package directly. `@get-halo/plugin-sdk/view` contains only Halo-owned providers, hooks, and sidebar components. Follow the maui skill and do not wrap `MauiProvider`.
 
 Other packages are allowed. Add them to that plugin's `package.json`, run `npm install` in the plugin folder, then `halo plugin build`. esbuild inlines them. A missing package fails the build.
 
@@ -72,7 +74,12 @@ Import `pluginOs` and `syncRoutes` from `@get-halo/plugin-sdk/server`. Import `c
     "view": "./view.tsx"
   },
   "devDependencies": {
-    "@get-halo/plugin-sdk": "0.1.20"
+    "@get-halo/plugin-sdk": "0.1.20",
+    "@types/react": "19.2.2",
+    "maui": "npm:@tanishqkancharla/maui@0.0.11",
+    "purse-styles": "^0.2.1",
+    "react": "^19.2.8",
+    "wouter": "^3.10.0"
   }
 }
 ```
@@ -86,21 +93,16 @@ Use the running Halo version, not this example number.
 The host paints that pane with `backgroundColor.app`. Follow the maui skill for page width: center ordinary pages at `proseMaxWidth`. Full pane width should be reserved for when you need it (horizontally dense tools, like tables, a CRM, kanban, or side-by-side panes).
 
 ```tsx
-import {
-  Flex,
-  H1,
-  Padding,
-  Route,
-  SidebarItem,
-  SidebarSection,
-  Switch,
-  proseMaxWidth,
-} from "@get-halo/plugin-sdk/view";
+import { Flex, H1, Padding, proseMaxWidth } from "maui";
+import { Route, Switch } from "wouter";
+import { SidebarItem, SidebarSection } from "@get-halo/plugin-sdk/view";
 
 export function Sidebar() {
   return (
     <SidebarSection label="Notes">
-      <SidebarItem href="/">Scratch</SidebarItem>
+      <SidebarItem href="/" pageTitle="Scratch">
+        Scratch
+      </SidebarItem>
     </SidebarSection>
   );
 }
@@ -209,7 +211,12 @@ export default {
     "server": "./server.ts"
   },
   "devDependencies": {
-    "@get-halo/plugin-sdk": "0.1.20"
+    "@get-halo/plugin-sdk": "0.1.20",
+    "@types/react": "19.2.2",
+    "maui": "npm:@tanishqkancharla/maui@0.0.11",
+    "purse-styles": "^0.2.1",
+    "react": "^19.2.8",
+    "wouter": "^3.10.0"
   }
 }
 ```
@@ -217,29 +224,32 @@ export default {
 `view.tsx`:
 
 ```tsx
+import { useState } from "react";
+import { Route, Switch } from "wouter";
 import {
   Button,
   Checkbox,
   Flex,
   H1,
   Padding,
-  PluginStorageProvider,
-  Route,
-  SidebarItem,
-  SidebarSection,
-  Switch,
   TextField,
   proseMaxWidth,
+} from "maui";
+import {
+  PluginStorageProvider,
+  SidebarItem,
+  SidebarSection,
   usePluginQuery,
   usePluginTransaction,
-  useState,
 } from "@get-halo/plugin-sdk/view";
 import { todoTables } from "./storage.ts";
 
 export function Sidebar() {
   return (
     <SidebarSection label="Todos">
-      <SidebarItem href="/">List</SidebarItem>
+      <SidebarItem href="/" pageTitle="List">
+        List
+      </SidebarItem>
     </SidebarSection>
   );
 }

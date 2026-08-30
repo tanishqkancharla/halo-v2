@@ -8,11 +8,13 @@ import { backgroundColor, colors, navigationItem, radius, spacing } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Link, useRoute } from "wouter";
 import { sidebarPadding } from "./SidebarSection.js";
+import { useRegisterSidebarNavigation } from "./SidebarNavigationProvider.js";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 type SidebarItemProps = {
   href: string;
+  pageTitle: string;
   children: ReactNode;
   icon?: IconComponent;
   trailing?: ReactNode;
@@ -31,6 +33,7 @@ export function SidebarItem(props: SidebarItemProps) {
   const labelClassName = useStyles(itemLabelClass);
   const trailingClassName = useStyles(trailingClass);
   const Icon = props.icon;
+  useRegisterSidebarNavigation({ active: isActive, page: props.pageTitle });
 
   return createElement(
     "div",

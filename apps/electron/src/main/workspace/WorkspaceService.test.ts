@@ -234,7 +234,7 @@ describe("workspace path helpers", () => {
           "agent",
           "skills",
           "maui",
-          "references",
+          "src",
           "apps",
           "Calendar",
           "Calendar.tsx",
