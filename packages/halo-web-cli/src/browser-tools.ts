@@ -1,9 +1,9 @@
 import {
-  createBrowserTools,
-  LocalBrowserProvider,
-  type BrowserToolkit,
+  createBrowserToolsForPage,
+  type BorrowedPageBrowserToolkit,
 } from "libretto-browser-tools";
 import * as errore from "errore";
+import { chromium, type Browser } from "playwright";
 
 const debuggerVersionUrl = "http://127.0.0.1:4445/json/version";
 
@@ -17,8 +17,9 @@ type DebuggerVersion = {
 };
 
 type ConnectedTools = {
+  browser: Browser;
   sessionId: string;
-  toolkit: BrowserToolkit;
+  toolkit: BorrowedPageBrowserToolkit;
 };
 
 type ExecutionResult = {
@@ -35,6 +36,36 @@ type SnapshotResult = {
   };
   tree: string;
 };
+
+async function connectOverCdp(cdpUrl: string) {
+  // Playwright defaults to prefers-color-scheme: light on CDP attach.
+  // Halo follows the system theme, so that override flashes the window.
+  const browser = await chromium
+    .connectOverCDP(cdpUrl, { noDefaults: true })
+    .catch(
+      (e) =>
+        new BrowserToolsError({
+          reason: "Failed to attach to debugger",
+          cause: e,
+        }),
+    );
+  if (browser instanceof Error) return browser;
+
+  const context = browser.contexts()[0];
+  if (context === undefined) {
+    await browser.close();
+    return new BrowserToolsError({ reason: "Debugger has no browser context" });
+  }
+
+  const page = context.pages().at(-1);
+  if (page === undefined) {
+    await browser.close();
+    return new BrowserToolsError({ reason: "Debugger has no open pages" });
+  }
+
+  const toolkit = createBrowserToolsForPage(page);
+  return { browser, sessionId: toolkit.sessionId, toolkit };
+}
 
 async function connect() {
   const response = await fetch(debuggerVersionUrl).catch(
@@ -57,17 +88,7 @@ async function connect() {
     );
   if (version instanceof Error) return version;
 
-  const toolkit = createBrowserTools(new LocalBrowserProvider());
-  const connection = await toolkit.tools.browser_connect.execute({
-    cdpUrl: version.webSocketDebuggerUrl,
-  });
-
-  if (!connection.ok) {
-    await toolkit.dispose();
-    return new BrowserToolsError({ reason: connection.error });
-  }
-
-  return { sessionId: connection.sessionId, toolkit };
+  return await connectOverCdp(version.webSocketDebuggerUrl);
 }
 
 async function useConnectedTools<T>(
@@ -77,6 +98,7 @@ async function useConnectedTools<T>(
   if (connection instanceof Error) return connection;
 
   await using cleanup = new errore.AsyncDisposableStack();
+  cleanup.defer(() => connection.browser.close());
   cleanup.defer(() => connection.toolkit.dispose());
   return await run(connection);
 }

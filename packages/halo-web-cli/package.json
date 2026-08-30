@@ -19,7 +19,8 @@
   "dependencies": {
     "errore": "^0.14.1",
     "incur": "^0.4.20",
-    "libretto-browser-tools": "^0.1.2"
+    "libretto-browser-tools": "^0.1.2",
+    "playwright": "^1.62.1"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
