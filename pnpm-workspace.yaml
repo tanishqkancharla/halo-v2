@@ -24,6 +24,7 @@ allowBuilds:
   workerd: true
 # alchemy@2.0.0-beta.70 still uses Schema.TaggedErrorClass (removed in effect beta.104+)
 overrides:
+  "dts-bundle-generator>typescript": "5.9.3"
   "@effect/platform-node": "4.0.0-beta.103"
   "@effect/platform-node-shared": "4.0.0-beta.103"
   effect: "4.0.0-beta.103"

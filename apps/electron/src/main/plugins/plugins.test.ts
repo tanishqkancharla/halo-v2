@@ -279,4 +279,5 @@ export default {
       data: { path: "message.txt", text: "hello" },
     });
   },
+  15_000,
 );

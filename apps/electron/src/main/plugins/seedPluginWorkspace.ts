@@ -1,10 +1,13 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import * as errore from "errore";
 import haloPluginSkill from "./haloPluginSkill.md?raw";
 import mauiSkill from "../bundled/mauiSkill.md?raw";
 import type { WorkspaceLayout } from "../workspace/WorkspaceService.js";
+
+const require = createRequire(import.meta.url);
 
 export class PluginSeedError extends errore.createTaggedError({
   name: "PluginSeedError",
@@ -29,12 +32,23 @@ export async function seedPluginWorkspace(
     alwaysWrite: args.alwaysWrite,
   });
   if (pluginSkill instanceof Error) return pluginSkill;
-  return writeIfStale({
+  const mauiSkillWritten = await writeIfStale({
     path: mauiSkillPath,
     contents: mauiSkill,
     appVersion: args.appVersion,
     alwaysWrite: args.alwaysWrite,
   });
+  if (mauiSkillWritten instanceof Error) return mauiSkillWritten;
+  const mauiRoot = dirname(require.resolve("maui/package.json"));
+  const referencesRoot = join(dirname(mauiSkillPath), "references");
+  for (const directory of ["apps", "patterns"]) {
+    const copied = await cp(
+      join(mauiRoot, "src", directory),
+      join(referencesRoot, directory),
+      { recursive: true, force: true },
+    ).catch((e) => new PluginSeedError({ cause: e }));
+    if (copied instanceof Error) return copied;
+  }
 }
 
 function stampSkillVersion(contents: string, version: string) {

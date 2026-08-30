@@ -15,6 +15,8 @@ Always read the maui skill before writing view code. Use Maui components and Rea
 
 If the plugin keeps data, add `storage.ts` and `syncRoutes`. Do not use `localStorage`, `sessionStorage`, cookies, or files you invent.
 
+Plugins do not inherit the agent's tools. A plugin requests specific tools by listing their exact canonical paths in `package.json` under `halo.capabilities`, and its server calls those same paths through `context.tools`. Declaring a path does not grant it: check the request with `tools.plugins.check`, then explicitly add its current valid paths with `tools.plugins.grant`. Removing a declared path revokes it; adding it back requires a new grant. Connections and plugin grants are separate: connect integrations through Executor's normal connection flow, and never give credentials to plugin code.
+
 Halo must be running. During agent work, use the following exact calls through exec:
 
 1. `tools.plugins.create({ id })` — scaffold the plugin folder, pin `@get-halo/plugin-sdk` to this Halo version, and install that contract
@@ -279,7 +281,7 @@ function Home() {
         style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
       >
         <H1>Todos</H1>
-        <Flex gap={2}>
+        <Flex row gap={2}>
           <TextField
             aria-label="New todo"
             value={title}

@@ -57,6 +57,10 @@ export function PluginStorageProvider<Schema extends AnySchema>(args: {
   );
 }
 
+export function usePluginQuery<Row = { id: string }>(
+  query: { collection: string; where?: unknown },
+  deps: readonly unknown[],
+): Row[];
 export function usePluginQuery<
   Schema extends AnySchema,
   Query extends RelationalQuery<Schema, Relations>,

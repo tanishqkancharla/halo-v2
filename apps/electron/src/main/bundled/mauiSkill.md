@@ -9,9 +9,22 @@ description: >
 
 Halo already wraps the app in `MauiProvider` and paints the plugin pane with `backgroundColor.app`. Import every UI name from `@get-halo/plugin-sdk/view`. Do not import from `"maui"` or `"purse-styles"`. Do not wrap `MauiProvider`.
 
-Source (TypeScript, unminified): [maui/src/components](https://github.com/tanishqkancharla/maui/tree/main/src/components). Barrel: [maui/src/maui.ts](https://github.com/tanishqkancharla/maui/blob/main/src/maui.ts). Read those files for props.
-
 Do not use raw `<button>`, `<input>`, `<textarea>`, `<select>`, or a native checkbox.
+
+## Design approach
+
+Start from the closest Maui pattern or app before inventing layout or chrome. Reuse its structure and density, then adapt it to real data. Do not default to a generic dashboard of stat cards, pill clouds, oversized headings, or a separate raised card for every section.
+
+Closest references:
+
+- Calendar or schedule: `references/apps/Calendar/Calendar.tsx` — compact toolbar, integrated all-day row and time grid, small-radius tinted events
+- Mail or work queues: `references/patterns/Inbox.tsx` and `references/patterns/MessageList.tsx` — dense rows with quiet secondary text
+- Chat: `references/apps/AiChat/` and `references/patterns/AssistantMessage.tsx`
+- Dense editors: `references/apps/JsxEditor/` — full-pane tool layout
+
+Read the closest reference source before writing the view. Resolve these paths relative to this `SKILL.md`.
+
+Reserve full pane width for dense tools such as calendars, tables, kanban, and side-by-side editors. Ordinary reading, settings, and form pages use the centered `proseMaxWidth` pattern below.
 
 ## Page width
 
@@ -59,7 +72,7 @@ Prefer `Flex` over `style({ display: "flex" })`.
 
 ### Controls
 
-- `Button` — actions. `variant="quiet"` for secondary actions.
+- `Button` — actions. `variant="quiet"` for secondary actions and `variant="primary"` for the main action. Buttons already include their control surface and focus treatment.
 - `TextField` — text. `value`, `onChange(value)`, `aria-label` or `label`.
 - `QuietTextField` — borderless text.
 - `SearchField` `NumberField`
@@ -102,7 +115,7 @@ import {
     style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
   >
     <H1>Todos</H1>
-    <Flex gap={2}>
+    <Flex row gap={2}>
       <TextField aria-label="New todo" value={title} onChange={setTitle} />
       <Button onClick={add}>Add</Button>
     </Flex>
@@ -119,6 +132,16 @@ import {
 
 If you need `style()`, import `style` and tokens from `@get-halo/plugin-sdk/view`. Use `colors`, `background`, `backgroundColor`, `shadow`, `radius`, and `spacing`. Do not use raw `rgba(...)`, hex colors, or pixel padding.
 
+Use tokens directly; do not enumerate them or add a `getTokenValue` helper. Compose class names with `style()` and `useStyles()`:
+
+```tsx
+const card = style(radius.sm, shadow.subtle, {
+  backgroundColor: backgroundColor.element,
+});
+
+<div className={useStyles(card)} />;
+```
+
 - `backgroundColor.app` — page
 - `backgroundColor.element` — raised control/surface
 - `shadow.subtle` — cards and controls
@@ -129,8 +152,12 @@ Shadows already include a 1px ring. Do not also apply `border()`.
 
 `focusRing()` is the keyboard focus style. Do not hand-roll an outline.
 
+Hover fills snap immediately. Do not animate `background` or `background-color` on hover.
+
+Use `shadow.subtle` once on an ordinary raised surface or compound control. Use `shadow.medium` for tooltips and `shadow.strong` for popovers. Do not put shadows on every row or event in a dense schedule.
+
 Token source: [maui/src/tokens](https://github.com/tanishqkancharla/maui/tree/main/src/tokens).
 
 ## Custom CSS
 
-Use `style` and `useStyles` only when a Maui component cannot do the job. Most screens need no `style()` besides the `proseMaxWidth` column.
+Use `style` and `useStyles` when Maui components cannot express the layout. Keep custom CSS structural and token-based.

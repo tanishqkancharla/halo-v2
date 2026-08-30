@@ -226,6 +226,22 @@ describe("workspace path helpers", () => {
       "SKILL.md",
     );
     const original = await readFile(skillPath, "utf8");
+    expect(
+      await readFile(
+        join(
+          root,
+          ".pi",
+          "agent",
+          "skills",
+          "maui",
+          "references",
+          "apps",
+          "Calendar",
+          "Calendar.tsx",
+        ),
+        "utf8",
+      ),
+    ).toContain("export function Calendar");
     await writeFile(
       skillPath,
       '---\nversion: 1.2.3\n---\n# stale skill\nimport from "@halo/plugin-sdk/view"\n',

@@ -220,6 +220,11 @@ export default {
   Route,
   Switch,
   TextField,
+  backgroundColor,
+  radius,
+  shadow,
+  style,
+  useStyles,
   usePluginQuery,
   usePluginTransaction,
   useState,
@@ -227,6 +232,10 @@ export default {
 import { todoTables } from "./storage.ts";
 
 type Todo = { id: string; title: string; done: boolean };
+
+const card = style(radius.sm, shadow.subtle, {
+  backgroundColor: backgroundColor.element,
+});
 
 export function Routes() {
   return (
@@ -239,18 +248,20 @@ export function Routes() {
 }
 
 function Home() {
+  const cardClassName = useStyles(card);
   const todos = usePluginQuery<Todo>({ collection: "todos" }, []);
   const addTodo = usePluginTransaction((tx, title: string) => {
     tx.set("todos", { id: crypto.randomUUID(), title, done: false });
   });
   const [title, setTitle] = useState("");
   return (
+    <div className={cardClassName}>
     <Flex column gap={4}>
       <H1>Todos</H1>
       <TextField aria-label="New todo" value={title} onChange={setTitle} />
       <Button onClick={() => addTodo(title)}>Add</Button>
       {todos.map((todo) => (
-        <Flex key={todo.id} gap={2}>
+        <Flex key={todo.id} row gap={2}>
           <Checkbox
             label={todo.title}
             checked={todo.done}
@@ -261,6 +272,7 @@ function Home() {
         </Flex>
       ))}
     </Flex>
+    </div>
   );
 }
 `,

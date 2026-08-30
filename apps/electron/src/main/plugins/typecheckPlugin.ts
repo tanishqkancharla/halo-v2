@@ -15,7 +15,10 @@ const pluginTsconfig = `${JSON.stringify(
       moduleResolution: "bundler",
       skipLibCheck: true,
       paths: {
-        react: ["./node_modules/@get-halo/plugin-sdk/bundled-types/react.d.ts"],
+        csstype: [
+          "./node_modules/@get-halo/plugin-sdk/bundled-types/csstype.d.ts",
+        ],
+        react: ["./node_modules/@get-halo/plugin-sdk/bundled-types/index.d.ts"],
         "react/jsx-runtime": [
           "./node_modules/@get-halo/plugin-sdk/bundled-types/jsx-runtime.d.ts",
         ],

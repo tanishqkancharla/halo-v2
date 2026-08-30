@@ -10,11 +10,13 @@ export class ContractPackageError extends errore.createTaggedError({
 export const contractPackageName = "@get-halo/plugin-sdk";
 
 export const contractTypeFiles = [
-  "view.d.ts",
+  "sdk/view.d.ts",
   "server.d.ts",
   "schema.d.ts",
   "storage.d.ts",
-  "react.d.ts",
+  "global.d.ts",
+  "index.d.ts",
+  "csstype.d.ts",
   "jsx-runtime.d.ts",
 ] as const;
 
@@ -31,7 +33,7 @@ export function contractPackageJson(version: string) {
       access: "public",
     },
     exports: {
-      "./view": { types: "./bundled-types/view.d.ts" },
+      "./view": { types: "./bundled-types/sdk/view.d.ts" },
       "./server": { types: "./bundled-types/server.d.ts" },
       "./schema": { types: "./bundled-types/schema.d.ts" },
       "./storage": { types: "./bundled-types/storage.d.ts" },
