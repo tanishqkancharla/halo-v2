@@ -1,12 +1,17 @@
 import { implement, ORPCError } from "@orpc/server";
+import { createPluginToolsFacade } from "@halo/plugin-sdk/host";
 import type { Logger } from "@repo/logger";
 import { contract } from "../../shared/contract.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { WorkspaceService } from "../workspace/WorkspaceService.js";
+import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import type { PluginService } from "./PluginService.js";
+import type { PluginToolGrants } from "./PluginToolGrants.js";
 
 export type PluginsRouterContext = {
   plugins: PluginService;
+  pluginToolGrants: PluginToolGrants;
+  toolRuntime: ToolRuntimeService;
   workspace: WorkspaceService;
   logger: Logger;
 };
@@ -50,10 +55,30 @@ export const pluginsRouter = os.router({
       pluginId: input.pluginId,
       path: input.path,
     });
+    const manifest = await context.plugins.getManifest(input.pluginId);
+    if (manifest instanceof Error) return orpcErrors.badRequest(manifest);
+    const declaredPaths =
+      manifest.halo.capabilities === undefined
+        ? []
+        : manifest.halo.capabilities;
+    const tools = createPluginToolsFacade({
+      authorize: (path) =>
+        context.pluginToolGrants.authorize({
+          pluginId: input.pluginId,
+          declaredPaths,
+          path,
+        }),
+      invoke: async (path, toolInput) => {
+        const runtime = await context.toolRuntime.get();
+        if (runtime instanceof Error) return runtime;
+        return runtime.invokePath({ path, args: toolInput, signal });
+      },
+    });
     const result = await context.plugins.invoke({
       ...input,
       signal,
       lastEventId,
+      tools,
     });
     if (result instanceof Error) {
       return new ORPCError("PLUGIN_ERROR", {

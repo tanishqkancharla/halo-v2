@@ -10,6 +10,7 @@ import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
+import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
 import type { HaloContext } from "./router.js";
 import { SessionRegistry } from "./sessions/SessionRegistry.js";
 import { UserService } from "./UserService.js";
@@ -51,10 +52,12 @@ const rpcHttpTest = test.extend<{
       authority: new StaticAgentAuthority([]),
     });
     const sessions = new SessionRegistry({ workspace, toolRuntime });
+    const pluginToolGrants = new PluginToolGrants(workspace);
     const context: HaloContext = {
       workspace,
       sessions,
       toolRuntime,
+      pluginToolGrants,
       plugins: new PluginService(workspace),
       getWindow: () => {
         throw new Error("Halo main window is not open.");

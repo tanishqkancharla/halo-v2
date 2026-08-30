@@ -6,6 +6,7 @@
   "exports": {
     "./view": "./src/view.ts",
     "./server": "./src/server.ts",
+    "./host": "./src/PluginToolsFacade.ts",
     "./schema": "./src/schema.ts",
     "./storage": "./src/storage.ts",
     "./shared": "./src/AsyncEventQueue.ts",

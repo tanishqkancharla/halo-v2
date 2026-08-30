@@ -57,7 +57,6 @@ export class ToolRuntimeService {
     const credentialVault = createEncryptedFileCredentialVault({
       workspaceRoot: layout.root,
     });
-    if (credentialVault instanceof Error) return credentialVault;
 
     const runtime = await ToolRuntime.create({
       workspaceRoot: layout.root,

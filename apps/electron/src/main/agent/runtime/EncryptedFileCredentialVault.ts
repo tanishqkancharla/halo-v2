@@ -20,6 +20,8 @@ class EncryptedFileCredentialVault implements CredentialVault {
     }
     if (encrypted instanceof Error) return encrypted;
 
+    const available = encryptionAvailable();
+    if (available instanceof Error) return available;
     return errore.try({
       try: () => safeStorage.decryptString(encrypted),
       catch: (cause) =>
@@ -28,6 +30,8 @@ class EncryptedFileCredentialVault implements CredentialVault {
   }
 
   async set(id: string, value: string) {
+    const available = encryptionAvailable();
+    if (available instanceof Error) return available;
     const encrypted = errore.try({
       try: () => safeStorage.encryptString(value),
       catch: (cause) =>
@@ -68,8 +72,14 @@ class EncryptedFileCredentialVault implements CredentialVault {
 
 export function createEncryptedFileCredentialVault(input: {
   workspaceRoot: string;
-}): CredentialVault | CredentialVaultError {
-  if (!safeStorage.isEncryptionAvailable()) {
+}): CredentialVault {
+  return new EncryptedFileCredentialVault(
+    path.join(input.workspaceRoot, ".halo", "executor", "credentials"),
+  );
+}
+
+function encryptionAvailable() {
+  if (safeStorage === undefined || !safeStorage.isEncryptionAvailable()) {
     return new CredentialVaultError({
       operation: "initialization",
       cause: new Error("Secure operating-system encryption is unavailable."),
@@ -84,9 +94,6 @@ export function createEncryptedFileCredentialVault(input: {
       cause: new Error("Electron selected the insecure basic_text backend."),
     });
   }
-  return new EncryptedFileCredentialVault(
-    path.join(input.workspaceRoot, ".halo", "executor", "credentials"),
-  );
 }
 
 function isMissingFile(cause: unknown) {

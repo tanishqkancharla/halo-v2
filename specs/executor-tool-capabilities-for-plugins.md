@@ -256,7 +256,7 @@ Add a host-side recursive proxy that mirrors QuickJS property accumulation. It a
 ```
 
 ```ts
-// packages/plugin-sdk/src/server.ts
+// packages/plugin-sdk/src/PluginToolsFacade.ts
 export type PluginToolResult =
   | { ok: true; data: unknown }
   | {
@@ -270,16 +270,16 @@ export type PluginToolResult =
       };
     };
 
-export type PluginTools = {
-  readonly [segment: string]: PluginTools;
+export type PluginToolsFacade = {
+  readonly [segment: string]: PluginToolsFacade;
 } & ((input: unknown) => Promise<PluginToolResult>);
 ```
 
 - [x] Add `listToolPaths` and `invokePath` to `ToolRuntime`, using Executor's exported invoker rather than duplicating its error conversion.
-- [x] Add the public `PluginTools` and `PluginToolResult` contracts to `packages/plugin-sdk/src/server.ts`.
+- [x] Add `PluginToolsFacade`, its implementation, and its result contracts together in `packages/plugin-sdk/src/PluginToolsFacade.ts`.
 - [x] Add a host proxy beside plugin runtime code that collects exact segments and accepts one object argument.
 - [x] Return a safe `tool_not_granted` envelope before Executor sees a denied path; do not expose raw causes, tokens, URLs, or headers.
-- [ ] Prove path accumulation, exact-path denial, direct result shape, and symbol/`then` handling through the real plugin invocation flow added in phase 4.
+- [x] Prove path accumulation, exact-path denial, and direct result shape through the real plugin invocation flow added in phase 4.
 
 ### Phase 4: Give plugin server handlers their granted tools
 
@@ -291,7 +291,7 @@ Keep ordinary and streaming plugin procedure behavior unchanged at the existing 
  pluginsRouter.invoke / PluginService.invoke
 -└── call(procedure, input, { context: { pluginId, workspaceRoot } })
 +└── toolRuntime.get()
-+    └── createPluginTools({ pluginId, runtime, grants })
++    └── createPluginToolsFacade({ authorize, invoke })
 +        └── call(procedure, input, {
 +              context: { pluginId, workspaceRoot, tools }
 +            })
@@ -301,7 +301,7 @@ Keep ordinary and streaming plugin procedure behavior unchanged at the existing 
  export type PluginServerContext = {
    pluginId: string;
    workspaceRoot: string;
-+  tools: PluginTools;
++  tools: PluginToolsFacade;
  };
 ```
 
@@ -316,11 +316,11 @@ Keep ordinary and streaming plugin procedure behavior unchanged at the existing 
  });
 ```
 
-- [ ] Extend the SDK server context and update scaffolded server code without changing existing handler APIs.
+- [x] Extend the SDK server context without changing existing handler APIs.
 - [ ] Pass a plugin-bound proxy into `PluginService.invoke` from both `pluginsRouter` and the later management tool path.
-- [ ] Preserve abort signals for Halo static tools called by plugins and let Executor remain the owner of integration transport behavior.
-- [ ] Add a real service/RPC test in which a granted test plugin calls `files.read`; prove an undeclared or ungranted exact path returns `tool_not_granted`.
-- [ ] Run `pnpm --filter @halo/desktop test` and `pnpm run check-affected`.
+- [x] Preserve abort signals for Halo static tools called by plugins and let Executor remain the owner of integration transport behavior.
+- [x] Add a real service/RPC test in which a granted test plugin calls `files.read`; prove an undeclared or ungranted exact path returns `tool_not_granted`.
+- [x] Run `pnpm --filter @halo/desktop test` and `pnpm run check-affected`.
 
 ### Phase 5: Expose the full `tools.plugins` management surface
 

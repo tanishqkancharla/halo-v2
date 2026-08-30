@@ -1,7 +1,4 @@
-import type { ToolRuntime } from "../agent/runtime/ToolRuntime.js";
-import type { PluginToolGrants } from "./PluginToolGrants.js";
-
-type PluginToolResult =
+export type PluginToolResult =
   | {
       ok: true;
       data: unknown;
@@ -18,7 +15,7 @@ type PluginToolResult =
       };
     };
 
-type PluginToolValue =
+export type PluginToolValue =
   | string
   | number
   | boolean
@@ -26,23 +23,22 @@ type PluginToolValue =
   | readonly PluginToolValue[]
   | null;
 
-type PluginToolInput = {
+export type PluginToolInput = {
   readonly [key: string]: PluginToolValue;
 };
 
-type PluginToolsFacade = {
+export type PluginToolsFacade = {
   readonly [segment: string]: PluginToolsFacade;
 } & ((input: PluginToolInput) => Promise<PluginToolResult>);
 
 type PluginToolsFacadeOptions = {
-  pluginId: string;
-  declaredPaths: readonly string[];
-  grants: PluginToolGrants;
-  runtime: ToolRuntime;
-  signal?: AbortSignal;
+  authorize: (path: string) => Promise<boolean | Error>;
+  invoke: (
+    path: string,
+    input: PluginToolInput,
+  ) => Promise<PluginToolResult | Error>;
 };
 
-// oxlint-disable-next-line anti-slop/no-unused-exports -- Phase 4 injects this proxy into plugin handlers.
 export function createPluginToolsFacade(
   options: PluginToolsFacadeOptions,
 ): PluginToolsFacade {
@@ -75,25 +71,19 @@ export function createPluginToolsFacade(
         "Plugin tools accept one object argument.",
       );
     }
-    const authorized = await options.grants.authorize({
-      pluginId: options.pluginId,
-      declaredPaths: options.declaredPaths,
-      path,
-    });
+    const authorized = await options.authorize(path);
     if (authorized instanceof Error) {
       return failure("tool_authorization_failed", "Tool authorization failed.");
     }
     if (!authorized) {
       return failure(
         "tool_not_granted",
-        `Plugin '${options.pluginId}' is not granted tool '${path}'.`,
+        `Plugin is not granted tool '${path}'.`,
       );
     }
-    const result = await options.runtime.invokePath({
-      path,
-      args: args[0],
-      signal: options.signal,
-    });
+    // SAFETY: PluginToolsFacade's callable input contract guarantees PluginToolInput.
+    const input = args[0] as PluginToolInput;
+    const result = await options.invoke(path, input);
     if (result instanceof Error) {
       return failure("tool_invocation_failed", "Tool invocation failed.");
     }

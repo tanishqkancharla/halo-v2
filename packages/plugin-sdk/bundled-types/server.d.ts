@@ -1,6 +1,36 @@
+export type PluginToolResult =
+  | { ok: true; data: unknown }
+  | {
+      ok: false;
+      error: {
+        code: string;
+        message: string;
+        status?: number;
+        details?: unknown;
+        retryable?: boolean;
+      };
+    };
+
+export type PluginToolValue =
+  | string
+  | number
+  | boolean
+  | PluginToolInput
+  | readonly PluginToolValue[]
+  | null;
+
+export type PluginToolInput = {
+  readonly [key: string]: PluginToolValue;
+};
+
+export type PluginToolsFacade = {
+  readonly [segment: string]: PluginToolsFacade;
+} & ((input: PluginToolInput) => Promise<PluginToolResult>);
+
 export type PluginServerContext = {
   pluginId: string;
   workspaceRoot: string;
+  tools: PluginToolsFacade;
 };
 
 type PluginHandler<T> = (args: {

@@ -32,6 +32,7 @@ import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js"
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
+import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
 import { SessionRegistry } from "./sessions/SessionRegistry.js";
 import { UserService } from "./UserService.js";
@@ -104,6 +105,7 @@ const sessionRegistry = new SessionRegistry({
   toolRuntime,
 });
 const pluginService = new PluginService(workspaceService);
+const pluginToolGrants = new PluginToolGrants(workspaceService);
 let mainWindow: BrowserWindow | undefined;
 let rpcHttp: HaloRpcHttp | undefined;
 let shutdownStarted = false;
@@ -122,6 +124,7 @@ app.whenReady().then(async () => {
     context: {
       workspace: workspaceService,
       plugins: pluginService,
+      pluginToolGrants,
       sessions: sessionRegistry,
       toolRuntime,
       getWindow: () => {
@@ -252,6 +255,7 @@ function registerRpcBridge(): void {
     const context: HaloContext = {
       workspace: workspaceService,
       plugins: pluginService,
+      pluginToolGrants,
       sessions: sessionRegistry,
       toolRuntime,
       getWindow: () => {

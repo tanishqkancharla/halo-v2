@@ -4,14 +4,22 @@ import type { RuntimeSchemaDefinition } from "@tandem/core";
 import type { AnySchema, ClientId, RemoteApi } from "@tandem/types";
 import { AsyncEventQueue } from "./AsyncEventQueue.js";
 import { FileRemoteStore, PluginStorageStoreError } from "./FileRemoteStore.js";
+import type { PluginToolsFacade } from "./PluginToolsFacade.js";
 
 export type PluginServerContext = {
   pluginId: string;
   workspaceRoot: string;
+  tools: PluginToolsFacade;
 };
 
 export const pluginOs = os.$context<PluginServerContext>();
 
+export {
+  type PluginToolInput,
+  type PluginToolResult,
+  type PluginToolsFacade,
+  type PluginToolValue,
+} from "./PluginToolsFacade.js";
 export { os, type, PluginStorageStoreError };
 
 export function syncRoutes<Schema extends AnySchema>(

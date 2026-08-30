@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { call, getRouter, Procedure, type AnyRouter } from "@orpc/server";
+import type { PluginToolsFacade } from "@halo/plugin-sdk/server";
 import * as errore from "errore";
 import type { PluginInvocationInput } from "../../shared/contract.js";
 import type { PluginList, PluginLoadError } from "../../shared/plugin.js";
@@ -218,12 +219,24 @@ export class PluginService {
     return manifests;
   }
 
+  async getManifest(id: string) {
+    const pluginId = parsePluginId(id);
+    if (pluginId instanceof Error) return pluginId;
+    const layout = this.workspace.getLayout();
+    if (layout instanceof Error) return layout;
+    return readPluginManifest({
+      id: pluginId,
+      directory: join(layout.root, ".halo", "plugins", pluginId),
+    });
+  }
+
   async invoke(args: {
     pluginId: string;
     path: string[];
     input: PluginInvocationInput["input"];
     signal?: AbortSignal;
     lastEventId?: string;
+    tools: PluginToolsFacade;
   }) {
     const router = this.routers.get(args.pluginId);
     if (router === undefined)
@@ -244,6 +257,7 @@ export class PluginService {
       context: {
         pluginId: args.pluginId,
         workspaceRoot: workspace.workspaceRoot,
+        tools: args.tools,
       },
       signal: args.signal,
       lastEventId: args.lastEventId,
