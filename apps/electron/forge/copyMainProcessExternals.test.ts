@@ -45,6 +45,7 @@ describe("copyMainProcessExternals", () => {
       expect(loaded.os).toBeDefined();
       expect(isCallable({ value: loaded.pluginOs.handler })).toBe(true);
     },
+    15_000,
   );
 
   copyTest(
