@@ -13,6 +13,7 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Filesystem, mockWorkspacePaths } from "./patterns/Filesystem.tsx";
+import { HaloLogo } from "./haloLogo/HaloLogo.tsx";
 
 export function UiKitPage() {
   const pane = useStyles(styles.pane);
@@ -20,6 +21,7 @@ export function UiKitPage() {
   const header = useStyles(styles.header);
   const title = useStyles(styles.title);
   const preview = useStyles(styles.preview);
+  const logoPreview = useStyles(styles.logoPreview);
 
   return (
     <main className={pane} aria-label="UI kit">
@@ -28,6 +30,15 @@ export function UiKitPage() {
           <div className={title}>UI kit</div>
         </header>
         <Prose>
+          <H2>Halo logo</H2>
+          <P>
+            The workspace donut, tumbling on its side axis. The present pass
+            pixelates as the ring turns edge-on.
+          </P>
+          <H3>Example</H3>
+          <div className={logoPreview}>
+            <HaloLogo />
+          </div>
           <H2>Filesystem</H2>
           <P>
             Workspace tree styled like sidebar session rows. The gallery uses
@@ -88,5 +99,10 @@ const styles = {
     minHeight: 0,
     overflow: "hidden",
     backgroundColor: `light-dark(${colors.gray[1]}, ${colors.gray[2]})`,
+  }),
+  logoPreview: style({
+    width: "16rem",
+    height: "16rem",
+    maxWidth: "100%",
   }),
 };
