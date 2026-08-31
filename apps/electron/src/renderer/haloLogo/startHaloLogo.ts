@@ -31,7 +31,9 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
   let loop: FrameLoopHandle | undefined;
   let gpu: Gpu | undefined;
 
-  void start();
+  void start().catch((e) => {
+    console.warn(new HaloLogoInitError({ cause: e }).message);
+  });
 
   async function start() {
     const mesh = parseObj(haloDonutSource);
@@ -53,6 +55,14 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       return;
     }
     gpu = gpuResult;
+    gpu.gpu.lost.then((info) => {
+      if (disposed) return;
+      console.warn(`Halo logo GPU lost (${info.reason}): ${info.message}`);
+    });
+    gpu.onError((error) => {
+      if (disposed) return;
+      console.warn(error.message);
+    });
 
     const canvasSurface = surface(gpu, canvas, {
       dpr: [1, 2],
