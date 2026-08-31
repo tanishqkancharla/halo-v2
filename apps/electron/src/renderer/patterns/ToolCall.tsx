@@ -104,7 +104,7 @@ const styles = {
     width: "100%",
     font: "inherit",
   }),
-  shell: style(monospace),
+  shell: style(monospace, { fontFeatureSettings: '"calt" 1' }),
   body: style(flex({ direction: "column", gap: 3 }), {
     minWidth: 0,
   }),

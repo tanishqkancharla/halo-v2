@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type * as Cause from "effect/Cause";
 import {
   createExecutionEngine,
+  EXECUTE_SKILL,
   type ExecutionEngine,
   INTEGRATION_INVENTORY_HEADER,
   makeExecutorToolInvoker,
@@ -71,10 +72,6 @@ export class ToolRuntimeError extends errore.createTaggedError({
 export class ToolRuntimeToolNotFoundError extends errore.createTaggedError({
   name: "ToolRuntimeToolNotFoundError",
   message: 'Tool "$path" was not found',
-}) {}
-
-export class CodeExecutionError extends errore.createTaggedError({
-  name: "CodeExecutionError",
 }) {}
 
 export class ConnectionRequiredError extends errore.createTaggedError({
@@ -283,6 +280,14 @@ export class ToolRuntime {
     private readonly authority: AgentAuthority,
   ) {}
 
+  authorize(input: {
+    pluginId: string;
+    toolName: string;
+    requiredCapabilities: readonly string[];
+  }) {
+    return this.authority.authorize(input);
+  }
+
   async getAgentDescription() {
     const executorDescription = await Effect.runPromise(
       this.engine.getDescription,
@@ -295,40 +300,8 @@ export class ToolRuntime {
     const inventoryStart = executorDescription.indexOf(
       INTEGRATION_INVENTORY_HEADER,
     );
-    const integrationInventory =
-      inventoryStart === -1
-        ? "## Connected integrations\n\nNo integrations are connected."
-        : executorDescription.slice(inventoryStart);
-    const toolStatuses = await Promise.all(
-      this.toolPlugins.flatMap((plugin) =>
-        plugin.tools.map(async (haloTool) => {
-          const authorization = await this.authority.authorize({
-            pluginId: plugin.id,
-            toolName: haloTool.name,
-            requiredCapabilities: haloTool.requiredCapabilities,
-          });
-          return {
-            path: `${plugin.id}.${haloTool.name}`,
-            status: authorization instanceof Error ? "blocked" : "granted",
-          };
-        }),
-      ),
-    );
-    const haloTools = [
-      "## Halo tools",
-      "",
-      "Tools configured for this session:",
-      ...toolStatuses.map(
-        (status) => `- \`${status.path}\` — ${status.status}`,
-      ),
-    ].join("\n");
-
-    return [
-      "Run JavaScript in Halo's sandbox with the tools available below.",
-      haloTools,
-      integrationInventory,
-      "Other integrations can be discovered and connected when needed.",
-    ].join("\n\n");
+    if (inventoryStart === -1) return EXECUTE_SKILL.body;
+    return `${EXECUTE_SKILL.body}\n\n${executorDescription.slice(inventoryStart)}`;
   }
 
   async executeCode(input: {
@@ -361,13 +334,7 @@ export class ToolRuntime {
     if (connectionRequests.length > 0) {
       return new ConnectionRequiredError({ connectionRequests, cause });
     }
-    if (execution.error !== undefined) {
-      return new CodeExecutionError({ message: execution.error, cause });
-    }
-    return {
-      value: execution.result,
-      logs: execution.logs === undefined ? [] : [...execution.logs],
-    };
+    return execution;
   }
 
   async invokeTool(input: {

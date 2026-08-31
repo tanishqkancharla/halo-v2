@@ -15,6 +15,7 @@ import type {
   WorkspaceService,
 } from "../workspace/WorkspaceService.js";
 import type { ToolRuntimeService } from "./runtime/ToolRuntimeService.js";
+import { createAuthorizedCodingTools } from "./tools/codingTools.js";
 import { createExecTool } from "./tools/execTool.js";
 import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
 
@@ -146,7 +147,13 @@ export class HaloAgentSession {
       agentDir: layout.agentDir,
       sessionManager: manager,
       tools: [],
-      customTools: [createExecTool({ runtime, runtimeDescription })],
+      customTools: [
+        ...createAuthorizedCodingTools({
+          cwd: layout.root,
+          authority: runtime,
+        }),
+        createExecTool({ runtime, runtimeDescription }),
+      ],
       resourceLoader,
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;

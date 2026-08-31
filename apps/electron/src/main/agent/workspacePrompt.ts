@@ -1,7 +1,4 @@
-import {
-  DefaultResourceLoader,
-  formatSkillsForPrompt,
-} from "@mariozechner/pi-coding-agent";
+import { DefaultResourceLoader } from "@mariozechner/pi-coding-agent";
 
 function haloSystemPrompt(workspaceRoot: string) {
   const path = workspaceRoot.replaceAll("\\", "/");
@@ -31,13 +28,13 @@ Your final response must stand on its own. Start with what changed or what you f
 
 ## Getting work done
 
-Inspect the relevant state before acting. Use the tools available through exec for files, commands, web research, and connected services. Combine related independent operations when practical, and return only the tool output needed to continue.
+Inspect the relevant state before acting. Use read, edit, write, patch, and bash for workspace files and commands. Use exec to discover and call integrations and Halo service APIs. Combine related independent operations when practical, and return only the tool output needed to continue.
 
-Pass JavaScript in exec's js field. The tools object and console are in scope. Discovery helpers return data directly. Runtime tools return either { ok: true, data } or { ok: false, error }; check the result before using its data.
+When using exec, pass JavaScript in its js field. The tools object and console are in scope. Discovery helpers return data directly. Runtime tools return either { ok: true, data } or { ok: false, error }; check the result before using its data.
 
-Use tools.search to find connected integration operations and tools.describe.tool to inspect an operation's schema. Search results contain canonical paths that you can invoke as tools[path](args). When account identity matters, inspect the available connections before choosing one.
+In exec, use tools.search to find connected integration operations and tools.describe.tool to inspect an operation's schema. Search results contain canonical paths that you can invoke as tools[path](args). An empty tool search means no connected operation matched, not that the integration is unavailable. Search available integrations, including disconnected ones, with tools.executor.integrations.list({ query: "integration name" }). When account identity matters, inspect the available connections before choosing one.
 
-Use tools.files.read for UTF-8 text, tools.files.edit for exact replacements, tools.files.patch for patches, tools.files.write for full writes, and tools.files.delete for deletion. Use tools.bash.run for shell commands in the workspace. Use tools.web.search for live web research and tools.web.fetch when you need the contents of known pages.
+Use exec's tools.web.search for live web research and tools.web.fetch when you need the contents of known pages.
 
 Prefer rg or rg --files for code and file searches. Read files before editing them. Use exact edits or patches for focused changes and full writes only for new files or complete rewrites.
 
@@ -57,7 +54,7 @@ Do not expose secrets in commands, logs, or responses.
 
 ## Skills
 
-Skills contain extra instructions for specific kinds of work. When a task matches a skill's description, use exec to read its SKILL.md completely before acting and follow it for that turn. Resolve relative references from the skill's folder and read only the supporting material needed for the task.
+Skills contain extra instructions for specific kinds of work. When a task matches a skill's description, use read to load its SKILL.md completely before acting and follow it for that turn. Resolve relative references from the skill's folder and read only the supporting material needed for the task.
 
 ## Workspace
 
@@ -72,18 +69,9 @@ Pi documentation paths in this prompt live outside the workspace. Open them only
 }
 
 export function createWorkspaceResourceLoader(cwd: string, agentDir: string) {
-  const skillCatalog = { prompt: "" };
   return new DefaultResourceLoader({
     cwd,
     agentDir,
     systemPromptOverride: () => haloSystemPrompt(cwd),
-    skillsOverride: (result) => {
-      skillCatalog.prompt = formatSkillsForPrompt(result.skills).replace(
-        "Use the read tool to load a skill's file when the task matches its description.",
-        'Use exec to call tools.files.read({ path: "<location from the skill catalog>" }) when the task matches a skill\'s description, then follow that skill.',
-      );
-      return result;
-    },
-    appendSystemPromptOverride: (base) => [...base, skillCatalog.prompt],
   });
 }

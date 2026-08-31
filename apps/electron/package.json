@@ -34,6 +34,7 @@
     "@halo/plugin-sdk": "workspace:*",
     "@jitl/quickjs-singlefile-cjs-release-sync": "0.31.0",
     "@libsql/client": "0.17.3",
+    "@mariozechner/pi-agent-core": "0.60.0",
     "@mariozechner/pi-coding-agent": "0.60.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@orpc/client": "2.0.0-beta.29",
