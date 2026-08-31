@@ -6,10 +6,10 @@ import {
   frameLoop,
   geometry,
   init,
-  surface,
   target,
   type FrameLoopHandle,
   type Gpu,
+  type Target,
 } from "vgpu";
 import { perspectiveCamera } from "vgpu/scene";
 import haloDonutSource from "../assets/halo-donut-3d.obj?raw";
@@ -30,6 +30,8 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
   let disposed = false;
   let loop: FrameLoopHandle | undefined;
   let gpu: Gpu | undefined;
+  let observer: ResizeObserver | undefined;
+  let reading = false;
 
   void start().catch((e) => {
     console.warn(new HaloLogoInitError({ cause: e }).message);
@@ -39,6 +41,12 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
     const mesh = parseObj(haloDonutSource);
     if (mesh instanceof Error) {
       console.warn(mesh.message);
+      return;
+    }
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (ctx === null) {
+      console.warn("Halo logo canvas 2d context failed");
       return;
     }
 
@@ -61,40 +69,45 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
     });
     gpu.onError((error) => {
       if (disposed) return;
-      console.warn(error.message);
+      const cause = error.cause;
+      console.warn(
+        error.message,
+        error.where,
+        cause instanceof Error ? `${cause.name}: ${cause.message}` : cause,
+      );
     });
 
-    const canvasSurface = surface(gpu, canvas, {
-      dpr: [1, 2],
-      alphaMode: "premultiplied",
-    });
+    const size = drawingBufferSize(canvas);
     const sceneTarget = target(gpu, {
-      size: [canvasSurface.size[0], canvasSurface.size[1]],
+      size,
       depth: true,
+      clearColor: [0, 0, 0, 0],
+    });
+    const output = target(gpu, {
+      size,
       clearColor: [0, 0, 0, 0],
     });
     const camera = perspectiveCamera({
       fov: 38,
-      aspect: canvasSurface.size[0] / canvasSurface.size[1],
+      aspect: size[0] / size[1],
       position: CAMERA_POSITION,
       target: [0, 0, 0],
     });
-    const donutGeometry = geometry(gpu, {
-      buffers: [
-        {
-          data: mesh.vertices,
-          stride: 24,
-          attributes: {
-            position: "float32x3",
-            normal: "float32x3",
-          },
-        },
-      ],
-      indices: mesh.indices,
-    });
     const donut = draw(gpu, {
       shader: donutShader,
-      geometry: donutGeometry,
+      geometry: geometry(gpu, {
+        buffers: [
+          {
+            data: mesh.vertices,
+            stride: 24,
+            attributes: {
+              position: "float32x3",
+              normal: "float32x3",
+            },
+          },
+        ],
+        indices: mesh.indices,
+      }),
       cull: "back",
     });
     donut.set({
@@ -104,28 +117,11 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       },
       model: { model: rotationX(0), pixelation: 0 },
     });
-
     const present = effect(gpu, presentShader, {
-      blend: "premultiplied",
       set: {
         scene: sceneTarget,
         params: { pixelation: 0 },
       },
-    });
-
-    canvasSurface.onResize(({ width, height }) => {
-      if (disposed) return;
-      if (width < 2) return;
-      if (height < 2) return;
-      sceneTarget.resize([width, height]);
-      camera.set({ aspect: width / height });
-      donut.set({
-        camera: {
-          viewProjection: camera.viewProjection,
-          position: camera.worldPosition,
-        },
-      });
-      present.set({ scene: sceneTarget });
     });
 
     const compiledDonut = await donut
@@ -136,9 +132,8 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       console.warn(compiledDonut.message);
       return;
     }
-
     const compiledPresent = await present
-      .compile({ colors: [canvasSurface.format] })
+      .compile(output)
       .catch((e) => new HaloLogoInitError({ cause: e }));
     if (disposed) return;
     if (compiledPresent instanceof Error) {
@@ -146,29 +141,60 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       return;
     }
 
-    const time = clock(gpu);
-    loop = frameLoop(gpu, (frame) => {
+    const resize = () => {
       if (disposed) return;
-      if (canvasSurface.size[0] < 2) return;
-      if (canvasSurface.size[1] < 2) return;
+      const next = drawingBufferSize(canvas);
+      if (next[0] === output.size[0] && next[1] === output.size[1]) return;
+      sceneTarget.resize(next);
+      output.resize(next);
+      camera.set({ aspect: next[0] / next[1] });
+      donut.set({
+        camera: {
+          viewProjection: camera.viewProjection,
+          position: camera.worldPosition,
+        },
+      });
+      present.set({ scene: sceneTarget });
+    };
+    observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+
+    const time = clock(gpu);
+    loop = frameLoop(gpu, (currentFrame) => {
+      if (disposed) return;
+      const width = output.size[0];
+      const height = output.size[1];
+      if (width < 2) return;
+      if (height < 2) return;
       const angle = time.time * RADIANS_PER_SECOND;
       const pixelation = cornerPixelation(angle);
       donut.set({
         model: { model: rotationX(angle), pixelation },
       });
       present.set({ params: { pixelation } });
-      frame.pass(
+      currentFrame.pass(
         { target: sceneTarget, clear: [0, 0, 0, 0], clearDepth: 1 },
         (pass) => {
           pass.draw(donut);
         },
       );
-      frame.pass(canvasSurface, present);
+      currentFrame.pass(output, present);
+      if (reading) return;
+      reading = true;
+      queueMicrotask(() => {
+        void blit(output, ctx, width, height).then(() => {
+          reading = false;
+        });
+      });
     });
   }
 
   return () => {
     disposed = true;
+    if (observer !== undefined) {
+      observer.disconnect();
+      observer = undefined;
+    }
     if (loop !== undefined) {
       loop.stop();
       loop = undefined;
@@ -178,4 +204,28 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       gpu = undefined;
     }
   };
+}
+
+function drawingBufferSize(canvas: HTMLCanvasElement) {
+  const raw = window.devicePixelRatio;
+  const dpr = raw > 2 ? 2 : raw < 1 ? 1 : raw;
+  const width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+  const height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  return [width, height] as const;
+}
+
+async function blit(
+  output: Target,
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+) {
+  const pixels = await output.read();
+  ctx.putImageData(
+    new ImageData(new Uint8ClampedArray(pixels), width, height),
+    0,
+    0,
+  );
 }
