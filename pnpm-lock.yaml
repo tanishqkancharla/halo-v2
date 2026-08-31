@@ -109,12 +109,6 @@ overrides:
   '@effect/platform-node': 4.0.0-beta.103
   '@effect/platform-node-shared': 4.0.0-beta.103
   effect: 4.0.0-beta.103
-  '@tandem/types': github:tanishqkancharla/tandem#path:packages/types
-
-patchedDependencies:
-  '@tandem/core': 1050cb0b0f9ae409ece7327d0153528cdda024caeb23079f65fa70e5891ec315
-  '@tandem/server': afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1
-  '@tandem/types': cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c
 
 importers:
 
@@ -235,8 +229,8 @@ importers:
         specifier: 2.7.0
         version: 2.7.0
       maui:
-        specifier: github:tanishqkancharla/maui#v0.0.5
-        version: '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(supports-color@8.1.1)'
+        specifier: npm:@tanishqkancharla/maui@0.0.11
+        version: '@tanishqkancharla/maui@0.0.11(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
       purse-styles:
         specifier: ^0.2.1
         version: 0.2.1(react@19.2.8)
@@ -444,21 +438,18 @@ importers:
       '@sinclair/typebox':
         specifier: ^0.34.52
         version: 0.34.52
-      '@tandem/core':
-        specifier: github:tanishqkancharla/tandem#path:packages/core
-        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/core(patch_hash=1050cb0b0f9ae409ece7327d0153528cdda024caeb23079f65fa70e5891ec315)(react@19.2.8)
-      '@tandem/server':
-        specifier: github:tanishqkancharla/tandem#path:packages/server
-        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/server(patch_hash=afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1)(react@19.2.8)
-      '@tandem/types':
-        specifier: github:tanishqkancharla/tandem#path:packages/types
-        version: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
+      '@tanishqkancharla/tandem-core':
+        specifier: 0.2.0
+        version: 0.2.0(react@19.2.8)
+      '@tanishqkancharla/tandem-server':
+        specifier: 0.2.0
+        version: 0.2.0(react@19.2.8)
       errore:
         specifier: ^0.14.1
         version: 0.14.1
       maui:
-        specifier: github:tanishqkancharla/maui#v0.0.5
-        version: '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(supports-color@8.1.1)'
+        specifier: npm:@tanishqkancharla/maui@0.0.11
+        version: '@tanishqkancharla/maui@0.0.11(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
       purse-styles:
         specifier: ^0.2.1
         version: 0.2.1(react@19.2.8)
@@ -481,6 +472,9 @@ importers:
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+      typescript6:
+        specifier: npm:typescript@5.9.3
+        version: typescript@5.9.3
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@22.20.1)(jsdom@30.0.1(@noble/hashes@2.3.0))(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -500,8 +494,8 @@ importers:
         specifier: ^0.4.20
         version: 0.4.20
       maui:
-        specifier: github:tanishqkancharla/maui#v0.0.5
-        version: '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(supports-color@8.1.1)'
+        specifier: npm:@tanishqkancharla/maui@0.0.11
+        version: '@tanishqkancharla/maui@0.0.11(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
       md4x:
         specifier: ^0.0.29
         version: 0.0.29
@@ -3063,26 +3057,22 @@ packages:
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
 
-  '@tandem/core@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/core':
-    resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/core, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
-    version: 0.2.0
+  '@tanishqkancharla/maui@0.0.11':
+    resolution: {integrity: sha512-WehgexrTgLoknP1juyvEBNpasC1kddFkbMDzBJ2qA73tgWpvlPt0kIKHzVpoPMHaCwoYl1LX+yLVOz5Y11Dkyg==}
+    peerDependencies:
+      react: ^19.0.0
+      react-dom: ^19.0.0
 
-  '@tandem/server@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/server':
-    resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/server, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
-    version: 0.2.0
+  '@tanishqkancharla/tandem-core@0.2.0':
+    resolution: {integrity: sha512-Nuh++scUZFmHENVwThDS64eIXAUuXoldjHSx+dfRQLUa8zqFGTHft8dm365vKakFCAkKIWJ3ym1ARiNHt23KPQ==}
+
+  '@tanishqkancharla/tandem-server@0.2.0':
+    resolution: {integrity: sha512-PWabUMGtCE8fg18CX+bSMIRFi5Hux/3+SsTgVRGMJgX8VtlaJtT/SunmaiJpqLGKVRU3jpVUBnJ0eJcvyX8dXw==}
     peerDependencies:
       drizzle-orm: ^0.44.0
     peerDependenciesMeta:
       drizzle-orm:
         optional: true
-
-  '@tandem/types@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types':
-    resolution: {gitHosted: true, integrity: sha512-V4sOTxORAVKrY3MuxPyPannwBVQhCIbrQfRveURI/ZBmGDL0YW+VmrAVagpo0hM7xAP6/uflKAmLbqIJyAWm4A==, path: packages/types, tarball: https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83}
-    version: 0.2.0
-
-  '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc':
-    resolution: {commit: e210358873e86609ae494defa67582fefd9877cc, repo: https://github.com/tanishqkancharla/maui.git, type: git}
-    version: 0.0.5
 
   '@tanstack/query-core@5.101.4':
     resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
@@ -10919,30 +10909,7 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
-  '@tandem/core@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/core(patch_hash=1050cb0b0f9ae409ece7327d0153528cdda024caeb23079f65fa70e5891ec315)(react@19.2.8)':
-    dependencies:
-      '@tandem/types': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
-      '@triplit/tuple-database': 2.2.33(react@19.2.8)
-      '@types/lodash-es': 4.17.12
-      idb: 8.0.3
-      lodash-es: 4.18.1
-      tuple-database: 2.2.4(react@19.2.8)
-    transitivePeerDependencies:
-      - react
-
-  '@tandem/server@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/server(patch_hash=afd41c056251daeeaeebf997af6f4d87a1b4497b76bd3ceeb01ed1678e17ecb1)(react@19.2.8)':
-    dependencies:
-      '@tandem/types': https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)
-    transitivePeerDependencies:
-      - react
-
-  '@tandem/types@https://codeload.github.com/tanishqkancharla/tandem/tar.gz/399bc8e7d07398354b0aee65da4303e694795a83#path:packages/types(patch_hash=cca8faa945e4f1ade0f3ae12c66f428caf2f77948245bf822324add7c1c5118c)(react@19.2.8)':
-    dependencies:
-      tuple-database: 2.2.4(react@19.2.8)
-    transitivePeerDependencies:
-      - react
-
-  '@tanishqkancharla/maui@git+https://github.com/tanishqkancharla/maui.git#e210358873e86609ae494defa67582fefd9877cc(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(supports-color@8.1.1)':
+  '@tanishqkancharla/maui@0.0.11(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)':
     dependencies:
       '@codemirror/autocomplete': 6.20.3
       '@codemirror/commands': 6.11.0
@@ -10991,6 +10958,22 @@ snapshots:
       - babel-plugin-macros
       - codemirror
       - supports-color
+
+  '@tanishqkancharla/tandem-core@0.2.0(react@19.2.8)':
+    dependencies:
+      '@triplit/tuple-database': 2.2.33(react@19.2.8)
+      '@types/lodash-es': 4.17.12
+      idb: 8.0.3
+      lodash-es: 4.18.1
+      tuple-database: 2.2.4(react@19.2.8)
+    transitivePeerDependencies:
+      - react
+
+  '@tanishqkancharla/tandem-server@0.2.0(react@19.2.8)':
+    dependencies:
+      '@tanishqkancharla/tandem-core': 0.2.0(react@19.2.8)
+    transitivePeerDependencies:
+      - react
 
   '@tanstack/query-core@5.101.4': {}
 
