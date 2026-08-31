@@ -5,7 +5,6 @@ struct Camera {
 
 struct Model {
   model: mat4x4f,
-  pixelation: f32,
 }
 
 @group(0) @binding(0) var<uniform> camera: Camera;
@@ -33,11 +32,7 @@ struct VertexOut {
   @location(0) worldPosition: vec3f,
   @location(1) normal: vec3f,
 ) -> @location(0) vec4f {
-  var n = normalize(normal);
-  if (model.pixelation > 0.001) {
-    let bands = mix(24.0, 3.0, model.pixelation);
-    n = normalize(round(n * bands) / bands);
-  }
+  let n = normalize(normal);
 
   let lightDir = normalize(vec3f(0.35, 0.8, 0.45));
   let viewDir = normalize(camera.position - worldPosition);

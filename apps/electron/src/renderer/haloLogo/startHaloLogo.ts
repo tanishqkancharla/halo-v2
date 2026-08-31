@@ -1,6 +1,5 @@
 import * as errore from "errore";
 import {
-  clock,
   draw,
   effect,
   frameLoop,
@@ -31,7 +30,6 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
   let loop: FrameLoopHandle | undefined;
   let gpu: Gpu | undefined;
   let observer: ResizeObserver | undefined;
-  let reading = false;
 
   void start().catch((e) => {
     console.warn(new HaloLogoInitError({ cause: e }).message);
@@ -63,11 +61,11 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       return;
     }
     gpu = gpuResult;
-    gpu.gpu.lost.then((info) => {
+    gpuResult.gpu.lost.then((info) => {
       if (disposed) return;
       console.warn(`Halo logo GPU lost (${info.reason}): ${info.message}`);
     });
-    gpu.onError((error) => {
+    gpuResult.onError((error) => {
       if (disposed) return;
       const cause = error.cause;
       console.warn(
@@ -78,24 +76,26 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
     });
 
     const size = drawingBufferSize(canvas);
-    const sceneTarget = target(gpu, {
+    const sceneTarget = target(gpuResult, {
       size,
       depth: true,
       clearColor: [0, 0, 0, 0],
     });
-    const output = target(gpu, {
-      size,
-      clearColor: [0, 0, 0, 0],
-    });
+    const outputs = [
+      target(gpuResult, { size, clearColor: [0, 0, 0, 0] }),
+      target(gpuResult, { size, clearColor: [0, 0, 0, 0] }),
+    ];
+    const inFlight = [false, false];
+    let writeIndex = 0;
     const camera = perspectiveCamera({
       fov: 38,
       aspect: size[0] / size[1],
       position: CAMERA_POSITION,
       target: [0, 0, 0],
     });
-    const donut = draw(gpu, {
+    const donut = draw(gpuResult, {
       shader: donutShader,
-      geometry: geometry(gpu, {
+      geometry: geometry(gpuResult, {
         buffers: [
           {
             data: mesh.vertices,
@@ -115,9 +115,9 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
         viewProjection: camera.viewProjection,
         position: camera.worldPosition,
       },
-      model: { model: rotationX(0), pixelation: 0 },
+      model: { model: rotationX(0) },
     });
-    const present = effect(gpu, presentShader, {
+    const present = effect(gpuResult, presentShader, {
       set: {
         scene: sceneTarget,
         params: { pixelation: 0 },
@@ -132,8 +132,10 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       console.warn(compiledDonut.message);
       return;
     }
+    const firstOutput = outputs[0];
+    if (firstOutput === undefined) return;
     const compiledPresent = await present
-      .compile(output)
+      .compile(firstOutput)
       .catch((e) => new HaloLogoInitError({ cause: e }));
     if (disposed) return;
     if (compiledPresent instanceof Error) {
@@ -144,9 +146,11 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
     const resize = () => {
       if (disposed) return;
       const next = drawingBufferSize(canvas);
-      if (next[0] === output.size[0] && next[1] === output.size[1]) return;
+      const current = outputs[0];
+      if (current === undefined) return;
+      if (next[0] === current.size[0] && next[1] === current.size[1]) return;
       sceneTarget.resize(next);
-      output.resize(next);
+      for (const output of outputs) output.resize(next);
       camera.set({ aspect: next[0] / next[1] });
       donut.set({
         camera: {
@@ -159,18 +163,22 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
     observer = new ResizeObserver(resize);
     observer.observe(canvas);
 
-    const time = clock(gpu);
-    loop = frameLoop(gpu, (currentFrame) => {
+    const startedAt = performance.now();
+    loop = frameLoop(gpuResult, (currentFrame) => {
       if (disposed) return;
-      if (reading) return;
+      if (inFlight[writeIndex] === true) writeIndex = 1 - writeIndex;
+      if (inFlight[writeIndex] === true) return;
+      const output = outputs[writeIndex];
+      if (output === undefined) return;
       const width = output.size[0];
       const height = output.size[1];
       if (width < 2) return;
       if (height < 2) return;
-      const angle = time.time * RADIANS_PER_SECOND;
+      const angle =
+        ((performance.now() - startedAt) / 1000) * RADIANS_PER_SECOND;
       const pixelation = cornerPixelation(angle);
       donut.set({
-        model: { model: rotationX(angle), pixelation },
+        model: { model: rotationX(angle) },
       });
       present.set({ params: { pixelation } });
       currentFrame.pass(
@@ -180,13 +188,22 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
         },
       );
       currentFrame.pass(output, present);
-      reading = true;
+      const index = writeIndex;
+      inFlight[index] = true;
+      writeIndex = 1 - writeIndex;
       queueMicrotask(() => {
-        void gpu
+        void gpuResult
           .settled()
-          .then(() => blit(output, ctx, width, height))
+          .then(() => {
+            if (disposed) return;
+            return blit({ output, ctx, width, height, canvas });
+          })
+          .catch((e) => {
+            if (disposed) return;
+            console.warn(new HaloLogoInitError({ cause: e }).message);
+          })
           .finally(() => {
-            reading = false;
+            inFlight[index] = false;
           });
       });
     });
@@ -219,13 +236,23 @@ function drawingBufferSize(canvas: HTMLCanvasElement) {
   return [width, height] as const;
 }
 
-async function blit(
-  output: Target,
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-) {
+async function blit({
+  output,
+  ctx,
+  width,
+  height,
+  canvas,
+}: {
+  output: Target;
+  ctx: CanvasRenderingContext2D;
+  width: number;
+  height: number;
+  canvas: HTMLCanvasElement;
+}) {
+  if (canvas.width !== width) return;
+  if (canvas.height !== height) return;
   const pixels = await output.read();
+  if (canvas.width !== width) return;
   ctx.putImageData(
     new ImageData(new Uint8ClampedArray(pixels), width, height),
     0,
