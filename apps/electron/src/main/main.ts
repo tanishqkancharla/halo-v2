@@ -65,6 +65,8 @@ if (isDevelopment) {
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", "4445");
 }
+// Chromium still gates WebGPU behind this switch on Linux.
+app.commandLine.appendSwitch("enable-unsafe-webgpu");
 if (process.env.HALO_USE_SWIFTSHADER === "1") {
   // Software WebGL for headless / Xvfb hosts where Mesa llvmpipe is blocklisted.
   app.commandLine.appendSwitch("ignore-gpu-blocklist");
@@ -72,6 +74,8 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
   app.commandLine.appendSwitch("use-gl", "angle");
   app.commandLine.appendSwitch("use-angle", "swiftshader");
   app.commandLine.appendSwitch("disable-gpu-sandbox");
+  // Dawn software adapter; Chromium flag `--use-webgpu-adapter=swiftshader`.
+  app.commandLine.appendSwitch("use-webgpu-adapter", "swiftshader");
 }
 
 process.env.HALO_USER_DATA = applicationConfig.dataDir;

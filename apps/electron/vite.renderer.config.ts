@@ -1,11 +1,12 @@
 import { fileURLToPath } from "node:url";
+import { wgslVitePlugin } from "@vgpu/wgsl/loader-vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const rendererPort = process.env.HALO_RENDERER_PORT;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), wgslVitePlugin()],
   build: {
     minify: false,
   },

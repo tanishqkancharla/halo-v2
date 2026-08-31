@@ -11,6 +11,7 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
+import { HaloLogo } from "./haloLogo/HaloLogo.tsx";
 
 type OnboardingProps = {
   message?: string;
@@ -20,27 +21,34 @@ type OnboardingProps = {
 
 export function Onboarding(props: OnboardingProps) {
   const shell = useStyles(styles.shell);
+  const stack = useStyles(styles.stack);
+  const logo = useStyles(styles.logo);
   const card = useStyles(styles.card);
   const error = useStyles(styles.error);
 
   return (
     <main className={shell}>
-      <section className={card}>
-        <Flex column gap={8}>
-          <div>
-            <H1>Choose a workspace</H1>
-            <P>Pick the folder where Halo and Pi should work.</P>
-          </div>
-          {props.message && (
-            <div className={error} role="alert">
-              {props.message}
+      <div className={stack}>
+        <div className={logo}>
+          <HaloLogo />
+        </div>
+        <section className={card}>
+          <Flex column gap={8}>
+            <div>
+              <H1>Choose a workspace</H1>
+              <P>Pick the folder where Halo and Pi should work.</P>
             </div>
-          )}
-          <Button onClick={props.onChoose} disabled={props.isChoosing}>
-            {props.isChoosing ? "Choosing…" : "Choose workspace"}
-          </Button>
-        </Flex>
-      </section>
+            {props.message && (
+              <div className={error} role="alert">
+                {props.message}
+              </div>
+            )}
+            <Button onClick={props.onChoose} disabled={props.isChoosing}>
+              {props.isChoosing ? "Choosing…" : "Choose workspace"}
+            </Button>
+          </Flex>
+        </section>
+      </div>
     </main>
   );
 }
@@ -51,6 +59,16 @@ const styles = {
     placeItems: "center",
     minHeight: "100vh",
     backgroundColor: colors.gray[2],
+  }),
+  stack: style({
+    display: "grid",
+    justifyItems: "center",
+    gap: spacing.value(8),
+    width: "min(100%, 440px)",
+  }),
+  logo: style({
+    width: "11rem",
+    height: "11rem",
   }),
   card: style(shadow.subtle, radius.lg, spacing.padding({ all: 12 }), {
     width: "min(100%, 440px)",

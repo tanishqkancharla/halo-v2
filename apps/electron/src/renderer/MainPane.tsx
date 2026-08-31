@@ -37,6 +37,7 @@ import { Loader } from "./patterns/Loader.tsx";
 import { ToolCall } from "./patterns/ToolCall.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView } from "../shared/plugin.js";
+import { HaloLogo } from "./haloLogo/HaloLogo.tsx";
 import { ThreadHeader } from "./ThreadHeader.tsx";
 import { UiKitPage } from "./UiKitPage.tsx";
 
@@ -164,6 +165,8 @@ function DraftPane({ draftId }: { draftId: string }) {
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body, styles.bodyTop);
   const column = useStyles(styles.column);
+  const emptyLogo = useStyles(styles.emptyLogo);
+  const emptyLogoFrame = useStyles(styles.emptyLogoFrame);
   const hasMessages = sessionViewItems(state).length > 0;
 
   return (
@@ -173,7 +176,13 @@ function DraftPane({ draftId }: { draftId: string }) {
         <div className={column}>
           {hasMessages ? (
             <SessionView state={state} sessionId={sessionId} />
-          ) : undefined}
+          ) : (
+            <div className={emptyLogo}>
+              <div className={emptyLogoFrame}>
+                <HaloLogo />
+              </div>
+            </div>
+          )}
           <Composer
             key={draftId}
             error={state.error}
@@ -395,6 +404,17 @@ const styles = {
     minWidth: 0,
     minHeight: 0,
     marginInline: "auto",
+  }),
+  emptyLogo: style({
+    flex: "1 1 auto",
+    display: "grid",
+    placeItems: "center",
+    minWidth: 0,
+    minHeight: 0,
+  }),
+  emptyLogoFrame: style({
+    width: "min(16rem, 100%)",
+    aspectRatio: "1",
   }),
   view: style(
     flex({ direction: "column", gap: 6 }),

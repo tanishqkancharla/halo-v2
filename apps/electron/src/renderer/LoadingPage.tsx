@@ -1,30 +1,15 @@
-import { useEffect, useState } from "react";
-import { colors, motion } from "maui";
+import { colors } from "maui";
 import { style, useStyles } from "purse-styles";
-import { Loader } from "./patterns/Loader.tsx";
-
-const SHOW_INDICATOR_AFTER_MS = 2000;
+import { HaloLogo } from "./haloLogo/HaloLogo.tsx";
 
 export function LoadingPage() {
-  const [showIndicator, setShowIndicator] = useState(false);
   const shell = useStyles(styles.shell);
-  const indicator = useStyles(
-    styles.indicator,
-    motion.standard("opacity"),
-    showIndicator ? styles.indicatorVisible : undefined,
-  );
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setShowIndicator(true);
-    }, SHOW_INDICATOR_AFTER_MS);
-    return () => clearTimeout(timeout);
-  }, []);
+  const logo = useStyles(styles.logo);
 
   return (
     <main className={shell}>
-      <div className={indicator}>
-        <Loader size="1.5rem" variant="muted" />
+      <div className={logo}>
+        <HaloLogo />
       </div>
     </main>
   );
@@ -37,10 +22,8 @@ const styles = {
     height: "100%",
     backgroundColor: colors.gray[2],
   }),
-  indicator: style({
-    opacity: 0,
-  }),
-  indicatorVisible: style({
-    opacity: 1,
+  logo: style({
+    width: "14rem",
+    height: "14rem",
   }),
 };
