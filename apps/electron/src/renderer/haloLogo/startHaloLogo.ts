@@ -162,6 +162,7 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
     const time = clock(gpu);
     loop = frameLoop(gpu, (currentFrame) => {
       if (disposed) return;
+      if (reading) return;
       const width = output.size[0];
       const height = output.size[1];
       if (width < 2) return;
@@ -179,12 +180,14 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
         },
       );
       currentFrame.pass(output, present);
-      if (reading) return;
       reading = true;
       queueMicrotask(() => {
-        void blit(output, ctx, width, height).then(() => {
-          reading = false;
-        });
+        void gpu
+          .settled()
+          .then(() => blit(output, ctx, width, height))
+          .finally(() => {
+            reading = false;
+          });
       });
     });
   }
