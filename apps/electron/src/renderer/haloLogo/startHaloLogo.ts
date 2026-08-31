@@ -15,7 +15,7 @@ import haloDonutSource from "../assets/halo-donut-3d.obj?raw";
 import donutShader from "./HaloDonut.wgsl";
 import presentShader from "./HaloPresent.wgsl";
 import { parseObj } from "./parseObj.ts";
-import { cornerPixelation, rotationX } from "./pixelation.ts";
+import { rotationX } from "./pixelation.ts";
 
 class HaloLogoInitError extends errore.createTaggedError({
   name: "HaloLogoInitError",
@@ -118,10 +118,7 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       model: { model: rotationX(0) },
     });
     const present = effect(gpuResult, presentShader, {
-      set: {
-        scene: sceneTarget,
-        params: { pixelation: 0 },
-      },
+      set: { scene: sceneTarget },
     });
 
     const compiledDonut = await donut
@@ -176,11 +173,9 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       if (height < 2) return;
       const angle =
         ((performance.now() - startedAt) / 1000) * RADIANS_PER_SECOND;
-      const pixelation = cornerPixelation(angle);
       donut.set({
         model: { model: rotationX(angle) },
       });
-      present.set({ params: { pixelation } });
       currentFrame.pass(
         { target: sceneTarget, clear: [0, 0, 0, 0], clearDepth: 1 },
         (pass) => {
