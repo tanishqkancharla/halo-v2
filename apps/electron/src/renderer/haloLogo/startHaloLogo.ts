@@ -6,7 +6,6 @@ import {
   frameLoop,
   geometry,
   init,
-  sampler,
   surface,
   target,
   type FrameLoopHandle,
@@ -96,19 +95,16 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
       model: { model: rotationX(0), pixelation: 0 },
     });
 
-    const sceneSampler = sampler(gpu, {
-      minFilter: "nearest",
-      magFilter: "nearest",
-    });
     const present = effect(gpu, presentShader, {
+      blend: "premultiplied",
       set: {
         scene: sceneTarget,
-        sceneSampler,
-        params: { pixelation: 0, texel: canvasSurface.texelSize },
+        params: { pixelation: 0 },
       },
     });
 
     canvasSurface.onResize(({ width, height }) => {
+      if (disposed) return;
       if (width < 2) return;
       if (height < 2) return;
       sceneTarget.resize([width, height]);
@@ -119,14 +115,30 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
           position: camera.worldPosition,
         },
       });
-      present.set({
-        scene: sceneTarget,
-        params: { texel: canvasSurface.texelSize },
-      });
+      present.set({ scene: sceneTarget });
     });
+
+    const compiledDonut = await donut
+      .compile(sceneTarget)
+      .catch((e) => new HaloLogoInitError({ cause: e }));
+    if (disposed) return;
+    if (compiledDonut instanceof Error) {
+      console.warn(compiledDonut.message);
+      return;
+    }
+
+    const compiledPresent = await present
+      .compile({ colors: [canvasSurface.format] })
+      .catch((e) => new HaloLogoInitError({ cause: e }));
+    if (disposed) return;
+    if (compiledPresent instanceof Error) {
+      console.warn(compiledPresent.message);
+      return;
+    }
 
     const time = clock(gpu);
     loop = frameLoop(gpu, (frame) => {
+      if (disposed) return;
       if (canvasSurface.size[0] < 2) return;
       if (canvasSurface.size[1] < 2) return;
       const angle = time.time * RADIANS_PER_SECOND;
@@ -147,7 +159,13 @@ export function startHaloLogo(canvas: HTMLCanvasElement) {
 
   return () => {
     disposed = true;
-    if (loop !== undefined) loop.stop();
-    if (gpu !== undefined) gpu.dispose();
+    if (loop !== undefined) {
+      loop.stop();
+      loop = undefined;
+    }
+    if (gpu !== undefined) {
+      gpu.dispose();
+      gpu = undefined;
+    }
   };
 }
