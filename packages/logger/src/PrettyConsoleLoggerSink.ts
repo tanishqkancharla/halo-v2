@@ -29,6 +29,12 @@ function selectLogger(level: LogLevel) {
   return console.log;
 }
 
+function streamForLevel(level: LogLevel) {
+  if (level === "error") return process.stderr;
+  if (level === "warn") return process.stderr;
+  return process.stdout;
+}
+
 function isStringValue(args: { value: LoggerValue | undefined }) {
   return {}.toString.call(args.value) === "[object String]";
 }
@@ -62,10 +68,11 @@ export class PrettyConsoleLoggerSink implements LoggerSinkApi {
       .filter((part) => part.length > 0)
       .join(" ");
 
+    if (!streamForLevel(entry.level).writable) return;
     try {
       selectLogger(entry.level)(`${prefix} ${JSON.stringify(data)}`);
     } catch {
-      // Ignore console transport failures (EIO/EPIPE); file sink remains authoritative.
+      // console can throw if the stream closed between the writable check and write.
     }
   }
 }

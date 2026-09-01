@@ -52,11 +52,19 @@ loadDevelopmentEnvironment();
 configureUserDataPath();
 
 const applicationConfig = getApplicationConfig({ isDevelopment });
+if (isDevelopment) {
+  // Forge closes this process's stdio when it restarts main. A log after
+  // that writes EPIPE; Node throws unless the stream has an error listener.
+  ignoreClosedStdioPipe(process.stdout);
+  ignoreClosedStdioPipe(process.stderr);
+}
+const fileSink = new JsonlLoggerSink({
+  filePath: getLogFilePath(applicationConfig),
+});
 const logger = new Logger({
-  sinks: [
-    new PrettyConsoleLoggerSink(),
-    new JsonlLoggerSink({ filePath: getLogFilePath(applicationConfig) }),
-  ],
+  sinks: isDevelopment
+    ? [new PrettyConsoleLoggerSink(), fileSink]
+    : [fileSink],
 });
 const rendererLogger = logger.scope("renderer");
 const rpcLogger = logger.scope("rpc");
@@ -432,6 +440,13 @@ async function switchWorkspace(): Promise<void> {
     });
   }
   mainWindow.reload();
+}
+
+function ignoreClosedStdioPipe(stream: NodeJS.WriteStream) {
+  stream.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EPIPE") return;
+    throw error;
+  });
 }
 
 function configureUserDataPath(): void {
