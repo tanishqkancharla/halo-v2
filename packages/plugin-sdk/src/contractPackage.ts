@@ -1,6 +1,7 @@
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import * as errore from "errore";
+import mauiPackageJson from "maui/package.json" with { type: "json" };
 
 export class ContractPackageError extends errore.createTaggedError({
   name: "ContractPackageError",
@@ -17,8 +18,8 @@ export const contractTypeFiles = [
 ] as const;
 
 export const contractPeerDependencies = {
-  maui: "0.0.11",
-  "purse-styles": "^0.2.1",
+  maui: mauiPackageJson.version,
+  "purse-styles": "^0.2.3",
   react: "^19.2.8",
   wouter: "^3.10.0",
 } as const;
@@ -31,7 +32,7 @@ export const contractDependencies = {
   errore: "^0.14.1",
 } as const;
 
-export const mauiPackage = "npm:@tanishqkancharla/maui@0.0.11";
+export const mauiPackage = `npm:${mauiPackageJson.name}@${mauiPackageJson.version}`;
 
 export function contractPackageJson(version: string) {
   return {

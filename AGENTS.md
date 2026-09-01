@@ -93,4 +93,4 @@ mkdir -p /home/ubuntu/halo-workspace /workspace/.halo
 echo '{"workspaceRoot":"/home/ubuntu/halo-workspace"}' > /workspace/.halo/workspace.json
 ```
 
-`.halo/` holds dev userData and is gitignored. Choosing a workspace seeds `{workspace}/.pi/agent/skills/halo-plugin/SKILL.md` and `{workspace}/.pi/agent/skills/maui/SKILL.md` when those files are missing. Reload (View → Reload, or Cmd-R / Ctrl-R) to pick up plugin edits.
+`.halo/` holds dev userData and is gitignored. Choosing a workspace seeds `{workspace}/.pi/agent/skills/halo-plugin/SKILL.md`. Halo provides the Maui skill from its installed runtime package, and each scaffolded view plugin also installs it under `node_modules/maui/skills/maui/SKILL.md`. Reload (View → Reload, or Cmd-R / Ctrl-R) to pick up plugin edits.

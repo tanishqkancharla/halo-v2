@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
+import { FilesystemService } from "../filesystem/FilesystemService.js";
 import { copyPluginWorkspacePackages } from "./copyPluginWorkspacePackages.js";
 import { typecheckPlugin, writePluginTsconfig } from "./typecheckPlugin.js";
 
@@ -39,9 +40,15 @@ function Home() {
       );
       await mkdir(join(pluginDir, "node_modules"), { recursive: true });
       await copyPluginWorkspacePackages(pluginDir);
-      const written = await writePluginTsconfig(pluginDir);
+      const filesystem = new FilesystemService();
+      const written = await writePluginTsconfig({
+        filesystem,
+        directory: pluginDir,
+      });
       expect(written).toBeUndefined();
-      expect(await typecheckPlugin(pluginDir)).toEqual([]);
+      expect(
+        await typecheckPlugin({ filesystem, directory: pluginDir }),
+      ).toEqual([]);
     },
   );
 });

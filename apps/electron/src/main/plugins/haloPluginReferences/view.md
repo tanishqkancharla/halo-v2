@@ -17,9 +17,9 @@ const server = usePluginServer<typeof router>();
 const result = await server.status();
 ```
 
-Use Maui for controls and layout, purse-styles for styles, and wouter for routes. Halo already supplies their providers and runtime packages. Do not use raw HTML controls. Read the `maui` skill and its source references before choosing component props or tokens.
+Use Maui for controls and layout, purse-styles for styles, and wouter for routes. Halo already supplies their providers and runtime packages. Do not use raw HTML controls. Halo provides the `maui` skill from its runtime package; use it from the available skill list before choosing component props or tokens. Do not look for it under the workspace's `.pi/agent/skills/` directory.
 
-After scaffolding, Maui's source examples are available under `node_modules/maui/src/`. Read the closest app or pattern there before inventing a layout.
+After scaffolding, the same Maui skill and its source examples are available under `node_modules/maui/skills/maui/SKILL.md` and `node_modules/maui/src/`. Read the closest app or pattern before inventing a layout.
 
 `halo plugin build` writes `dist/view.js`. Halo supplies React, Maui, purse-styles, wouter, and the Halo SDK at runtime. The build bundles other plugin dependencies.
 

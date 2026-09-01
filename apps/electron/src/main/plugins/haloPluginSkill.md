@@ -19,7 +19,7 @@ Read only the references needed for the plugin:
 - For persistent records and sync, read `references/storage.md`.
 - Before inventing an API shape, read `references/examples.md` and the installed declarations in the plugin's `node_modules/@get-halo/plugin-sdk/dist/`.
 
-The installed declarations match the running Halo version and take priority over examples and remembered syntax. Also read the `maui` skill before writing view code.
+The installed declarations match the running Halo version and take priority over examples and remembered syntax. Halo provides the `maui` skill to the agent from the same Maui package that it runs. Use that skill from the available skill list; it does not live under the workspace's `.pi/agent/skills/` directory.
 
 ## Plugin files and hook points
 
@@ -35,11 +35,12 @@ A plugin may be view-only, server-only, or both. Halo finds view entries at `vie
 1. Decide which data belongs to the plugin and which belongs to an existing service. Search integrations before treating service-backed data as local plugin data.
 2. If a needed service is not connected, show its connection card immediately and keep working on independent parts.
 3. Run `halo plugin new <id>`. Add `--storage` only for plugin-owned persistent records.
-4. Edit the scaffold instead of replacing its working setup.
-5. Run `halo plugin types` often. It checks every workspace plugin against its installed dependencies.
-6. Run `halo plugin build` to compile views and remount servers.
-7. Check non-streaming procedures with `halo plugin <id> <procedure> --input '<json>'`.
-8. Ask the user to reload Halo so the new view bundle appears.
+4. Before editing view code, read the provided `maui` skill. The scaffold also installs the matching skill and source references under `node_modules/maui/`.
+5. Edit the scaffold instead of replacing its working setup.
+6. Run `halo plugin types` often. It checks every workspace plugin against its installed dependencies.
+7. Run `halo plugin build` to compile views and remount servers.
+8. Check non-streaming procedures with `halo plugin <id> <procedure> --input '<json>'`.
+9. Ask the user to reload Halo so the new view bundle appears.
 
 `types` and `build` act on every workspace plugin. Report errors from unrelated plugins instead of changing them.
 
