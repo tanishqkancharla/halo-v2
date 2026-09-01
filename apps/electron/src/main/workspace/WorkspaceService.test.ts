@@ -13,6 +13,7 @@ import { basename, join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { FilesystemService } from "../filesystem/FilesystemService.js";
 import {
+  WorkspaceInvalidPathError,
   WorkspaceIoError,
   WorkspaceNotDirectoryError,
   WorkspaceNotReadyError,
@@ -196,6 +197,49 @@ describe("WorkspaceService", () => {
     const appDataDir = await testDirectory("app-data");
     const paths = await createWorkspaceService(appDataDir).listPaths();
     expect(paths).toBeInstanceOf(WorkspaceNotReadyError);
+  });
+
+  test("writeFile overwrites a workspace file", async () => {
+    const root = await testDirectory("write-file");
+    const appDataDir = await testDirectory("app-data");
+    await writeFile(join(root, "note.md"), "old\n");
+    const service = createWorkspaceService(appDataDir);
+    const selected = await service.select(root);
+    expect(selected).not.toBeInstanceOf(Error);
+
+    const written = await service.writeFile("note.md", "new\n");
+    expect(written).toEqual({ path: "note.md" });
+    expect(await service.readFile("note.md")).toBe("new\n");
+    expect(await readFile(join(root, "note.md"), "utf8")).toBe("new\n");
+  });
+
+  test("writeFile rejects skipped paths", async () => {
+    const root = await testDirectory("write-skip");
+    const appDataDir = await testDirectory("app-data");
+    const service = createWorkspaceService(appDataDir);
+    const selected = await service.select(root);
+    expect(selected).not.toBeInstanceOf(Error);
+
+    const written = await service.writeFile(".env", "SECRET=1\n");
+    expect(written).toBeInstanceOf(WorkspaceInvalidPathError);
+  });
+
+  test("writeFile rejects paths outside the workspace", async () => {
+    const root = await testDirectory("write-escape");
+    const outside = await testDirectory("write-outside");
+    const appDataDir = await testDirectory("app-data");
+    const service = createWorkspaceService(appDataDir);
+    const selected = await service.select(root);
+    expect(selected).not.toBeInstanceOf(Error);
+
+    const written = await service.writeFile(
+      `../${basename(outside)}/secret.txt`,
+      "nope\n",
+    );
+    expect(written).toBeInstanceOf(WorkspaceInvalidPathError);
+    await expect(
+      readFile(join(outside, "secret.txt"), "utf8"),
+    ).rejects.toThrow();
   });
 });
 

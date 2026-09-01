@@ -42,6 +42,15 @@ export const workspaceRouter = os.router({
     if (contents instanceof Error) return orpcErrors.badRequest(contents);
     return contents;
   }),
+  writeFile: os.writeFile.handler(async ({ context, input }) => {
+    context.logger.info({ event: "writeWorkspaceFile", path: input.path });
+    const written = await context.workspace.writeFile(
+      input.path,
+      input.content,
+    );
+    if (written instanceof Error) return orpcErrors.badRequest(written);
+    return written;
+  }),
   events: os.events.handler(({ context, signal }) => {
     context.logger.info({ event: "subscribeWorkspaceTree" });
     return context.workspace.treeEvents.consume(signal);

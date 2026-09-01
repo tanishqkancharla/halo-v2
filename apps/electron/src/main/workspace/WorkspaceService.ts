@@ -222,6 +222,26 @@ export class WorkspaceService {
     return contents;
   }
 
+  async writeFile(path: string, content: string) {
+    const layout = this.getLayout();
+    if (layout instanceof Error) return layout;
+
+    const absolutePath = resolve(layout.root, path);
+    const relativePath = toPosixRelative(layout.root, absolutePath);
+    if (relativePath !== path || isSkippedRelativePath(path)) {
+      return new WorkspaceInvalidPathError({ path });
+    }
+
+    const written = await this.options.filesystem.writeFile(
+      absolutePath,
+      content,
+      "utf8",
+    );
+    if (written instanceof Error)
+      return new WorkspaceIoError({ cause: written });
+    return { path };
+  }
+
   async restore() {
     const preference = await readWorkspacePreference(
       this.options.filesystem,
