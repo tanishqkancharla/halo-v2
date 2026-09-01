@@ -1,4 +1,4 @@
-import { basename, delimiter, join, relative, sep } from "node:path";
+import { basename, delimiter, join, relative, resolve, sep } from "node:path";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
@@ -36,6 +36,11 @@ export class WorkspaceNotDirectoryError extends errore.createTaggedError({
 export class WorkspaceIoError extends errore.createTaggedError({
   name: "WorkspaceIoError",
   message: "Workspace I/O failed",
+}) {}
+
+export class WorkspaceInvalidPathError extends errore.createTaggedError({
+  name: "WorkspaceInvalidPathError",
+  message: "'$path' is not a workspace file.",
 }) {}
 
 type WorkspaceState =
@@ -196,6 +201,25 @@ export class WorkspaceService {
     if (paths instanceof Error) return paths;
     this.directoryPaths = directoryPathsFromList(paths);
     return paths;
+  }
+
+  async readFile(path: string) {
+    const layout = this.getLayout();
+    if (layout instanceof Error) return layout;
+
+    const absolutePath = resolve(layout.root, path);
+    const relativePath = toPosixRelative(layout.root, absolutePath);
+    if (relativePath !== path || isSkippedRelativePath(path)) {
+      return new WorkspaceInvalidPathError({ path });
+    }
+
+    const contents = await this.options.filesystem.readFile(
+      absolutePath,
+      "utf8",
+    );
+    if (contents instanceof Error)
+      return new WorkspaceIoError({ cause: contents });
+    return contents;
   }
 
   async restore() {

@@ -37,6 +37,7 @@ When writing tests, load the `testing` skill.
 
 ## Working Style
 
+- Store temporary files and workspaces in a named folder under this repo's `tmp/` directory.
 - Garden as you go. When the current work exposes small, clear friction—such as incorrect guidance, stale docs, misleading comments, dead code, or a confusing local API—fix it in the same change and verify the fix. If the issue is too large, risky, or separate to finish well in the current session, do not derail the main task; note it and discuss or scope it as follow-up work.
 - If straightforward code seems to need surprising guards, wrappers, assertions, or other ceremony, stop and research how the dependency's own code and reference projects handle the same case before keeping that shape.
 - When working on issues that seem like they would be common (e.g. issues hooking up popular libraries to each other), do research into the Github issues of those repos or research code of projects that use the same libraries. Here's some reference projects you can look at:
@@ -75,7 +76,7 @@ Review every prose output against these rules before delivering.
 
 The one service is the Halo Electron app. Start it from the repo root with `pnpm --filter @halo/desktop dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo-web` (see the halo-web skill). After edits, run `pnpm run check-affected` (see Commands).
 
-When adding or changing any UI, always record a short demo video of the change and attach it to the PR (and show it in the walkthrough). Use screen recording against the running Halo app; do not skip this for “small” UI tweaks.
+Cursor Cloud agents must record a short demo video when they add or change any UI, attach it to the PR, and show it in the walkthrough. Use screen recording against the running Halo app; do not skip this for “small” UI tweaks. This requirement does not apply to agents outside Cursor Cloud.
 
 Dev Agentation notes sync through the `agentation-mcp` terminal (`127.0.0.1:4747`). Query pending notes with `GET http://127.0.0.1:4747/pending`. Cursor loads the same server from `.cursor/mcp.json`.
 

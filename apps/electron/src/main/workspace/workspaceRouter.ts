@@ -36,6 +36,12 @@ export const workspaceRouter = os.router({
     if (paths instanceof Error) return orpcErrors.badRequest(paths);
     return paths;
   }),
+  readFile: os.readFile.handler(async ({ context, input }) => {
+    context.logger.info({ event: "readWorkspaceFile", path: input.path });
+    const contents = await context.workspace.readFile(input.path);
+    if (contents instanceof Error) return orpcErrors.badRequest(contents);
+    return contents;
+  }),
   events: os.events.handler(({ context, signal }) => {
     context.logger.info({ event: "subscribeWorkspaceTree" });
     return context.workspace.treeEvents.consume(signal);

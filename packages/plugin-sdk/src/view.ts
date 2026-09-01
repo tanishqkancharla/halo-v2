@@ -1,4 +1,5 @@
-export { SidebarItem } from "./SidebarItem.js";
+export { Sidebar } from "./Sidebar.js";
+export { SidebarItem, sidebarItem } from "./SidebarItem.js";
 export {
   SidebarSection,
   sidebarPadding,

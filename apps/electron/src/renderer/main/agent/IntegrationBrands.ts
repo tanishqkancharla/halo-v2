@@ -1,4 +1,4 @@
-import googleLogoUrl from "./assets/google.png";
+import googleLogoUrl from "../../assets/google.png";
 
 type IntegrationBrand = {
   logoUrl: string;

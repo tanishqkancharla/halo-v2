@@ -1,84 +1,132 @@
+/* oxlint-disable react/no-children-prop -- React Aria requires children in props for createElement calls. */
 import {
   createElement,
+  Fragment,
   type ComponentType,
+  type ReactElement,
   type ReactNode,
   type SVGProps,
 } from "react";
-import { backgroundColor, colors, navigationItem, radius, spacing } from "maui";
+import {
+  Button,
+  Link,
+  NavigationTreeItem,
+  NavigationTreeItemContent,
+  type NavigationTreeItemContentRenderProps,
+} from "react-aria-components/NavigationTree";
+import {
+  backgroundColor,
+  colors,
+  focusRing,
+  motion,
+  navigationItem,
+  radius,
+  spacing,
+} from "maui";
+import { ChevronRight } from "maui/icons";
 import { style, useStyles } from "purse-styles";
-import { Link, useRoute } from "wouter";
+import { useRoute, useRouter } from "wouter";
 import { sidebarPadding } from "./SidebarSection.js";
 import { useRegisterSidebarNavigation } from "./SidebarNavigationProvider.js";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 type SidebarItemProps = {
-  href: string;
+  id?: string | number;
+  href?: string;
   pageTitle: string;
   children: ReactNode;
+  items?: ReactNode;
   icon?: IconComponent;
   trailing?: ReactNode;
   className?: string;
 };
 
-export function SidebarItem(props: SidebarItemProps) {
-  const [isActive] = useRoute(props.href);
-  const itemClassName = useStyles(itemClass);
-  const listItemClassName = useStyles(listItemClass);
+export function SidebarItem(props: SidebarItemProps): ReactElement {
+  const route =
+    props.href === undefined ? "/__sidebar-directory__" : props.href;
+  const [isActive] = useRoute(route);
+  const router = useRouter();
+  const itemClassName = useStyles(sidebarItem);
+  const linkClassName = useStyles(itemLink);
   const iconWrapClassName = useStyles(
-    iconWrapClass,
-    ...(isActive ? [iconWrapActiveClass] : []),
+    iconWrap,
+    ...(isActive ? [iconWrapActive] : []),
   );
-  const iconClassName = useStyles(iconClass);
-  const labelClassName = useStyles(itemLabelClass);
-  const trailingClassName = useStyles(trailingClass);
+  const iconClassName = useStyles(icon);
+  const trailingClassName = useStyles(trailing);
+  const chevronClassName = useStyles(chevron);
+  const chevronIconClassName = useStyles(chevronIcon);
+  const chevronIconExpandedClassName = useStyles(
+    chevronIcon,
+    chevronIconExpanded,
+  );
   const Icon = props.icon;
+  const href =
+    props.href === undefined
+      ? undefined
+      : absoluteHref(router.base, props.href);
   useRegisterSidebarNavigation({ active: isActive, page: props.pageTitle });
 
-  return createElement(
-    "div",
-    { className: listItemClassName, role: "listitem" },
-    createElement(
-      Link,
-      {
-        href: props.href,
-        className: joinClassNames(itemClassName, props.className),
-        "aria-current": isActive ? "page" : undefined,
-      },
-      Icon === undefined
-        ? undefined
-        : createElement(
-            "span",
-            { className: iconWrapClassName },
-            createElement(Icon, { className: iconClassName }),
+  return createElement(NavigationTreeItem, {
+    id: props.id,
+    href,
+    textValue: props.pageTitle,
+    className: joinClassNames(itemClassName, props.className),
+    children: createElement(
+      Fragment,
+      undefined,
+      createElement(NavigationTreeItemContent, {
+        children: ({
+          hasChildItems,
+          isExpanded,
+        }: NavigationTreeItemContentRenderProps) =>
+          createElement(
+            Fragment,
+            undefined,
+            hasChildItems
+              ? createElement(
+                  Button,
+                  { slot: "chevron", className: chevronClassName },
+                  createElement(ChevronRight, {
+                    size: "lg",
+                    className: isExpanded
+                      ? chevronIconExpandedClassName
+                      : chevronIconClassName,
+                  }),
+                )
+              : Icon === undefined
+                ? undefined
+                : createElement(
+                    "span",
+                    { className: iconWrapClassName, "aria-hidden": "true" },
+                    createElement(Icon, { className: iconClassName }),
+                  ),
+            createElement(Link, { className: linkClassName }, props.children),
+            props.trailing === undefined
+              ? undefined
+              : createElement(
+                  "span",
+                  { className: trailingClassName },
+                  props.trailing,
+                ),
           ),
-      createElement("span", { className: labelClassName }, props.children),
-      props.trailing === undefined
-        ? undefined
-        : createElement(
-            "span",
-            { className: trailingClassName },
-            props.trailing,
-          ),
+      }),
+      props.items,
     ),
-  );
+  });
 }
 
-const listItemClass = style({
-  display: "block",
-  width: "100%",
-  minWidth: 0,
-});
-
-const itemClass = style(navigationItem, sidebarPadding, {
+export const sidebarItem = style(navigationItem, sidebarPadding, {
   display: "flex",
   alignItems: "center",
-  gap: spacing.value(3),
+  gap: spacing.value(2),
   minWidth: 0,
   width: "100%",
   borderRadius: 0,
   paddingTop: spacing.value(2),
   paddingBottom: spacing.value(2),
+  paddingLeft: `calc(${spacing.value(4)} + (var(--tree-item-level, 1) - 1) * ${spacing.value(4)})`,
   border: 0,
   textDecoration: "none",
   textAlign: "left",
@@ -87,9 +135,26 @@ const itemClass = style(navigationItem, sidebarPadding, {
     backgroundColor: backgroundColor.elementActive,
     color: colors.accent[11],
   },
+  "&[data-current]": {
+    backgroundColor: backgroundColor.elementActive,
+    color: colors.accent[11],
+    fontWeight: 500,
+  },
 });
 
-const iconWrapClass = style(radius.sm, {
+const itemLink = style({
+  flex: "1 1 auto",
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  color: "inherit",
+  textDecoration: "none",
+  outline: "none",
+  cursor: "default",
+});
+
+const iconWrap = style(radius.sm, {
   display: "grid",
   placeItems: "center",
   flexShrink: 0,
@@ -100,26 +165,36 @@ const iconWrapClass = style(radius.sm, {
   marginLeft: "-2px",
 });
 
-const iconWrapActiveClass = style({
-  color: colors.accent[11],
+const iconWrapActive = style({ color: colors.accent[11] });
+const icon = style({ width: "16px", height: "16px" });
+const trailing = style({ flexShrink: 0 });
+
+const chevron = style(focusRing(), radius.sm, {
+  display: "grid",
+  placeItems: "center",
+  flexShrink: 0,
+  width: "20px",
+  height: "20px",
+  marginBlock: "-2px",
+  marginLeft: "-2px",
+  padding: 0,
+  border: 0,
+  color: colors.gray[11],
+  backgroundColor: "transparent",
 });
 
-const iconClass = style({
+const chevronIcon = style(motion.standard("transform"), {
   width: "16px",
   height: "16px",
 });
+const chevronIconExpanded = style({ transform: "rotate(90deg)" });
 
-const itemLabelClass = style({
-  flex: "1 1 auto",
-  minWidth: 0,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-});
-
-const trailingClass = style({
-  flexShrink: 0,
-});
+function absoluteHref(base: string, href: string) {
+  if (href.startsWith("~")) return href.slice(1);
+  if (base === "/") return href;
+  if (href === "/") return base;
+  return `${base}${href}`;
+}
 
 function joinClassNames(...classNames: Array<string | undefined>) {
   return classNames.filter((name) => name !== undefined).join(" ");

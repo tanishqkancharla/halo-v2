@@ -1,7 +1,7 @@
 import { border, flexItem, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 
-export function ThreadHeader({
+export function PaneHeader({
   section,
   title,
 }: {

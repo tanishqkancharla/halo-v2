@@ -32,6 +32,7 @@
     "errore": "^0.14.1",
     "maui": "npm:@tanishqkancharla/maui@0.0.13",
     "purse-styles": "^0.2.3",
+    "react-aria-components": "1.21.0",
     "wouter": "^3.10.0"
   },
   "devDependencies": {

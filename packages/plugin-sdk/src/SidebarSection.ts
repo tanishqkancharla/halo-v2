@@ -1,4 +1,8 @@
-import { createElement, useId, type AriaRole, type ReactNode } from "react";
+import { createElement, type ReactElement, type ReactNode } from "react";
+import {
+  NavigationTreeHeader,
+  NavigationTreeSection,
+} from "react-aria-components/NavigationTree";
 import {
   borderColor,
   flex,
@@ -13,9 +17,10 @@ import { SidebarSectionContext } from "./SidebarNavigationProvider.js";
 export const sidebarPadding = style(spacing.padding({ x: 4 }));
 
 export const sidebarSection = style(
-  flex({ direction: "column", gap: 4 }),
+  flex({ direction: "column" }),
   spacing.padding({ y: 2 }),
   {
+    gap: 1,
     minWidth: 0,
     width: "100%",
     borderTop: "1px solid transparent",
@@ -32,48 +37,32 @@ type SidebarSectionProps = {
   label: string;
   children: ReactNode;
   className?: string;
-  role?: AriaRole;
 };
 
-export function SidebarSection(props: SidebarSectionProps) {
-  const labelId = useId();
+export function SidebarSection(props: SidebarSectionProps): ReactElement {
   const sectionClassName = useStyles(sidebarSection);
-  const labelClassName = useStyles(sectionLabelClass);
-  const bodyClassName = useStyles(sectionBodyClass);
-  const role = props.role === undefined ? "list" : props.role;
-
+  const labelClassName = useStyles(sectionLabel);
   return createElement(
-    "section",
-    { className: joinClassNames(sectionClassName, props.className) },
+    SidebarSectionContext.Provider,
+    { value: props.label },
     createElement(
-      "div",
-      { id: labelId, className: labelClassName },
-      props.label,
-    ),
-    createElement(
-      "div",
-      { className: bodyClassName, role, "aria-labelledby": labelId },
+      NavigationTreeSection,
+      { className: joinClassNames(sectionClassName, props.className) },
       createElement(
-        SidebarSectionContext.Provider,
-        { value: props.label },
-        props.children,
+        NavigationTreeHeader,
+        { className: labelClassName },
+        props.label,
       ),
+      props.children,
     ),
   );
 }
 
-const sectionLabelClass = style(
+const sectionLabel = style(
   text({ size: "xs", fontWeight: 500, color: "lowContrast" }),
   sidebarPadding,
+  { marginBottom: spacing.value(3) },
 );
-
-const sectionBodyClass = style(flex({ direction: "column" }), {
-  margin: 0,
-  padding: 0,
-  width: "100%",
-  minWidth: 0,
-  gap: "1px",
-});
 
 function joinClassNames(...classNames: Array<string | undefined>) {
   return classNames.filter((name) => name !== undefined).join(" ");

@@ -1,7 +1,6 @@
 import {
   PluginServerProvider,
-  SidebarItem,
-  SidebarSection,
+  Sidebar as NavigationSidebar,
   sidebarPadding,
 } from "@halo/plugin-sdk/view";
 import type { AnyRouter, RouterClient } from "@orpc/server";
@@ -17,10 +16,11 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router, useLocation } from "wouter";
-import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
-import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
-import { useInstallAppUpdateMutation } from "./api/ApiProvider.tsx";
-import { WorkspaceFilesystem } from "./patterns/WorkspaceFilesystem.tsx";
+import type { AppInfo, SessionSummary } from "../../shared/rpc.ts";
+import type { LoadedPluginView, PluginLoadError } from "../../shared/plugin.js";
+import { useInstallAppUpdateMutation } from "../api/ApiProvider.tsx";
+import { FilesystemSection } from "./FilesystemSection.tsx";
+import { SessionsSection } from "./SessionsSection.tsx";
 
 type SidebarProps = {
   sessions: SessionSummary[];
@@ -40,36 +40,37 @@ export function Sidebar({
   const sidebar = useStyles(styles.sidebar);
   const titleBar = useStyles(styles.titleBar);
   const newButton = useStyles(styles.newButton);
-  const filesSection = useStyles(styles.filesSection);
+  const navigation = useStyles(styles.navigation);
   const sessionList = useStyles(styles.sessionList);
   const footer = useStyles(styles.footer);
   const versionLabel = useStyles(styles.versionLabel);
   const updateLabel = useStyles(styles.updateLabel);
   const pluginError = useStyles(styles.pluginError);
-  const pluginSidebar = useStyles(styles.pluginSidebar);
   const newSessionPad = useStyles(sidebarPadding);
 
   return (
-    <nav className={sidebar} aria-label="Sessions">
+    <nav className={sidebar} aria-label="Workspace">
       <div className={titleBar} aria-hidden="true" />
       <div className={newSessionPad}>
         <NewSessionButton className={newButton} />
       </div>
-      <WorkspaceFilesystem
-        maxHeight={filesTreeMaxHeightPx}
-        className={filesSection}
-      />
-      <SidebarSection label="Sessions">
-        {sessions.map((session) => (
-          <SidebarItem
-            key={session.sessionId}
-            href={`/sessions/${session.sessionId}`}
-            pageTitle={session.title ? session.title : session.sessionId}
-          >
-            {session.title ? session.title : session.sessionId}
-          </SidebarItem>
-        ))}
-      </SidebarSection>
+      <NavigationSidebar aria-label="Workspace" className={navigation}>
+        <FilesystemSection />
+        <SessionsSection sessions={sessions} />
+        {pluginViews.map((plugin) => {
+          if (plugin.Sidebar === undefined) return undefined;
+          return (
+            <Router key={plugin.id} base={`/plugins/${plugin.id}`}>
+              <PluginServerProvider
+                pluginId={plugin.id}
+                server={pluginServers[plugin.id]}
+              >
+                <plugin.Sidebar />
+              </PluginServerProvider>
+            </Router>
+          );
+        })}
+      </NavigationSidebar>
       {pluginErrors.length > 0 ? (
         <ul className={sessionList}>
           {pluginErrors.map((error) => (
@@ -81,25 +82,6 @@ export function Sidebar({
           ))}
         </ul>
       ) : undefined}
-      {pluginViews.map((plugin) => {
-        if (plugin.Sidebar === undefined) return undefined;
-        return (
-          <div
-            key={plugin.id}
-            data-testid={`plugin-sidebar-${plugin.id}`}
-            className={pluginSidebar}
-          >
-            <Router base={`/plugins/${plugin.id}`}>
-              <PluginServerProvider
-                pluginId={plugin.id}
-                server={pluginServers[plugin.id]}
-              >
-                <plugin.Sidebar />
-              </PluginServerProvider>
-            </Router>
-          </div>
-        );
-      })}
       {appInfo !== undefined && (
         <div className={footer} data-testid="app-update-status">
           <div className={versionLabel}>Halo {appInfo.version}</div>
@@ -165,16 +147,6 @@ function formatUpdateStatus(update: AppInfo["update"]): string {
   }
 }
 
-const filesSectionMaxHeightPx = 240;
-const filesLabelLineHeightPx = 18;
-const filesSectionBorderPx = 2;
-const filesTreeMaxHeightPx =
-  filesSectionMaxHeightPx -
-  filesLabelLineHeightPx -
-  Number.parseInt(spacing.value(4), 10) -
-  Number.parseInt(spacing.value(2), 10) * 2 -
-  filesSectionBorderPx;
-
 const styles = {
   sidebar: style(shadow.medium, flex({ direction: "column", gap: 4 }), {
     width: "100%",
@@ -195,14 +167,13 @@ const styles = {
     alignSelf: "stretch",
     width: "100%",
   }),
+  navigation: style(flexItem({ size: "auto" }), {
+    minHeight: 0,
+    overflow: "auto",
+  }),
   restartButton: style({
     alignSelf: "stretch",
     width: "100%",
-  }),
-  filesSection: style(flexItem({ size: "hug" }), {
-    minHeight: 0,
-    maxHeight: `${filesSectionMaxHeightPx}px`,
-    overflow: "hidden",
   }),
   sessionList: style(flex({ direction: "column" }), {
     listStyleType: "none",
@@ -248,8 +219,4 @@ const styles = {
       paddingBottom: spacing.value(2),
     },
   ),
-  pluginSidebar: style({
-    width: "100%",
-    minWidth: 0,
-  }),
 };

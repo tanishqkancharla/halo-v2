@@ -48,6 +48,7 @@ export const contract = {
     get: oc.output(type<WorkspaceInfo | undefined>()),
     choose: oc.output(type<WorkspaceInfo | undefined>()),
     listPaths: oc.output(type<string[]>()),
+    readFile: oc.input(type<{ path: string }>()).output(type<string>()),
     events: oc.output(asyncIteratorObject(type<WorkspaceTreeEvent[]>())),
   },
   sessions: {

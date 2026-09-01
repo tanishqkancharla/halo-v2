@@ -8,9 +8,9 @@ import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
 import { SidebarNavigationProvider } from "@halo/plugin-sdk/view";
 import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
 import { LoadingPage } from "./LoadingPage.tsx";
-import { MainPane } from "./MainPane.tsx";
+import { MainPane } from "./main/MainPane.tsx";
 import { Onboarding } from "./Onboarding.tsx";
-import { Sidebar } from "./Sidebar.tsx";
+import { Sidebar } from "./sidebar/Sidebar.tsx";
 import {
   useSessionsQuery,
   useChooseWorkspaceMutation,

@@ -1,12 +1,12 @@
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import type { AgentMessage } from "../../shared/rpc.js";
-import type { AgentSessionState } from "../../shared/AgentSessionState.js";
+import type { AgentMessage } from "../../../shared/rpc.js";
+import type { AgentSessionState } from "../../../shared/AgentSessionState.js";
 import {
   connectionRequestLabel,
   connectionRequestSchema,
   type ConnectionRequest,
-} from "../../shared/connectionRequests.js";
+} from "../../../shared/connectionRequests.js";
 
 export type SessionViewItem =
   | { kind: "user"; id: string; text: string }

@@ -1,10 +1,5 @@
-import {
-  PluginServerProvider,
-  useSidebarNavigation,
-} from "@halo/plugin-sdk/view";
-import type { AnyRouter, RouterClient } from "@orpc/server";
 import { useLayoutEffect, useRef, useState } from "react";
-import { Route, Switch, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import {
   Button,
   Icons,
@@ -18,107 +13,20 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import {
-  useAgentSession,
-  useDraftAgentSession,
-} from "./agentSession/useAgentSession.ts";
-import {
-  sessionViewItems,
-  type SessionViewItem,
-} from "./agentSession/sessionView.ts";
+import { useAgentSession, useDraftAgentSession } from "./useAgentSession.ts";
+import { sessionViewItems, type SessionViewItem } from "./sessionView.ts";
 import {
   lastAssistantTurnWasAborted,
   type AgentSessionState,
-} from "../shared/AgentSessionState.ts";
-import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
-import { Editor } from "./patterns/Editor.tsx";
-import { ExecutorConnectionCard } from "./patterns/ExecutorConnectionCard.tsx";
-import { ToolActivity } from "./patterns/ToolActivity.tsx";
-import { type SessionSummary } from "../shared/rpc.ts";
-import type { LoadedPluginView } from "../shared/plugin.js";
-import { ThreadHeader } from "./ThreadHeader.tsx";
-import { UiKitPage } from "./UiKitPage.tsx";
+} from "../../../shared/AgentSessionState.ts";
+import { AssistantMessage } from "./AssistantMessage.tsx";
+import { Editor } from "./Editor.tsx";
+import { ExecutorConnectionCard } from "./ExecutorConnectionCard.tsx";
+import { ToolActivity } from "./ToolActivity.tsx";
+import { type SessionSummary } from "../../../shared/rpc.ts";
+import { PaneHeader } from "../PaneHeader.tsx";
 
-export function MainPane({
-  sessions,
-  pluginViews,
-  pluginServers,
-}: {
-  sessions: SessionSummary[];
-  pluginViews: LoadedPluginView[];
-  pluginServers: Record<string, RouterClient<AnyRouter>>;
-}) {
-  return (
-    <Switch>
-      <Route path="/uikit">
-        <UiKitPage />
-      </Route>
-      <Route path="/draft/:draftId">
-        {(params) => <DraftPane draftId={params.draftId} />}
-      </Route>
-      <Route path="/sessions/:sessionId">
-        {(params) => (
-          <SavedPane sessionId={params.sessionId} sessions={sessions} />
-        )}
-      </Route>
-      <Route path="/plugins/:pluginId" nest>
-        {(params) => {
-          const plugin = pluginViews.find(
-            (item) => item.id === params.pluginId,
-          );
-          if (plugin === undefined || plugin.Routes === undefined) {
-            return <MissingPlugin pluginId={params.pluginId} />;
-          }
-          return (
-            <PluginRoutesPane
-              plugin={plugin}
-              server={pluginServers[plugin.id]}
-            />
-          );
-        }}
-      </Route>
-    </Switch>
-  );
-}
-
-function PluginRoutesPane({
-  plugin,
-  server,
-}: {
-  plugin: LoadedPluginView;
-  server: RouterClient<AnyRouter> | undefined;
-}) {
-  const pane = useStyles(styles.pluginPane);
-  const body = useStyles(styles.pluginBody);
-  const navigation = useSidebarNavigation();
-  const Routes = plugin.Routes;
-  if (Routes === undefined) return <MissingPlugin pluginId={plugin.id} />;
-  return (
-    <main className={pane} aria-label={plugin.id}>
-      <ThreadHeader section={navigation?.section} title={navigation?.page} />
-      <div className={body}>
-        <PluginServerProvider pluginId={plugin.id} server={server}>
-          <Routes />
-        </PluginServerProvider>
-      </div>
-    </main>
-  );
-}
-
-function MissingPlugin({ pluginId }: { pluginId: string }) {
-  const pane = useStyles(styles.pane);
-  const body = useStyles(styles.body, styles.bodyTop);
-  const column = useStyles(styles.column);
-  return (
-    <main className={pane} aria-label={pluginId}>
-      <div className={body}>
-        <div className={column}>Plugin '{pluginId}' has no Routes</div>
-      </div>
-    </main>
-  );
-}
-
-function SavedPane({
+export function AgentPane({
   sessionId,
   sessions,
 }: {
@@ -136,7 +44,7 @@ function SavedPane({
 
   return (
     <main className={pane} aria-label={title}>
-      <ThreadHeader title={title} />
+      <PaneHeader title={title} />
       <div className={body}>
         <div className={column}>
           <SessionView state={state} sessionId={sessionId} />
@@ -154,7 +62,7 @@ function SavedPane({
   );
 }
 
-function DraftPane({ draftId }: { draftId: string }) {
+export function DraftAgentPane({ draftId }: { draftId: string }) {
   const [, navigate] = useLocation();
   const { state, sessionId, prompt, abort } = useDraftAgentSession(
     (createdSessionId) => {
@@ -168,7 +76,7 @@ function DraftPane({ draftId }: { draftId: string }) {
 
   return (
     <main className={pane} aria-label="New session" data-draft-id={draftId}>
-      <ThreadHeader />
+      <PaneHeader />
       <div className={body}>
         <div className={column}>
           {hasMessages ? (
@@ -354,19 +262,6 @@ const styles = {
     minHeight: 0,
     overflow: "hidden",
     backgroundColor: backgroundColor.app,
-  }),
-  pluginPane: style(flex({ direction: "column" }), {
-    width: "100%",
-    minWidth: 0,
-    minHeight: 0,
-    overflow: "hidden",
-    backgroundColor: backgroundColor.app,
-  }),
-  pluginBody: style({
-    flex: "1 1 auto",
-    minWidth: 0,
-    minHeight: 0,
-    overflow: "auto",
   }),
   body: style(
     flex({ direction: "column" }),

@@ -146,6 +146,14 @@ export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
   });
 }
 
+export function useWorkspaceFileQuery(path: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["workspace-file", path],
+    queryFn: () => api.workspace.readFile({ path }),
+  });
+}
+
 export function useAppInfoQuery() {
   const api = useApi();
   return useQuery({

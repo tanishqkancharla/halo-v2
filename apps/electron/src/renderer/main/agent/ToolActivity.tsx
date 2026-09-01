@@ -10,7 +10,7 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import type { SessionViewPart, ToolPart } from "../agentSession/sessionView.ts";
+import type { SessionViewPart, ToolPart } from "./sessionView.ts";
 import { ToolCall } from "./ToolCall.tsx";
 
 type ToolActivityPart = Extract<SessionViewPart, { kind: "toolActivity" }>;
