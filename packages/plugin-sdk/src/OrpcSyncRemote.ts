@@ -3,12 +3,16 @@ import type {
   ClientId,
   RemoteApi,
 } from "@tanishqkancharla/tandem-core";
+import * as errore from "errore";
 
 type PokeEvent = { type: "poke" };
 
-type PokeIterator = AsyncIterable<PokeEvent> & {
-  return?: (value?: undefined) => Promise<IteratorResult<PokeEvent>>;
-};
+type PokeIterator = AsyncIterable<PokeEvent>;
+
+class SyncRemoteConnectionError extends errore.createTaggedError({
+  name: "SyncRemoteConnectionError",
+  message: "Plugin sync connection failed",
+}) {}
 
 type OrpcSyncClient<Schema extends AnySchema> = {
   push: (
@@ -43,15 +47,22 @@ export function orpcSyncRemote<Schema extends AnySchema>(
         { signal: controller.signal },
       );
       if (iterator instanceof Error) throw iterator;
-      void (async () => {
-        for await (const event of iterator) {
-          if (event.type === "poke") poke();
-        }
-      })();
+      const consumed = consumePokes(iterator, poke).catch((cause) =>
+        controller.signal.aborted
+          ? undefined
+          : new SyncRemoteConnectionError({ cause }),
+      );
       return async () => {
         controller.abort();
-        void iterator.return?.(undefined);
+        const result = await consumed;
+        if (result instanceof Error) throw result;
       };
     },
   };
+}
+
+async function consumePokes(iterator: PokeIterator, poke: () => void) {
+  for await (const event of iterator) {
+    if (event.type === "poke") poke();
+  }
 }

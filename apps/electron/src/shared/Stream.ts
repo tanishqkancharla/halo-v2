@@ -1,9 +1,8 @@
-/* oxlint-disable anti-slop/no-unused-exports -- Shared primitive awaiting its first consumer. */
-
-export type StreamSubscriber<T> = (value: T) => void;
+type StreamSubscriber<T> = (value: T) => void;
 
 export type ReadonlyStream<T> = {
   subscribe(subscriber: StreamSubscriber<T>): () => void;
+  consume(signal?: AbortSignal): AsyncGenerator<T, void, void>;
   map<U>(transform: (value: T) => U): ReadonlyStream<U>;
   filter<S extends T>(predicate: (value: T) => value is S): ReadonlyStream<S>;
   filter(predicate: (value: T) => boolean): ReadonlyStream<T>;
@@ -21,6 +20,10 @@ export class Stream<T> implements ReadonlyStream<T> {
   subscribe(subscriber: StreamSubscriber<T>): () => void {
     this.subscribers.add(subscriber);
     return () => this.subscribers.delete(subscriber);
+  }
+
+  consume(signal?: AbortSignal): AsyncGenerator<T, void, void> {
+    return consumeStream(this, signal);
   }
 
   map<U>(transform: (value: T) => U): ReadonlyStream<U> {
@@ -42,6 +45,10 @@ class MappedStream<T, U> implements ReadonlyStream<U> {
 
   subscribe(subscriber: StreamSubscriber<U>): () => void {
     return this.source.subscribe((value) => subscriber(this.transform(value)));
+  }
+
+  consume(signal?: AbortSignal): AsyncGenerator<U, void, void> {
+    return consumeStream(this, signal);
   }
 
   map<V>(transform: (value: U) => V): ReadonlyStream<V> {
@@ -69,6 +76,10 @@ class FilteredStream<T, U extends T = T> implements ReadonlyStream<U> {
     });
   }
 
+  consume(signal?: AbortSignal): AsyncGenerator<U, void, void> {
+    return consumeStream(this, signal);
+  }
+
   map<V>(transform: (value: U) => V): ReadonlyStream<V> {
     return new MappedStream(this, transform);
   }
@@ -77,5 +88,47 @@ class FilteredStream<T, U extends T = T> implements ReadonlyStream<U> {
   filter(predicate: (value: U) => boolean): ReadonlyStream<U>;
   filter(predicate: (value: U) => boolean): ReadonlyStream<U> {
     return new FilteredStream(this, predicate);
+  }
+}
+
+async function* consumeStream<T>(
+  stream: ReadonlyStream<T>,
+  signal?: AbortSignal,
+): AsyncGenerator<T, void, void> {
+  const values: T[] = [];
+  let wake: (() => void) | undefined;
+  let aborted = signal?.aborted === true;
+  const wakeConsumer = () => {
+    const current = wake;
+    wake = undefined;
+    current?.();
+  };
+  const unsubscribe = stream.subscribe((value) => {
+    values.push(value);
+    wakeConsumer();
+  });
+  const abort = () => {
+    aborted = true;
+    wakeConsumer();
+  };
+  signal?.addEventListener("abort", abort, { once: true });
+
+  try {
+    while (true) {
+      if (aborted) return;
+      if (values.length === 0) {
+        await new Promise<void>((resolve) => {
+          wake = resolve;
+        });
+      }
+      const ready = values.splice(0);
+      for (const value of ready) {
+        if (aborted) return;
+        yield value;
+      }
+    }
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    unsubscribe();
   }
 }

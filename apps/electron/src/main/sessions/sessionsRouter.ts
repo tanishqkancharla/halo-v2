@@ -1,9 +1,7 @@
 import { implement } from "@orpc/server";
-import { AsyncEventQueue } from "@halo/plugin-sdk/shared";
 import type { Logger } from "@repo/logger";
 import { contract } from "../../shared/contract.js";
 import { connectionRequestLabel } from "../../shared/connectionRequests.js";
-import type { AgentSessionEvent } from "../../shared/rpc.js";
 import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { SessionRegistry } from "./SessionRegistry.js";
@@ -48,17 +46,7 @@ export const sessionsRouter = os.router({
     });
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    const queue = new AsyncEventQueue<AgentSessionEvent>();
-    const unsubscribe = session.events.subscribe((event) => {
-      void queue.push(event);
-    });
-    return (async function* () {
-      try {
-        yield* queue.values(signal);
-      } finally {
-        unsubscribe();
-      }
-    })();
+    return session.events.consume(signal);
   }),
   prompt: os.prompt.handler(async ({ input, context }) => {
     context.logger.info({

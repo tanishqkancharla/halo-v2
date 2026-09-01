@@ -1,9 +1,7 @@
 import { dialog, type BrowserWindow } from "electron";
 import { implement } from "@orpc/server";
-import { AsyncEventQueue } from "@halo/plugin-sdk/shared";
 import type { Logger } from "@repo/logger";
 import { contract } from "../../shared/contract.js";
-import type { WorkspaceTreeEvent } from "../../shared/rpc.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { WorkspaceService } from "./WorkspaceService.js";
 
@@ -40,16 +38,6 @@ export const workspaceRouter = os.router({
   }),
   events: os.events.handler(({ context, signal }) => {
     context.logger.info({ event: "subscribeWorkspaceTree" });
-    const queue = new AsyncEventQueue<WorkspaceTreeEvent[]>();
-    const unsubscribe = context.workspace.treeEvents.subscribe((events) => {
-      void queue.push(events);
-    });
-    return (async function* () {
-      try {
-        yield* queue.values(signal);
-      } finally {
-        unsubscribe();
-      }
-    })();
+    return context.workspace.treeEvents.consume(signal);
   }),
 });

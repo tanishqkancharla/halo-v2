@@ -168,8 +168,7 @@ export class WorkspaceService {
       },
     );
     this.unsubscribeFilesystemEvents = watchEvents.subscribe((batch) => {
-      // oxlint-disable-next-line typescript/no-floating-promises -- Stream subscribers cannot await; later batches must not wait on filesystem refreshes.
-      void this.handleWatchEvents(batch);
+      this.handleWatchEvents(batch);
     });
   }
 
@@ -294,7 +293,7 @@ export class WorkspaceService {
     this.unsubscribeFilesystemEvents();
   }
 
-  private async handleWatchEvents(batch: FilesystemWatchBatch) {
+  private handleWatchEvents(batch: FilesystemWatchBatch) {
     const mapped = mapFilesystemEventsToTreeEvents(
       batch.watchedPath,
       batch.events,

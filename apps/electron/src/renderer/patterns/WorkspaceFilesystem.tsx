@@ -35,7 +35,8 @@ export function WorkspaceFilesystem({
   useEffect(() => {
     if (workspaceRoot === undefined) return;
 
-    const stop = listenWorkspaceTree(api, (events) => {
+    const controller = new AbortController();
+    listenWorkspaceTree(api, controller.signal, (events) => {
       applyTreeEvents(modelRef.current, events);
       queryClient.setQueryData(
         workspacePathsQueryKey(workspaceRoot),
@@ -48,10 +49,14 @@ export function WorkspaceFilesystem({
           return next;
         },
       );
+    }).catch((cause) => {
+      if (!controller.signal.aborted) {
+        console.warn("Workspace event stream failed:", cause);
+      }
     });
 
     return () => {
-      stop();
+      controller.abort();
       modelRef.current = undefined;
     };
   }, [api, queryClient, workspaceRoot]);
@@ -74,28 +79,13 @@ export function WorkspaceFilesystem({
   );
 }
 
-function listenWorkspaceTree(
+async function listenWorkspaceTree(
   api: HaloClient,
+  signal: AbortSignal,
   onEvents: (events: WorkspaceTreeEvent[]) => void,
 ) {
-  let cancelled = false;
-  let iterator:
-    | Awaited<ReturnType<HaloClient["workspace"]["events"]>>
-    | undefined;
-
-  void (async () => {
-    iterator = await api.workspace.events();
-    for await (const events of iterator) {
-      if (cancelled) return;
-      onEvents(events);
-    }
-  })();
-
-  return () => {
-    cancelled = true;
-    if (iterator === undefined) return;
-    void iterator.return();
-  };
+  const events = await api.workspace.events(undefined, { signal });
+  for await (const event of events) onEvents(event);
 }
 
 function applyPathEvents(paths: string[], events: WorkspaceTreeEvent[]) {
