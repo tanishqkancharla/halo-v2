@@ -1,7 +1,9 @@
-import { CodeBlock, backgroundColor, flex, spacing, text } from "maui";
+import { CodeBlock, Editor, backgroundColor, flex, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { useWorkspaceFileQuery } from "../api/ApiProvider.tsx";
+import { fileKind, fileLanguage } from "./fileKind.ts";
 import { PaneHeader } from "./PaneHeader.tsx";
+import { useAutosaveFile } from "./useAutosaveFile.ts";
 
 export function FilePane({ path }: { path: string }) {
   const file = useWorkspaceFileQuery(path);
@@ -9,6 +11,7 @@ export function FilePane({ path }: { path: string }) {
   const body = useStyles(styles.body);
   const content = useStyles(styles.content);
   const status = useStyles(styles.status);
+  const kind = fileKind(path);
 
   return (
     <main className={pane} aria-label={path}>
@@ -22,7 +25,11 @@ export function FilePane({ path }: { path: string }) {
           </div>
         ) : (
           <div className={content} data-testid="file-page-content">
-            <CodeBlock lang={fileLanguage(path)}>{file.data}</CodeBlock>
+            {kind === "markdown" ? (
+              <MarkdownFileEditor key={path} path={path} loaded={file.data} />
+            ) : (
+              <CodeBlock lang={fileLanguage(path)}>{file.data}</CodeBlock>
+            )}
           </div>
         )}
       </div>
@@ -30,17 +37,23 @@ export function FilePane({ path }: { path: string }) {
   );
 }
 
-function fileLanguage(path: string) {
-  const extension = path.split(".").at(-1)?.toLowerCase();
-  if (extension === "ts") return "typescript";
-  if (extension === "js" || extension === "mjs" || extension === "cjs") {
-    return "javascript";
-  }
-  if (extension === "tsx") return "tsx";
-  if (extension === "css") return "css";
-  if (extension === "json") return "json";
-  if (extension === "sh") return "bash";
-  return "text";
+function MarkdownFileEditor({
+  path,
+  loaded,
+}: {
+  path: string;
+  loaded: string;
+}) {
+  const autosave = useAutosaveFile({ path, loaded });
+  return (
+    <Editor
+      content={loaded}
+      onChange={autosave.onChange}
+      placeholder="Write…"
+      aria-label={path}
+      size="md"
+    />
+  );
 }
 
 const styles = {
