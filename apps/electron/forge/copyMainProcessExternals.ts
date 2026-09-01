@@ -9,6 +9,7 @@ import * as errore from "errore";
 import {
   mainProcessDiskPackages,
   mainProcessExternals,
+  pluginHostDiskPackages,
   pluginSdkJitiDependencies,
 } from "./mainExternals.js";
 
@@ -49,6 +50,9 @@ export async function copyMainProcessExternals(
   }
   for (const packageName of pluginSdkJitiDependencies) {
     await copyPackageClosure(buildPath, packageName, copied);
+  }
+  for (const packageName of pluginHostDiskPackages) {
+    await copyPackage(buildPath, packageName, copied);
   }
 }
 

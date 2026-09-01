@@ -49,6 +49,28 @@ describe("copyMainProcessExternals", () => {
   );
 
   copyTest(
+    "lets packaged main resolve plugin host type packages",
+    async ({ buildPath }) => {
+      await copyMainProcessExternals(buildPath);
+      const mainPath = join(buildPath, ".vite", "build", "main.cjs");
+      await mkdir(join(buildPath, ".vite", "build"), { recursive: true });
+      await writeFile(mainPath, "");
+      const requireFromMain = createRequire(mainPath);
+      const specifiers = [
+        "csstype/index.d.ts",
+        "maui/package.json",
+        "purse-styles/package.json",
+        "@types/react/package.json",
+        "wouter",
+      ];
+      expect(
+        specifiers.map((specifier) => requireFromMain.resolve(specifier)),
+      ).toHaveLength(specifiers.length);
+    },
+    15_000,
+  );
+
+  copyTest(
     "lets packaged main load @libsql/client native bindings",
     async ({ buildPath }) => {
       await copyMainProcessExternals(buildPath);
