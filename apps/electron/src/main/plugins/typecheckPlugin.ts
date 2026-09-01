@@ -1,19 +1,7 @@
-import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 import * as errore from "errore";
 import ts from "typescript6";
-
-const require = createRequire(import.meta.url);
-
-function packageDirectory(entryPath: string) {
-  let directory = dirname(entryPath);
-  while (!existsSync(join(directory, "package.json"))) {
-    directory = dirname(directory);
-  }
-  return directory;
-}
 
 const pluginTsconfig = `${JSON.stringify(
   {
@@ -26,26 +14,6 @@ const pluginTsconfig = `${JSON.stringify(
       module: "ESNext",
       moduleResolution: "bundler",
       skipLibCheck: true,
-      paths: {
-        "@orpc/server": [packageDirectory(require.resolve("@orpc/server"))],
-        "@sinclair/typebox": [
-          packageDirectory(require.resolve("@sinclair/typebox")),
-        ],
-        "@tanishqkancharla/tandem-core": [
-          packageDirectory(require.resolve("@tanishqkancharla/tandem-core")),
-        ],
-        "@tanishqkancharla/tandem-server": [
-          packageDirectory(require.resolve("@tanishqkancharla/tandem-server")),
-        ],
-        csstype: [dirname(require.resolve("csstype/index.d.ts"))],
-        maui: [dirname(require.resolve("maui/package.json"))],
-        "purse-styles": [dirname(require.resolve("purse-styles/package.json"))],
-        react: [dirname(require.resolve("@types/react/package.json"))],
-        "react/*": [
-          `${dirname(require.resolve("@types/react/package.json"))}/*`,
-        ],
-        wouter: [packageDirectory(require.resolve("wouter"))],
-      },
     },
     include: ["*.ts", "*.tsx", "view/**/*", "server/**/*"],
   },

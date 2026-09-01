@@ -1,9 +1,20 @@
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { mauiSkillsDirName } from "../../shared/mauiSkills.js";
 
-const require = createRequire(import.meta.url);
-const mauiRoot = dirname(require.resolve("maui/package.json"));
+function mauiSkillsDirectory() {
+  const bundled = join(
+    dirname(fileURLToPath(import.meta.url)),
+    mauiSkillsDirName,
+  );
+  if (existsSync(bundled)) return bundled;
+  // Unbundled tests import this file from src/; Vite has not copied skills yet.
+  const require = createRequire(import.meta.url);
+  return join(dirname(require.resolve("maui/package.json")), "skills");
+}
 
 function haloSystemPrompt(workspaceRoot: string) {
   const path = workspaceRoot.replaceAll("\\", "/");
@@ -50,7 +61,7 @@ export function createWorkspaceResourceLoader(cwd: string, agentDir: string) {
   return new DefaultResourceLoader({
     cwd,
     agentDir,
-    additionalSkillPaths: [join(mauiRoot, "skills")],
+    additionalSkillPaths: [mauiSkillsDirectory()],
     systemPromptOverride: () => haloSystemPrompt(cwd),
   });
 }

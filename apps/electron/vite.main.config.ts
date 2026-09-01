@@ -1,5 +1,6 @@
 import { builtinModules } from "node:module";
 import { defineConfig } from "vite";
+import { copyMauiSkillsPlugin } from "./forge/copyMauiSkills.js";
 import { viteMainExternals } from "./forge/mainExternals.js";
 
 const nodeBuiltins = [
@@ -8,6 +9,7 @@ const nodeBuiltins = [
 ];
 
 export default defineConfig({
+  plugins: [copyMauiSkillsPlugin()],
   build: {
     // Forge Vite only packs `/.vite`. Bundle npm packages into main.
     minify: false,
