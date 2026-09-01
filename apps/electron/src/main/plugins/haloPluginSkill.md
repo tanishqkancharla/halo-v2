@@ -106,13 +106,11 @@ Host tool calls return either `{ ok: true, data }` or `{ ok: false, error }`. Ha
 
 ### When an integration is not connected
 
-The user's request to build a plugin with a named integration authorizes you to request that connection and grant the plugin the exact tools it needs. Ask again if you need a different service, account, or broader access.
-
 Use this order:
 
 1. Search for the needed operation and inspect saved connections. If no matching operation exists, do not assume that the integration is unavailable.
 2. Search configured integrations with `tools.executor.integrations.list`. Choose the integration that fits the requested job. If several choices would change the result, ask the user which one to use.
-3. Use the Executor connection tools to start OAuth for that integration. Halo turns the request into a connection card in the chat.
+3. Call `tools.halo.showConnectionCard({ integration })`. This only shows an optional card, so do not ask for confirmation first.
 4. Keep creating the plugin while the card waits. Build every part that does not depend on the live connection, but do not guess canonical tool paths or claim that access was granted.
 5. Tell the user to sign in through the connection card. Halo will notify you and resume the session when sign-in finishes.
 6. After Halo resumes, search again for the now-connected operations and inspect their schemas. Add only the exact paths the plugin needs to `halo.capabilities` and use those paths in the server.

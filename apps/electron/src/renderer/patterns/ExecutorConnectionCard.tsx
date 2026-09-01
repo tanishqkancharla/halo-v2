@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Flex, Spacer, Text } from "maui";
+import { background, Button, Flex, radius, shadow, Spacer, Text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { connectionRequestLabel } from "../../shared/connectionRequests.js";
 import { useApi } from "../api/ApiProvider.tsx";
@@ -12,7 +12,10 @@ type ExecutorConnectionPart = Extract<
 >;
 type ConnectionStatus = "idle" | "connecting" | "connected";
 const idleStatus: ConnectionStatus = "idle";
-const card = style({ width: "100%", maxWidth: "400px" });
+const card = style(background.element, radius.lg, shadow.subtle, {
+  width: "100%",
+  maxWidth: "400px",
+});
 const brandLogo = style({
   width: "24px",
   height: "24px",
@@ -76,7 +79,7 @@ export function ExecutorConnectionCard({
       data-testid="executor-connection-card"
       className={cardClassName}
     >
-      <Flex column gap={6} p={6} shadow="subtle" radius="lg">
+      <Flex column gap={6} p={6}>
         <Flex row gap={4} alignItems="start">
           {/* Electron has no Next.js image component; this logo is a local build asset. */}
           {/* oxlint-disable-next-line next/no-img-element */}

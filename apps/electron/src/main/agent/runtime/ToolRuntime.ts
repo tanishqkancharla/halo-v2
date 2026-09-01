@@ -28,6 +28,7 @@ import {
   Effect,
   type ElicitationContext,
   type Executor,
+  firstPartyOAuthClientSlug,
   type FirstPartyOAuthClientConfig,
   type IntegrationPreset,
   IntegrationSlug,
@@ -94,6 +95,12 @@ type HaloToolsPluginOptions = {
   context: Pick<HaloToolContext, "workspaceRoot" | "userId">;
 };
 
+const showConnectionCardInputSchema = Type.Object({
+  integration: Type.String({
+    description: "The integration id returned by executor.integrations.list",
+  }),
+});
+
 type ToolExecutionContext = Pick<
   HaloToolContext,
   "signal" | "modelId" | "runtime"
@@ -106,8 +113,27 @@ const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
   return {
     id: "halo-tools" as const,
     storage: () => ({}),
-    staticIntegrations: () =>
-      options.plugins.map((plugin) => ({
+    staticIntegrations: () => [
+      {
+        id: "halo",
+        kind: "halo",
+        name: "Halo",
+        tools: [
+          tool({
+            name: "showConnectionCard",
+            description:
+              "Show the user a card where they can choose whether to connect an integration. This does not connect an account or grant access by itself. Use it proactively when the task needs an integration that has no connection; do not ask for confirmation first.",
+            inputSchema: toExecutorSchema(showConnectionCardInputSchema),
+            annotations: {
+              requiresApproval: true,
+              approvalDescription:
+                "Show an optional integration connection card",
+            },
+            execute: () => Effect.succeed(undefined),
+          }),
+        ],
+      },
+      ...options.plugins.map((plugin) => ({
         id: plugin.id,
         kind: "halo",
         name: plugin.name,
@@ -121,6 +147,7 @@ const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
           }),
         ),
       })),
+    ],
   };
 });
 
@@ -170,6 +197,7 @@ const googleOAuthClient: FirstPartyOAuthClientConfig = {
 };
 
 const oauthStartAddress = "executor.coreTools.oauth.start";
+const showConnectionCardAddress = "halo.showConnectionCard";
 const oauthStartInputSchema = Type.Object({
   client: Type.String(),
   clientOwner: Type.Union([Type.Literal("org"), Type.Literal("user")]),
@@ -185,6 +213,35 @@ type HaloRuntimePlugins = readonly [
   Plugin<"halo-tools", object>,
   Plugin<"openapi", OpenApiPluginExtension>,
 ];
+
+function connectionRequestsForClient(
+  client: FirstPartyOAuthClientConfig,
+  presets: readonly InstallableGooglePreset[],
+) {
+  return new Map(
+    presets.flatMap((preset) =>
+      preset.authTemplate === undefined
+        ? []
+        : preset.authTemplate.flatMap((authentication) =>
+            authentication.kind === "oauth2"
+              ? [
+                  [
+                    preset.defaultSlug,
+                    {
+                      client: firstPartyOAuthClientSlug(client.name),
+                      clientOwner: "org" as const,
+                      owner: "user" as const,
+                      connectionName: "default",
+                      integration: preset.defaultSlug,
+                      template: authentication.slug,
+                    } satisfies ConnectionRequest,
+                  ] as const,
+                ]
+              : [],
+          ),
+    ),
+  );
+}
 
 function toExecutorTool(input: {
   pluginId: string;
@@ -267,6 +324,7 @@ export class ToolRuntime {
     private readonly executionContext: AsyncLocalStorage<ToolExecutionContext>,
     private readonly toolPlugins: readonly HaloToolPlugin[],
     private readonly authority: AgentAuthority,
+    private readonly connectionRequests: ReadonlyMap<string, ConnectionRequest>,
   ) {}
 
   authorize(input: {
@@ -309,7 +367,10 @@ export class ToolRuntime {
         Effect.runPromise(
           this.engine.execute(input.code, {
             onElicitation: (context) => {
-              const connection = connectionInput(context);
+              const connection = connectionInput(
+                context,
+                this.connectionRequests,
+              );
               if (connection !== undefined) {
                 connectionRequests.push(connection);
               }
@@ -571,6 +632,7 @@ async function createToolRuntime(
     executionContext,
     input.toolPlugins,
     input.authority,
+    connectionRequestsForClient(googleOAuthClient, installableGooglePresets),
   );
 }
 
@@ -582,7 +644,14 @@ function sandboxPath(address: string) {
 
 function connectionInput(
   context: ElicitationContext,
+  connectionRequests: ReadonlyMap<string, ConnectionRequest>,
 ): ConnectionRequest | undefined {
+  if (context.address === showConnectionCardAddress) {
+    if (!Value.Check(showConnectionCardInputSchema, context.args)) {
+      return undefined;
+    }
+    return connectionRequests.get(context.args.integration);
+  }
   if (context.address !== oauthStartAddress) return undefined;
   if (!Value.Check(oauthStartInputSchema, context.args)) return undefined;
   const args: Static<typeof oauthStartInputSchema> = context.args;

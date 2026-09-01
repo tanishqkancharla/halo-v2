@@ -437,9 +437,9 @@ const styles = {
     },
   ),
   userRow: style(flex({ justify: "end" }), spacing.padding({ top: 3 }), {
-    position: "sticky",
-    top: 0,
-    zIndex: 1,
+    // position: "sticky",
+    // top: 0,
+    // zIndex: 1,
     minWidth: 0,
     backgroundColor: backgroundColor.app,
   }),
