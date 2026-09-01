@@ -1,7 +1,10 @@
-import fs from "node:fs/promises";
 import nodePath from "node:path";
 import { parseVersioned, Type, type Static } from "@halo/plugin-sdk/schema";
 import * as errore from "errore";
+import {
+  type FilesystemService,
+  FilesystemPathNotFoundError,
+} from "../filesystem/FilesystemService.js";
 import type { WorkspaceService } from "../workspace/WorkspaceService.js";
 
 export class PluginToolGrantsIoError extends errore.createTaggedError({
@@ -32,7 +35,12 @@ type DeclaredPathsInput = {
 };
 
 export class PluginToolGrants {
-  constructor(private readonly workspace: WorkspaceService) {}
+  constructor(
+    private readonly options: {
+      filesystem: FilesystemService;
+      workspace: WorkspaceService;
+    },
+  ) {}
 
   async reconcile(input: DeclaredPathsInput) {
     const state = await this.read();
@@ -81,15 +89,11 @@ export class PluginToolGrants {
   private async read() {
     const filePath = this.filePath();
     if (filePath instanceof Error) return filePath;
-    const raw = await fs
-      .readFile(filePath, "utf8")
-      .catch((cause: unknown) =>
-        isNodeErrorCode(cause, "ENOENT")
-          ? undefined
-          : new PluginToolGrantsIoError({ operation: "read", cause }),
-      );
-    if (raw instanceof Error) return raw;
-    if (raw === undefined) return emptyState();
+    const raw = await this.options.filesystem.readTextFile(filePath);
+    if (raw instanceof FilesystemPathNotFoundError) return emptyState();
+    if (raw instanceof Error) {
+      return new PluginToolGrantsIoError({ operation: "read", cause: raw });
+    }
 
     const json = errore.try({
       // SAFETY: JSON.parse is untyped; pluginToolGrantStateSchema validates the result.
@@ -111,28 +115,33 @@ export class PluginToolGrants {
   private async write(state: PluginToolGrantState) {
     const filePath = this.filePath();
     if (filePath instanceof Error) return filePath;
-    const created = await fs
-      .mkdir(nodePath.dirname(filePath), { recursive: true, mode: 0o700 })
-      .catch(
-        (cause) =>
-          new PluginToolGrantsIoError({
-            operation: "create directory for",
-            cause,
-          }),
-      );
-    if (created instanceof Error) return created;
-    const written = await fs
-      .writeFile(filePath, `${JSON.stringify(state, undefined, 2)}\n`, {
+    const created = await this.options.filesystem.makeDirectory(
+      nodePath.dirname(filePath),
+      { recursive: true, mode: 0o700 },
+    );
+    if (created instanceof Error) {
+      return new PluginToolGrantsIoError({
+        operation: "create directory for",
+        cause: created,
+      });
+    }
+    const written = await this.options.filesystem.writeFile(
+      filePath,
+      `${JSON.stringify(state, undefined, 2)}\n`,
+      {
         mode: 0o600,
-      })
-      .catch(
-        (cause) => new PluginToolGrantsIoError({ operation: "write", cause }),
-      );
-    if (written instanceof Error) return written;
+      },
+    );
+    if (written instanceof Error) {
+      return new PluginToolGrantsIoError({
+        operation: "write",
+        cause: written,
+      });
+    }
   }
 
   private filePath() {
-    const layout = this.workspace.getLayout();
+    const layout = this.options.workspace.getLayout();
     if (layout instanceof Error) return layout;
     return nodePath.join(layout.root, ".halo", "pluginGrants.json");
   }
@@ -144,8 +153,4 @@ function emptyState(): PluginToolGrantState {
 
 function uniqueSorted(paths: readonly string[]) {
   return [...new Set(paths)].toSorted();
-}
-
-function isNodeErrorCode(cause: unknown, code: string) {
-  return cause instanceof Error && "code" in cause && cause.code === code;
 }

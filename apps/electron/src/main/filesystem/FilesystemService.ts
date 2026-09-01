@@ -34,6 +34,11 @@ export class FilesystemOperationError extends errore.createTaggedError({
   message: "Filesystem $operation failed for '$path'",
 }) {}
 
+export class FilesystemPathNotFoundError extends errore.createTaggedError({
+  name: "FilesystemPathNotFoundError",
+  message: "Filesystem path '$path' does not exist",
+}) {}
+
 const parcelWatcherIgnore = [
   "**/node_modules/**",
   "**/.*",
@@ -58,10 +63,7 @@ export class FilesystemService {
   async readTextFile(path: string) {
     return fsPromises
       .readFile(path, "utf8")
-      .catch(
-        (cause) =>
-          new FilesystemOperationError({ operation: "read", path, cause }),
-      );
+      .catch((cause) => filesystemError({ operation: "read", path, cause }));
   }
 
   async writeFile(
@@ -72,10 +74,7 @@ export class FilesystemService {
     return fsPromises
       .writeFile(path, data, options)
       .then(() => undefined)
-      .catch(
-        (cause) =>
-          new FilesystemOperationError({ operation: "write", path, cause }),
-      );
+      .catch((cause) => filesystemError({ operation: "write", path, cause }));
   }
 
   async makeDirectory(
@@ -85,41 +84,27 @@ export class FilesystemService {
     return fsPromises
       .mkdir(path, options)
       .then(() => undefined)
-      .catch(
-        (cause) =>
-          new FilesystemOperationError({
-            operation: "create directory",
-            path,
-            cause,
-          }),
+      .catch((cause) =>
+        filesystemError({ operation: "create directory", path, cause }),
       );
   }
 
   async listDirectory(path: string) {
     return fsPromises
       .readdir(path, { withFileTypes: true })
-      .catch(
-        (cause) =>
-          new FilesystemOperationError({ operation: "list", path, cause }),
-      );
+      .catch((cause) => filesystemError({ operation: "list", path, cause }));
   }
 
   async realpath(path: string) {
     return fsPromises
       .realpath(path)
-      .catch(
-        (cause) =>
-          new FilesystemOperationError({ operation: "resolve", path, cause }),
-      );
+      .catch((cause) => filesystemError({ operation: "resolve", path, cause }));
   }
 
   async stat(path: string) {
     return fsPromises
       .stat(path)
-      .catch(
-        (cause) =>
-          new FilesystemOperationError({ operation: "stat", path, cause }),
-      );
+      .catch((cause) => filesystemError({ operation: "stat", path, cause }));
   }
 
   async remove(
@@ -129,20 +114,14 @@ export class FilesystemService {
     return fsPromises
       .rm(path, options)
       .then(() => undefined)
-      .catch(
-        (cause) =>
-          new FilesystemOperationError({ operation: "remove", path, cause }),
-      );
+      .catch((cause) => filesystemError({ operation: "remove", path, cause }));
   }
 
   async chmod(path: string, mode: number) {
     return fsPromises
       .chmod(path, mode)
       .then(() => undefined)
-      .catch(
-        (cause) =>
-          new FilesystemOperationError({ operation: "chmod", path, cause }),
-      );
+      .catch((cause) => filesystemError({ operation: "chmod", path, cause }));
   }
 
   async watch(path: string) {
@@ -212,4 +191,22 @@ export class FilesystemService {
     if (enriched.length === 0) return;
     this.watchEventStream.append({ watchedPath, events: enriched });
   }
+}
+
+function filesystemError(args: {
+  operation: string;
+  path: string;
+  cause: unknown;
+}) {
+  if (
+    args.cause instanceof Error &&
+    "code" in args.cause &&
+    args.cause.code === "ENOENT"
+  ) {
+    return new FilesystemPathNotFoundError({
+      path: args.path,
+      cause: args.cause,
+    });
+  }
+  return new FilesystemOperationError(args);
 }

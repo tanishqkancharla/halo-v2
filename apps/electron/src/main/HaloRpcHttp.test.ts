@@ -51,14 +51,14 @@ const rpcHttpTest = test.extend<{
       throw new Error("workspace restore returned undefined");
     }
 
-    const user = new UserService(userDataDir);
+    const user = new UserService({ filesystem, appDataDir: userDataDir });
     const plugins = new PluginService(workspace, (directory) =>
       installPluginSdkContract({
         directory,
         appVersion: workspace.appVersion,
       }),
     );
-    const pluginToolGrants = new PluginToolGrants(workspace);
+    const pluginToolGrants = new PluginToolGrants({ filesystem, workspace });
     const toolRuntime = new ToolRuntimeService({
       workspace,
       user,

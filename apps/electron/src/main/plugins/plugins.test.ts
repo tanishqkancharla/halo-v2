@@ -80,10 +80,16 @@ const pluginTest = test.extend<{
         return copyPluginWorkspacePackages(directory);
       },
     );
-    const grants = new PluginToolGrants(workspaceService);
+    const grants = new PluginToolGrants({
+      filesystem: filesystemService,
+      workspace: workspaceService,
+    });
     const toolRuntime = new ToolRuntimeService({
       workspace: workspaceService,
-      user: new UserService(userDataDir),
+      user: new UserService({
+        appDataDir: userDataDir,
+        filesystem: filesystemService,
+      }),
       toolPlugins: [workspaceFilesPlugin],
       authority: new StaticAgentAuthority(["workspace.files.read"]),
     });

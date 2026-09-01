@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
+import type { FilesystemService } from "./filesystem/FilesystemService.js";
 
 type User = {
   id: string;
@@ -24,14 +23,19 @@ const userPreferenceSchema = Type.Object({
 export class UserService {
   private user: User | undefined;
 
-  constructor(private readonly appDataDir: string) {}
+  constructor(
+    private readonly options: {
+      appDataDir: string;
+      filesystem: FilesystemService;
+    },
+  ) {}
 
   async getUser() {
     if (this.user !== undefined) return this.user;
 
-    const path = preferencePath(this.appDataDir);
-    if (existsSync(path)) {
-      const existing = await readUserPreference(path);
+    const path = preferencePath(this.options.appDataDir);
+    if (this.options.filesystem.exists(path)) {
+      const existing = await readUserPreference(this.options.filesystem, path);
       if (existing instanceof Error) {
         console.warn("Invalid user.json:", existing.message);
       } else {
@@ -41,7 +45,11 @@ export class UserService {
     }
 
     const user: User = { id: randomUUID() };
-    const written = await writeUserPreference(this.appDataDir, user);
+    const written = await writeUserPreference(
+      this.options.filesystem,
+      this.options.appDataDir,
+      user,
+    );
     if (written instanceof Error) return written;
     this.user = user;
     return user;
@@ -52,11 +60,9 @@ function preferencePath(appDataDir: string) {
   return join(appDataDir, preferenceFileName);
 }
 
-async function readUserPreference(path: string) {
-  const raw = await readFile(path, "utf8").catch(
-    (e) => new UserIoError({ cause: e }),
-  );
-  if (raw instanceof Error) return raw;
+async function readUserPreference(filesystem: FilesystemService, path: string) {
+  const raw = await filesystem.readTextFile(path);
+  if (raw instanceof Error) return new UserIoError({ cause: raw });
 
   const parsed = errore.try({
     try: () => {
@@ -70,18 +76,22 @@ async function readUserPreference(path: string) {
   return { id: parsed.id };
 }
 
-async function writeUserPreference(appDataDir: string, user: User) {
-  const created = await mkdir(appDataDir, {
+async function writeUserPreference(
+  filesystem: FilesystemService,
+  appDataDir: string,
+  user: User,
+) {
+  const created = await filesystem.makeDirectory(appDataDir, {
     recursive: true,
     mode: 0o700,
-  }).catch((e) => new UserIoError({ cause: e }));
-  if (created instanceof Error) return created;
+  });
+  if (created instanceof Error) return new UserIoError({ cause: created });
 
   const preference: User = { id: user.id };
-  const written = await writeFile(
+  const written = await filesystem.writeFile(
     preferencePath(appDataDir),
     `${JSON.stringify(preference, undefined, 2)}\n`,
     { mode: 0o600 },
-  ).catch((e) => new UserIoError({ cause: e }));
-  if (written instanceof Error) return written;
+  );
+  if (written instanceof Error) return new UserIoError({ cause: written });
 }

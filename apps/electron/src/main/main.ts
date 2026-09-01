@@ -92,7 +92,10 @@ const workspaceService = new WorkspaceService({
   cliElectronRunAsNode: !isDevelopment,
   isDevelopment,
 });
-const userService = new UserService(applicationConfig.dataDir);
+const userService = new UserService({
+  appDataDir: applicationConfig.dataDir,
+  filesystem: filesystemService,
+});
 const toolPlugins = [
   workspaceFilesPlugin,
   workspaceBashPlugin,
@@ -105,7 +108,10 @@ const authority = new StaticAgentAuthority([
   "network.web.search",
 ]);
 const pluginService = new PluginService(workspaceService);
-const pluginToolGrants = new PluginToolGrants(workspaceService);
+const pluginToolGrants = new PluginToolGrants({
+  filesystem: filesystemService,
+  workspace: workspaceService,
+});
 const toolRuntime = new ToolRuntimeService({
   workspace: workspaceService,
   user: userService,
