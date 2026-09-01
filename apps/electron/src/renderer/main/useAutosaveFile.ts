@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as errore from "errore";
+import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/ApiProvider.tsx";
 import type { HaloClient } from "../../shared/contract.js";
 
@@ -16,6 +17,7 @@ type AutosaveRefs = {
   lastWritten: { current: string };
   pending: { current: string | undefined };
   timer: { current: ReturnType<typeof setTimeout> | undefined };
+  setCachedFile: { current: (path: string, content: string) => void };
 };
 
 function flushAutosave(refs: AutosaveRefs) {
@@ -28,11 +30,10 @@ function flushAutosave(refs: AutosaveRefs) {
   if (pending === undefined) return;
   if (pending === refs.lastWritten.current) return;
   const path = refs.path.current;
+  refs.lastWritten.current = pending;
+  refs.setCachedFile.current(path, pending);
   void refs.api.current.workspace
     .writeFile({ path, content: pending })
-    .then(() => {
-      refs.lastWritten.current = pending;
-    })
     .catch((cause) => {
       console.warn(new WorkspaceFileWriteError({ path, cause }));
     });
@@ -40,15 +41,25 @@ function flushAutosave(refs: AutosaveRefs) {
 
 export function useAutosaveFile(args: { path: string; loaded: string }) {
   const api = useApi();
+  const queryClient = useQueryClient();
   const apiRef = useRef(api);
   const pathRef = useRef(args.path);
   const lastWrittenRef = useRef(args.loaded);
   const pendingRef = useRef<string | undefined>(undefined);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const setCachedFileRef = useRef((path: string, content: string) => {
+    queryClient.setQueryData(["workspace-file", path], content);
+  });
 
   useEffect(() => {
     apiRef.current = api;
   }, [api]);
+
+  useEffect(() => {
+    setCachedFileRef.current = (path: string, content: string) => {
+      queryClient.setQueryData(["workspace-file", path], content);
+    };
+  }, [queryClient]);
 
   useEffect(() => {
     pathRef.current = args.path;
@@ -64,6 +75,7 @@ export function useAutosaveFile(args: { path: string; loaded: string }) {
         lastWritten: lastWrittenRef,
         pending: pendingRef,
         timer: timerRef,
+        setCachedFile: setCachedFileRef,
       });
     };
   }, []);
@@ -83,6 +95,7 @@ export function useAutosaveFile(args: { path: string; loaded: string }) {
           lastWritten: lastWrittenRef,
           pending: pendingRef,
           timer: timerRef,
+          setCachedFile: setCachedFileRef,
         });
       }, autosaveDelayMs);
     },
