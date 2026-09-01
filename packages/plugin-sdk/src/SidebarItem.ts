@@ -89,7 +89,7 @@ export function SidebarItem(props: SidebarItemProps): ReactElement {
                   Button,
                   { slot: "chevron", className: chevronClassName },
                   createElement(ChevronRight, {
-                    size: "lg",
+                    size: "sm",
                     className: isExpanded
                       ? chevronIconExpandedClassName
                       : chevronIconClassName,
@@ -183,10 +183,7 @@ const chevron = style(focusRing(), radius.sm, {
   backgroundColor: "transparent",
 });
 
-const chevronIcon = style(motion.standard("transform"), {
-  width: "16px",
-  height: "16px",
-});
+const chevronIcon = style(motion.standard("transform"));
 const chevronIconExpanded = style({ transform: "rotate(90deg)" });
 
 function absoluteHref(base: string, href: string) {
