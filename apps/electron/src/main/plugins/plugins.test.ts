@@ -16,6 +16,7 @@ import { UserService } from "../UserService.js";
 import { WorkspaceService } from "../workspace/WorkspaceService.js";
 import { PluginService } from "./PluginService.js";
 import { installPluginSdkContract } from "./installPluginSdk.js";
+import { copyPluginWorkspacePackages } from "./copyPluginWorkspacePackages.js";
 import { PluginToolGrants } from "./PluginToolGrants.js";
 
 type PluginHandle = {
@@ -64,11 +65,16 @@ const pluginTest = test.extend<{
     });
     const selected = await workspaceService.select(workspaceRoot);
     if (selected instanceof Error) throw selected;
-    const pluginService = new PluginService(workspaceService, (directory) =>
-      installPluginSdkContract({
-        directory,
-        appVersion: workspaceService.appVersion,
-      }),
+    const pluginService = new PluginService(
+      workspaceService,
+      async (directory) => {
+        const contract = await installPluginSdkContract({
+          directory,
+          appVersion: workspaceService.appVersion,
+        });
+        if (contract instanceof Error) return contract;
+        return copyPluginWorkspacePackages(directory);
+      },
     );
     const grants = new PluginToolGrants(workspaceService);
     const toolRuntime = new ToolRuntimeService({

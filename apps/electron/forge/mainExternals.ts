@@ -22,17 +22,6 @@ export const pluginSdkJitiDependencies = [
   "errore",
 ] as const;
 
-// Bundled main calls require.resolve on these at load for plugin tsconfig
-// paths and Maui skill lookup. They are not Vite externals, so Forge must
-// copy them onto disk or the packaged app exits before a window opens.
-export const pluginHostDiskPackages = [
-  "@types/react",
-  "csstype",
-  "maui",
-  "purse-styles",
-  "wouter",
-] as const;
-
 /** Vite/Rolldown external entries for the main process build. */
 export function viteMainExternals(): Array<string | RegExp> {
   return [

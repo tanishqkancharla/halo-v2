@@ -15,35 +15,39 @@ type PluginModule = AnyRouter & {
   Server?: AnyRouter;
 };
 
-const requireFromThisFile = createRequire(import.meta.url);
-const jiti = createJiti(import.meta.url, {
-  moduleCache: false,
-  alias: {
-    "@get-halo/plugin-sdk/schema": sdkEntry("schema"),
-    "@get-halo/plugin-sdk/server": sdkEntry("server"),
-    "@get-halo/plugin-sdk/storage": sdkEntry("storage"),
-    "@get-halo/plugin-sdk/view": sdkEntry("view"),
-    "@tanishqkancharla/tandem-core": requireFromThisFile.resolve(
-      "@tanishqkancharla/tandem-core",
-    ),
-    "@tanishqkancharla/tandem-server": requireFromThisFile.resolve(
-      "@tanishqkancharla/tandem-server",
-    ),
-  },
-});
+function pluginServerJiti() {
+  const requireFromThisFile = createRequire(import.meta.url);
+  return createJiti(import.meta.url, {
+    moduleCache: false,
+    alias: {
+      "@get-halo/plugin-sdk/schema": sdkEntry(requireFromThisFile, "schema"),
+      "@get-halo/plugin-sdk/server": sdkEntry(requireFromThisFile, "server"),
+      "@get-halo/plugin-sdk/storage": sdkEntry(requireFromThisFile, "storage"),
+      "@get-halo/plugin-sdk/view": sdkEntry(requireFromThisFile, "view"),
+      "@tanishqkancharla/tandem-core": requireFromThisFile.resolve(
+        "@tanishqkancharla/tandem-core",
+      ),
+      "@tanishqkancharla/tandem-server": requireFromThisFile.resolve(
+        "@tanishqkancharla/tandem-server",
+      ),
+    },
+  });
+}
 
 export async function loadPluginServer(args: {
   id: string;
   serverPath: string;
 }): Promise<PluginServerLoadError | AnyRouter> {
-  const imported = await jiti.import(args.serverPath).catch(
-    (e) =>
-      new PluginServerLoadError({
-        id: args.id,
-        detail: String(e),
-        cause: e,
-      }),
-  );
+  const imported = await pluginServerJiti()
+    .import(args.serverPath)
+    .catch(
+      (e) =>
+        new PluginServerLoadError({
+          id: args.id,
+          detail: String(e),
+          cause: e,
+        }),
+    );
   if (imported instanceof PluginServerLoadError) return imported;
   if (imported instanceof Procedure) return imported;
   if (isCallable({ value: imported })) {
@@ -98,6 +102,9 @@ function isPluginRouter(value: AnyRouter | Lazy<AnyRouter>) {
   return true;
 }
 
-function sdkEntry(subpath: "schema" | "server" | "storage" | "view") {
+function sdkEntry(
+  requireFromThisFile: NodeRequire,
+  subpath: "schema" | "server" | "storage" | "view",
+) {
   return requireFromThisFile.resolve(`@halo/plugin-sdk/${subpath}`);
 }
