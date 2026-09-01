@@ -1,5 +1,5 @@
 import { connectHaloRpc } from "./HaloRpcClient.js";
-import type { HaloClient } from "../../shared/contract.js";
+import type { HaloClient } from "@repo/shared/contract";
 
 let electronApiPromise: Promise<HaloClient> | undefined;
 

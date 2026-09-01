@@ -9,11 +9,8 @@ import {
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import * as errore from "errore";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import type {
-  HaloClient,
-  PluginInvocationInput,
-} from "../../shared/contract.js";
-import type { WorkspaceInfo } from "../../shared/rpc.js";
+import type { HaloClient, PluginInvocationInput } from "@repo/shared/contract";
+import type { WorkspaceInfo } from "@repo/shared/rpc";
 import {
   loadPluginViews,
   type LoadedPluginList,

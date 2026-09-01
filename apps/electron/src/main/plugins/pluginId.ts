@@ -1,5 +1,4 @@
 import * as errore from "errore";
-import { reservedPluginIds } from "../../shared/contract.js";
 
 export class PluginIdError extends errore.createTaggedError({
   name: "PluginIdError",
@@ -20,4 +19,14 @@ export function parsePluginId(id: string) {
   return id;
 }
 
-const reservedPluginIdSet: ReadonlySet<string> = new Set(reservedPluginIds);
+const reservedPluginIdSet: ReadonlySet<string> = new Set([
+  "new",
+  "servers",
+  "create",
+  "build",
+  "types",
+  "list",
+  "check",
+  "grant",
+  "call",
+]);

@@ -11,8 +11,8 @@ import * as errore from "errore";
 import {
   agentSessionStateFromSession,
   type AgentSessionState,
-} from "../../shared/AgentSessionState.js";
-import type { AgentSessionEvent, SessionSummary } from "../../shared/rpc.js";
+} from "@repo/shared/AgentSessionState";
+import type { AgentSessionEvent, SessionSummary } from "@repo/shared/rpc";
 import { type ReadonlyStream, Stream } from "../../shared/Stream.js";
 import type {
   WorkspaceLayout,

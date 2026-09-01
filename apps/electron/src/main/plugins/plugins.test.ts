@@ -5,7 +5,7 @@ import { createHaloRpcClient } from "@halo/cli";
 import type { PluginToolResult } from "@halo/plugin-sdk/server";
 import { Logger } from "@repo/logger";
 import { expect, test } from "vitest";
-import type { HaloClient } from "../../shared/contract.js";
+import type { HaloClient } from "@repo/shared/contract";
 import { StaticAgentAuthority } from "../agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import { createWorkspaceFilesPlugin } from "../agent/tools/files/WorkspaceFilesPlugin.js";

@@ -16,9 +16,10 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router, useLocation } from "wouter";
-import type { AppInfo, SessionSummary } from "../../shared/rpc.ts";
-import type { LoadedPluginView, PluginLoadError } from "../../shared/plugin.js";
+import type { PluginLoadError } from "@repo/shared/contract";
+import type { AppInfo, SessionSummary } from "@repo/shared/rpc";
 import { useInstallAppUpdateMutation } from "../api/ApiProvider.tsx";
+import type { LoadedPluginView } from "../evaluatePluginView.js";
 import { FilesystemSection } from "./FilesystemSection.tsx";
 import { SessionsSection } from "./SessionsSection.tsx";
 

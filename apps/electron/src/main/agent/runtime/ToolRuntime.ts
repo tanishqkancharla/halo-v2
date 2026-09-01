@@ -51,7 +51,7 @@ import {
   type QuickJSWASMModule,
 } from "quickjs-emscripten";
 import * as errore from "errore";
-import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
+import type { ConnectionRequest } from "@repo/shared/connectionRequests";
 import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 import type {
   HaloTool,

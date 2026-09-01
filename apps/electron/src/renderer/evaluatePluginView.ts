@@ -9,12 +9,14 @@ import * as jsxRuntime from "react/jsx-runtime";
 import * as reactDom from "react-dom";
 import type { ComponentType } from "react";
 import * as wouter from "wouter";
+import type { PluginList, PluginLoadError } from "@repo/shared/contract";
 import { isCallable } from "../shared/isCallable.js";
-import type {
-  LoadedPluginView,
-  PluginList,
-  PluginLoadError,
-} from "../shared/plugin.js";
+
+export type LoadedPluginView = {
+  id: string;
+  Sidebar?: ComponentType;
+  Routes?: ComponentType;
+};
 
 type PluginViewExports = {
   Sidebar?: ComponentType;

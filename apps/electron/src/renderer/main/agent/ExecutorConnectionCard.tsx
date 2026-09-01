@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { background, Button, Flex, radius, shadow, Spacer, Text } from "maui";
 import { style, useStyles } from "purse-styles";
-import { connectionRequestLabel } from "../../../shared/connectionRequests.js";
+import { connectionRequestLabel } from "@repo/shared/connectionRequests";
 import { useApi } from "../../api/ApiProvider.tsx";
 import type { SessionViewPart } from "./sessionView.ts";
 import { integrationBrands } from "./IntegrationBrands.ts";

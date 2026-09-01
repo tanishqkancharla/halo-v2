@@ -4,11 +4,13 @@ import {
   pluginPackageJsonSchema,
 } from "@halo/plugin-sdk/schema";
 import * as errore from "errore";
-import {
-  PluginManifestError,
-  type PluginManifest,
-} from "../../shared/pluginManifest.js";
+import type { PluginManifest } from "@repo/shared/contract";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
+
+export class PluginManifestError extends errore.createTaggedError({
+  name: "PluginManifestError",
+  message: "Plugin '$id' package.json is not a Halo plugin: $detail",
+}) {}
 
 const viewFallbacks = [
   "view.tsx",

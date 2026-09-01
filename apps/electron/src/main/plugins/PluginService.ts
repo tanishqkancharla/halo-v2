@@ -2,9 +2,12 @@ import { join } from "node:path";
 import { call, getRouter, Procedure, type AnyRouter } from "@orpc/server";
 import type { PluginToolsFacade } from "@halo/plugin-sdk/server";
 import * as errore from "errore";
-import type { PluginInvocationInput } from "../../shared/contract.js";
-import type { PluginList, PluginLoadError } from "../../shared/plugin.js";
-import type { PluginManifest } from "../../shared/pluginManifest.js";
+import type { PluginInvocationInput } from "@repo/shared/contract";
+import type {
+  PluginList,
+  PluginLoadError,
+  PluginManifest,
+} from "@repo/shared/contract";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 import {
   WorkspaceNotReadyError,

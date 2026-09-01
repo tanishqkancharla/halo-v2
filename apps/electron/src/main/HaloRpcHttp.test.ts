@@ -5,7 +5,7 @@ import { basename, join } from "node:path";
 import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
-import type { HaloClient } from "../shared/contract.js";
+import type { HaloClient } from "@repo/shared/contract";
 import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
 import { FilesystemService } from "./filesystem/FilesystemService.js";

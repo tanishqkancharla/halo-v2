@@ -1,4 +1,5 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { HaloManifest } from "@halo/plugin-sdk/schema";
 import {
   asyncIteratorObject,
   oc,
@@ -9,24 +10,35 @@ import type { AgentSessionState } from "./AgentSessionState.js";
 import type { ConnectionRequest } from "./connectionRequests.js";
 import type {
   AppInfo,
-  PluginList,
-  PluginLoadError,
   SessionSummary,
   WorkspaceInfo,
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const reservedPluginIds = [
-  "new",
-  "servers",
-  "create",
-  "build",
-  "types",
-  "list",
-  "check",
-  "grant",
-  "call",
-] as const;
+export type PluginManifest = {
+  id: string;
+  directory: string;
+  packageName: string;
+  halo: HaloManifest;
+  viewPath?: string;
+  serverPath?: string;
+};
+
+export type PluginLoadError = {
+  id: string;
+  message: string;
+};
+
+export type CompiledPluginView = {
+  id: string;
+  source: string;
+};
+
+export type PluginList = {
+  plugins: PluginManifest[];
+  compiledViews: CompiledPluginView[];
+  errors: PluginLoadError[];
+};
 
 type PluginTypeDiagnostic = {
   id: string;
