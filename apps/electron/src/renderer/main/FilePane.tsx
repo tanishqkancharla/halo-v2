@@ -1,4 +1,12 @@
-import { CodeBlock, Editor, backgroundColor, flex, spacing, text } from "maui";
+import {
+  CodeBlock,
+  Editor,
+  backgroundColor,
+  flex,
+  proseMaxWidth,
+  spacing,
+  text,
+} from "maui";
 import { style, useStyles } from "purse-styles";
 import { useWorkspaceFileQuery } from "../api/ApiProvider.tsx";
 import { CodeViewFileEditor } from "./CodeViewFileEditor.tsx";
@@ -56,7 +64,7 @@ function MarkdownFileEditor({
       onChange={autosave.onChange}
       placeholder="Write…"
       aria-label={path}
-      size="md"
+      size="sm"
     />
   );
 }
@@ -76,7 +84,7 @@ const styles = {
     overflow: "auto",
     overscrollBehavior: "contain",
   }),
-  codeBody: style({
+  codeBody: style(spacing.padding({ all: 12 }), {
     flex: "1 1 auto",
     minWidth: 0,
     minHeight: 0,
@@ -85,9 +93,14 @@ const styles = {
   }),
   content: style({
     width: "100%",
+    maxWidth: proseMaxWidth,
+    marginInline: "auto",
     minWidth: 0,
   }),
   codeContent: style({
+    width: "100%",
+    maxWidth: proseMaxWidth,
+    marginInline: "auto",
     flex: "1 1 auto",
     minWidth: 0,
     minHeight: 0,
