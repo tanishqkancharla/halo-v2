@@ -5,7 +5,6 @@ import {
   contractPeerDependencies,
   mauiPackage,
 } from "@halo/plugin-sdk/contract";
-import { installPluginSdkContract } from "./installPluginSdk.js";
 import { writePluginTsconfig } from "./typecheckPlugin.js";
 
 export class PluginScaffoldError extends errore.createTaggedError({
@@ -17,6 +16,8 @@ export async function writePluginScaffold(args: {
   directory: string;
   id: string;
   appVersion: string;
+  storage: boolean;
+  installDependencies: (directory: string) => Promise<Error | void>;
 }) {
   const created = await mkdir(args.directory, { recursive: true }).catch(
     (e) => new PluginScaffoldError({ id: args.id, cause: e }),
@@ -26,9 +27,13 @@ export async function writePluginScaffold(args: {
   const files: Array<[string, string]> = [
     ["package.json", packageJsonSource(args.id, args.appVersion)],
     [".gitignore", "node_modules\ndist\n"],
-    ["view.tsx", viewSource(args.id)],
-    ["server.ts", serverSource()],
+    [
+      "view.tsx",
+      args.storage ? storageViewSource(args.id) : viewSource(args.id),
+    ],
+    ["server.ts", args.storage ? storageServerSource() : serverSource()],
   ];
+  if (args.storage) files.push(["storage.ts", storageSource()]);
   for (const [name, contents] of files) {
     const written = await writeFile(join(args.directory, name), contents).catch(
       (e) => new PluginScaffoldError({ id: args.id, cause: e }),
@@ -36,10 +41,7 @@ export async function writePluginScaffold(args: {
     if (written instanceof Error) return written;
   }
 
-  const installed = await installPluginSdkContract({
-    directory: args.directory,
-    appVersion: args.appVersion,
-  });
+  const installed = await args.installDependencies(args.directory);
   if (installed instanceof Error) return installed;
 
   return writePluginTsconfig(args.directory);
@@ -118,5 +120,100 @@ export default {
     pluginId: context.pluginId,
   })),
 };
+`;
+}
+
+function storageSource() {
+  return `import { collection, defineSchema, t } from "@get-halo/plugin-sdk/storage";
+
+export const tables = defineSchema({
+  items: collection({
+    id: t.id(),
+    label: t.string(),
+    done: t.boolean(),
+  }),
+});
+`;
+}
+
+function storageServerSource() {
+  return `import { syncRoutes } from "@get-halo/plugin-sdk/server";
+import { tables } from "./storage.js";
+
+export default {
+  ...syncRoutes(tables),
+};
+`;
+}
+
+function storageViewSource(id: string) {
+  const name = pluginDisplayName(id);
+  return `import { useState } from "react";
+import { Button, Checkbox, Flex, H1, TextField } from "maui";
+import { Route, Switch } from "wouter";
+import {
+  PluginStorageProvider,
+  SidebarItem,
+  SidebarSection,
+  usePluginQuery,
+  usePluginTransaction,
+} from "@get-halo/plugin-sdk/view";
+import { tables } from "./storage.js";
+
+type Item = { id: string; label: string; done: boolean };
+
+export function Sidebar() {
+  return (
+    <SidebarSection label="${name}">
+      <SidebarItem href="/" pageTitle="Home">Home</SidebarItem>
+    </SidebarSection>
+  );
+}
+
+export function Routes() {
+  return (
+    <PluginStorageProvider tables={tables}>
+      <Switch>
+        <Route path="/" component={Home} />
+      </Switch>
+    </PluginStorageProvider>
+  );
+}
+
+function Home() {
+  const [label, setLabel] = useState("");
+  const items = usePluginQuery<Item>({ collection: "items" }, []);
+  const addItem = usePluginTransaction((tx, nextLabel: string) => {
+    tx.set("items", { id: crypto.randomUUID(), label: nextLabel, done: false });
+  });
+  const setDone = usePluginTransaction((tx, item: Item, done: boolean) => {
+    tx.set("items", { ...item, done });
+  });
+
+  return (
+    <Flex column gap={4}>
+      <H1>${name}</H1>
+      <Flex row gap={2}>
+        <TextField aria-label="New item" value={label} onChange={setLabel} />
+        <Button
+          onClick={() => {
+            addItem(label);
+            setLabel("");
+          }}
+        >
+          Add
+        </Button>
+      </Flex>
+      {items.map((item) => (
+        <Checkbox
+          key={item.id}
+          label={item.label}
+          checked={item.done}
+          setChecked={(done) => setDone(item, done)}
+        />
+      ))}
+    </Flex>
+  );
+}
 `;
 }

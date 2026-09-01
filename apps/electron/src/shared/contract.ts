@@ -1,4 +1,4 @@
-import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
+import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import {
   asyncIteratorObject,
   oc,
@@ -68,7 +68,7 @@ export const contract = {
   plugins: {
     list: oc.output(type<PluginList>()),
     create: oc
-      .input(type<{ id: string }>())
+      .input(type<{ id: string; storage?: boolean }>())
       .output(type<{ id: string; directory: string }>()),
     build: oc.output(type<{ built: string[]; errors: PluginLoadError[] }>()),
     types:

@@ -32,7 +32,7 @@ type HaloHost = {
       }>;
       errors: Array<{ id: string; message: string }>;
     }>;
-    create: (input: { id: string }) => Promise<{
+    create: (input: { id: string; storage?: boolean }) => Promise<{
       id: string;
       directory: string;
     }>;
@@ -136,6 +136,12 @@ const plugin = Cli.create("plugin", {
     args: z.object({
       id: z.string().describe("Plugin id: [a-z][a-z0-9-]*"),
     }),
+    options: z.object({
+      storage: z
+        .boolean()
+        .optional()
+        .describe("Include persistent storage and a working stored-list view"),
+    }),
     env: haloRpcEnv,
     output: z.object({
       id: z.string(),
@@ -150,7 +156,7 @@ const plugin = Cli.create("plugin", {
         });
       }
       const created = await connected.client.plugins
-        .create({ id: c.args.id })
+        .create({ id: c.args.id, storage: c.options.storage })
         .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
       if (created instanceof Error) {
         return c.error({ code: "PLUGIN", message: created.message });

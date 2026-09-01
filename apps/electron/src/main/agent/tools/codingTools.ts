@@ -3,9 +3,9 @@ import {
   createEditTool,
   createReadTool,
   createWriteTool,
-} from "@mariozechner/pi-coding-agent";
-import type { AgentTool } from "@mariozechner/pi-agent-core";
-import { type TSchema, Type } from "@sinclair/typebox";
+} from "@earendil-works/pi-coding-agent";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
+import { type TSchema, Type } from "typebox";
 import type { AgentAuthority } from "../runtime/AgentAuthority.js";
 import { patchFiles } from "./files/patch.js";
 

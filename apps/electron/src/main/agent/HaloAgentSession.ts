@@ -1,9 +1,12 @@
+import { join } from "node:path";
+import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import {
   createAgentSession,
+  ModelRuntime,
   SessionManager,
   type AgentSession,
   type SessionInfo,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import * as errore from "errore";
 import {
   agentSessionStateFromSession,
@@ -142,11 +145,26 @@ export class HaloAgentSession {
       .reload()
       .catch((e) => new CreateAgentSessionError({ cause: e }));
     if (reloaded instanceof Error) return reloaded;
+    registerBunOAuthFlows();
+    const modelRuntime = await ModelRuntime.create({
+      modelsPath: join(layout.agentDir, "models.json"),
+    }).catch((e) => new CreateAgentSessionError({ cause: e }));
+    if (modelRuntime instanceof Error) return modelRuntime;
+    const model = modelRuntime
+      .getModels("openai-codex")
+      .find(({ id }) => id === "gpt-5.6-terra");
+    if (model === undefined) {
+      return new CreateAgentSessionError({
+        cause: new Error("Pi is missing GPT-5.6 Terra"),
+      });
+    }
     const created = await createAgentSession({
       cwd: layout.root,
       agentDir: layout.agentDir,
       sessionManager: manager,
-      tools: [],
+      model,
+      modelRuntime,
+      noTools: "builtin",
       customTools: [
         ...createAuthorizedCodingTools({
           cwd: layout.root,

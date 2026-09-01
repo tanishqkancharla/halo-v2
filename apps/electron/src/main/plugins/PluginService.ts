@@ -16,7 +16,7 @@ import { loadPluginServer } from "./loadPluginServer.js";
 import { parsePluginId } from "./pluginId.js";
 import { readPluginManifest } from "./readPluginManifest.js";
 import { writePluginScaffold } from "./scaffoldPlugin.js";
-import { installPluginSdkContract } from "./installPluginSdk.js";
+import { installPluginDependencies } from "./installPluginDependencies.js";
 import { assertPluginSdkPin, readPluginSdkPinFile } from "./pluginSdkPin.js";
 import { typecheckPlugin, writePluginTsconfig } from "./typecheckPlugin.js";
 
@@ -53,10 +53,15 @@ type PluginDirectory = {
 export class PluginService {
   private routers = new Map<string, AnyRouter>();
 
-  constructor(private readonly workspace: WorkspaceService) {}
+  constructor(
+    private readonly workspace: WorkspaceService,
+    private readonly dependencyInstaller: (
+      directory: string,
+    ) => Promise<Error | void> = installPluginDependencies,
+  ) {}
 
-  async create(id: string) {
-    const parsed = parsePluginId(id);
+  async create(input: { id: string; storage?: boolean }) {
+    const parsed = parsePluginId(input.id);
     if (parsed instanceof Error) return parsed;
 
     const layout = this.workspace.getLayout();
@@ -69,6 +74,8 @@ export class PluginService {
       directory,
       id: parsed,
       appVersion: this.workspace.appVersion,
+      storage: input.storage === true,
+      installDependencies: this.dependencyInstaller,
     });
     if (written instanceof Error) return written;
     return { id: parsed, directory };
@@ -137,11 +144,6 @@ export class PluginService {
         });
         continue;
       }
-      const installed = await installPluginSdkContract({
-        directory: plugin.directory,
-        appVersion: this.workspace.appVersion,
-      });
-      if (installed instanceof Error) return installed;
       const prepared = await writePluginTsconfig(plugin.directory);
       if (prepared instanceof Error) return prepared;
       written.push(plugin.id);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import {
   Icons,
   Thinking,
@@ -10,7 +10,7 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import type { SessionViewPart } from "../agentSession/sessionView.ts";
+import type { SessionViewPart, ToolPart } from "../agentSession/sessionView.ts";
 import { ToolCall } from "./ToolCall.tsx";
 
 type ToolActivityPart = Extract<SessionViewPart, { kind: "toolActivity" }>;
@@ -18,22 +18,16 @@ type ToolActivityPart = Extract<SessionViewPart, { kind: "toolActivity" }>;
 const thinkingSize = "0.6em";
 const chevronSize = "0.85em";
 const markSlot = "0.85em";
+const transitionRemovalDelayMs = motionDurationMs + 16;
 
 export function ToolActivity({ part }: { part: ToolActivityPart }) {
   const [expanded, setExpanded] = useState(false);
   const activityClassName = useStyles(styles.activity);
   const summaryClassName = useStyles(styles.summary);
   const thinkingClassName = useStyles(styles.thinking);
-  const callsClassName = useStyles(styles.calls);
   const interactive =
     part.activeCalls.length > 0 || part.completedCalls.length > 0;
-  const visibleCalls = (() => {
-    if (part.toolsDone === true) {
-      return expanded ? part.completedCalls : [];
-    }
-    if (expanded) return part.completedCalls;
-    return part.activeCalls;
-  })();
+  const visibleCalls = expanded ? part.completedCalls : part.activeCalls;
 
   return (
     <div className={activityClassName} aria-label="Tool activity">
@@ -42,14 +36,14 @@ export function ToolActivity({ part }: { part: ToolActivityPart }) {
           type="button"
           className={summaryClassName}
           aria-expanded={expanded}
-          data-tools-done={part.toolsDone === true ? "" : undefined}
+          data-active={part.active ? "" : undefined}
           onClick={() => setExpanded(!expanded)}
         >
-          {part.toolsDone === true ? undefined : (
+          {part.active ? (
             <span data-activity-thinking="">
               <Thinking size={thinkingSize} variant="muted" />
             </span>
-          )}
+          ) : undefined}
           <span data-activity-chevron="">
             <Icons.ChevronRightLarge width={chevronSize} height={chevronSize} />
           </span>
@@ -57,21 +51,82 @@ export function ToolActivity({ part }: { part: ToolActivityPart }) {
         </button>
       ) : (
         <div className={thinkingClassName}>
-          {part.toolsDone === true ? undefined : (
+          {part.active ? (
             <span data-activity-thinking="">
               <Thinking size={thinkingSize} variant="muted" />
             </span>
-          )}
+          ) : undefined}
           {part.summary}
         </div>
       )}
-      {visibleCalls.length > 0 ? (
-        <div className={callsClassName}>
-          {visibleCalls.map((call) => (
-            <ToolCall key={call.id} part={call} />
-          ))}
-        </div>
-      ) : undefined}
+      <AnimatedToolCalls calls={visibleCalls} />
+    </div>
+  );
+}
+
+function AnimatedToolCalls({ calls }: { calls: ToolPart[] }) {
+  const callIds = JSON.stringify(calls.map((call) => call.id));
+  const [previousCallIds, setPreviousCallIds] = useState(callIds);
+  const [retainedCalls, setRetainedCalls] = useState(calls);
+  const transitionClassName = useStyles(styles.callsTransition);
+  const callsClassName = useStyles(styles.calls);
+  const callClassName = useStyles(styles.call);
+  const callContentClassName = useStyles(styles.callContent);
+
+  if (callIds !== previousCallIds) {
+    setPreviousCallIds(callIds);
+    setRetainedCalls((currentCalls) => {
+      const retainedIds = new Set(currentCalls.map((call) => call.id));
+      return [
+        ...currentCalls,
+        ...calls.filter((call) => !retainedIds.has(call.id)),
+      ];
+    });
+  }
+
+  const finishTransition = useEffectEvent((transitionCallIds: string) => {
+    const currentCallIds = JSON.stringify(calls.map((call) => call.id));
+    if (currentCallIds !== transitionCallIds) return;
+    const visibleIds = new Set(calls.map((call) => call.id));
+    setRetainedCalls((currentCalls) =>
+      currentCalls.filter((call) => visibleIds.has(call.id)),
+    );
+  });
+
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => finishTransition(callIds),
+      transitionRemovalDelayMs,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [callIds]);
+
+  if (retainedCalls.length === 0) return undefined;
+
+  const visibleCalls = new Map(calls.map((call) => [call.id, call]));
+  return (
+    <div
+      className={transitionClassName}
+      data-visible={calls.length > 0 ? "" : undefined}
+    >
+      <div className={callsClassName}>
+        {retainedCalls.map((retainedCall) => {
+          const visibleCall = visibleCalls.get(retainedCall.id);
+          return (
+            <div
+              key={retainedCall.id}
+              className={callClassName}
+              data-visible={visibleCall === undefined ? undefined : ""}
+            >
+              <div className={callContentClassName}>
+                <ToolCall
+                  part={visibleCall === undefined ? retainedCall : visibleCall}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -94,7 +149,7 @@ const summaryRow = style(
 );
 
 const styles = {
-  activity: style(flex({ direction: "column", gap: 3 }), {
+  activity: style(flex({ direction: "column" }), {
     minWidth: 0,
   }),
   thinking: summaryRow,
@@ -128,17 +183,17 @@ const styles = {
       {
         display: "inline-flex",
       },
-    "&[data-tools-done] [data-activity-chevron]": {
+    "&:not([data-active]) [data-activity-chevron]": {
       display: "inline-flex",
     },
     "&[aria-expanded='true']": {
       color: colors.gray[12],
       background: "transparent",
     },
-    "&[aria-expanded='true'] [data-activity-thinking]": {
+    "&[aria-expanded='true']:not([data-active]) [data-activity-thinking]": {
       display: "none",
     },
-    "&[aria-expanded='true'] [data-activity-chevron]": {
+    "&[aria-expanded='true']:not([data-active]) [data-activity-chevron]": {
       display: "inline-flex",
     },
     "&[aria-expanded='true'] [data-activity-chevron] svg": {
@@ -148,9 +203,52 @@ const styles = {
       outline: "none",
     },
   }),
+  callsTransition: style({
+    display: "grid",
+    gridTemplateRows: "minmax(0, 0fr)",
+    minWidth: 0,
+    marginTop: 0,
+    opacity: 0,
+    transition: `grid-template-rows ${String(motionDurationMs)}ms ${motionEasing}, margin-top ${String(motionDurationMs)}ms ${motionEasing}, opacity ${String(motionDurationMs)}ms ${motionEasing}`,
+    "&[data-visible]": {
+      gridTemplateRows: "minmax(0, 1fr)",
+      marginTop: spacing.value(3),
+      opacity: 1,
+    },
+    "@starting-style": {
+      gridTemplateRows: "minmax(0, 0fr)",
+      marginTop: 0,
+      opacity: 0,
+    },
+  }),
   calls: style(flex({ direction: "column", gap: 2 }), {
     minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
     marginLeft: spacing.value(6),
     paddingLeft: spacing.value(4),
+  }),
+  call: style({
+    display: "grid",
+    gridTemplateRows: "minmax(0, 0fr)",
+    minWidth: 0,
+    opacity: 0,
+    transform: `translateY(-${spacing.value(1)})`,
+    transition: `grid-template-rows ${String(motionDurationMs)}ms ${motionEasing}, opacity ${String(motionDurationMs)}ms ${motionEasing}, transform ${String(motionDurationMs)}ms ${motionEasing}`,
+    "&[data-visible]": {
+      gridTemplateRows: "minmax(0, 1fr)",
+      opacity: 1,
+      transform: "translateY(0)",
+    },
+    "@starting-style": {
+      gridTemplateRows: "minmax(0, 0fr)",
+      opacity: 0,
+      transform: `translateY(-${spacing.value(1)})`,
+    },
+  }),
+  callContent: style({
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
   }),
 };

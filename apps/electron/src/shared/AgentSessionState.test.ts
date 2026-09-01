@@ -193,6 +193,7 @@ describe("applyAgentSessionEvent", () => {
     const ended = applyAgentSessionEvent(started, {
       type: "agent_end",
       messages: [],
+      willRetry: false,
     });
     expect(ended.isWorking).toBe(false);
   });

@@ -1,4 +1,4 @@
-import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
+import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
 export type { AgentSessionEvent };
 export type { PluginList, PluginLoadError } from "./plugin.js";

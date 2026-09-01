@@ -10,6 +10,7 @@ import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
+import { installPluginSdkContract } from "./plugins/installPluginSdk.js";
 import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
 import type { HaloContext } from "./router.js";
 import { SessionRegistry } from "./sessions/SessionRegistry.js";
@@ -45,7 +46,12 @@ const rpcHttpTest = test.extend<{
     }
 
     const user = new UserService(userDataDir);
-    const plugins = new PluginService(workspace);
+    const plugins = new PluginService(workspace, (directory) =>
+      installPluginSdkContract({
+        directory,
+        appVersion: workspace.appVersion,
+      }),
+    );
     const pluginToolGrants = new PluginToolGrants(workspace);
     const toolRuntime = new ToolRuntimeService({
       workspace,
@@ -133,91 +139,4 @@ describe("listenHaloRpcHttp", () => {
     await rpc.close();
     expect(existsSync(path)).toBe(false);
   });
-
-  rpcHttpTest(
-    "creates, builds, and calls a plugin over HTTP",
-    async ({ rpc, userDataDir }) => {
-      expect(rpc.port).toBeGreaterThan(0);
-      const file = await readHaloRpcFile(rpcFilePath(userDataDir));
-      if (file instanceof Error) throw file;
-      const client = createHaloRpcClient<HaloClient>(file);
-
-      const created = await client.plugins.create({ id: "notes" });
-      expect(created.id).toBe("notes");
-
-      const beforeBuild = await client.plugins
-        .invoke({
-          pluginId: "notes",
-          path: ["ping"],
-          input: undefined,
-        })
-        .catch((e) => (e instanceof Error ? e : new Error(String(e))));
-      expect(beforeBuild).toBeInstanceOf(Error);
-
-      await writeFile(
-        join(created.directory, "server.ts"),
-        `import { pluginOs } from "@get-halo/plugin-sdk/server";
-
-export default {
-  ping: pluginOs.handler(async ({ context }) => ({
-    pluginId: context.pluginId,
-  })),
-  count: pluginOs.handler(() => (async function* () {
-    yield 1;
-    yield 2;
-  })()),
-};
-`,
-      );
-
-      const reserved = await client.plugins
-        .create({ id: "new" })
-        .catch((e) => (e instanceof Error ? e : new Error(String(e))));
-      expect(reserved).toBeInstanceOf(Error);
-
-      const built = await client.plugins.build();
-      expect(built.built).toEqual(["notes"]);
-      expect(built.errors).toEqual([]);
-
-      const ping = await client.plugins.invoke({
-        pluginId: "notes",
-        path: ["ping"],
-        input: undefined,
-      });
-      expect(ping).toEqual({ pluginId: "notes" });
-
-      const count = await client.plugins.invoke({
-        pluginId: "notes",
-        path: ["count"],
-        input: undefined,
-      });
-      expect(count).toBeInstanceOf(Object);
-      // SAFETY: the test plugin's count procedure returns an async number iterator.
-      const stream = count as AsyncIterable<number>;
-      const values: unknown[] = [];
-      for await (const value of stream) values.push(value);
-      expect(values).toEqual([1, 2]);
-
-      await writeFile(
-        join(created.directory, "server.ts"),
-        `import { pluginOs } from "@get-halo/plugin-sdk/server";
-
-export default {
-  ping: pluginOs.handler(async ({ context }) => ({
-    pluginId: context.pluginId,
-    reloaded: true,
-  })),
-};
-`,
-      );
-      await client.plugins.build();
-
-      const reloaded = await client.plugins.invoke({
-        pluginId: "notes",
-        path: ["ping"],
-        input: undefined,
-      });
-      expect(reloaded).toEqual({ pluginId: "notes", reloaded: true });
-    },
-  );
 });

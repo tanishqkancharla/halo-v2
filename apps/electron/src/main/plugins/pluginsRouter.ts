@@ -37,7 +37,7 @@ export const pluginsRouter = os.router({
   }),
   create: os.create.handler(async ({ input, context }) => {
     context.logger.info({ event: "plugin.create", id: input.id });
-    const created = await context.plugins.create(input.id);
+    const created = await context.plugins.create(input);
     if (created instanceof Error) return orpcErrors.badRequest(created);
     return created;
   }),

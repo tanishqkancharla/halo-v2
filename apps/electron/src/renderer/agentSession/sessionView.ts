@@ -29,7 +29,7 @@ export type SessionViewPart =
       kind: "toolActivity";
       id: string;
       summary: string;
-      toolsDone: boolean;
+      active: boolean;
       activeCalls: ToolPart[];
       completedCalls: ToolPart[];
     }
@@ -209,7 +209,7 @@ export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
           kind: "toolActivity",
           id: "assistant-working-activity",
           summary: "Thinking",
-          toolsDone: false,
+          active: true,
           activeCalls: [],
           completedCalls: [],
         },
@@ -279,7 +279,7 @@ function projectTurn(turn: PendingTurn, live: boolean): SessionViewPart[] {
           kind: "toolActivity",
           id: `${turn.id}-activity`,
           summary: "Thinking",
-          toolsDone: false,
+          active: true,
           activeCalls: [],
           completedCalls: [],
         },
@@ -301,12 +301,12 @@ function projectTurn(turn: PendingTurn, live: boolean): SessionViewPart[] {
   const parts: SessionViewPart[] = [];
   let pendingGroups: GroupSegment[] = [];
 
-  function flushGroups() {
+  function flushGroups(active: boolean) {
     if (pendingGroups.length === 0) return;
     const tools = pendingGroups.flatMap((group) => group.tools);
     const lastGroupId = pendingGroups.at(-1)?.groupId;
     if (lastGroupId === undefined) return;
-    const activity = groupActivity(tools, lastGroupId);
+    const activity = groupActivity(tools, lastGroupId, active);
     if (activity !== undefined) parts.push(activity);
     for (const tool of tools) {
       for (const [index, request] of tool.connectionRequests.entries()) {
@@ -322,7 +322,7 @@ function projectTurn(turn: PendingTurn, live: boolean): SessionViewPart[] {
 
   for (const segment of turn.segments) {
     if (segment.kind === "text") {
-      flushGroups();
+      flushGroups(false);
       parts.push({
         kind: "text",
         id: segment.id,
@@ -333,28 +333,25 @@ function projectTurn(turn: PendingTurn, live: boolean): SessionViewPart[] {
     }
     pendingGroups.push(segment);
   }
-  flushGroups();
+  flushGroups(live);
   return parts;
 }
 
 function groupActivity(
   tools: CollectedTool[],
   lastGroupId: string,
+  active: boolean,
 ): SessionViewPart | undefined {
   if (tools.length === 0) return undefined;
 
-  const toolsDone = tools.every((call) => call.resultText !== undefined);
-  const lastGroupOpen = tools.some(
-    (call) => call.groupId === lastGroupId && call.resultText === undefined,
-  );
   const visible = tools.filter((call) => call.connectionRequests.length === 0);
 
   return {
     kind: "toolActivity",
     id: `assistant-${lastGroupId}-activity`,
     summary: activitySummary(tools),
-    toolsDone,
-    activeCalls: lastGroupOpen
+    active,
+    activeCalls: active
       ? visible.filter((call) => call.groupId === lastGroupId).map(toToolPart)
       : [],
     completedCalls: visible.map(toToolPart),

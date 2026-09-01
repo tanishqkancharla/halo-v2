@@ -4,6 +4,10 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import * as errore from "errore";
 import haloPluginSkill from "./haloPluginSkill.md?raw";
+import pluginExamplesReference from "./haloPluginReferences/examples.md?raw";
+import pluginServerReference from "./haloPluginReferences/server.md?raw";
+import pluginStorageReference from "./haloPluginReferences/storage.md?raw";
+import pluginViewReference from "./haloPluginReferences/view.md?raw";
 import type { WorkspaceLayout } from "../workspace/WorkspaceService.js";
 
 const require = createRequire(import.meta.url);
@@ -37,6 +41,19 @@ export async function seedPluginWorkspace(
     alwaysWrite: args.alwaysWrite,
   });
   if (pluginSkill instanceof Error) return pluginSkill;
+  const pluginReferences = [
+    ["examples.md", pluginExamplesReference],
+    ["server.md", pluginServerReference],
+    ["storage.md", pluginStorageReference],
+    ["view.md", pluginViewReference],
+  ] as const;
+  for (const [name, contents] of pluginReferences) {
+    const reference = await writeSeedFile({
+      path: join(dirname(pluginSkillPath), "references", name),
+      contents,
+    });
+    if (reference instanceof Error) return reference;
+  }
   const mauiSkillWritten = await writeIfStale({
     path: mauiSkillPath,
     contents: mauiSkill,
@@ -53,6 +70,17 @@ export async function seedPluginWorkspace(
     ).catch((e) => new PluginSeedError({ cause: e }));
     if (copied instanceof Error) return copied;
   }
+}
+
+async function writeSeedFile(args: { path: string; contents: string }) {
+  const created = await mkdir(dirname(args.path), { recursive: true }).catch(
+    (e) => new PluginSeedError({ cause: e }),
+  );
+  if (created instanceof Error) return created;
+  const written = await writeFile(args.path, args.contents).catch(
+    (e) => new PluginSeedError({ cause: e }),
+  );
+  if (written instanceof Error) return written;
 }
 
 function stampSkillVersion(contents: string, version: string) {

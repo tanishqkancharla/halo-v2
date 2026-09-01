@@ -233,6 +233,20 @@ describe("workspace path helpers", () => {
           ".pi",
           "agent",
           "skills",
+          "halo-plugin",
+          "references",
+          "storage.md",
+        ),
+        "utf8",
+      ),
+    ).toContain("tx.set");
+    expect(
+      await readFile(
+        join(
+          root,
+          ".pi",
+          "agent",
+          "skills",
           "maui",
           "src",
           "apps",

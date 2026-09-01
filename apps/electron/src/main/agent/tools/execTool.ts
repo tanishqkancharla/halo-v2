@@ -1,6 +1,6 @@
-import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { formatExecuteResult } from "@executor-js/execution/core";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import {
   ConnectionRequiredError,
   type ToolRuntime,
