@@ -1,9 +1,8 @@
 import * as errore from "errore";
-import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 export class InstallHaloCliError extends errore.createTaggedError({
   name: "InstallHaloCliError",
@@ -20,16 +19,19 @@ function haloCliBinPath(workspaceRoot: string) {
 
 export const haloCliResourceName = "halo-cli.cjs";
 
-export function resolveHaloCliEntry(fromMainUrl: string) {
+export function resolveHaloCliEntry(
+  filesystem: FilesystemService,
+  fromMainUrl: string,
+) {
   const electronRoot = join(dirname(fileURLToPath(fromMainUrl)), "../..");
   const destCli = join(electronRoot, "../../packages/halo-cli/src/cli.ts");
-  if (existsSync(destCli)) return destCli;
+  if (filesystem.exists(destCli)) return destCli;
   const resourcesDir =
     process.platform === "darwin"
       ? join(dirname(process.execPath), "..", "Resources")
       : join(dirname(process.execPath), "resources");
   const packaged = join(resourcesDir, haloCliResourceName);
-  if (existsSync(packaged)) return packaged;
+  if (filesystem.exists(packaged)) return packaged;
   return undefined;
 }
 
@@ -78,6 +80,7 @@ function resolveHaloCliImportHook(cliEntry: string) {
 }
 
 export async function installHaloCli(args: {
+  filesystem: FilesystemService;
   workspaceRoot: string;
   appVersion: string;
   cliEntry: string;
@@ -85,21 +88,26 @@ export async function installHaloCli(args: {
   electronRunAsNode?: boolean;
 }) {
   const binPath = haloCliBinPath(args.workspaceRoot);
-  if (existsSync(binPath)) {
-    const existing = await readFile(binPath, "utf8").catch(
-      (e) => new InstallHaloCliError({ detail: "read halo", cause: e }),
-    );
-    if (existing instanceof Error) return existing;
+  if (args.filesystem.exists(binPath)) {
+    const existing = await args.filesystem.readTextFile(binPath);
+    if (existing instanceof Error) {
+      return new InstallHaloCliError({ detail: "read halo", cause: existing });
+    }
     if (readInstalledHaloVersion(existing) === args.appVersion) return binPath;
   }
 
   const importHook = resolveHaloCliImportHook(args.cliEntry);
   if (importHook instanceof Error) return importHook;
 
-  const created = await mkdir(haloCliBinDir(args.workspaceRoot), {
-    recursive: true,
-  }).catch((e) => new InstallHaloCliError({ detail: "mkdir bin", cause: e }));
-  if (created instanceof Error) return created;
+  const created = await args.filesystem.makeDirectory(
+    haloCliBinDir(args.workspaceRoot),
+    {
+      recursive: true,
+    },
+  );
+  if (created instanceof Error) {
+    return new InstallHaloCliError({ detail: "mkdir bin", cause: created });
+  }
 
   const script = wrapHaloCli({
     appVersion: args.appVersion,
@@ -109,13 +117,15 @@ export async function installHaloCli(args: {
       args.nodeExecutable === undefined ? "node" : args.nodeExecutable,
     electronRunAsNode: args.electronRunAsNode === true,
   });
-  const written = await writeFile(binPath, script, { mode: 0o755 }).catch(
-    (e) => new InstallHaloCliError({ detail: "write halo", cause: e }),
-  );
-  if (written instanceof Error) return written;
-  const mode = await chmod(binPath, 0o755).catch(
-    (e) => new InstallHaloCliError({ detail: "chmod halo", cause: e }),
-  );
-  if (mode instanceof Error) return mode;
+  const written = await args.filesystem.writeFile(binPath, script, {
+    mode: 0o755,
+  });
+  if (written instanceof Error) {
+    return new InstallHaloCliError({ detail: "write halo", cause: written });
+  }
+  const mode = await args.filesystem.chmod(binPath, 0o755);
+  if (mode instanceof Error) {
+    return new InstallHaloCliError({ detail: "chmod halo", cause: mode });
+  }
   return binPath;
 }

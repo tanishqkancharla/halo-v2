@@ -1,13 +1,3 @@
-import { existsSync } from "node:fs";
-import {
-  mkdir,
-  readFile,
-  readdir,
-  realpath,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
 import { basename, delimiter, join, relative, sep } from "node:path";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
@@ -87,11 +77,11 @@ export function toPosixRelative(
   return rel.split(sep).join("/");
 }
 
-export async function mapFilesystemEventsToTreeEvents(
+export function mapFilesystemEventsToTreeEvents(
   workspaceRoot: string,
   events: readonly FilesystemWatchEvent[],
   directoryPaths: Set<string>,
-): Promise<WorkspaceTreeEvent[]> {
+) {
   const mapped: WorkspaceTreeEvent[] = [];
 
   for (const event of events) {
@@ -114,11 +104,7 @@ export async function mapFilesystemEventsToTreeEvents(
       continue;
     }
 
-    const metadata = await stat(event.path).catch(
-      (e) => new WorkspaceIoError({ cause: e }),
-    );
-    if (metadata instanceof Error) continue;
-    if (metadata.isDirectory()) {
+    if (event.kind === "directory") {
       const directoryPath = relativePath.endsWith("/")
         ? relativePath
         : `${relativePath}/`;
@@ -126,9 +112,7 @@ export async function mapFilesystemEventsToTreeEvents(
       mapped.push({ type: "create", path: directoryPath });
       continue;
     }
-    if (metadata.isFile()) {
-      mapped.push({ type: "create", path: relativePath });
-    }
+    mapped.push({ type: "create", path: relativePath });
   }
 
   return mapped;
@@ -205,14 +189,20 @@ export class WorkspaceService {
   async listPaths() {
     const layout = this.getLayout();
     if (layout instanceof Error) return layout;
-    const paths = await listRelativeWorkspacePaths(layout.root);
+    const paths = await listRelativeWorkspacePaths(
+      this.options.filesystem,
+      layout.root,
+    );
     if (paths instanceof Error) return paths;
     this.directoryPaths = directoryPathsFromList(paths);
     return paths;
   }
 
   async restore() {
-    const preference = await readWorkspacePreference(this.options.appDataDir);
+    const preference = await readWorkspacePreference(
+      this.options.filesystem,
+      this.options.appDataDir,
+    );
     if (preference instanceof Error) {
       console.warn("Workspace preference unreadable:", preference.message);
       return undefined;
@@ -223,7 +213,10 @@ export class WorkspaceService {
     const selected = await this.select(preference.workspaceRoot);
     if (selected instanceof Error) {
       console.warn("Saved workspace unavailable:", selected.message);
-      const cleared = await clearWorkspacePreference(this.options.appDataDir);
+      const cleared = await clearWorkspacePreference(
+        this.options.filesystem,
+        this.options.appDataDir,
+      );
       if (cleared instanceof Error) {
         console.warn("Could not clear workspace preference:", cleared.message);
       }
@@ -233,15 +226,13 @@ export class WorkspaceService {
   }
 
   async select(directory: string) {
-    const root = await realpath(directory).catch(
-      (e) => new WorkspaceIoError({ cause: e }),
-    );
-    if (root instanceof Error) return root;
+    const root = await this.options.filesystem.realpath(directory);
+    if (root instanceof Error) return new WorkspaceIoError({ cause: root });
 
-    const metadata = await stat(root).catch(
-      (e) => new WorkspaceIoError({ cause: e }),
-    );
-    if (metadata instanceof Error) return metadata;
+    const metadata = await this.options.filesystem.stat(root);
+    if (metadata instanceof Error) {
+      return new WorkspaceIoError({ cause: metadata });
+    }
     if (!metadata.isDirectory()) return new WorkspaceNotDirectoryError();
 
     const layout = workspaceLayout(root);
@@ -252,13 +243,18 @@ export class WorkspaceService {
       return workspaceInfo(this.state.layout);
     }
 
-    const sessionDir = await mkdir(layout.sessionDir, {
-      recursive: true,
-      mode: 0o700,
-    }).catch((e) => new WorkspaceIoError({ cause: e }));
-    if (sessionDir instanceof Error) return sessionDir;
+    const sessionDir = await this.options.filesystem.makeDirectory(
+      layout.sessionDir,
+      {
+        recursive: true,
+        mode: 0o700,
+      },
+    );
+    if (sessionDir instanceof Error) {
+      return new WorkspaceIoError({ cause: sessionDir });
+    }
 
-    const seeded = await seedPluginWorkspace(layout, {
+    const seeded = await seedPluginWorkspace(this.options.filesystem, layout, {
       appVersion: this.options.appVersion,
       alwaysWrite: this.options.isDevelopment === true,
     });
@@ -266,6 +262,7 @@ export class WorkspaceService {
 
     if (this.options.cliEntry !== undefined) {
       const installed = await installHaloCli({
+        filesystem: this.options.filesystem,
         workspaceRoot: root,
         appVersion: this.options.appVersion,
         cliEntry: this.options.cliEntry,
@@ -277,6 +274,7 @@ export class WorkspaceService {
     prependHaloCliPath(root);
 
     const preference = await writeWorkspacePreference(
+      this.options.filesystem,
       this.options.appDataDir,
       root,
     );
@@ -296,7 +294,7 @@ export class WorkspaceService {
   }
 
   private async handleWatchEvents(batch: FilesystemWatchBatch) {
-    const mapped = await mapFilesystemEventsToTreeEvents(
+    const mapped = mapFilesystemEventsToTreeEvents(
       batch.watchedPath,
       batch.events,
       this.directoryPaths,
@@ -308,22 +306,24 @@ export class WorkspaceService {
   }
 }
 
-async function listRelativeWorkspacePaths(workspaceRoot: string) {
+async function listRelativeWorkspacePaths(
+  filesystem: FilesystemService,
+  workspaceRoot: string,
+) {
   const paths: string[] = [];
-  const walked = await walkDirectory(workspaceRoot, "", paths);
+  const walked = await walkDirectory(filesystem, workspaceRoot, "", paths);
   if (walked instanceof Error) return walked;
   return paths;
 }
 
 async function walkDirectory(
+  filesystem: FilesystemService,
   absoluteDir: string,
   relativeDir: string,
   paths: string[],
 ): Promise<void | WorkspaceIoError> {
-  const entries = await readdir(absoluteDir, { withFileTypes: true }).catch(
-    (e) => new WorkspaceIoError({ cause: e }),
-  );
-  if (entries instanceof Error) return entries;
+  const entries = await filesystem.listDirectory(absoluteDir);
+  if (entries instanceof Error) return new WorkspaceIoError({ cause: entries });
 
   const included = entries.filter((entry) => {
     if (shouldSkipEntryName(entry.name)) return false;
@@ -342,6 +342,7 @@ async function walkDirectory(
       relativeDir.length === 0 ? entry.name : `${relativeDir}/${entry.name}`;
     if (entry.isDirectory()) {
       const walked: void | WorkspaceIoError = await walkDirectory(
+        filesystem,
         childAbsolute,
         childRelative,
         paths,
@@ -373,14 +374,15 @@ function preferencePath(appDataDir: string): string {
   return join(appDataDir, preferenceFileName);
 }
 
-async function readWorkspacePreference(appDataDir: string) {
+async function readWorkspacePreference(
+  filesystem: FilesystemService,
+  appDataDir: string,
+) {
   const path = preferencePath(appDataDir);
-  if (!existsSync(path)) return undefined;
+  if (!filesystem.exists(path)) return undefined;
 
-  const raw = await readFile(path, "utf8").catch(
-    (e) => new WorkspaceIoError({ cause: e }),
-  );
-  if (raw instanceof Error) return raw;
+  const raw = await filesystem.readTextFile(path);
+  if (raw instanceof Error) return new WorkspaceIoError({ cause: raw });
 
   const parsed = errore.try({
     try: () => {
@@ -391,7 +393,7 @@ async function readWorkspacePreference(appDataDir: string) {
   });
   if (parsed instanceof Error) {
     console.warn("Invalid workspace preference JSON:", parsed.message);
-    const cleared = await clearWorkspacePreference(appDataDir);
+    const cleared = await clearWorkspacePreference(filesystem, appDataDir);
     if (cleared instanceof Error) {
       console.warn("Could not clear workspace preference:", cleared.message);
     }
@@ -399,7 +401,7 @@ async function readWorkspacePreference(appDataDir: string) {
   }
 
   if (!Value.Check(workspacePreferenceSchema, parsed)) {
-    const cleared = await clearWorkspacePreference(appDataDir);
+    const cleared = await clearWorkspacePreference(filesystem, appDataDir);
     if (cleared instanceof Error) {
       console.warn("Could not clear workspace preference:", cleared.message);
     }
@@ -409,22 +411,23 @@ async function readWorkspacePreference(appDataDir: string) {
 }
 
 async function writeWorkspacePreference(
+  filesystem: FilesystemService,
   appDataDir: string,
   workspaceRoot: string,
 ) {
-  const created = await mkdir(appDataDir, {
+  const created = await filesystem.makeDirectory(appDataDir, {
     recursive: true,
     mode: 0o700,
-  }).catch((e) => new WorkspaceIoError({ cause: e }));
-  if (created instanceof Error) return created;
+  });
+  if (created instanceof Error) return new WorkspaceIoError({ cause: created });
 
   const preference: WorkspacePreference = { workspaceRoot };
-  const written = await writeFile(
+  const written = await filesystem.writeFile(
     preferencePath(appDataDir),
     `${JSON.stringify(preference, undefined, 2)}\n`,
     { mode: 0o600 },
-  ).catch((e) => new WorkspaceIoError({ cause: e }));
-  if (written instanceof Error) return written;
+  );
+  if (written instanceof Error) return new WorkspaceIoError({ cause: written });
 }
 
 function prependHaloCliPath(workspaceRoot: string) {
@@ -438,11 +441,12 @@ function prependHaloCliPath(workspaceRoot: string) {
   process.env.PATH = `${binDir}${delimiter}${path}`;
 }
 
-async function clearWorkspacePreference(appDataDir: string) {
+async function clearWorkspacePreference(
+  filesystem: FilesystemService,
+  appDataDir: string,
+) {
   const path = preferencePath(appDataDir);
-  if (!existsSync(path)) return;
-  const removed = await rm(path).catch(
-    (e) => new WorkspaceIoError({ cause: e }),
-  );
-  if (removed instanceof Error) return removed;
+  if (!filesystem.exists(path)) return;
+  const removed = await filesystem.remove(path);
+  if (removed instanceof Error) return new WorkspaceIoError({ cause: removed });
 }

@@ -295,9 +295,9 @@ describe("workspace path helpers", () => {
       root,
       [
         { type: "update", path: join(root, "src", "a.ts") },
-        { type: "create", path: join(root, "src", "b.ts") },
+        { type: "create", path: join(root, "src", "b.ts"), kind: "file" },
         { type: "delete", path: join(root, "src", "a.ts") },
-        { type: "create", path: join(root, ".env") },
+        { type: "create", path: join(root, ".env"), kind: "file" },
       ],
       directories,
     );

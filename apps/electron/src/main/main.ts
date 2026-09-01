@@ -87,7 +87,7 @@ const workspaceService = new WorkspaceService({
   appDataDir: applicationConfig.dataDir,
   filesystem: filesystemService,
   appVersion: app.getVersion(),
-  cliEntry: resolveHaloCliEntry(import.meta.url),
+  cliEntry: resolveHaloCliEntry(filesystemService, import.meta.url),
   cliNodeExecutable: isDevelopment ? "node" : process.execPath,
   cliElectronRunAsNode: !isDevelopment,
   isDevelopment,
