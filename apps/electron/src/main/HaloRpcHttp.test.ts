@@ -60,6 +60,7 @@ const rpcHttpTest = test.extend<{
     );
     const pluginToolGrants = new PluginToolGrants({ filesystem, workspace });
     const toolRuntime = new ToolRuntimeService({
+      filesystem,
       workspace,
       user,
       toolPlugins: [],

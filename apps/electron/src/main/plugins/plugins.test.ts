@@ -85,6 +85,7 @@ const pluginTest = test.extend<{
       workspace: workspaceService,
     });
     const toolRuntime = new ToolRuntimeService({
+      filesystem: filesystemService,
       workspace: workspaceService,
       user: new UserService({
         appDataDir: userDataDir,

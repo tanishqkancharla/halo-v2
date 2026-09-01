@@ -52,6 +52,7 @@ import {
 } from "quickjs-emscripten";
 import * as errore from "errore";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
+import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 import type {
   HaloTool,
   HaloToolContext,
@@ -304,6 +305,7 @@ function toExecutorSchema(schema: TObject) {
 }
 
 type ToolRuntimeOptions = {
+  filesystem: FilesystemService;
   workspaceRoot: string;
   userId: string;
   credentialVault: CredentialVault;
@@ -585,6 +587,7 @@ async function createToolRuntime(
       db: ({ tables }) =>
         Effect.promise(() =>
           openExecutorDatabase({
+            filesystem: input.filesystem,
             workspaceRoot: input.workspaceRoot,
             tables,
           }),

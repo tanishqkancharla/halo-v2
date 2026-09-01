@@ -113,6 +113,7 @@ const pluginToolGrants = new PluginToolGrants({
   workspace: workspaceService,
 });
 const toolRuntime = new ToolRuntimeService({
+  filesystem: filesystemService,
   workspace: workspaceService,
   user: userService,
   toolPlugins,

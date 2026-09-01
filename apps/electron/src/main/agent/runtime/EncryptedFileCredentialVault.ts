@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import fs from "node:fs/promises";
 import path from "node:path";
 import { safeStorage } from "electron";
 import * as errore from "errore";
@@ -7,18 +6,26 @@ import {
   type CredentialVault,
   CredentialVaultError,
 } from "./CredentialVault.js";
+import {
+  type FilesystemService,
+  FilesystemPathNotFoundError,
+} from "../../filesystem/FilesystemService.js";
 
 class EncryptedFileCredentialVault implements CredentialVault {
-  constructor(private readonly directory: string) {}
+  private readonly filesystem: FilesystemService;
+  private readonly directory: string;
+
+  constructor(options: { filesystem: FilesystemService; directory: string }) {
+    this.filesystem = options.filesystem;
+    this.directory = options.directory;
+  }
 
   async get(id: string) {
-    const encrypted = await fs
-      .readFile(this.filePath(id))
-      .catch((cause) => new CredentialVaultError({ operation: "read", cause }));
-    if (encrypted instanceof Error && isMissingFile(encrypted.cause)) {
-      return undefined;
+    const encrypted = await this.filesystem.readFile(this.filePath(id));
+    if (encrypted instanceof FilesystemPathNotFoundError) return undefined;
+    if (encrypted instanceof Error) {
+      return new CredentialVaultError({ operation: "read", cause: encrypted });
     }
-    if (encrypted instanceof Error) return encrypted;
 
     const available = encryptionAvailable();
     if (available instanceof Error) return available;
@@ -39,29 +46,34 @@ class EncryptedFileCredentialVault implements CredentialVault {
     });
     if (encrypted instanceof Error) return encrypted;
 
-    const created = await fs
-      .mkdir(this.directory, { recursive: true, mode: 0o700 })
-      .catch(
-        (cause) =>
-          new CredentialVaultError({ operation: "create directory", cause }),
-      );
-    if (created instanceof Error) return created;
+    const created = await this.filesystem.makeDirectory(this.directory, {
+      recursive: true,
+      mode: 0o700,
+    });
+    if (created instanceof Error) {
+      return new CredentialVaultError({
+        operation: "create directory",
+        cause: created,
+      });
+    }
 
-    const written = await fs
-      .writeFile(this.filePath(id), encrypted, { mode: 0o600 })
-      .catch(
-        (cause) => new CredentialVaultError({ operation: "write", cause }),
-      );
-    if (written instanceof Error) return written;
+    const written = await this.filesystem.writeFile(
+      this.filePath(id),
+      encrypted,
+      { mode: 0o600 },
+    );
+    if (written instanceof Error) {
+      return new CredentialVaultError({ operation: "write", cause: written });
+    }
   }
 
   async delete(id: string) {
-    const removed = await fs
-      .rm(this.filePath(id), { force: true })
-      .catch(
-        (cause) => new CredentialVaultError({ operation: "delete", cause }),
-      );
-    if (removed instanceof Error) return removed;
+    const removed = await this.filesystem.remove(this.filePath(id), {
+      force: true,
+    });
+    if (removed instanceof Error) {
+      return new CredentialVaultError({ operation: "delete", cause: removed });
+    }
   }
 
   private filePath(id: string) {
@@ -71,11 +83,18 @@ class EncryptedFileCredentialVault implements CredentialVault {
 }
 
 export function createEncryptedFileCredentialVault(input: {
+  filesystem: FilesystemService;
   workspaceRoot: string;
 }): CredentialVault {
-  return new EncryptedFileCredentialVault(
-    path.join(input.workspaceRoot, ".halo", "executor", "credentials"),
-  );
+  return new EncryptedFileCredentialVault({
+    filesystem: input.filesystem,
+    directory: path.join(
+      input.workspaceRoot,
+      ".halo",
+      "executor",
+      "credentials",
+    ),
+  });
 }
 
 function encryptionAvailable() {
@@ -94,8 +113,4 @@ function encryptionAvailable() {
       cause: new Error("Electron selected the insecure basic_text backend."),
     });
   }
-}
-
-function isMissingFile(cause: unknown) {
-  return cause instanceof Error && "code" in cause && cause.code === "ENOENT";
 }

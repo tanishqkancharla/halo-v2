@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import {
   createDrizzleRuntimeSchemaFromTables,
@@ -9,6 +8,7 @@ import type { FumaTables } from "@executor-js/sdk/core";
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as errore from "errore";
+import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 
 class ExecutorDatabaseError extends errore.createTaggedError({
   name: "ExecutorDatabaseError",
@@ -19,17 +19,21 @@ const namespace = "halo_executor";
 const version = "1.0.0";
 
 export async function openExecutorDatabase(input: {
+  filesystem: FilesystemService;
   workspaceRoot: string;
   tables: FumaTables;
 }) {
   const directory = path.join(input.workspaceRoot, ".halo", "executor");
-  const created = await fs
-    .mkdir(directory, { recursive: true, mode: 0o700 })
-    .catch(
-      (cause) =>
-        new ExecutorDatabaseError({ operation: "create directory", cause }),
-    );
-  if (created instanceof Error) return created;
+  const created = await input.filesystem.makeDirectory(directory, {
+    recursive: true,
+    mode: 0o700,
+  });
+  if (created instanceof Error) {
+    return new ExecutorDatabaseError({
+      operation: "create directory",
+      cause: created,
+    });
+  }
 
   const client = errore.try({
     try: () =>

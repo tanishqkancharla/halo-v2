@@ -2,6 +2,7 @@ import { shell } from "electron";
 import * as errore from "errore";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
 import type { UserService } from "../../UserService.js";
+import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 import type { WorkspaceService } from "../../workspace/WorkspaceService.js";
 import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import type { AgentAuthority } from "./AgentAuthority.js";
@@ -18,6 +19,7 @@ type PendingConnection = {
 };
 
 type ToolRuntimeServiceOptions = {
+  filesystem: FilesystemService;
   workspace: WorkspaceService;
   user: UserService;
   toolPlugins: readonly HaloToolPlugin[];
@@ -55,10 +57,12 @@ export class ToolRuntimeService {
     if (closed instanceof Error) return closed;
 
     const credentialVault = createEncryptedFileCredentialVault({
+      filesystem: this.options.filesystem,
       workspaceRoot: layout.root,
     });
 
     const runtime = await ToolRuntime.create({
+      filesystem: this.options.filesystem,
       workspaceRoot: layout.root,
       userId: user.id,
       credentialVault,

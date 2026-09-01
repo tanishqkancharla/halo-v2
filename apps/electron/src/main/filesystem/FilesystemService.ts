@@ -66,6 +66,12 @@ export class FilesystemService {
       .catch((cause) => filesystemError({ operation: "read", path, cause }));
   }
 
+  async readFile(path: string) {
+    return fsPromises
+      .readFile(path)
+      .catch((cause) => filesystemError({ operation: "read", path, cause }));
+  }
+
   async writeFile(
     path: string,
     data: string | Uint8Array,
