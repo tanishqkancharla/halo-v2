@@ -38,6 +38,7 @@ window.addEventListener("message", (event) => {
 });
 
 ipcRenderer.on(RPC_CHANNELS.provideRpc, (event) => {
+  // oxlint-disable-next-line typescript/no-floating-promises -- Electron owns this synchronous event callback; the message must wait for the window.
   void windowLoaded.then(() => {
     window.postMessage(RPC_CHANNELS.provideRpc, "*", event.ports);
   });

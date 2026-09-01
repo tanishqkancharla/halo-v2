@@ -67,6 +67,7 @@ export function startAppUpdates(args: {
     updateStatus = { state: "idle" };
     if (!manualCheckPending) return;
     manualCheckPending = false;
+    // oxlint-disable-next-line typescript/no-floating-promises -- Electron owns this synchronous updater event callback; the dialog is informational.
     void dialog.showMessageBox({
       type: "info",
       title: "Check for Updates",
@@ -81,6 +82,7 @@ export function startAppUpdates(args: {
     };
     if (!manualCheckPending) return;
     manualCheckPending = false;
+    // oxlint-disable-next-line typescript/no-floating-promises -- Electron owns this synchronous updater event callback; the dialog is informational.
     void dialog.showMessageBox({
       type: "error",
       title: "Check for Updates",
@@ -103,6 +105,7 @@ export function checkForUpdates(): void {
       updateStatus.state === "disabled"
         ? updateStatus.reason
         : "Updates are not available.";
+    // oxlint-disable-next-line typescript/no-floating-promises -- This command only opens an informational dialog and has no follow-up work.
     void dialog.showMessageBox({
       type: "info",
       title: "Check for Updates",
@@ -118,6 +121,7 @@ export function checkForUpdates(): void {
   }
 
   if (updateStatus.state === "available" || updateStatus.state === "checking") {
+    // oxlint-disable-next-line typescript/no-floating-promises -- This command only opens an informational dialog and has no follow-up work.
     void dialog.showMessageBox({
       type: "info",
       title: "Check for Updates",
@@ -156,6 +160,7 @@ function showUpdateReadyDialog(version: string): void {
     window === undefined
       ? dialog.showMessageBox(options)
       : dialog.showMessageBox(window, options);
+  // oxlint-disable-next-line typescript/no-floating-promises -- The modeless dialog owns this user interaction beyond the caller's lifetime.
   void shown.then(({ response }) => {
     if (response !== layout.updateIndex) return;
     autoUpdater.quitAndInstall();

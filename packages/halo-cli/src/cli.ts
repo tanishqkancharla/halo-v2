@@ -378,7 +378,7 @@ const plugin = Cli.create("plugin", {
 
 const haloVersion = cliVersion();
 
-Cli.create("halo", {
+await Cli.create("halo", {
   description: "Talk to a running Halo app",
   version: haloVersion === undefined ? "dev" : haloVersion,
 })

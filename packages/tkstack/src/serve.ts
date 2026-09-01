@@ -95,6 +95,7 @@ export async function startServer(input: StartServerInput) {
               new URL(url, "http://127.0.0.1").pathname === "/" &&
               acceptsMarkdown(req.headers.accept)
             ) {
+              // oxlint-disable-next-line typescript/no-floating-promises -- Connect middleware callbacks cannot await response handling.
               void serveMarkdown({ filePath, res });
               return;
             }
@@ -102,6 +103,7 @@ export async function startServer(input: StartServerInput) {
               next();
               return;
             }
+            // oxlint-disable-next-line typescript/no-floating-promises -- Connect middleware callbacks cannot await response handling.
             void handleTkstackRequest({
               url,
               method: req.method === undefined ? "GET" : req.method,
@@ -137,9 +139,11 @@ export async function startServer(input: StartServerInput) {
   registryPath = registered;
 
   process.once("SIGINT", () => {
+    // oxlint-disable-next-line typescript/no-floating-promises -- Process signal callbacks cannot await shutdown.
     void shutdown();
   });
   process.once("SIGTERM", () => {
+    // oxlint-disable-next-line typescript/no-floating-promises -- Process signal callbacks cannot await shutdown.
     void shutdown();
   });
 
@@ -206,6 +210,7 @@ async function handleTkstackRequest(input: {
     input.res.setHeader("content-type", "text/plain; charset=utf-8");
     input.res.end("ok");
     setTimeout(() => {
+      // oxlint-disable-next-line typescript/no-floating-promises -- The response must finish before the delayed shutdown begins.
       void input.shutdown();
     }, 250);
     return;

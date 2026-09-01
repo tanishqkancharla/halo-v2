@@ -82,6 +82,7 @@ export function syncRoutes<Schema extends AnySchema>(
             .connect({
               clientId: input.clientId,
               poke: () => {
+                // oxlint-disable-next-line typescript/no-floating-promises -- The sync callback cannot await; the queue owns delivery.
                 void queue.push({ type: "poke" });
               },
             })

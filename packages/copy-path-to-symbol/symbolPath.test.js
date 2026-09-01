@@ -14,7 +14,9 @@ function range(start, end) {
   };
 }
 
+// oxlint-disable-next-line typescript/no-floating-promises -- node:test owns the registered suite Promise.
 describe("findDocumentSymbolPath", () => {
+  // oxlint-disable-next-line typescript/no-floating-promises -- node:test owns the registered test Promise.
   test("returns the deepest symbol path at the selection", () => {
     const symbols = [
       {
@@ -30,13 +32,16 @@ describe("findDocumentSymbolPath", () => {
     ]);
   });
 
+  // oxlint-disable-next-line typescript/no-floating-promises -- node:test owns the registered test Promise.
   test("returns undefined outside every symbol", () => {
     const symbols = [{ name: "load", range: range(20, 30), children: [] }];
     assert.equal(findDocumentSymbolPath(symbols, { line: 10 }), undefined);
   });
 });
 
+// oxlint-disable-next-line typescript/no-floating-promises -- node:test owns the registered suite Promise.
 describe("findSymbolInformationPath", () => {
+  // oxlint-disable-next-line typescript/no-floating-promises -- node:test owns the registered test Promise.
   test("uses the smallest matching symbol and its container", () => {
     const symbols = [
       {

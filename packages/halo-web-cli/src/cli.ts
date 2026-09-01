@@ -16,7 +16,7 @@ async function readStdin(): Promise<string> {
   return source;
 }
 
-Cli.create("halo-web", {
+await Cli.create("halo-web", {
   description: "Control the webview in a running Halo debug app",
   version: "0.1.0",
 })

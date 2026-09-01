@@ -62,4 +62,4 @@ const cli = Cli.create("tkstack", {
   },
 });
 
-cli.serve();
+await cli.serve();

@@ -5,6 +5,9 @@
     "correctness": "error",
     "suspicious": "error"
   },
+  "options": {
+    "typeAware": true
+  },
   "jsPlugins": [
     {
       "name": "anti-slop",
@@ -13,6 +16,17 @@
   ],
   "rules": {
     "react/react-in-jsx-scope": "off",
+    "typescript/await-thenable": "off",
+    "typescript/consistent-return": "off",
+    "typescript/no-base-to-string": "off",
+    "typescript/no-floating-promises": ["error", { "ignoreVoid": false }],
+    "typescript/no-implied-eval": "off",
+    "typescript/no-misused-spread": "off",
+    "typescript/no-unnecessary-type-arguments": "off",
+    "typescript/no-unnecessary-type-assertion": "off",
+    "typescript/no-unnecessary-type-parameters": "off",
+    "typescript/no-unsafe-type-assertion": "off",
+    "typescript/unbound-method": "off",
     "unicorn/no-null": "error",
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
@@ -29,6 +43,7 @@
     "anti-slop/no-unused-exports": "error",
     "anti-slop/no-unsafe-dictionary-type": "error",
     "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-reason-for-floating-promise-disable": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error"
   },
   "ignorePatterns": [

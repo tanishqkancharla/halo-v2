@@ -30,7 +30,9 @@ export function tkstackContentPlugin(input: {
       server.watcher.on("change", (file) => {
         if (file !== input.filePath) return;
         const mod = server.moduleGraph.getModuleById(virtualId);
-        if (mod !== undefined) void server.reloadModule(mod);
+        if (mod === undefined) return;
+        // oxlint-disable-next-line typescript/no-floating-promises -- Vite watcher callbacks cannot await module reloads.
+        void server.reloadModule(mod);
       });
     },
   };

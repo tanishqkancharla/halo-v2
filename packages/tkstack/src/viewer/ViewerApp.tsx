@@ -49,6 +49,7 @@ export function ViewerApp() {
         <DoneButton
           onClick={() => {
             setShutDown(true);
+            // oxlint-disable-next-line typescript/no-floating-promises -- React click callbacks cannot await the server shutdown request.
             void closeViewer();
           }}
         />
@@ -65,6 +66,7 @@ export function ViewerApp() {
 function useViewerMeta() {
   const [meta, setMeta] = useState<ViewerMeta>();
   useEffect(() => {
+    // oxlint-disable-next-line typescript/no-floating-promises -- React effects cannot await; this request owns the metadata update.
     void fetch("/__tkstack/meta")
       .then((response) => response.json())
       .then((value) => {

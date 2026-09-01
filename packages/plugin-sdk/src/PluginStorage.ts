@@ -136,6 +136,7 @@ export function usePluginTransaction<
     (...args: Args) => {
       const tx = typed.transact();
       callback(tx, ...args);
+      // oxlint-disable-next-line typescript/no-floating-promises -- React mutation callbacks stay synchronous while the client persists the transaction.
       void typed.commit(tx);
     },
     [callback, typed],
