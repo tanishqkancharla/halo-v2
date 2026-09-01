@@ -1,17 +1,20 @@
 import { CodeBlock, Editor, backgroundColor, flex, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { useWorkspaceFileQuery } from "../api/ApiProvider.tsx";
+import { CodeViewFileEditor } from "./CodeViewFileEditor.tsx";
 import { fileKind, fileLanguage } from "./fileKind.ts";
 import { PaneHeader } from "./PaneHeader.tsx";
 import { useAutosaveFile } from "./useAutosaveFile.ts";
 
 export function FilePane({ path }: { path: string }) {
   const file = useWorkspaceFileQuery(path);
-  const pane = useStyles(styles.pane);
-  const body = useStyles(styles.body);
-  const content = useStyles(styles.content);
-  const status = useStyles(styles.status);
   const kind = fileKind(path);
+  const pane = useStyles(styles.pane);
+  const body = useStyles(kind === "code" ? styles.codeBody : styles.body);
+  const content = useStyles(
+    kind === "code" ? styles.codeContent : styles.content,
+  );
+  const status = useStyles(styles.status);
 
   return (
     <main className={pane} aria-label={path}>
@@ -27,6 +30,8 @@ export function FilePane({ path }: { path: string }) {
           <div className={content} data-testid="file-page-content">
             {kind === "markdown" ? (
               <MarkdownFileEditor key={path} path={path} loaded={file.data} />
+            ) : kind === "code" ? (
+              <CodeViewFileEditor key={path} path={path} loaded={file.data} />
             ) : (
               <CodeBlock lang={fileLanguage(path)}>{file.data}</CodeBlock>
             )}
@@ -71,9 +76,22 @@ const styles = {
     overflow: "auto",
     overscrollBehavior: "contain",
   }),
+  codeBody: style({
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
+    display: "flex",
+  }),
   content: style({
     width: "100%",
     minWidth: 0,
+  }),
+  codeContent: style({
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: 0,
+    display: "flex",
   }),
   status: style(text({ size: "sm", color: "lowContrast" })),
 };
