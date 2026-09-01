@@ -52,8 +52,6 @@ const rpcHttpTest = test.extend<{
       user,
       toolPlugins: [],
       authority: new StaticAgentAuthority([]),
-      plugins,
-      pluginToolGrants,
     });
     const sessions = new SessionRegistry({ workspace, toolRuntime });
     const context: HaloContext = {

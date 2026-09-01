@@ -5,6 +5,10 @@ import { contract } from "../../shared/contract.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { WorkspaceService } from "../workspace/WorkspaceService.js";
 import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
+import {
+  checkPluginCapabilities,
+  grantPluginCapabilities,
+} from "./PluginCapabilities.js";
 import type { PluginService } from "./PluginService.js";
 import type { PluginToolGrants } from "./PluginToolGrants.js";
 
@@ -87,5 +91,33 @@ export const pluginsRouter = os.router({
       });
     }
     return result;
+  }),
+  check: os.check.handler(async ({ input, context }) => {
+    context.logger.info({
+      event: "plugin.check",
+      pluginId: input.pluginId,
+    });
+    const checked = await checkPluginCapabilities({
+      pluginId: input.pluginId,
+      plugins: context.plugins,
+      pluginToolGrants: context.pluginToolGrants,
+      toolRuntime: context.toolRuntime,
+    });
+    if (checked instanceof Error) return orpcErrors.badRequest(checked);
+    return checked;
+  }),
+  grant: os.grant.handler(async ({ input, context }) => {
+    context.logger.info({
+      event: "plugin.grant",
+      pluginId: input.pluginId,
+    });
+    const granted = await grantPluginCapabilities({
+      pluginId: input.pluginId,
+      plugins: context.plugins,
+      pluginToolGrants: context.pluginToolGrants,
+      toolRuntime: context.toolRuntime,
+    });
+    if (granted instanceof Error) return orpcErrors.badRequest(granted);
+    return granted;
   }),
 });

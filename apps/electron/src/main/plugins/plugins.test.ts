@@ -2,17 +2,13 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createHaloRpcClient } from "@halo/cli";
-import type {
-  PluginToolInput,
-  PluginToolResult,
-} from "@halo/plugin-sdk/server";
+import type { PluginToolResult } from "@halo/plugin-sdk/server";
 import { Logger } from "@repo/logger";
 import { expect, test } from "vitest";
 import type { HaloClient } from "../../shared/contract.js";
 import { StaticAgentAuthority } from "../agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import { workspaceFilesPlugin } from "../agent/tools/files/WorkspaceFilesPlugin.js";
-import { pluginManagementPlugin } from "../agent/tools/plugins/PluginManagementPlugin.js";
 import { listenHaloRpcHttp } from "../HaloRpcHttp.js";
 import type { HaloContext } from "../router.js";
 import { SessionRegistry } from "../sessions/SessionRegistry.js";
@@ -28,28 +24,13 @@ type PluginHandle = {
 };
 
 type PluginDriver = {
+  client: HaloClient;
   create: (input: {
     id: string;
     capabilities: string[];
     source: string;
   }) => Promise<PluginHandle>;
-  types: () => Promise<void>;
-  build: () => Promise<void>;
-  grant: (pluginId: string) => Promise<void>;
-  execute: (
-    operation: PluginManagementOperation,
-    input: PluginToolInput,
-  ) => Promise<PluginToolResult>;
 };
-
-type PluginManagementOperation =
-  | "list"
-  | "create"
-  | "build"
-  | "types"
-  | "check"
-  | "grant"
-  | "invoke";
 
 const pluginTest = test.extend<{
   workspaceRoot: string;
@@ -85,13 +66,8 @@ const pluginTest = test.extend<{
     const toolRuntime = new ToolRuntimeService({
       workspace: workspaceService,
       user: new UserService(userDataDir),
-      toolPlugins: [workspaceFilesPlugin, pluginManagementPlugin],
-      authority: new StaticAgentAuthority([
-        "workspace.files.read",
-        "halo.plugins.manage",
-      ]),
-      plugins: pluginService,
-      pluginToolGrants: grants,
+      toolPlugins: [workspaceFilesPlugin],
+      authority: new StaticAgentAuthority(["workspace.files.read"]),
     });
     const sessions = new SessionRegistry({
       workspace: workspaceService,
@@ -116,26 +92,11 @@ const pluginTest = test.extend<{
       port: rpc.port,
       token: rpc.token,
     });
-    const executeManagement = async (
-      operation: PluginManagementOperation,
-      input: PluginToolInput,
-    ) => {
-      const runtime = await toolRuntime.get();
-      if (runtime instanceof Error) throw runtime;
-      const result = await runtime.invokePath({
-        path: `plugins.${operation}`,
-        args: input,
-      });
-      if (result instanceof Error) throw result;
-      return result;
-    };
 
     const driver: PluginDriver = {
+      client,
       create: async (input) => {
-        const result = await executeManagement("create", { id: input.id });
-        if (!result.ok) throw new Error(result.error.message);
-        // SAFETY: plugins.create returns the PluginService create result.
-        const created = result.data as { id: string; directory: string };
+        const created = await client.plugins.create({ id: input.id });
         const packagePath = path.join(created.directory, "package.json");
         const setCapabilities = async (capabilities: string[]) => {
           // SAFETY: PluginService.create wrote a package object with a Halo manifest.
@@ -167,19 +128,6 @@ const pluginTest = test.extend<{
           setCapabilities,
         };
       },
-      types: async () => {
-        const result = await executeManagement("types", {});
-        if (!result.ok) throw new Error(result.error.message);
-      },
-      build: async () => {
-        const result = await executeManagement("build", {});
-        if (!result.ok) throw new Error(result.error.message);
-      },
-      grant: async (pluginId) => {
-        const result = await executeManagement("grant", { pluginId });
-        if (!result.ok) throw new Error(result.error.message);
-      },
-      execute: executeManagement,
     };
 
     await use(driver);
@@ -205,60 +153,31 @@ export default {
   read: pluginOs.handler(({ context }) =>
     context.tools.files.read({ path: "message.txt" }),
   ),
-  stream: pluginOs.handler(() => (async function* () {
-    yield "one";
-  })()),
 };
 `,
     });
-    await plugins.types();
-    await plugins.build();
+    await plugins.client.plugins.types();
+    await plugins.client.plugins.build();
 
-    expect(await plugins.execute("list", {})).toMatchObject({ ok: true });
-    expect(
-      await plugins.execute("check", { pluginId: reader.id }),
-    ).toMatchObject({
-      ok: true,
-      data: {
+    const listed = await plugins.client.plugins.list();
+    expect(listed.plugins.map((plugin) => plugin.id)).toContain("reader");
+    expect(await plugins.client.plugins.check({ pluginId: reader.id })).toEqual(
+      {
         requested: ["files.read"],
         existing: ["files.read"],
         granted: [],
         missing: [],
       },
-    });
+    );
     expect(await reader.invoke("read")).toMatchObject({
       ok: false,
       error: { code: "tool_not_granted" },
     });
 
-    await plugins.grant(reader.id);
+    await plugins.client.plugins.grant({ pluginId: reader.id });
     expect(await reader.invoke("read")).toEqual({
       ok: true,
       data: { path: "message.txt", text: "hello" },
-    });
-    expect(
-      await plugins.execute("invoke", {
-        pluginId: reader.id,
-        path: ["read"],
-        input: {},
-      }),
-    ).toEqual({
-      ok: true,
-      data: { path: "message.txt", text: "hello" },
-    });
-    expect(
-      await plugins.execute("invoke", {
-        pluginId: reader.id,
-        path: ["stream"],
-        input: {},
-      }),
-    ).toEqual({
-      ok: false,
-      error: {
-        code: "PluginToolStreamingUnsupportedError",
-        message:
-          "Agent plugin invocation does not support streaming procedures",
-      },
     });
 
     await reader.setCapabilities([]);
@@ -273,7 +192,7 @@ export default {
       error: { code: "tool_not_granted" },
     });
 
-    await plugins.grant(reader.id);
+    await plugins.client.plugins.grant({ pluginId: reader.id });
     expect(await reader.invoke("read")).toEqual({
       ok: true,
       data: { path: "message.txt", text: "hello" },

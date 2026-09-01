@@ -22,6 +22,10 @@ export const reservedPluginIds = [
   "create",
   "build",
   "types",
+  "list",
+  "check",
+  "grant",
+  "call",
 ] as const;
 
 type PluginTypeDiagnostic = {
@@ -75,6 +79,23 @@ export const contract = {
         }>(),
       ),
     invoke: oc.input(type<PluginInvocationInput>()).output(type<unknown>()),
+    check: oc.input(type<{ pluginId: string }>()).output(
+      type<{
+        requested: string[];
+        existing: string[];
+        granted: string[];
+        missing: string[];
+      }>(),
+    ),
+    grant: oc.input(type<{ pluginId: string }>()).output(
+      type<{
+        requested: string[];
+        existing: string[];
+        granted: string[];
+        newlyGranted: string[];
+        missing: string[];
+      }>(),
+    ),
   },
 };
 

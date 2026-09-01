@@ -1,8 +1,6 @@
 import { type Static, type TObject } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
-import type { PluginService } from "../../plugins/PluginService.js";
-import type { PluginToolGrants } from "../../plugins/PluginToolGrants.js";
 import type { ToolRuntime } from "../runtime/ToolRuntime.js";
 
 export class HaloToolInputError extends errore.createTaggedError({
@@ -17,8 +15,6 @@ export type HaloToolExecution = {
 export type HaloToolContext = {
   workspaceRoot: string;
   userId: string;
-  plugins: PluginService;
-  pluginToolGrants: PluginToolGrants;
   runtime: ToolRuntime;
   signal: AbortSignal | undefined;
   modelId: string | undefined;

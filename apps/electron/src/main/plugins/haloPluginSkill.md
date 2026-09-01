@@ -1,322 +1,123 @@
 ---
 name: halo-plugin
 version: 1
-description: >
-  Create or edit a Halo plugin, which provides extension points to create and customize UI on the Halo app.
+description: Create or edit a Halo plugin that adds workspace UI, server procedures, persistent data, or access to granted tools.
 ---
 
 # Halo plugins
 
-Plugins live in `{workspace}/.halo/plugins/<id>/`. The folder name is the plugin id. `halo.name` is the label in the UI.
+You can create Halo plugins that change how Halo looks and works. Plugins live in `.halo/plugins/<id>/` inside the selected workspace. Write plugin code only in that folder; do not edit Halo itself.
 
-Write plugin code only in that folder. Do not edit Halo app source.
+Halo must be running because the `halo` CLI talks to the open app.
 
-Always read the maui skill before writing view code. Import Maui components and tokens from `"maui"`, styles from `"purse-styles"`, hooks from `"react"`, routing from `"wouter"`, and only Halo-owned APIs from `@get-halo/plugin-sdk/view`. Do not use raw HTML controls.
+## Work loop
 
-The Maui skill also covers standalone apps. Halo already provides `MauiProvider`, so a plugin must not add another one.
+1. `halo plugin new <id>` scaffolds the plugin and installs the contract for the running Halo version.
+2. Edit only that plugin's source files.
+3. `halo plugin types` refreshes the local SDK contract and typechecks every plugin.
+4. If the plugin requests host tools, follow the connection and grant flow below.
+5. `halo plugin build` compiles every plugin view and remounts plugin servers.
+6. `halo plugin <id> <procedure> --input '<json>'` checks a non-streaming server procedure.
+7. Reload Halo after a build to render the new view bundle.
 
-If the plugin keeps data, add `storage.ts` and `syncRoutes`. Do not use `localStorage`, `sessionStorage`, cookies, or files you invent.
-
-Plugins do not inherit the agent's tools. A plugin requests specific tools by listing their exact canonical paths in `package.json` under `halo.capabilities`, and its server calls those same paths through `context.tools`. Declaring a path does not grant it: check the request with `tools.plugins.check`, then explicitly add its current valid paths with `tools.plugins.grant`. Removing a declared path revokes it; adding it back requires a new grant. Connections and plugin grants are separate: connect integrations through Executor's normal connection flow, and never give credentials to plugin code.
-
-Halo must be running. Use read, edit, write, patch, and bash for workspace files and commands. Use the following exact calls through exec for Halo plugin management:
-
-1. `tools.plugins.create({ id })` — scaffold the plugin folder, pin `@get-halo/plugin-sdk` to this Halo version, and install that contract
-2. Edit sources in the returned directory with read, edit, write, and patch
-3. `tools.plugins.types({})` — typecheck every plugin. Fix all reported diagnostics.
-4. `tools.plugins.check({ pluginId: id })` — compare requested capabilities with saved grants and the live tool catalog
-5. `tools.plugins.grant({ pluginId: id })` — grant the currently declared paths that exist in the catalog
-6. `tools.plugins.build({})` — build every plugin and remount its server
-7. `tools.plugins.invoke({ pluginId: id, path: ["ping"], input: {} })` — check a non-streaming server procedure
-8. Reload (View → Reload, or Cmd-R / Ctrl-R) to render view changes
-
-Check every `{ ok, data/error }` result before continuing. `types` and `build` currently operate on every workspace plugin, so report unrelated plugin errors instead of changing those plugins.
-
-The `halo` CLI remains available for humans and fallback debugging: `halo plugin new <id>`, `halo plugin types`, `halo plugin build`, and `halo plugin <id> <endpoint>`. `new`, `build`, and `types` are reserved ids.
-
-Do not compile the view yourself. Halo reads `dist/view.js` on load. A missing file is a load error for that plugin only. A pin that is missing or not this Halo version is a load error for that plugin only.
+`types` and `build` act on every workspace plugin. Report errors from unrelated plugins instead of changing them.
 
 ## Layout
 
-Required:
+A plugin can have these files:
 
-- `package.json` with a nested `halo` object
-- `halo.version` set to `1`
-- `halo.name` set to a non-empty string
+- `package.json` is required. It declares the plugin, its optional entry points, and the host tools it requests.
+- `view.tsx` is optional. It runs in Halo's renderer and exports the `Sidebar` and `Routes` UI hook points.
+- `server.ts` is optional. It runs in Halo's main process and exposes oRPC procedures to views and the CLI.
+- `storage.ts` is optional. It defines typed Tandem collections for plugin-owned persistent data.
 
-Optional:
+Plugins may be UI-only, server-only, or both. `storage.ts` is not an entry point; the view and server import its schema to connect the two sides of storage.
 
-- `halo.capabilities` with exact Executor paths such as `files.read`
-- `view.tsx` (or `view/index.tsx`, `view.ts`, `view/index.ts`) with named exports `Sidebar` and `Routes`
-- `server.ts` (or `server/index.ts`) with a default oRPC router
-- `storage.ts` with Tandem collections from `@get-halo/plugin-sdk/storage`
+Halo finds view entries at `view.tsx`, `view/index.tsx`, `view.ts`, or `view/index.ts`, and server entries at `server.ts` or `server/index.ts`. Set an explicit manifest path only when using another location.
 
-## View bundle
+## Metadata
 
-Pin `@get-halo/plugin-sdk` in `devDependencies` to the exact Halo app version, with no caret. A mismatch fails types, build, and load. Keep the React, Maui, purse-styles, and wouter packages written by `tools.plugins.create`; plugin views import them directly. Halo copies its own contract into the plugin `node_modules` and resolves those packages from the host while running `types`. A clone without Halo runs `npm install`, then `tsc`. Run and rebuild still need Halo.
+`package.json` must have a non-empty package `name` and a `halo` object with:
 
-`halo plugin build` compiles the view with esbuild. Packages Halo already ships are external: `react`, `maui`, `purse-styles`, `wouter`, `@get-halo/plugin-sdk/view`. Import each public package directly. `@get-halo/plugin-sdk/view` contains only Halo-owned providers, hooks, and sidebar components. Follow the maui skill and do not wrap `MauiProvider`.
+- `version: 1`
+- a non-empty `name`, shown in Halo
+- optional `description`
+- optional `view` and `server` entry paths
+- optional `capabilities`, containing exact canonical host tool paths
 
-Other packages are allowed. Add them to that plugin's `package.json`, run `npm install` in the plugin folder, then `halo plugin build`. esbuild inlines them. A missing package fails the build.
-
-Import `pluginOs` and `syncRoutes` from `@get-halo/plugin-sdk/server`. Import `collection`, `defineSchema`, and `t` from `@get-halo/plugin-sdk/storage`. Parse JSON with `parseVersioned` from `@get-halo/plugin-sdk/schema`.
-
-## package.json
-
-```json
-{
-  "name": "halo-plugin-notes",
-  "halo": {
-    "version": 1,
-    "name": "Notes",
-    "description": "Scratch notes.",
-    "capabilities": ["files.read"],
-    "view": "./view.tsx"
-  },
-  "devDependencies": {
-    "@get-halo/plugin-sdk": "0.1.20",
-    "@types/react": "19.2.2",
-    "maui": "npm:@tanishqkancharla/maui@0.0.11",
-    "purse-styles": "^0.2.1",
-    "react": "^19.2.8",
-    "wouter": "^3.10.0"
-  }
-}
-```
-
-Use the running Halo version, not this example number.
+Pin `@get-halo/plugin-sdk` in `devDependencies` to the running Halo version exactly. This pin is the plugin's contract with the host. A missing or different version prevents typechecking, building, and loading. Let `halo plugin new` and `halo plugin types` install the contract.
 
 ## View
 
-`Sidebar` mounts in the app sidebar only when you export it. `Routes` fills the main pane at `/plugins/<id>`. Both are React components. Use `SidebarSection` and `SidebarItem` for sidebar chrome. Plugin links are relative to `/plugins/<id>`.
+The view is one browser bundle with two independent React mount points:
 
-The host paints that pane with `backgroundColor.app`. Follow the maui skill for page width: center ordinary pages at `proseMaxWidth`. Full pane width should be reserved for when you need it (horizontally dense tools, like tables, a CRM, kanban, or side-by-side panes).
+- `Sidebar` mounts in Halo's left sidebar. Use it for navigation or small status UI. `SidebarSection` supplies the section title. An active `SidebarItem` uses its `pageTitle` and section title to fill Halo's shared page header.
+- `Routes` mounts in the main pane below Halo's shared header at `/plugins/<id>`. Use it for the plugin's pages. Routes and sidebar links are relative to the plugin base.
 
-```tsx
-import { Flex, H1, Padding, proseMaxWidth } from "maui";
-import { Route, Switch } from "wouter";
-import { SidebarItem, SidebarSection } from "@get-halo/plugin-sdk/view";
+Exporting one hook does not require the other. A view with neither export is empty. The hooks do not share a React tree, so component state and custom context do not cross between them.
 
-export function Sidebar() {
-  return (
-    <SidebarSection label="Notes">
-      <SidebarItem href="/" pageTitle="Scratch">
-        Scratch
-      </SidebarItem>
-    </SidebarSection>
-  );
-}
+Halo mounts each hook inside a `PluginServerProvider`. When the plugin has a server, call it with `usePluginServer<typeof router>()` and import the router from `server.ts` as a type only.
 
-export function Routes() {
-  return (
-    <Switch>
-      <Route path="/" component={Home} />
-    </Switch>
-  );
-}
+Always read the `maui` skill before writing view code. Halo already provides `MauiProvider`. Import React, Maui, purse-styles, and wouter from their public packages. `@get-halo/plugin-sdk/view` contains Halo-owned providers, hooks, and sidebar components. Do not use raw HTML controls.
 
-function Home() {
-  return (
-    <Padding xy={6}>
-      <Flex
-        column
-        gap={4}
-        style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
-      >
-        <H1>Notes</H1>
-      </Flex>
-    </Padding>
-  );
-}
-```
-
-A view that exports neither `Sidebar` nor `Routes` is empty, not an error. Import the server as a type only:
-
-```ts
-import type router from "./server.ts";
-import { usePluginServer } from "@get-halo/plugin-sdk/view";
-```
+`halo plugin build` writes `dist/view.js`; do not compile it yourself. Halo supplies React, Maui, purse-styles, wouter, and the Halo view and storage SDKs at runtime. The build bundles other plugin dependencies.
 
 ## Server
 
-Export a default oRPC router. Handlers read `{ pluginId, workspaceRoot, tools }` from context. A declared and granted `files.read` path is called as `context.tools.files.read(input)`. Return an `Error` from a handler to fail the RPC call.
+The server exports an oRPC router. Each procedure becomes a callable path. Views call procedures through `usePluginServer`; the CLI calls them with `halo plugin <id> <procedure>`.
 
-```ts
-import { pluginOs } from "@get-halo/plugin-sdk/server";
+Procedures are request handlers, not lifecycle hooks. Halo runs one only when a view, the CLI, or another host caller invokes its path. Each handler receives:
 
-const plugin = pluginOs;
+- `pluginId`, the mounted plugin
+- `workspaceRoot`, the selected workspace
+- `tools`, the plugin's granted host-tool facade
 
-export default {
-  ping: plugin.handler(async ({ context }) => ({
-    pluginId: context.pluginId,
-  })),
-  read: plugin.handler(({ context }) =>
-    context.tools.files.read({ path: "notes.md" }),
-  ),
-};
-```
+Use `pluginOs` from `@get-halo/plugin-sdk/server` so handlers receive that context. Prefer a default router object. Nested router objects create dotted procedure paths.
 
-You can also export a named `router` or `Server` object. Do not export a class or function.
-
-In the view:
-
-```ts
-const server = usePluginServer<typeof router>();
-await server.ping();
-```
+Builds reload server modules without a module cache. Return an `Error` from a handler to fail its RPC call. The renderer can consume streaming procedures, but the CLI supports non-streaming calls only.
 
 ## Storage
 
-This is the only persistence API. Do not use `localStorage`, `sessionStorage`, cookies, or files you invent.
+Use storage for plugin-owned data that must survive reloads and remain in the workspace. Define collections in `storage.ts` with `defineSchema`, `collection`, and `t` from `@get-halo/plugin-sdk/storage`.
 
-Add `storage.ts` with Tandem collections. Spread `syncRoutes(tables)` into the server. Wrap `PluginStorageProvider` around `Routes`, and around `Sidebar` if the sidebar queries. Use `usePluginServer` for other RPC.
+A schema does not persist anything by itself. Connect both sides:
 
-A complete todo plugin lives at `.halo/plugins/todos`. `halo.name` is `Todos`. `Sidebar` has a `SidebarItem` named `List`. `Routes` wraps `PluginStorageProvider` with `tables={todoTables}`, lists todos, and adds items with a field labeled `New todo` and a button named `Add`.
+1. Spread `syncRoutes(tables)` into the server router. This adds `sync.push`, `sync.pull`, and `sync.connect` and persists data at `.halo/plugin-data/<id>/store.json`.
+2. Wrap each view hook that uses storage in `PluginStorageProvider tables={tables}`. Wrap `Sidebar` separately when it uses storage because it does not share the `Routes` tree.
 
-`storage.ts`:
+Inside the provider, use `usePluginQuery`, `usePluginEntity`, and `usePluginTransaction`. Use ordinary server procedures for work that is not persistent collection state.
 
-```ts
-import { collection, defineSchema, t } from "@get-halo/plugin-sdk/storage";
+Do not use `localStorage`, `sessionStorage`, cookies, or an invented persistence file. They bypass Halo's workspace-backed plugin state.
 
-export const todoTables = defineSchema({
-  todos: collection({
-    id: t.id(),
-    title: t.string(),
-    done: t.boolean(),
-  }),
-});
-```
+## Host tools
 
-`server.ts`:
+Plugins do not inherit the agent's tools. Only server procedures can call host tools, through `context.tools`.
 
-```ts
-import { syncRoutes } from "@get-halo/plugin-sdk/server";
-import { todoTables } from "./storage.ts";
+Access has two gates:
 
-export default {
-  ...syncRoutes(todoTables),
-};
-```
+1. The plugin requests exact canonical paths in `halo.capabilities`.
+2. The user grants requested paths that exist in the live catalog.
 
-`package.json`:
+Declaring a path does not grant it. Use `halo plugin check <id>` before asking for a grant. Removing a declared path revokes it; adding it later requires a new grant.
 
-```json
-{
-  "name": "halo-plugin-todos",
-  "halo": {
-    "version": 1,
-    "name": "Todos",
-    "description": "A list that survives reload.",
-    "view": "./view.tsx",
-    "server": "./server.ts"
-  },
-  "devDependencies": {
-    "@get-halo/plugin-sdk": "0.1.20",
-    "@types/react": "19.2.2",
-    "maui": "npm:@tanishqkancharla/maui@0.0.11",
-    "purse-styles": "^0.2.1",
-    "react": "^19.2.8",
-    "wouter": "^3.10.0"
-  }
-}
-```
+Connections and grants are separate. A granted integration tool still needs its normal Executor connection. Never put credentials in plugin code or storage.
 
-`view.tsx`:
+Host tool calls return either `{ ok: true, data }` or `{ ok: false, error }`. Handle both in the server procedure.
 
-```tsx
-import { useState } from "react";
-import { Route, Switch } from "wouter";
-import {
-  Button,
-  Checkbox,
-  Flex,
-  H1,
-  Padding,
-  TextField,
-  proseMaxWidth,
-} from "maui";
-import {
-  PluginStorageProvider,
-  SidebarItem,
-  SidebarSection,
-  usePluginQuery,
-  usePluginTransaction,
-} from "@get-halo/plugin-sdk/view";
-import { todoTables } from "./storage.ts";
+### When an integration is not connected
 
-export function Sidebar() {
-  return (
-    <SidebarSection label="Todos">
-      <SidebarItem href="/" pageTitle="List">
-        List
-      </SidebarItem>
-    </SidebarSection>
-  );
-}
+The user's request to build a plugin with a named integration authorizes you to request that connection and grant the plugin the exact tools it needs. Ask again if you need a different service, account, or broader access.
 
-export function Routes() {
-  return (
-    <PluginStorageProvider tables={todoTables}>
-      <Switch>
-        <Route path="/" component={Home} />
-      </Switch>
-    </PluginStorageProvider>
-  );
-}
+Use this order:
 
-type Todo = { id: string; title: string; done: boolean };
+1. Search for the needed operation and inspect saved connections. If no matching operation exists, do not assume that the integration is unavailable.
+2. Search configured integrations with `tools.executor.integrations.list`. Choose the integration that fits the requested job. If several choices would change the result, ask the user which one to use.
+3. Use the Executor connection tools to start OAuth for that integration. Halo turns the request into a connection card in the chat.
+4. Keep creating the plugin while the card waits. Build every part that does not depend on the live connection, but do not guess canonical tool paths or claim that access was granted.
+5. Tell the user to sign in through the connection card. Halo will notify you and resume the session when sign-in finishes.
+6. After Halo resumes, search again for the now-connected operations and inspect their schemas. Add only the exact paths the plugin needs to `halo.capabilities` and use those paths in the server.
+7. Run `halo plugin check <id>`, then `halo plugin grant <id>`. Finish the normal typecheck, build, procedure check, and reload steps.
 
-function Home() {
-  const todos = usePluginQuery<Todo>({ collection: "todos" }, []);
-  const addTodo = usePluginTransaction((tx, title: string) => {
-    tx.set("todos", { id: crypto.randomUUID(), title, done: false });
-  });
-  const toggleTodo = usePluginTransaction((tx, todo: Todo) => {
-    tx.set("todos", { ...todo, done: !todo.done });
-  });
-  const [title, setTitle] = useState("");
+## Find current details
 
-  function add() {
-    const trimmed = title.trim();
-    if (trimmed.length === 0) return;
-    addTodo(trimmed);
-    setTitle("");
-  }
-
-  return (
-    <Padding xy={6}>
-      <Flex
-        column
-        gap={4}
-        style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
-      >
-        <H1>Todos</H1>
-        <Flex row gap={2}>
-          <TextField
-            aria-label="New todo"
-            value={title}
-            onChange={setTitle}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void add();
-            }}
-          />
-          <Button onClick={add}>Add</Button>
-        </Flex>
-        <Flex column gap={2}>
-          {todos.map((todo) => (
-            <Flex key={todo.id} gap={2}>
-              <Checkbox
-                label={todo.title}
-                checked={todo.done}
-                setChecked={() => {
-                  toggleTodo(todo);
-                }}
-              />
-            </Flex>
-          ))}
-        </Flex>
-      </Flex>
-    </Padding>
-  );
-}
-```
+Do not carry large API examples in this skill. When a detail is unclear, inspect the generated scaffold, run the relevant `halo ... --help`, or read the declarations in the plugin's installed `@get-halo/plugin-sdk`. Those sources match the running Halo version and take precedence over remembered syntax.

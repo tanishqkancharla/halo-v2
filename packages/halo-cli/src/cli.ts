@@ -24,6 +24,14 @@ type HaloHost = {
     get: () => Promise<WorkspaceInfo | undefined>;
   };
   plugins: {
+    list: () => Promise<{
+      plugins: Array<{
+        id: string;
+        directory: string;
+        halo: { name: string };
+      }>;
+      errors: Array<{ id: string; message: string }>;
+    }>;
     create: (input: { id: string }) => Promise<{
       id: string;
       directory: string;
@@ -46,6 +54,19 @@ type HaloHost = {
       path: string[];
       input: unknown;
     }) => Promise<PluginProcedureOutput>;
+    check: (input: { pluginId: string }) => Promise<{
+      requested: string[];
+      existing: string[];
+      granted: string[];
+      missing: string[];
+    }>;
+    grant: (input: { pluginId: string }) => Promise<{
+      requested: string[];
+      existing: string[];
+      granted: string[];
+      newlyGranted: string[];
+      missing: string[];
+    }>;
   };
 };
 
@@ -70,8 +91,46 @@ const pluginLoadError = z.object({
 rewritePluginInvokeArgv();
 
 const plugin = Cli.create("plugin", {
-  description: "Create, build, typecheck, or call a workspace plugin",
+  description:
+    "List, create, build, typecheck, grant, or call a workspace plugin",
 })
+  .command("list", {
+    description: "List workspace plugins",
+    env: haloRpcEnv,
+    output: z.object({
+      plugins: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          directory: z.string(),
+        }),
+      ),
+      errors: z.array(pluginLoadError),
+    }),
+    async run(c) {
+      const connected = await connectHost(c.env);
+      if (connected instanceof Error) {
+        return c.error({
+          code: "NOT_RUNNING",
+          message: connected.message,
+        });
+      }
+      const listed = await connected.client.plugins
+        .list()
+        .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
+      if (listed instanceof Error) {
+        return c.error({ code: "PLUGIN", message: listed.message });
+      }
+      return c.ok({
+        plugins: listed.plugins.map((entry) => ({
+          id: entry.id,
+          name: entry.halo.name,
+          directory: entry.directory,
+        })),
+        errors: listed.errors,
+      });
+    },
+  })
   .command("new", {
     description: "Scaffold a plugin in the open workspace",
     args: z.object({
@@ -171,6 +230,67 @@ const plugin = Cli.create("plugin", {
         });
       }
       return c.ok(checked);
+    },
+  })
+  .command("check", {
+    description:
+      "Compare a plugin's requested tools with its grants and the live catalog",
+    args: z.object({
+      id: z.string().describe("Plugin id"),
+    }),
+    env: haloRpcEnv,
+    output: z.object({
+      requested: z.array(z.string()),
+      existing: z.array(z.string()),
+      granted: z.array(z.string()),
+      missing: z.array(z.string()),
+    }),
+    async run(c) {
+      const connected = await connectHost(c.env);
+      if (connected instanceof Error) {
+        return c.error({
+          code: "NOT_RUNNING",
+          message: connected.message,
+        });
+      }
+      const checked = await connected.client.plugins
+        .check({ pluginId: c.args.id })
+        .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
+      if (checked instanceof Error) {
+        return c.error({ code: "PLUGIN", message: checked.message });
+      }
+      return c.ok(checked);
+    },
+  })
+  .command("grant", {
+    description:
+      "Grant a plugin's declared tools that exist in the live catalog",
+    args: z.object({
+      id: z.string().describe("Plugin id"),
+    }),
+    env: haloRpcEnv,
+    output: z.object({
+      requested: z.array(z.string()),
+      existing: z.array(z.string()),
+      granted: z.array(z.string()),
+      newlyGranted: z.array(z.string()),
+      missing: z.array(z.string()),
+    }),
+    async run(c) {
+      const connected = await connectHost(c.env);
+      if (connected instanceof Error) {
+        return c.error({
+          code: "NOT_RUNNING",
+          message: connected.message,
+        });
+      }
+      const granted = await connected.client.plugins
+        .grant({ pluginId: c.args.id })
+        .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
+      if (granted instanceof Error) {
+        return c.error({ code: "PLUGIN", message: granted.message });
+      }
+      return c.ok(granted);
     },
   })
   .command("call", {
@@ -322,7 +442,15 @@ function wrapRpc(error: { message: string }) {
 }
 
 function rewritePluginInvokeArgv() {
-  const reserved = new Set(["new", "build", "types", "call"]);
+  const reserved = new Set([
+    "new",
+    "build",
+    "types",
+    "call",
+    "list",
+    "check",
+    "grant",
+  ]);
   const argv = process.argv;
   const pluginAt = argv.indexOf("plugin");
   if (pluginAt === -1) return;

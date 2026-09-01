@@ -2,7 +2,6 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type * as Cause from "effect/Cause";
 import {
   createExecutionEngine,
-  EXECUTE_SKILL,
   type ExecutionEngine,
   INTEGRATION_INVENTORY_HEADER,
   makeExecutorToolInvoker,
@@ -52,8 +51,6 @@ import {
 } from "quickjs-emscripten";
 import * as errore from "errore";
 import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
-import type { PluginService } from "../../plugins/PluginService.js";
-import type { PluginToolGrants } from "../../plugins/PluginToolGrants.js";
 import type {
   HaloTool,
   HaloToolContext,
@@ -94,10 +91,7 @@ type HaloToolsPluginOptions = {
   plugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
   executionContext: AsyncLocalStorage<ToolExecutionContext>;
-  context: Pick<
-    HaloToolContext,
-    "workspaceRoot" | "userId" | "plugins" | "pluginToolGrants"
-  >;
+  context: Pick<HaloToolContext, "workspaceRoot" | "userId">;
 };
 
 type ToolExecutionContext = Pick<
@@ -197,10 +191,7 @@ function toExecutorTool(input: {
   haloTool: HaloTool;
   authority: AgentAuthority;
   executionContext: AsyncLocalStorage<ToolExecutionContext>;
-  context: Pick<
-    HaloToolContext,
-    "workspaceRoot" | "userId" | "plugins" | "pluginToolGrants"
-  >;
+  context: Pick<HaloToolContext, "workspaceRoot" | "userId">;
 }) {
   return tool({
     name: input.haloTool.name,
@@ -261,8 +252,6 @@ type ToolRuntimeOptions = {
   credentialVault: CredentialVault;
   toolPlugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
-  plugins: PluginService;
-  pluginToolGrants: PluginToolGrants;
   oauthRedirectUri: string | undefined;
 };
 
@@ -297,11 +286,15 @@ export class ToolRuntime {
     );
     if (executorDescription instanceof Error) return executorDescription;
 
+    const prefix = [
+      "Execute JavaScript. tools and console are in scope.",
+      "Return the value you need next. emit(value) shows that value to the user only.",
+    ].join("\n");
     const inventoryStart = executorDescription.indexOf(
       INTEGRATION_INVENTORY_HEADER,
     );
-    if (inventoryStart === -1) return EXECUTE_SKILL.body;
-    return `${EXECUTE_SKILL.body}\n\n${executorDescription.slice(inventoryStart)}`;
+    if (inventoryStart === -1) return prefix;
+    return `${prefix}\n\n${executorDescription.slice(inventoryStart)}`;
   }
 
   async executeCode(input: {
@@ -520,8 +513,6 @@ async function createToolRuntime(
           context: {
             workspaceRoot: input.workspaceRoot,
             userId: input.userId,
-            plugins: input.plugins,
-            pluginToolGrants: input.pluginToolGrants,
           },
         }),
         googleOpenApiPlugin,

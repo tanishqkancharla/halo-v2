@@ -295,6 +295,7 @@ function SessionViewRow({
   item: SessionViewItem;
   sessionId: string | undefined;
 }) {
+  const userRow = useStyles(styles.userRow);
   const userMessage = useStyles(styles.userMessage);
   const body = useStyles(styles.messageBody);
   const assistantRow = useStyles(styles.assistantRow);
@@ -302,9 +303,11 @@ function SessionViewRow({
 
   if (item.kind === "user") {
     return (
-      <article className={userMessage} aria-label="You message">
-        <div className={body}>{item.text}</div>
-      </article>
+      <div className={userRow}>
+        <article className={userMessage} aria-label="You message">
+          <div className={body}>{item.text}</div>
+        </article>
+      </div>
     );
   }
 
@@ -433,12 +436,19 @@ const styles = {
       overflowWrap: "anywhere",
     },
   ),
+  userRow: style(flex({ justify: "end" }), spacing.padding({ top: 3 }), {
+    position: "sticky",
+    top: 0,
+    zIndex: 1,
+    minWidth: 0,
+    backgroundColor: backgroundColor.app,
+  }),
   userMessage: style(radius.pill, spacing.padding({ x: 4, y: 2 }), {
-    alignSelf: "flex-end",
     width: "fit-content",
     maxWidth: "80%",
     minWidth: 0,
     backgroundColor: colors.gray[3],
+    // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- Chromium defines this CSS property name.
     cornerShape: "squircle",
   }),
   assistantRow: style(flex({ direction: "column", gap: 6 }), {

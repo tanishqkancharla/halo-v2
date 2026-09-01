@@ -1,6 +1,14 @@
 import * as errore from "errore";
 
-export const reservedPluginCommands = ["new", "build", "types"] as const;
+export const reservedPluginCommands = [
+  "new",
+  "build",
+  "types",
+  "list",
+  "check",
+  "grant",
+  "call",
+] as const;
 
 export type PluginJson =
   | string
@@ -34,7 +42,8 @@ export function parsePluginArgv(
   const first = argv[0];
   if (first === undefined) {
     return new PluginArgvError({
-      detail: "expected new <id>, build, types, or <id> <endpoint>",
+      detail:
+        "expected new <id>, list, build, types, check <id>, grant <id>, or <id> <endpoint>",
     });
   }
 

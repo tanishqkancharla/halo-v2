@@ -2,7 +2,7 @@ import "csstype";
 
 declare module "csstype" {
   namespace Property {
-    type CornerShape =
+    type CornerStyle =
       | Globals
       | "bevel"
       | "notch"
@@ -15,6 +15,7 @@ declare module "csstype" {
 
   interface Properties<TLength = (string & {}) | 0, TTime = string & {}> {
     WebkitAppRegion?: "drag" | "no-drag";
-    cornerShape?: Property.CornerShape | undefined;
+    // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- Chromium defines this CSS property name.
+    cornerShape?: Property.CornerStyle | undefined;
   }
 }
