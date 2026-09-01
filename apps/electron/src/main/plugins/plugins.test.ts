@@ -9,6 +9,7 @@ import type { HaloClient } from "../../shared/contract.js";
 import { StaticAgentAuthority } from "../agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import { workspaceFilesPlugin } from "../agent/tools/files/WorkspaceFilesPlugin.js";
+import { FilesystemService } from "../filesystem/FilesystemService.js";
 import { listenHaloRpcHttp } from "../HaloRpcHttp.js";
 import type { HaloContext } from "../router.js";
 import { SessionRegistry } from "../sessions/SessionRegistry.js";
@@ -60,7 +61,10 @@ const pluginTest = test.extend<{
     const userDataDir = await fs.mkdtemp(
       path.join(os.tmpdir(), `halo-plugin-e2e-user-${task.id}-`),
     );
-    const workspaceService = new WorkspaceService(userDataDir, {
+    const filesystemService = new FilesystemService();
+    const workspaceService = new WorkspaceService({
+      appDataDir: userDataDir,
+      filesystem: filesystemService,
       appVersion: "1.2.3",
     });
     const selected = await workspaceService.select(workspaceRoot);
@@ -154,6 +158,9 @@ const pluginTest = test.extend<{
     if (sessionsClosed instanceof Error) throw sessionsClosed;
     const runtimeClosed = await toolRuntime.close();
     if (runtimeClosed instanceof Error) throw runtimeClosed;
+    workspaceService.close();
+    const filesystemClosed = await filesystemService.close();
+    if (filesystemClosed instanceof Error) throw filesystemClosed;
     await fs.rm(userDataDir, { recursive: true, force: true });
   },
 });

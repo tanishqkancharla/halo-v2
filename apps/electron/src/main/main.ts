@@ -30,6 +30,7 @@ import { workspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
 import { workspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
 import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
+import { FilesystemService } from "./filesystem/FilesystemService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
 import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
@@ -81,7 +82,10 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 
 process.env.HALO_USER_DATA = applicationConfig.dataDir;
 
-const workspaceService = new WorkspaceService(applicationConfig.dataDir, {
+const filesystemService = new FilesystemService();
+const workspaceService = new WorkspaceService({
+  appDataDir: applicationConfig.dataDir,
+  filesystem: filesystemService,
   appVersion: app.getVersion(),
   cliEntry: resolveHaloCliEntry(import.meta.url),
   cliNodeExecutable: isDevelopment ? "node" : process.execPath,
@@ -189,6 +193,11 @@ async function closeAppServices(http: HaloRpcHttp | undefined) {
   const runtimeClosed = await toolRuntime.close();
   if (runtimeClosed instanceof Error) {
     logger.error({ event: "tool-runtime-close-failed", error: runtimeClosed });
+  }
+  workspaceService.close();
+  const filesystemClosed = await filesystemService.close();
+  if (filesystemClosed instanceof Error) {
+    logger.error({ event: "filesystem-close-failed", error: filesystemClosed });
   }
   if (http !== undefined) {
     await http.close().catch((error) => {

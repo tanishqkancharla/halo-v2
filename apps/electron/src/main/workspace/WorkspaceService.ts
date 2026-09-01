@@ -9,11 +9,16 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, delimiter, join, relative, sep } from "node:path";
-import * as watcher from "@parcel/watcher";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import type { WorkspaceTreeEvent } from "../../shared/rpc.js";
+import { type ReadonlyStream, Stream } from "../../shared/Stream.js";
+import {
+  type FilesystemWatchBatch,
+  type FilesystemWatchEvent,
+  FilesystemService,
+} from "../filesystem/FilesystemService.js";
 import { haloCliBinDir, installHaloCli } from "./installHaloCli.js";
 import { seedPluginWorkspace } from "../plugins/seedPluginWorkspace.js";
 
@@ -55,8 +60,6 @@ const workspacePreferenceSchema = Type.Object({
   workspaceRoot: Type.String({ minLength: 1 }),
 });
 
-type TreeListener = (events: WorkspaceTreeEvent[]) => void;
-
 const preferenceFileName = "workspace.json";
 
 /** Finder-hidden names (leading `.`) plus `node_modules` for walk cost. */
@@ -84,20 +87,9 @@ export function toPosixRelative(
   return rel.split(sep).join("/");
 }
 
-const parcelWatcherIgnore = [
-  "**/node_modules/**",
-  "**/.*",
-  "**/.*/**",
-] as const;
-
-type ParcelWatchEvent = {
-  type: "create" | "update" | "delete";
-  path: string;
-};
-
-export async function mapParcelEventsToTreeEvents(
+export async function mapFilesystemEventsToTreeEvents(
   workspaceRoot: string,
-  events: readonly ParcelWatchEvent[],
+  events: readonly FilesystemWatchEvent[],
   directoryPaths: Set<string>,
 ): Promise<WorkspaceTreeEvent[]> {
   const mapped: WorkspaceTreeEvent[] = [];
@@ -162,6 +154,8 @@ function removeDirectoryAndDescendants(
 }
 
 type WorkspaceServiceOptions = {
+  appDataDir: string;
+  filesystem: FilesystemService;
   appVersion: string;
   cliEntry?: string;
   cliNodeExecutable?: string;
@@ -171,14 +165,28 @@ type WorkspaceServiceOptions = {
 
 export class WorkspaceService {
   private state: WorkspaceState = { status: "notStarted" };
-  private treeListener: TreeListener | undefined;
-  private watchSubscription: watcher.AsyncSubscription | undefined;
+  private readonly treeEventStream = new Stream<WorkspaceTreeEvent[]>();
+  readonly treeEvents: ReadonlyStream<WorkspaceTreeEvent[]> =
+    this.treeEventStream;
+  private readonly unsubscribeFilesystemEvents: () => void;
   private directoryPaths = new Set<string>();
 
-  constructor(
-    private readonly appDataDir: string,
-    private readonly options: WorkspaceServiceOptions = { appVersion: "0.0.0" },
-  ) {}
+  constructor(private readonly options: WorkspaceServiceOptions) {
+    const watchEvents = this.options.filesystem.watchEvents.filter(
+      (entry): entry is FilesystemWatchBatch => {
+        if (this.state.status === "notStarted") return false;
+        if (entry.watchedPath !== this.state.layout.root) return false;
+        if (entry instanceof Error) {
+          console.warn("Workspace watch failed:", entry.message);
+          return false;
+        }
+        return true;
+      },
+    );
+    this.unsubscribeFilesystemEvents = watchEvents.subscribe((batch) => {
+      void this.handleWatchEvents(batch);
+    });
+  }
 
   getWorkspace(): WorkspaceInfo | undefined {
     if (this.state.status === "notStarted") return undefined;
@@ -203,12 +211,8 @@ export class WorkspaceService {
     return paths;
   }
 
-  setTreeListener(listener: TreeListener | undefined) {
-    this.treeListener = listener;
-  }
-
   async restore() {
-    const preference = await readWorkspacePreference(this.appDataDir);
+    const preference = await readWorkspacePreference(this.options.appDataDir);
     if (preference instanceof Error) {
       console.warn("Workspace preference unreadable:", preference.message);
       return undefined;
@@ -219,7 +223,7 @@ export class WorkspaceService {
     const selected = await this.select(preference.workspaceRoot);
     if (selected instanceof Error) {
       console.warn("Saved workspace unavailable:", selected.message);
-      const cleared = await clearWorkspacePreference(this.appDataDir);
+      const cleared = await clearWorkspacePreference(this.options.appDataDir);
       if (cleared instanceof Error) {
         console.warn("Could not clear workspace preference:", cleared.message);
       }
@@ -272,62 +276,35 @@ export class WorkspaceService {
     }
     prependHaloCliPath(root);
 
-    const preference = await writeWorkspacePreference(this.appDataDir, root);
+    const preference = await writeWorkspacePreference(
+      this.options.appDataDir,
+      root,
+    );
     if (preference instanceof Error) return preference;
 
-    await this.stopWatch();
     this.state = { status: "ready", layout };
     this.directoryPaths = new Set();
-    await this.startWatch(layout.root);
+    const watched = await this.options.filesystem.watch(layout.root);
+    if (watched instanceof Error) {
+      console.warn("Workspace watch failed to start:", watched.message);
+    }
     return workspaceInfo(layout);
   }
 
-  private async startWatch(root: string) {
-    const subscription = await watcher
-      .subscribe(
-        root,
-        (err, events) => {
-          if (err !== null) {
-            console.warn("Workspace watch error:", err.message);
-            return;
-          }
-          void this.handleWatchEvents(root, events);
-        },
-        { ignore: [...parcelWatcherIgnore] },
-      )
-      .catch((e) => new WorkspaceIoError({ cause: e }));
-    if (subscription instanceof Error) {
-      console.warn("Workspace watch failed to start:", subscription.message);
-      return;
-    }
-    this.watchSubscription = subscription;
+  close() {
+    this.unsubscribeFilesystemEvents();
   }
 
-  private async stopWatch() {
-    const subscription = this.watchSubscription;
-    this.watchSubscription = undefined;
-    if (subscription === undefined) return;
-    const stopped = await subscription
-      .unsubscribe()
-      .catch((e) => new WorkspaceIoError({ cause: e }));
-    if (stopped instanceof Error) {
-      console.warn("Workspace watch stop failed:", stopped.message);
-    }
-  }
-
-  private async handleWatchEvents(
-    root: string,
-    events: readonly watcher.Event[],
-  ) {
-    const mapped = await mapParcelEventsToTreeEvents(
-      root,
-      events,
+  private async handleWatchEvents(batch: FilesystemWatchBatch) {
+    const mapped = await mapFilesystemEventsToTreeEvents(
+      batch.watchedPath,
+      batch.events,
       this.directoryPaths,
     );
+    if (this.state.status === "notStarted") return;
+    if (batch.watchedPath !== this.state.layout.root) return;
     if (mapped.length === 0) return;
-    const listener = this.treeListener;
-    if (listener === undefined) return;
-    listener(mapped);
+    this.treeEventStream.append(mapped);
   }
 }
 

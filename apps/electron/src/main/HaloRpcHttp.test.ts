@@ -8,6 +8,7 @@ import { describe, expect, test } from "vitest";
 import type { HaloClient } from "../shared/contract.js";
 import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
+import { FilesystemService } from "./filesystem/FilesystemService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
 import { installPluginSdkContract } from "./plugins/installPluginSdk.js";
@@ -35,7 +36,12 @@ const rpcHttpTest = test.extend<{
     await rm(directory, { recursive: true, force: true });
   },
   rpc: async ({ userDataDir, workspaceRoot }, use) => {
-    const workspace = new WorkspaceService(userDataDir);
+    const filesystem = new FilesystemService();
+    const workspace = new WorkspaceService({
+      appDataDir: userDataDir,
+      filesystem,
+      appVersion: "0.0.0",
+    });
     await writeFile(
       join(userDataDir, "workspace.json"),
       `${JSON.stringify({ workspaceRoot })}\n`,
@@ -79,6 +85,9 @@ const rpcHttpTest = test.extend<{
     if (sessionsClosed instanceof Error) throw sessionsClosed;
     const runtimeClosed = await toolRuntime.close();
     if (runtimeClosed instanceof Error) throw runtimeClosed;
+    workspace.close();
+    const filesystemClosed = await filesystem.close();
+    if (filesystemClosed instanceof Error) throw filesystemClosed;
   },
 });
 

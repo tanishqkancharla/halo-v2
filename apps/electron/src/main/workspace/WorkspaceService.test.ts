@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { describe, expect, test } from "vitest";
+import { FilesystemService } from "../filesystem/FilesystemService.js";
 import {
   WorkspaceIoError,
   WorkspaceNotDirectoryError,
@@ -18,7 +19,7 @@ import {
   WorkspaceService,
   directoryPathsFromList,
   isSkippedRelativePath,
-  mapParcelEventsToTreeEvents,
+  mapFilesystemEventsToTreeEvents,
   shouldSkipEntryName,
   toPosixRelative,
 } from "./WorkspaceService.js";
@@ -27,12 +28,20 @@ async function testDirectory(name: string) {
   return mkdtemp(join(tmpdir(), `halo-${name}-`));
 }
 
+function createWorkspaceService(appDataDir: string) {
+  return new WorkspaceService({
+    appDataDir,
+    filesystem: new FilesystemService(),
+    appVersion: "0.0.0",
+  });
+}
+
 describe("WorkspaceService", () => {
   test("selects a directory and creates Pi session storage", async () => {
     const root = await testDirectory("workspace");
     const appDataDir = await testDirectory("app-data");
     const resolvedRoot = await realpath(root);
-    const service = new WorkspaceService(appDataDir);
+    const service = createWorkspaceService(appDataDir);
 
     await expect(service.select(root)).resolves.toEqual({
       name: basename(resolvedRoot),
@@ -49,7 +58,7 @@ describe("WorkspaceService", () => {
     const root = await testDirectory("workspace");
     const appDataDir = await testDirectory("app-data");
     const resolvedRoot = await realpath(root);
-    const service = new WorkspaceService(appDataDir);
+    const service = createWorkspaceService(appDataDir);
 
     const selected = await service.select(root);
     expect(selected).not.toBeInstanceOf(Error);
@@ -63,10 +72,10 @@ describe("WorkspaceService", () => {
     const root = await testDirectory("workspace");
     const appDataDir = await testDirectory("app-data");
     const resolvedRoot = await realpath(root);
-    const selected = await new WorkspaceService(appDataDir).select(root);
+    const selected = await createWorkspaceService(appDataDir).select(root);
     expect(selected).not.toBeInstanceOf(Error);
 
-    const restored = await new WorkspaceService(appDataDir).restore();
+    const restored = await createWorkspaceService(appDataDir).restore();
 
     expect(restored).toEqual({
       name: basename(resolvedRoot),
@@ -78,19 +87,19 @@ describe("WorkspaceService", () => {
     const appDataDir = await testDirectory("app-data");
 
     await expect(
-      new WorkspaceService(appDataDir).restore(),
+      createWorkspaceService(appDataDir).restore(),
     ).resolves.toBeUndefined();
   });
 
   test("restore clears a missing saved workspace", async () => {
     const root = await testDirectory("workspace");
     const appDataDir = await testDirectory("app-data");
-    const selected = await new WorkspaceService(appDataDir).select(root);
+    const selected = await createWorkspaceService(appDataDir).select(root);
     expect(selected).not.toBeInstanceOf(Error);
     await rm(root, { recursive: true, force: true });
 
     await expect(
-      new WorkspaceService(appDataDir).restore(),
+      createWorkspaceService(appDataDir).restore(),
     ).resolves.toBeUndefined();
     await expect(
       readFile(join(appDataDir, "workspace.json"), "utf8"),
@@ -103,7 +112,7 @@ describe("WorkspaceService", () => {
     const file = join(root, "workspace.txt");
     await writeFile(file, "not a directory");
 
-    const selected = await new WorkspaceService(appDataDir).select(file);
+    const selected = await createWorkspaceService(appDataDir).select(file);
     expect(selected).toBeInstanceOf(WorkspaceNotDirectoryError);
   });
 
@@ -111,7 +120,7 @@ describe("WorkspaceService", () => {
     const root = await testDirectory("missing");
     const appDataDir = await testDirectory("app-data");
 
-    const selected = await new WorkspaceService(appDataDir).select(
+    const selected = await createWorkspaceService(appDataDir).select(
       join(root, "missing"),
     );
     expect(selected).toBeInstanceOf(WorkspaceIoError);
@@ -124,7 +133,7 @@ describe("WorkspaceService", () => {
     const link = join(parent, "workspace");
     await symlink(root, link);
 
-    const selected = await new WorkspaceService(appDataDir).select(link);
+    const selected = await createWorkspaceService(appDataDir).select(link);
     expect(selected).not.toBeInstanceOf(Error);
     if (selected instanceof Error) return;
     expect(selected.workspaceRoot).toBe(await realpath(root));
@@ -134,7 +143,7 @@ describe("WorkspaceService", () => {
     const first = await testDirectory("first");
     const second = await testDirectory("second");
     const appDataDir = await testDirectory("app-data");
-    const service = new WorkspaceService(appDataDir);
+    const service = createWorkspaceService(appDataDir);
     const initial = await service.select(first);
     expect(initial).not.toBeInstanceOf(Error);
 
@@ -170,7 +179,7 @@ describe("WorkspaceService", () => {
     const outside = await testDirectory("outside");
     await symlink(outside, join(root, "outside-link"));
 
-    const service = new WorkspaceService(appDataDir);
+    const service = createWorkspaceService(appDataDir);
     const selected = await service.select(root);
     expect(selected).not.toBeInstanceOf(Error);
 
@@ -185,7 +194,7 @@ describe("WorkspaceService", () => {
 
   test("listPaths returns WorkspaceNotReadyError before select", async () => {
     const appDataDir = await testDirectory("app-data");
-    const paths = await new WorkspaceService(appDataDir).listPaths();
+    const paths = await createWorkspaceService(appDataDir).listPaths();
     expect(paths).toBeInstanceOf(WorkspaceNotReadyError);
   });
 });
@@ -214,7 +223,11 @@ describe("workspace path helpers", () => {
   test("development restart overwrites skills stamped with the same version", async () => {
     const root = await testDirectory("skill-refresh");
     const appDataDir = await testDirectory("skill-refresh-app");
-    const first = new WorkspaceService(appDataDir, { appVersion: "1.2.3" });
+    const first = new WorkspaceService({
+      appDataDir,
+      filesystem: new FilesystemService(),
+      appVersion: "1.2.3",
+    });
     const selected = await first.select(root);
     if (selected instanceof Error) throw selected;
 
@@ -249,14 +262,20 @@ describe("workspace path helpers", () => {
       '---\nversion: 1.2.3\n---\n# stale skill\nimport from "@halo/plugin-sdk/view"\n',
     );
 
-    const packaged = new WorkspaceService(appDataDir, { appVersion: "1.2.3" });
+    const packaged = new WorkspaceService({
+      appDataDir,
+      filesystem: new FilesystemService(),
+      appVersion: "1.2.3",
+    });
     const packagedSelect = await packaged.select(root);
     if (packagedSelect instanceof Error) throw packagedSelect;
     expect(await readFile(skillPath, "utf8")).toContain(
       "@halo/plugin-sdk/view",
     );
 
-    const development = new WorkspaceService(appDataDir, {
+    const development = new WorkspaceService({
+      appDataDir,
+      filesystem: new FilesystemService(),
       appVersion: "1.2.3",
       isDevelopment: true,
     });
@@ -265,14 +284,14 @@ describe("workspace path helpers", () => {
     expect(await readFile(skillPath, "utf8")).toBe(original);
   });
 
-  test("mapParcelEventsToTreeEvents drops updates and maps create/delete", async () => {
+  test("mapFilesystemEventsToTreeEvents drops updates and maps create/delete", async () => {
     const root = await testDirectory("watch-map");
     await mkdir(join(root, "src"), { recursive: true });
     await writeFile(join(root, "src", "a.ts"), "a\n");
     const directories = directoryPathsFromList(["src/"]);
 
     await writeFile(join(root, "src", "b.ts"), "b\n");
-    const mapped = await mapParcelEventsToTreeEvents(
+    const mapped = await mapFilesystemEventsToTreeEvents(
       root,
       [
         { type: "update", path: join(root, "src", "a.ts") },

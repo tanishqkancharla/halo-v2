@@ -41,14 +41,14 @@ export const workspaceRouter = os.router({
   events: os.events.handler(({ context, signal }) => {
     context.logger.info({ event: "subscribeWorkspaceTree" });
     const queue = new AsyncEventQueue<WorkspaceTreeEvent[]>();
-    context.workspace.setTreeListener((events) => {
+    const unsubscribe = context.workspace.treeEvents.subscribe((events) => {
       void queue.push(events);
     });
     return (async function* () {
       try {
         yield* queue.values(signal);
       } finally {
-        context.workspace.setTreeListener(undefined);
+        unsubscribe();
       }
     })();
   }),
