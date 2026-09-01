@@ -14,6 +14,8 @@ export default defineConfig({
       "@tanishqkancharla/tandem-core",
       "@tanishqkancharla/tandem-core",
       "@halo/plugin-sdk/storage",
+      "@pierre/diffs/react",
+      "@pierre/diffs/edit",
     ],
   },
   resolve: {
