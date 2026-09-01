@@ -1,6 +1,6 @@
 # Halo
 
-Halo is an open-source self-modifiable desktop app built with Electron and Pi. It's currently a work-in-progress.
+Halo is an open-source self-modifiable desktop app built with Electron and Pi. It's currently a work-in-progress and has not been publically launched.
 
 ## Commands
 
@@ -27,6 +27,7 @@ Bump `apps/electron/package.json` `version`, commit, then create and push a git 
 - Workspace packages use the `@repo/*` naming convention.
 - File names: no hyphens. Name the file after the main abstraction it implements, in ClassNameCase (e.g. `MessagePortMainTransport.ts`). For a small bundle of related exports with no single primary type, use a lowercase single name (e.g. `rpc.ts`, `channels.ts`).
 - Generally, you should avoid adding comments and instead aim to make code readable. The only exception is when there is external context that is not easily traced back (e.g. external dependency behavior, or explicit business logic decisions).
+- Ignore migrations or backwards-compatability - Halo is unreleased and pre-1.0 so we can break/rebuild anything as necessary.
 
 ### Testing
 
