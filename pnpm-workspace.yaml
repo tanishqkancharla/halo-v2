@@ -79,3 +79,4 @@ minimumReleaseAgeExclude:
   - '@tanishqkancharla/maui@0.0.13'
   - '@tanishqkancharla/tandem-core@0.2.0'
   - '@tanishqkancharla/tandem-server@0.2.0'
+  - purse-styles@0.2.3
