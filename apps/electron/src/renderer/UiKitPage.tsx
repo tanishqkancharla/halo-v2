@@ -71,11 +71,15 @@ const styles = {
     marginInline: "auto",
     overflowY: "auto",
   }),
-  header: style(flexItem({ size: "hug" }), text("md", 600, "highContrast"), {
-    minWidth: 0,
-    height: "1lh",
-    overflow: "hidden",
-  }),
+  header: style(
+    flexItem({ size: "hug" }),
+    text({ size: "md", fontWeight: 600, color: "highContrast" }),
+    {
+      minWidth: 0,
+      height: "1lh",
+      overflow: "hidden",
+    },
+  ),
   title: style({
     overflow: "hidden",
     textOverflow: "ellipsis",

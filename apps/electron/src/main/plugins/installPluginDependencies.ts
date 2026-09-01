@@ -15,7 +15,6 @@ export async function installPluginDependencies(directory: string) {
     [
       "install",
       "--ignore-scripts",
-      "--legacy-peer-deps",
       "--no-audit",
       "--no-fund",
       "--package-lock=false",

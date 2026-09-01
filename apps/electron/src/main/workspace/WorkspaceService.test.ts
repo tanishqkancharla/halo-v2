@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
@@ -240,22 +241,9 @@ describe("workspace path helpers", () => {
         "utf8",
       ),
     ).toContain("tx.set");
-    expect(
-      await readFile(
-        join(
-          root,
-          ".pi",
-          "agent",
-          "skills",
-          "maui",
-          "src",
-          "apps",
-          "Calendar",
-          "Calendar.tsx",
-        ),
-        "utf8",
-      ),
-    ).toContain("export function Calendar");
+    expect(existsSync(join(root, ".pi", "agent", "skills", "maui"))).toBe(
+      false,
+    );
     await writeFile(
       skillPath,
       '---\nversion: 1.2.3\n---\n# stale skill\nimport from "@halo/plugin-sdk/view"\n',

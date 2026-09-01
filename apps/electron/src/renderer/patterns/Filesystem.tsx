@@ -302,11 +302,15 @@ const styles = {
   }),
   treeWrapHug: style(flexItem({ size: "hug" })),
   header: style(
-    text("xs", 500, "lowContrast"),
+    text({ size: "xs", fontWeight: 500, color: "lowContrast" }),
     spacing.padding({ x: 4, y: 2 }),
   ),
-  selection: style(flexItem({ size: "hug" }), text("sm", 400, "lowContrast"), {
-    margin: 0,
-    paddingInline: spacing.value(4),
-  }),
+  selection: style(
+    flexItem({ size: "hug" }),
+    text({ size: "sm", fontWeight: 400, color: "lowContrast" }),
+    {
+      margin: 0,
+      paddingInline: spacing.value(4),
+    },
+  ),
 };

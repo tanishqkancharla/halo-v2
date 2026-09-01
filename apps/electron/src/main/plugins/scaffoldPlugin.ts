@@ -77,7 +77,7 @@ function packageJsonSource(id: string, appVersion: string) {
 
 function viewSource(id: string) {
   const name = pluginDisplayName(id);
-  return `import { Flex, H1 } from "maui";
+  return `import { Flex, H1, Padding, proseMaxWidth } from "maui";
 import { Route, Switch } from "wouter";
 import {
   SidebarItem,
@@ -102,9 +102,15 @@ export function Routes() {
 
 function Home() {
   return (
-    <Flex column gap={4}>
-      <H1>${name}</H1>
-    </Flex>
+    <Padding xy={6}>
+      <Flex
+        column
+        gap={4}
+        style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
+      >
+        <H1>${name}</H1>
+      </Flex>
+    </Padding>
   );
 }
 `;
@@ -149,7 +155,7 @@ export default {
 function storageViewSource(id: string) {
   const name = pluginDisplayName(id);
   return `import { useState } from "react";
-import { Button, Checkbox, Flex, H1, TextField } from "maui";
+import { Button, Checkbox, Flex, H1, Padding, Text, TextField, proseMaxWidth } from "maui";
 import { Route, Switch } from "wouter";
 import {
   PluginStorageProvider,
@@ -191,28 +197,38 @@ function Home() {
   });
 
   return (
-    <Flex column gap={4}>
-      <H1>${name}</H1>
-      <Flex row gap={2}>
-        <TextField aria-label="New item" value={label} onChange={setLabel} />
-        <Button
-          onClick={() => {
-            addItem(label);
-            setLabel("");
-          }}
-        >
-          Add
-        </Button>
+    <Padding xy={6}>
+      <Flex
+        column
+        gap={4}
+        style={{ width: "100%", maxWidth: proseMaxWidth, marginInline: "auto" }}
+      >
+        <H1>${name}</H1>
+        <Flex row gap={2}>
+          <TextField aria-label="New item" value={label} onChange={setLabel} />
+          <Button
+            onClick={() => {
+              addItem(label);
+              setLabel("");
+            }}
+          >
+            Add
+          </Button>
+        </Flex>
+        {items.length === 0 ? (
+          <Text color="lowContrast">No items yet.</Text>
+        ) : (
+          items.map((item) => (
+            <Checkbox
+              key={item.id}
+              label={item.label}
+              checked={item.done}
+              setChecked={(done) => setDone(item, done)}
+            />
+          ))
+        )}
       </Flex>
-      {items.map((item) => (
-        <Checkbox
-          key={item.id}
-          label={item.label}
-          checked={item.done}
-          setChecked={(done) => setDone(item, done)}
-        />
-      ))}
-    </Flex>
+    </Padding>
   );
 }
 `;

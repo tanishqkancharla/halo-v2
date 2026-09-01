@@ -19,6 +19,8 @@ const result = await server.status();
 
 Use Maui for controls and layout, purse-styles for styles, and wouter for routes. Halo already supplies their providers and runtime packages. Do not use raw HTML controls. Read the `maui` skill and its source references before choosing component props or tokens.
 
+After scaffolding, Maui's source examples are available under `node_modules/maui/src/`. Read the closest app or pattern there before inventing a layout.
+
 `halo plugin build` writes `dist/view.js`. Halo supplies React, Maui, purse-styles, wouter, and the Halo SDK at runtime. The build bundles other plugin dependencies.
 
 Exports from `@get-halo/plugin-sdk/view`:

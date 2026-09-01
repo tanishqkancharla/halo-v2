@@ -222,22 +222,32 @@ const styles = {
       paddingBottom: spacing.value(8),
     },
   ),
-  versionLabel: style(text("xs", 500, "highContrast"), {
-    minWidth: 0,
-  }),
-  updateLabel: style(text("xs", 400, "lowContrast"), {
-    minWidth: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  }),
-  pluginError: style(text("xs", 500, "highContrast"), sidebarPadding, {
-    color: "light-dark(#b42318, #ff9592)",
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-    paddingTop: spacing.value(2),
-    paddingBottom: spacing.value(2),
-  }),
+  versionLabel: style(
+    text({ size: "xs", fontWeight: 500, color: "highContrast" }),
+    {
+      minWidth: 0,
+    },
+  ),
+  updateLabel: style(
+    text({ size: "xs", fontWeight: 400, color: "lowContrast" }),
+    {
+      minWidth: 0,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
+  ),
+  pluginError: style(
+    text({ size: "xs", fontWeight: 500, color: "highContrast" }),
+    sidebarPadding,
+    {
+      color: "light-dark(#b42318, #ff9592)",
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere",
+      paddingTop: spacing.value(2),
+      paddingBottom: spacing.value(2),
+    },
+  ),
   pluginSidebar: style({
     width: "100%",
     minWidth: 0,

@@ -1,4 +1,9 @@
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+
+const require = createRequire(import.meta.url);
+const mauiRoot = dirname(require.resolve("maui/package.json"));
 
 function haloSystemPrompt(workspaceRoot: string) {
   const path = workspaceRoot.replaceAll("\\", "/");
@@ -45,6 +50,7 @@ export function createWorkspaceResourceLoader(cwd: string, agentDir: string) {
   return new DefaultResourceLoader({
     cwd,
     agentDir,
+    additionalSkillPaths: [join(mauiRoot, "skills")],
     systemPromptOverride: () => haloSystemPrompt(cwd),
   });
 }

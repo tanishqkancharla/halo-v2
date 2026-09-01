@@ -20,7 +20,7 @@ export function DoneButton(props: { onClick?: () => void }) {
 
 const primaryButtonClass = style(
   background.accent,
-  text("xs", 400, "onAccent"),
+  text({ size: "xs", fontWeight: 400, color: "onAccent" }),
   {
     "&:hover": {
       backgroundColor: colors.accent[10],

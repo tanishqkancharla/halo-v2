@@ -62,7 +62,10 @@ export function SidebarSection(props: SidebarSectionProps) {
   );
 }
 
-const sectionLabelClass = style(text("xs", 500, "lowContrast"), sidebarPadding);
+const sectionLabelClass = style(
+  text({ size: "xs", fontWeight: 500, color: "lowContrast" }),
+  sidebarPadding,
+);
 
 const sectionBodyClass = style(flex({ direction: "column" }), {
   margin: 0,

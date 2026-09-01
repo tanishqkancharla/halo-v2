@@ -24,6 +24,7 @@ import { useRefCurrent } from "./useRefCurrent.ts";
 type EditorProps = {
   /** Initial markdown content. Updates are applied when this value changes. */
   content?: string;
+  autoFocus?: boolean;
   /** Called with the current markdown whenever the document changes. */
   onChange?: (markdown: string) => void;
   placeholder?: string;
@@ -43,6 +44,7 @@ type EditorProps = {
  */
 export function Editor({
   content = "",
+  autoFocus = false,
   onChange,
   placeholder = "Write a message…",
   size = "md",
@@ -80,6 +82,7 @@ export function Editor({
     ],
     content,
     contentType: "markdown",
+    autofocus: autoFocus,
     editable,
     immediatelyRender: false,
     editorProps: {
@@ -128,7 +131,19 @@ export function Editor({
   }, [editor, content]);
 
   return (
-    <div className={joinClassNames(shellClassName, className)}>
+    <div
+      className={joinClassNames(shellClassName, className)}
+      onClick={(event) => {
+        const editorElement = editor?.view.dom;
+        if (
+          event.target instanceof Node &&
+          editorElement?.contains(event.target)
+        ) {
+          return;
+        }
+        editor?.commands.focus();
+      }}
+    >
       <EditorContent editor={editor} />
       {error}
       {actions ? <div className={actionsClassName}>{actions}</div> : undefined}
@@ -143,6 +158,7 @@ const editorShellClass = style(
   focusRing("&:focus-within", shadowVars.subtle),
   flex({ direction: "column", gap: 2 }),
   {
+    cursor: "text",
     backgroundColor: backgroundColor.element,
     maxWidth: proseMaxWidth,
     minWidth: 0,

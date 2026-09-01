@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { colors, motion } from "maui";
+import { Thinking } from "maui";
 import { style, useStyles } from "purse-styles";
-import { Loader } from "./patterns/Loader.tsx";
 
 const SHOW_INDICATOR_AFTER_MS = 2000;
 
@@ -10,7 +9,7 @@ export function LoadingPage() {
   const shell = useStyles(styles.shell);
   const indicator = useStyles(
     styles.indicator,
-    motion.standard("opacity"),
+    { transition: "opacity ease-out 0.8s" },
     showIndicator ? styles.indicatorVisible : undefined,
   );
 
@@ -24,7 +23,7 @@ export function LoadingPage() {
   return (
     <main className={shell}>
       <div className={indicator}>
-        <Loader size="1.5rem" variant="muted" />
+        <Thinking size="0.8rem" variant="accent" />
       </div>
     </main>
   );
@@ -34,8 +33,7 @@ const styles = {
   shell: style({
     display: "grid",
     placeItems: "center",
-    height: "100%",
-    backgroundColor: colors.gray[2],
+    height: "100vh",
   }),
   indicator: style({
     opacity: 0,

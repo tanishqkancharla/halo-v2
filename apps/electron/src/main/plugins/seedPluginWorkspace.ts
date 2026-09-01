@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
-import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import * as errore from "errore";
 import haloPluginSkill from "./haloPluginSkill.md?raw";
@@ -9,8 +8,6 @@ import pluginServerReference from "./haloPluginReferences/server.md?raw";
 import pluginStorageReference from "./haloPluginReferences/storage.md?raw";
 import pluginViewReference from "./haloPluginReferences/view.md?raw";
 import type { WorkspaceLayout } from "../workspace/WorkspaceService.js";
-
-const require = createRequire(import.meta.url);
 
 export class PluginSeedError extends errore.createTaggedError({
   name: "PluginSeedError",
@@ -27,13 +24,11 @@ export async function seedPluginWorkspace(
     "halo-plugin",
     "SKILL.md",
   );
-  const mauiSkillPath = join(layout.agentDir, "skills", "maui", "SKILL.md");
-  const mauiRoot = dirname(require.resolve("maui/package.json"));
-  const mauiSkill = await readFile(
-    join(mauiRoot, "skills", "maui", "SKILL.md"),
-    "utf8",
-  ).catch((e) => new PluginSeedError({ cause: e }));
-  if (mauiSkill instanceof Error) return mauiSkill;
+  const removedMauiSkill = await rm(join(layout.agentDir, "skills", "maui"), {
+    recursive: true,
+    force: true,
+  }).catch((e) => new PluginSeedError({ cause: e }));
+  if (removedMauiSkill instanceof Error) return removedMauiSkill;
   const pluginSkill = await writeIfStale({
     path: pluginSkillPath,
     contents: haloPluginSkill,
@@ -53,22 +48,6 @@ export async function seedPluginWorkspace(
       contents,
     });
     if (reference instanceof Error) return reference;
-  }
-  const mauiSkillWritten = await writeIfStale({
-    path: mauiSkillPath,
-    contents: mauiSkill,
-    appVersion: args.appVersion,
-    alwaysWrite: args.alwaysWrite,
-  });
-  if (mauiSkillWritten instanceof Error) return mauiSkillWritten;
-  const referencesRoot = join(dirname(mauiSkillPath), "src");
-  for (const directory of ["apps", "patterns"]) {
-    const copied = await cp(
-      join(mauiRoot, "src", directory),
-      join(referencesRoot, directory),
-      { recursive: true, force: true },
-    ).catch((e) => new PluginSeedError({ cause: e }));
-    if (copied instanceof Error) return copied;
   }
 }
 

@@ -22,9 +22,9 @@
     "beautiful-mermaid": "^1.1.3",
     "errore": "^0.14.1",
     "incur": "^0.4.20",
-    "maui": "npm:@tanishqkancharla/maui@0.0.11",
+    "maui": "npm:@tanishqkancharla/maui@0.0.13",
     "md4x": "^0.0.29",
-    "purse-styles": "^0.2.1",
+    "purse-styles": "^0.2.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

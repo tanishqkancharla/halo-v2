@@ -142,6 +142,7 @@ function SavedPane({
           <SessionView state={state} sessionId={sessionId} />
           <Composer
             key={sessionId}
+            autoFocus
             error={state.error}
             isWorking={state.isWorking}
             onSubmit={prompt}
@@ -175,6 +176,7 @@ function DraftPane({ draftId }: { draftId: string }) {
           ) : undefined}
           <Composer
             key={draftId}
+            autoFocus
             error={state.error}
             isWorking={state.isWorking}
             onSubmit={prompt}
@@ -187,11 +189,13 @@ function DraftPane({ draftId }: { draftId: string }) {
 }
 
 function Composer({
+  autoFocus,
   error,
   isWorking,
   onSubmit,
   onStop,
 }: {
+  autoFocus: boolean;
   error: string | undefined;
   isWorking: boolean;
   onSubmit: (prompt: string) => Promise<void | Error>;
@@ -216,6 +220,7 @@ function Composer({
 
   return (
     <Editor
+      autoFocus={autoFocus}
       content={draft}
       onChange={setDraft}
       onSubmit={submit}
@@ -426,7 +431,7 @@ const styles = {
   }),
   liveStatus: style(
     flexItem({ size: "hug" }),
-    text("xs", 500, "highContrast"),
+    text({ size: "xs", fontWeight: 500, color: "highContrast" }),
     spacing.padding({ x: 4, y: 2 }),
     {
       color: "light-dark(#b42318, #ff9592)",
@@ -443,7 +448,7 @@ const styles = {
     minWidth: 0,
     backgroundColor: backgroundColor.app,
   }),
-  userMessage: style(radius.pill, spacing.padding({ x: 4, y: 2 }), {
+  userMessage: style(radius.pill, spacing.padding({ x: 6, y: 3 }), {
     width: "fit-content",
     maxWidth: "80%",
     minWidth: 0,
@@ -460,14 +465,17 @@ const styles = {
     maxWidth: "none",
     width: "100%",
   }),
-  stopped: style(text("md", 500, "highContrast"), {
+  stopped: style(text({ size: "md", fontWeight: 500, color: "highContrast" }), {
     alignSelf: "flex-end",
   }),
-  messageBody: style(text("md", 400, "highContrast"), {
-    minWidth: 0,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-  }),
+  messageBody: style(
+    text({ size: "md", fontWeight: 400, color: "highContrast" }),
+    {
+      minWidth: 0,
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere",
+    },
+  ),
   sendButton: style(radius.circle, {
     boxShadow: "none",
     backgroundColor: colors.grayAlpha[4],

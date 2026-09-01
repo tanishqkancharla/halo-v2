@@ -57,8 +57,12 @@ const styles = {
     minWidth: 0,
     backgroundColor: backgroundColor.element,
   }),
-  error: style(text("xs", 500, "highContrast"), spacing.padding({ all: 4 }), {
-    color: "light-dark(#b42318, #ff9592)",
-    backgroundColor: "light-dark(#ffebe9, #3b1219)",
-  }),
+  error: style(
+    text({ size: "xs", fontWeight: 500, color: "highContrast" }),
+    spacing.padding({ all: 4 }),
+    {
+      color: "light-dark(#b42318, #ff9592)",
+      backgroundColor: "light-dark(#ffebe9, #3b1219)",
+    },
+  ),
 };

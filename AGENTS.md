@@ -26,8 +26,13 @@ Bump `apps/electron/package.json` `version`, commit, then create and push a git 
 - ESM imports use `.js` extensions even for TypeScript files.
 - Workspace packages use the `@repo/*` naming convention.
 - File names: no hyphens. Name the file after the main abstraction it implements, in ClassNameCase (e.g. `MessagePortMainTransport.ts`). For a small bundle of related exports with no single primary type, use a lowercase single name (e.g. `rpc.ts`, `channels.ts`).
-- Use `vitest` for tests: `describe`, `test`, `expect`. Don't use `beforeAll` or `afterAll`; use Vitest fixtures instead.
 - Generally, you should avoid adding comments and instead aim to make code readable. The only exception is when there is external context that is not easily traced back (e.g. external dependency behavior, or explicit business logic decisions).
+
+### Testing
+
+Don't write tests unless updating tests or writing new ones in existing test files or asked.
+
+When writing tests, load the `testing` skill.
 
 ## Working Style
 

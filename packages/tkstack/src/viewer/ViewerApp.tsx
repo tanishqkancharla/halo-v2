@@ -101,7 +101,7 @@ const styles = {
   heading: style(flex({ direction: "column" }), {
     minWidth: 0,
   }),
-  title: style(text("md", 600, "highContrast"), {
+  title: style(text({ size: "md", fontWeight: 600, color: "highContrast" }), {
     minWidth: 0,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -141,8 +141,12 @@ const styles = {
       border: 0,
     },
   }),
-  closed: style(text("md", 500, "highContrast"), spacing.padding({ all: 12 }), {
-    minHeight: "100vh",
-    backgroundColor: backgroundColor.app,
-  }),
+  closed: style(
+    text({ size: "md", fontWeight: 500, color: "highContrast" }),
+    spacing.padding({ all: 12 }),
+    {
+      minHeight: "100vh",
+      backgroundColor: backgroundColor.app,
+    },
+  ),
 };

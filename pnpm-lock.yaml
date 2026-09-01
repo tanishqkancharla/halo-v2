@@ -235,11 +235,11 @@ importers:
         specifier: 2.7.0
         version: 2.7.0
       maui:
-        specifier: npm:@tanishqkancharla/maui@0.0.11
-        version: '@tanishqkancharla/maui@0.0.11(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
+        specifier: npm:@tanishqkancharla/maui@0.0.13
+        version: '@tanishqkancharla/maui@0.0.13(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
       purse-styles:
-        specifier: ^0.2.1
-        version: 0.2.1(react@19.2.8)
+        specifier: ^0.2.3
+        version: 0.2.3(react@19.2.8)
       quickjs-emscripten:
         specifier: 0.31.0
         version: 0.31.0
@@ -457,11 +457,11 @@ importers:
         specifier: ^0.14.1
         version: 0.14.1
       maui:
-        specifier: npm:@tanishqkancharla/maui@0.0.11
-        version: '@tanishqkancharla/maui@0.0.11(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
+        specifier: npm:@tanishqkancharla/maui@0.0.13
+        version: '@tanishqkancharla/maui@0.0.13(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
       purse-styles:
-        specifier: ^0.2.1
-        version: 0.2.1(react@19.2.8)
+        specifier: ^0.2.3
+        version: 0.2.3(react@19.2.8)
       wouter:
         specifier: ^3.10.0
         version: 3.10.0(react@19.2.8)
@@ -503,14 +503,14 @@ importers:
         specifier: ^0.4.20
         version: 0.4.20
       maui:
-        specifier: npm:@tanishqkancharla/maui@0.0.11
-        version: '@tanishqkancharla/maui@0.0.11(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
+        specifier: npm:@tanishqkancharla/maui@0.0.13
+        version: '@tanishqkancharla/maui@0.0.13(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)'
       md4x:
         specifier: ^0.0.29
         version: 0.0.29
       purse-styles:
-        specifier: ^0.2.1
-        version: 0.2.1(react@19.2.8)
+        specifier: ^0.2.3
+        version: 0.2.3(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -3063,8 +3063,8 @@ packages:
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
 
-  '@tanishqkancharla/maui@0.0.11':
-    resolution: {integrity: sha512-WehgexrTgLoknP1juyvEBNpasC1kddFkbMDzBJ2qA73tgWpvlPt0kIKHzVpoPMHaCwoYl1LX+yLVOz5Y11Dkyg==}
+  '@tanishqkancharla/maui@0.0.13':
+    resolution: {integrity: sha512-xsEtT1JRJEtleP6DvHhw0LnSfjKAUK3onHdv3qIGiFDrq08U9P+ZBoUsM+I0VBrEb+WX3NXBzE9xhlBCZH3H3Q==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -6814,10 +6814,10 @@ packages:
   pure-rand@8.4.2:
     resolution: {integrity: sha512-vvuOGgcuPJAirlHvuQw1TrOiw7ptaIXXmIbNuiNOY6lNGJJH49PQ1Kj4nd783nPdQhQdicgOjVI2yI/9BD6/Ng==}
 
-  purse-styles@0.2.1:
-    resolution: {integrity: sha512-y6SfswCCf1Zwn3vVJIxr1mxgTx1uw84Nln5nSVb72pm4810tpqpBLApuFNsMnO6932c1mEHE6IXpAG88boyBlw==}
+  purse-styles@0.2.3:
+    resolution: {integrity: sha512-Ulgeo7IZOWtCDvxOflW8XmGG7iBxdFD+VvzBpfMUd0wusTR69mO++GSmj22oY5tj3qYopqbZG6fpUdK8Z7H3lg==}
     peerDependencies:
-      react: ^18.3.1
+      react: ^18.3.1 || ^19.0.0
 
   qs@6.15.3:
     resolution: {integrity: sha512-O9gl3zCl5h5blw1KGUzQKhA5oUXSl8rwUIM5o0S3nCXMliSvy5Dzx7/DJcI+SwgICv+IneSZwhBh1oSyEHA71A==}
@@ -10866,7 +10866,7 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
-  '@tanishqkancharla/maui@0.0.11(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)':
+  '@tanishqkancharla/maui@0.0.13(@babel/runtime@7.29.7)(@codemirror/search@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/extensions@3.29.2(@tiptap/core@3.29.2(@tiptap/pm@3.29.2))(@tiptap/pm@3.29.2))(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@8.1.1)':
     dependencies:
       '@codemirror/autocomplete': 6.20.3
       '@codemirror/commands': 6.11.0
@@ -10891,7 +10891,7 @@ snapshots:
       inline-style-prefixer: 7.0.1
       lodash: 4.18.1
       prettier: 3.9.6
-      purse-styles: 0.2.1(react@19.2.8)
+      purse-styles: 0.2.3(react@19.2.8)
       react: 19.2.8
       react-aria: 3.50.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-aria-components: 1.19.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -15044,7 +15044,7 @@ snapshots:
 
   pure-rand@8.4.2: {}
 
-  purse-styles@0.2.1(react@19.2.8):
+  purse-styles@0.2.3(react@19.2.8):
     dependencies:
       csstype: 3.2.3
       extendable-expect: 1.0.5

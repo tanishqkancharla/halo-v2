@@ -30,9 +30,12 @@ const headerClass = style(
   },
 );
 
-const titleClass = style(text("sm", 400, "lowContrast"), {
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  textAlign: "left",
-});
+const titleClass = style(
+  text({ size: "sm", fontWeight: 400, color: "lowContrast" }),
+  {
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    textAlign: "left",
+  },
+);

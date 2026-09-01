@@ -149,10 +149,14 @@ const styles = {
       gridTemplateColumns: "180px minmax(0, 1fr)",
     },
   }),
-  error: style(text("xs", 500, "highContrast"), spacing.padding({ all: 4 }), {
-    position: "relative",
-    zIndex: 1,
-    color: "light-dark(#b42318, #ff9592)",
-    backgroundColor: "light-dark(#ffebe9, #3b1219)",
-  }),
+  error: style(
+    text({ size: "xs", fontWeight: 500, color: "highContrast" }),
+    spacing.padding({ all: 4 }),
+    {
+      position: "relative",
+      zIndex: 1,
+      color: "light-dark(#b42318, #ff9592)",
+      backgroundColor: "light-dark(#ffebe9, #3b1219)",
+    },
+  ),
 };
