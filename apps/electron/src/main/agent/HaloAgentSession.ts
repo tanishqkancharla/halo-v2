@@ -13,6 +13,7 @@ import {
   type AgentSessionState,
 } from "../../shared/AgentSessionState.js";
 import type { AgentSessionEvent, SessionSummary } from "../../shared/rpc.js";
+import { type ReadonlyStream, Stream } from "../../shared/Stream.js";
 import type {
   WorkspaceLayout,
   WorkspaceService,
@@ -72,10 +73,16 @@ export type HaloAgentSessionOptions = {
   toolRuntime: ToolRuntimeService;
 };
 
-type SessionListener = (event: AgentSessionEvent) => void;
-
 export class HaloAgentSession {
-  private constructor(private readonly piSession: AgentSession) {}
+  private readonly eventStream = new Stream<AgentSessionEvent>();
+  readonly events: ReadonlyStream<AgentSessionEvent> = this.eventStream;
+  private readonly unsubscribePiEvents: () => void;
+
+  private constructor(private readonly piSession: AgentSession) {
+    this.unsubscribePiEvents = this.piSession.subscribe((event) => {
+      this.eventStream.append(event);
+    });
+  }
 
   static async create(options: HaloAgentSessionOptions) {
     const layout = options.workspace.getLayout();
@@ -189,10 +196,6 @@ export class HaloAgentSession {
     });
   }
 
-  subscribe(listener: SessionListener) {
-    return this.piSession.subscribe(listener);
-  }
-
   async prompt(text: string) {
     if (text.trim().length === 0) return new EmptyPromptError();
     const prompted = await this.piSession
@@ -234,6 +237,7 @@ export class HaloAgentSession {
 
   async close() {
     const aborted = await this.abort();
+    this.unsubscribePiEvents();
     this.piSession.dispose();
     if (aborted instanceof Error) return aborted;
   }

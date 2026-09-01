@@ -49,7 +49,7 @@ export const sessionsRouter = os.router({
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
     const queue = new AsyncEventQueue<AgentSessionEvent>();
-    const unsubscribe = session.subscribe((event) => {
+    const unsubscribe = session.events.subscribe((event) => {
       void queue.push(event);
     });
     return (async function* () {
