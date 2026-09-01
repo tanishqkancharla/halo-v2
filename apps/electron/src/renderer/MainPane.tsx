@@ -33,8 +33,7 @@ import {
 import { AssistantMessage } from "./patterns/AssistantMessage.tsx";
 import { Editor } from "./patterns/Editor.tsx";
 import { ExecutorConnectionCard } from "./patterns/ExecutorConnectionCard.tsx";
-import { Loader } from "./patterns/Loader.tsx";
-import { ToolCall } from "./patterns/ToolCall.tsx";
+import { ToolActivity } from "./patterns/ToolActivity.tsx";
 import { type SessionSummary } from "../shared/rpc.ts";
 import type { LoadedPluginView } from "../shared/plugin.js";
 import { ThreadHeader } from "./ThreadHeader.tsx";
@@ -258,7 +257,6 @@ function SessionView({
 }) {
   const viewRef = useRef<HTMLDivElement>(null);
   const view = useStyles(styles.view);
-  const thinking = useStyles(styles.thinking);
   const stopped = useStyles(styles.stopped);
   const items = sessionViewItems(state);
   const showStopped =
@@ -281,12 +279,6 @@ function SessionView({
       {items.map((item) => (
         <SessionViewRow key={item.id} item={item} sessionId={sessionId} />
       ))}
-      {state.isWorking ? (
-        <span className={thinking}>
-          <Loader size="0.75em" variant="muted" aria-label="Thinking" />
-          Thinking
-        </span>
-      ) : undefined}
       {showStopped ? (
         <span className={stopped} role="status">
           Stopped
@@ -307,7 +299,6 @@ function SessionViewRow({
   const body = useStyles(styles.messageBody);
   const assistantRow = useStyles(styles.assistantRow);
   const assistantMessage = useStyles(styles.assistantMessage);
-  const toolCallsClassName = useStyles(styles.toolCalls);
 
   if (item.kind === "user") {
     return (
@@ -320,16 +311,8 @@ function SessionViewRow({
   return (
     <div className={assistantRow} aria-label="Assistant message">
       {item.parts.map((part) => {
-        if (part.kind === "tool") {
-          return (
-            <div
-              key={part.id}
-              className={toolCallsClassName}
-              aria-label="Tool calls"
-            >
-              <ToolCall part={part} />
-            </div>
-          );
+        if (part.kind === "toolActivity") {
+          return <ToolActivity key={part.id} part={part} />;
         }
         if (part.kind === "executorConnection") {
           return (
@@ -450,14 +433,15 @@ const styles = {
       overflowWrap: "anywhere",
     },
   ),
-  userMessage: style(radius.lg, spacing.padding({ x: 4, y: 2 }), {
+  userMessage: style(radius.pill, spacing.padding({ x: 4, y: 2 }), {
     alignSelf: "flex-end",
     width: "fit-content",
     maxWidth: "80%",
     minWidth: 0,
     backgroundColor: colors.gray[3],
+    cornerShape: "squircle",
   }),
-  assistantRow: style(flex({ direction: "column", gap: 3 }), {
+  assistantRow: style(flex({ direction: "column", gap: 6 }), {
     minWidth: 0,
     width: "100%",
     alignSelf: "stretch",
@@ -466,13 +450,6 @@ const styles = {
     maxWidth: "none",
     width: "100%",
   }),
-  toolCalls: style(flex({ direction: "column", gap: 2 }), {
-    minWidth: 0,
-  }),
-  thinking: style(
-    text("xs", 400, "lowContrast"),
-    flex({ align: "center", gap: 4 }),
-  ),
   stopped: style(text("md", 500, "highContrast"), {
     alignSelf: "flex-end",
   }),
