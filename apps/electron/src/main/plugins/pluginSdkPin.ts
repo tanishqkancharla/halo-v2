@@ -1,9 +1,9 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { contractPackageName } from "@halo/plugin-sdk/contract";
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
+import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 export class PluginSdkPinError extends errore.createTaggedError({
   name: "PluginSdkPinError",
@@ -57,14 +57,17 @@ export function assertPluginSdkPin(args: {
 }
 
 export async function readPluginSdkPinFile(args: {
+  filesystem: FilesystemService;
   id: string;
   directory: string;
 }) {
-  const raw = await readFile(
+  const raw = await args.filesystem.readFile(
     join(args.directory, "package.json"),
     "utf8",
-  ).catch((e) => new PluginSdkPinReadError({ id: args.id, cause: e }));
-  if (raw instanceof Error) return raw;
+  );
+  if (raw instanceof Error) {
+    return new PluginSdkPinReadError({ id: args.id, cause: raw });
+  }
 
   const parsed = errore.try({
     try: () => {

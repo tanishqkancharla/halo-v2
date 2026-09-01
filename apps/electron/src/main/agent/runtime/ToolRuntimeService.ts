@@ -91,7 +91,7 @@ export class ToolRuntimeService {
     }
     this.pendingConnections.clear();
     if (runtime === undefined) return;
-    return runtime.close();
+    return await runtime.close();
   }
 
   async startConnection(request: ConnectionRequest) {
@@ -109,16 +109,13 @@ export class ToolRuntimeService {
     const completed = new Promise<Error | undefined>((resolve) => {
       this.pendingConnections.set(started.state, { complete: resolve });
     });
-    const opened = await shell
-      .openExternal(started.authorizationUrl)
-      .then(() => undefined)
-      .catch(
-        (cause) =>
-          new ToolRuntimeError({
-            operation: "opening OAuth authorization",
-            cause,
-          }),
-      );
+    const opened = await shell.openExternal(started.authorizationUrl).catch(
+      (cause) =>
+        new ToolRuntimeError({
+          operation: "opening OAuth authorization",
+          cause,
+        }),
+    );
     if (opened instanceof Error) {
       this.pendingConnections.delete(started.state);
       const cancelled = await this.runtime.cancelOAuth(started.state);

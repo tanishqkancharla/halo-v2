@@ -81,12 +81,13 @@ export async function openExecutorDatabase(input: {
     client.close();
     return database;
   }
-  const ensured = await ensureDrizzleRuntimeSchemaFromTables(database, options)
-    .then(() => undefined)
-    .catch(
-      (cause) =>
-        new ExecutorDatabaseError({ operation: "initialize schema", cause }),
-    );
+  const ensured = await ensureDrizzleRuntimeSchemaFromTables(
+    database,
+    options,
+  ).catch(
+    (cause) =>
+      new ExecutorDatabaseError({ operation: "initialize schema", cause }),
+  );
   if (ensured instanceof Error) {
     client.close();
     return ensured;

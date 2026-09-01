@@ -266,7 +266,7 @@ function toExecutorTool(input: {
         // SAFETY: ToolRuntime runs every Executor invocation inside executionContext.
         const context =
           input.executionContext.getStore() as ToolExecutionContext;
-        return input.haloTool.execute(args, {
+        return await input.haloTool.execute(args, {
           ...input.context,
           ...context,
         });

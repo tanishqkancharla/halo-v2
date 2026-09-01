@@ -168,6 +168,7 @@ export class WorkspaceService {
       },
     );
     this.unsubscribeFilesystemEvents = watchEvents.subscribe((batch) => {
+      // oxlint-disable-next-line typescript/no-floating-promises -- Stream subscribers cannot await; later batches must not wait on filesystem refreshes.
       void this.handleWatchEvents(batch);
     });
   }
@@ -381,7 +382,7 @@ async function readWorkspacePreference(
   const path = preferencePath(appDataDir);
   if (!filesystem.exists(path)) return undefined;
 
-  const raw = await filesystem.readTextFile(path);
+  const raw = await filesystem.readFile(path, "utf8");
   if (raw instanceof Error) return new WorkspaceIoError({ cause: raw });
 
   const parsed = errore.try({

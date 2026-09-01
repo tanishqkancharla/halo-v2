@@ -1,4 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import * as errore from "errore";
 import {
@@ -6,6 +5,7 @@ import {
   mauiPackage,
 } from "@halo/plugin-sdk/contract";
 import { writePluginTsconfig } from "./typecheckPlugin.js";
+import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 export class PluginScaffoldError extends errore.createTaggedError({
   name: "PluginScaffoldError",
@@ -13,16 +13,19 @@ export class PluginScaffoldError extends errore.createTaggedError({
 }) {}
 
 export async function writePluginScaffold(args: {
+  filesystem: FilesystemService;
   directory: string;
   id: string;
   appVersion: string;
   storage: boolean;
   installDependencies: (directory: string) => Promise<Error | void>;
 }) {
-  const created = await mkdir(args.directory, { recursive: true }).catch(
-    (e) => new PluginScaffoldError({ id: args.id, cause: e }),
-  );
-  if (created instanceof Error) return created;
+  const created = await args.filesystem.makeDirectory(args.directory, {
+    recursive: true,
+  });
+  if (created instanceof Error) {
+    return new PluginScaffoldError({ id: args.id, cause: created });
+  }
 
   const files: Array<[string, string]> = [
     ["package.json", packageJsonSource(args.id, args.appVersion)],
@@ -35,16 +38,22 @@ export async function writePluginScaffold(args: {
   ];
   if (args.storage) files.push(["storage.ts", storageSource()]);
   for (const [name, contents] of files) {
-    const written = await writeFile(join(args.directory, name), contents).catch(
-      (e) => new PluginScaffoldError({ id: args.id, cause: e }),
+    const written = await args.filesystem.writeFile(
+      join(args.directory, name),
+      contents,
     );
-    if (written instanceof Error) return written;
+    if (written instanceof Error) {
+      return new PluginScaffoldError({ id: args.id, cause: written });
+    }
   }
 
   const installed = await args.installDependencies(args.directory);
   if (installed instanceof Error) return installed;
 
-  return writePluginTsconfig(args.directory);
+  return await writePluginTsconfig({
+    filesystem: args.filesystem,
+    directory: args.directory,
+  });
 }
 
 function pluginDisplayName(id: string) {

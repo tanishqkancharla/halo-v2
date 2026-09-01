@@ -1,29 +1,27 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import * as errore from "errore";
+import type { FilesystemService } from "../../../filesystem/FilesystemService.js";
 
 export class FilesReadError extends errore.createTaggedError({
   name: "FilesReadError",
   message: "Failed to read $path",
 }) {}
 
-export async function readFile(
-  cwd: string,
-  {
-    path: filePath,
-    offset,
-    limit,
-  }: {
+export async function readFile(args: {
+  filesystem: FilesystemService;
+  cwd: string;
+  input: {
     path: string;
     offset?: number;
     limit?: number;
-  },
-) {
-  const absolutePath = path.resolve(cwd, filePath);
-  const raw = await fs
-    .readFile(absolutePath, "utf8")
-    .catch((e) => new FilesReadError({ path: filePath, cause: e }));
-  if (raw instanceof Error) return raw;
+  };
+}) {
+  const { path: filePath, offset, limit } = args.input;
+  const absolutePath = path.resolve(args.cwd, filePath);
+  const raw = await args.filesystem.readFile(absolutePath, "utf8");
+  if (raw instanceof Error) {
+    return new FilesReadError({ path: filePath, cause: raw });
+  }
 
   if (offset === undefined && limit === undefined) {
     return { path: filePath, text: raw };

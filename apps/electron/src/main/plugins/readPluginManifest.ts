@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   parseVersioned,
@@ -10,6 +8,7 @@ import {
   PluginManifestError,
   type PluginManifest,
 } from "../../shared/pluginManifest.js";
+import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 const viewFallbacks = [
   "view.tsx",
@@ -21,21 +20,21 @@ const viewFallbacks = [
 const serverFallbacks = ["server.ts", "server/index.ts"] as const;
 
 export async function readPluginManifest(args: {
+  filesystem: FilesystemService;
   id: string;
   directory: string;
 }): Promise<PluginManifestError | PluginManifest> {
-  const raw = await readFile(
+  const raw = await args.filesystem.readFile(
     join(args.directory, "package.json"),
     "utf8",
-  ).catch(
-    (e) =>
-      new PluginManifestError({
-        id: args.id,
-        detail: "missing package.json",
-        cause: e,
-      }),
   );
-  if (raw instanceof Error) return raw;
+  if (raw instanceof Error) {
+    return new PluginManifestError({
+      id: args.id,
+      detail: "missing package.json",
+      cause: raw,
+    });
+  }
 
   const parsed = errore.try({
     try: () => {
@@ -65,6 +64,7 @@ export async function readPluginManifest(args: {
   }
 
   const viewPath = resolvePluginEntry({
+    filesystem: args.filesystem,
     id: args.id,
     directory: args.directory,
     kind: "view",
@@ -74,6 +74,7 @@ export async function readPluginManifest(args: {
   if (viewPath instanceof Error) return viewPath;
 
   const serverPath = resolvePluginEntry({
+    filesystem: args.filesystem,
     id: args.id,
     directory: args.directory,
     kind: "server",
@@ -99,6 +100,7 @@ export async function readPluginManifest(args: {
 }
 
 function resolvePluginEntry(args: {
+  filesystem: FilesystemService;
   id: string;
   directory: string;
   kind: "view" | "server";
@@ -107,7 +109,7 @@ function resolvePluginEntry(args: {
 }) {
   if (args.explicit !== undefined) {
     const path = join(args.directory, args.explicit);
-    if (!existsSync(path)) {
+    if (!args.filesystem.exists(path)) {
       return new PluginManifestError({
         id: args.id,
         detail: `missing ${args.kind} file ${args.explicit}`,
@@ -118,7 +120,7 @@ function resolvePluginEntry(args: {
 
   for (const relativePath of args.fallbacks) {
     const path = join(args.directory, relativePath);
-    if (existsSync(path)) return path;
+    if (args.filesystem.exists(path)) return path;
   }
   return undefined;
 }

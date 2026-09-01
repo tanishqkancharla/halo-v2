@@ -14,15 +14,12 @@
  *   *** End Patch
  */
 
-import {
-  readFileSync,
-  writeFileSync,
-  unlinkSync,
-  mkdirSync,
-  existsSync,
-} from "node:fs";
 import { resolve, dirname } from "node:path";
 import * as errore from "errore";
+import type {
+  FilesystemError,
+  FilesystemService,
+} from "../../../filesystem/FilesystemService.js";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -448,7 +445,11 @@ function applyPlannedUpdate(
   return resultLines.join("\n");
 }
 
-function createPatchPlan(patchText: string, cwd: string) {
+function createPatchPlan(
+  filesystem: FilesystemService,
+  patchText: string,
+  cwd: string,
+) {
   const hunks = parsePatch(patchText);
 
   if (hunks.length === 0) {
@@ -469,7 +470,9 @@ function createPatchPlan(patchText: string, cwd: string) {
         deleted.push(hunk.path);
         break;
       case "update": {
-        const original = readFileSync(resolve(cwd, hunk.path), "utf-8");
+        const original = filesystemValue(
+          filesystem.readFileSync(resolve(cwd, hunk.path), "utf8"),
+        );
         const plan = planUpdateChunks(original, hunk.path, hunk.chunks);
         plan.movePath = hunk.movePath;
         updates.push(plan);
@@ -482,8 +485,12 @@ function createPatchPlan(patchText: string, cwd: string) {
   return { hunks, updates, added, modified, deleted };
 }
 
-function applyPatch(patchText: string, cwd: string) {
-  const plan = createPatchPlan(patchText, cwd);
+function applyPatch(
+  filesystem: FilesystemService,
+  patchText: string,
+  cwd: string,
+) {
+  const plan = createPatchPlan(filesystem, patchText, cwd);
 
   for (const hunk of plan.hunks) {
     const absPath = resolve(cwd, hunk.path);
@@ -491,15 +498,15 @@ function applyPatch(patchText: string, cwd: string) {
     switch (hunk.type) {
       case "add": {
         const dir = dirname(absPath);
-        if (!existsSync(dir)) {
-          mkdirSync(dir, { recursive: true });
+        if (!filesystem.exists(dir)) {
+          filesystemValue(filesystem.makeDirectorySync(dir));
         }
-        writeFileSync(absPath, hunk.contents);
+        filesystemValue(filesystem.writeFileSync(absPath, hunk.contents));
         break;
       }
 
       case "delete": {
-        unlinkSync(absPath);
+        filesystemValue(filesystem.unlinkSync(absPath));
         break;
       }
 
@@ -508,18 +515,20 @@ function applyPatch(patchText: string, cwd: string) {
           (candidate) => candidate.path === hunk.path,
         );
         if (!update) throw new Error(`Missing update plan for ${hunk.path}`);
-        const original = readFileSync(absPath, "utf-8");
+        const original = filesystemValue(
+          filesystem.readFileSync(absPath, "utf8"),
+        );
         const newContent = applyPlannedUpdate(original, update);
 
         const dest = hunk.movePath ? resolve(cwd, hunk.movePath) : absPath;
         const destDir = dirname(dest);
-        if (!existsSync(destDir)) {
-          mkdirSync(destDir, { recursive: true });
+        if (!filesystem.exists(destDir)) {
+          filesystemValue(filesystem.makeDirectorySync(destDir));
         }
 
-        writeFileSync(dest, newContent);
+        filesystemValue(filesystem.writeFileSync(dest, newContent));
         if (hunk.movePath) {
-          unlinkSync(absPath);
+          filesystemValue(filesystem.unlinkSync(absPath));
         }
         break;
       }
@@ -540,14 +549,20 @@ export class FilesPatchError extends errore.createTaggedError({
   message: "Failed to apply patch",
 }) {}
 
-export async function patchFiles(
-  cwd: string,
-  { patchText }: { patchText: string },
-) {
+export async function patchFiles(args: {
+  filesystem: FilesystemService;
+  cwd: string;
+  input: { patchText: string };
+}) {
   const preview = errore.try({
-    try: () => applyPatch(patchText, cwd),
+    try: () => applyPatch(args.filesystem, args.input.patchText, args.cwd),
     catch: (e) => new FilesPatchError({ cause: e }),
   });
   if (preview instanceof Error) return preview;
   return preview;
+}
+
+function filesystemValue<T>(result: T | FilesystemError): T {
+  if (result instanceof Error) throw result;
+  return result;
 }

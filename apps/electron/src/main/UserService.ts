@@ -61,7 +61,7 @@ function preferencePath(appDataDir: string) {
 }
 
 async function readUserPreference(filesystem: FilesystemService, path: string) {
-  const raw = await filesystem.readTextFile(path);
+  const raw = await filesystem.readFile(path, "utf8");
   if (raw instanceof Error) return new UserIoError({ cause: raw });
 
   const parsed = errore.try({

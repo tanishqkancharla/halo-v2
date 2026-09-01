@@ -8,7 +8,7 @@ import { expect, test } from "vitest";
 import type { HaloClient } from "../../shared/contract.js";
 import { StaticAgentAuthority } from "../agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
-import { workspaceFilesPlugin } from "../agent/tools/files/WorkspaceFilesPlugin.js";
+import { createWorkspaceFilesPlugin } from "../agent/tools/files/WorkspaceFilesPlugin.js";
 import { FilesystemService } from "../filesystem/FilesystemService.js";
 import { listenHaloRpcHttp } from "../HaloRpcHttp.js";
 import type { HaloContext } from "../router.js";
@@ -69,9 +69,10 @@ const pluginTest = test.extend<{
     });
     const selected = await workspaceService.select(workspaceRoot);
     if (selected instanceof Error) throw selected;
-    const pluginService = new PluginService(
-      workspaceService,
-      async (directory) => {
+    const pluginService = new PluginService({
+      filesystem: filesystemService,
+      workspace: workspaceService,
+      dependencyInstaller: async (directory) => {
         const contract = await installPluginSdkContract({
           directory,
           appVersion: workspaceService.appVersion,
@@ -79,7 +80,7 @@ const pluginTest = test.extend<{
         if (contract instanceof Error) return contract;
         return copyPluginWorkspacePackages(directory);
       },
-    );
+    });
     const grants = new PluginToolGrants({
       filesystem: filesystemService,
       workspace: workspaceService,
@@ -91,10 +92,11 @@ const pluginTest = test.extend<{
         appDataDir: userDataDir,
         filesystem: filesystemService,
       }),
-      toolPlugins: [workspaceFilesPlugin],
+      toolPlugins: [createWorkspaceFilesPlugin(filesystemService)],
       authority: new StaticAgentAuthority(["workspace.files.read"]),
     });
     const sessions = new SessionRegistry({
+      filesystem: filesystemService,
       workspace: workspaceService,
       toolRuntime,
     });
@@ -109,7 +111,11 @@ const pluginTest = test.extend<{
       },
       logger: new Logger(),
     };
-    const rpc = await listenHaloRpcHttp({ context, userDataDir });
+    const rpc = await listenHaloRpcHttp({
+      context,
+      filesystem: filesystemService,
+      userDataDir,
+    });
     if (rpc instanceof Error) throw rpc;
     const client = createHaloRpcClient<HaloClient>({
       version: 1,

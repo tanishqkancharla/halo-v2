@@ -1,8 +1,7 @@
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import * as errore from "errore";
 import type { CompiledPluginView } from "../../shared/plugin.js";
+import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 const viewExternals = [
   "react",
@@ -27,12 +26,13 @@ export class PluginViewDistError extends errore.createTaggedError({
 }) {}
 
 export async function compilePluginView(args: {
+  filesystem: FilesystemService;
   id: string;
   directory: string;
   viewPath: string;
   outfile: string;
 }): Promise<PluginViewCompileError | { id: string; outfile: string }> {
-  const esbuild = await loadEsbuild();
+  const esbuild = await loadEsbuild(args.filesystem);
   const built = await Promise.resolve()
     .then(() =>
       esbuild.build({
@@ -70,24 +70,27 @@ export async function compilePluginView(args: {
 }
 
 export async function readPluginViewDist(args: {
+  filesystem: FilesystemService;
   id: string;
   directory: string;
 }): Promise<PluginViewDistError | CompiledPluginView> {
-  const source = await readFile(
+  const source = await args.filesystem.readFile(
     join(args.directory, "dist", "view.js"),
     "utf8",
-  ).catch((e) => new PluginViewDistError({ id: args.id, cause: e }));
-  if (source instanceof Error) return source;
+  );
+  if (source instanceof Error) {
+    return new PluginViewDistError({ id: args.id, cause: source });
+  }
   return { id: args.id, source };
 }
 
 let esbuildModule: Promise<typeof import("esbuild")> | undefined;
 
-function loadEsbuild() {
+function loadEsbuild(filesystem: FilesystemService) {
   if (esbuildModule !== undefined) return esbuildModule;
   // esbuild reads ESBUILD_BINARY_PATH when the module loads. spawn() cannot
   // run the copy stored inside the asar (ENOTDIR).
-  const binaryPath = packagedEsbuildBinary();
+  const binaryPath = packagedEsbuildBinary(filesystem);
   if (binaryPath !== undefined) {
     process.env.ESBUILD_BINARY_PATH = binaryPath;
   }
@@ -95,7 +98,7 @@ function loadEsbuild() {
   return esbuildModule;
 }
 
-function packagedEsbuildBinary() {
+function packagedEsbuildBinary(filesystem: FilesystemService) {
   const binaryName = process.platform === "win32" ? "esbuild.exe" : "esbuild";
   const resourcesDir =
     process.platform === "darwin"
@@ -109,6 +112,6 @@ function packagedEsbuildBinary() {
     "bin",
     binaryName,
   );
-  if (!existsSync(binaryPath)) return undefined;
+  if (!filesystem.exists(binaryPath)) return undefined;
   return binaryPath;
 }

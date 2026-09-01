@@ -1,6 +1,6 @@
 import { app } from "electron";
-import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import type { FilesystemService } from "./filesystem/FilesystemService.js";
 
 type ApplicationConfig = {
   isDevelopment: boolean;
@@ -10,10 +10,12 @@ type ApplicationConfig = {
 
 export function getApplicationConfig(env: {
   isDevelopment: boolean;
+  filesystem: FilesystemService;
 }): ApplicationConfig {
   const dataDir = app.getPath("userData");
   const logsDir = join(dataDir, "logs");
-  mkdirSync(logsDir, { recursive: true });
+  const created = env.filesystem.makeDirectorySync(logsDir);
+  if (created instanceof Error) throw created;
   return {
     isDevelopment: env.isDevelopment,
     dataDir,

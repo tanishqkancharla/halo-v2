@@ -52,12 +52,15 @@ const rpcHttpTest = test.extend<{
     }
 
     const user = new UserService({ filesystem, appDataDir: userDataDir });
-    const plugins = new PluginService(workspace, (directory) =>
-      installPluginSdkContract({
-        directory,
-        appVersion: workspace.appVersion,
-      }),
-    );
+    const plugins = new PluginService({
+      filesystem,
+      workspace,
+      dependencyInstaller: (directory) =>
+        installPluginSdkContract({
+          directory,
+          appVersion: workspace.appVersion,
+        }),
+    });
     const pluginToolGrants = new PluginToolGrants({ filesystem, workspace });
     const toolRuntime = new ToolRuntimeService({
       filesystem,
@@ -66,7 +69,11 @@ const rpcHttpTest = test.extend<{
       toolPlugins: [],
       authority: new StaticAgentAuthority([]),
     });
-    const sessions = new SessionRegistry({ workspace, toolRuntime });
+    const sessions = new SessionRegistry({
+      filesystem,
+      workspace,
+      toolRuntime,
+    });
     const context: HaloContext = {
       workspace,
       sessions,
@@ -78,7 +85,7 @@ const rpcHttpTest = test.extend<{
       },
       logger: new Logger(),
     };
-    const rpc = await listenHaloRpcHttp({ context, userDataDir });
+    const rpc = await listenHaloRpcHttp({ context, filesystem, userDataDir });
     if (rpc instanceof Error) throw rpc;
     await use(rpc);
     await rpc.close();

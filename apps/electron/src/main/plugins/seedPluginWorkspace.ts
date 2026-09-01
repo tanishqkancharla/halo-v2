@@ -98,7 +98,7 @@ async function writeIfStale(args: {
 }) {
   const stamped = stampSkillVersion(args.contents, args.appVersion);
   if (!args.alwaysWrite && args.filesystem.exists(args.path)) {
-    const existing = await args.filesystem.readTextFile(args.path);
+    const existing = await args.filesystem.readFile(args.path, "utf8");
     if (existing instanceof Error) {
       return new PluginSeedError({ cause: existing });
     }

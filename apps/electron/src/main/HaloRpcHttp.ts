@@ -1,6 +1,4 @@
 import { randomBytes } from "node:crypto";
-import { existsSync } from "node:fs";
-import { unlink, writeFile } from "node:fs/promises";
 import {
   createServer,
   type IncomingMessage,
@@ -10,6 +8,10 @@ import type { AddressInfo } from "node:net";
 import { RPCHandler } from "@orpc/server/node";
 import { rpcFilePath, type HaloRpcFile } from "@halo/cli";
 import * as errore from "errore";
+import {
+  FilesystemPathNotFoundError,
+  type FilesystemService,
+} from "./filesystem/FilesystemService.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
 
 export type HaloRpcHttp = {
@@ -27,11 +29,13 @@ export class HaloRpcHttpError extends errore.createTaggedError({
 
 export async function listenHaloRpcHttp(args: {
   context: HaloContext;
+  filesystem: FilesystemService;
   userDataDir: string;
 }): Promise<HaloRpcHttp | HaloRpcHttpError> {
   const token = randomBytes(32).toString("base64url");
   const handler = new RPCHandler<HaloContext>(haloRpcRouter);
   const server = createServer((req, res) => {
+    // oxlint-disable-next-line typescript/no-floating-promises -- Node owns this synchronous request callback; handleRpcRequest writes the response.
     void handleRpcRequest({
       req,
       res,
@@ -57,12 +61,16 @@ export async function listenHaloRpcHttp(args: {
     token,
   };
   const path = rpcFilePath(args.userDataDir);
-  const written = await writeFile(path, `${JSON.stringify(file)}\n`, {
-    mode: 0o600,
-  }).catch((e) => new HaloRpcHttpError({ detail: "write rpc.json", cause: e }));
+  const written = await args.filesystem.writeFile(
+    path,
+    `${JSON.stringify(file)}\n`,
+    {
+      mode: 0o600,
+    },
+  );
   if (written instanceof Error) {
     server.close();
-    return written;
+    return new HaloRpcHttpError({ detail: "write rpc.json", cause: written });
   }
 
   let closed = false;
@@ -78,11 +86,11 @@ export async function listenHaloRpcHttp(args: {
       if (closedServer instanceof Error) {
         console.warn("Could not close Halo RPC HTTP:", closedServer.message);
       }
-      if (!existsSync(path)) return;
-      const removed = await unlink(path).catch(
-        (e) => new HaloRpcHttpError({ detail: "unlink rpc.json", cause: e }),
-      );
-      if (removed instanceof Error) {
+      const removed = await args.filesystem.unlink(path);
+      if (
+        removed instanceof Error &&
+        !(removed instanceof FilesystemPathNotFoundError)
+      ) {
         console.warn("Could not unlink rpc.json:", removed.message);
       }
     },

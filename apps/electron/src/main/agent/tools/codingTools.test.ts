@@ -7,6 +7,7 @@ import {
   StaticAgentAuthority,
 } from "../runtime/AgentAuthority.js";
 import { createAuthorizedCodingTools } from "./codingTools.js";
+import { FilesystemService } from "../../filesystem/FilesystemService.js";
 
 const codingToolTest = test.extend<{ workspaceRoot: string }>({
   workspaceRoot: async ({ task }, use) => {
@@ -22,6 +23,7 @@ codingToolTest("checks authority before reading", async ({ workspaceRoot }) => {
   await fs.writeFile(path.join(workspaceRoot, "secret.txt"), "secret");
   const tools = createAuthorizedCodingTools({
     cwd: workspaceRoot,
+    filesystem: new FilesystemService(),
     authority: new StaticAgentAuthority([]),
   });
   const read = tools[0];
@@ -38,6 +40,7 @@ codingToolTest(
     await fs.writeFile(path.join(workspaceRoot, "message.txt"), "before\n");
     const tools = createAuthorizedCodingTools({
       cwd: workspaceRoot,
+      filesystem: new FilesystemService(),
       authority: new StaticAgentAuthority(["workspace.files.write"]),
     });
     const patch = tools[3];

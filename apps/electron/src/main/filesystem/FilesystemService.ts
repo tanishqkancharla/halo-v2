@@ -39,6 +39,10 @@ export class FilesystemPathNotFoundError extends errore.createTaggedError({
   message: "Filesystem path '$path' does not exist",
 }) {}
 
+export type FilesystemError =
+  | FilesystemOperationError
+  | FilesystemPathNotFoundError;
+
 const parcelWatcherIgnore = [
   "**/node_modules/**",
   "**/.*",
@@ -60,15 +64,30 @@ export class FilesystemService {
     return fs.existsSync(path);
   }
 
-  async readTextFile(path: string) {
-    return fsPromises
-      .readFile(path, "utf8")
-      .catch((cause) => filesystemError({ operation: "read", path, cause }));
+  loadEnvironmentFile(path: string) {
+    return errore.try({
+      try: () => process.loadEnvFile(path),
+      catch: (cause) =>
+        filesystemError({ operation: "load environment", path, cause }),
+    });
   }
 
-  async readFile(path: string) {
-    return fsPromises
-      .readFile(path)
+  readFile(path: string): Promise<Buffer | FilesystemError>;
+  readFile(
+    path: string,
+    encoding: BufferEncoding,
+  ): Promise<string | FilesystemError>;
+  async readFile(
+    path: string,
+    encoding?: BufferEncoding,
+  ): Promise<Buffer | string | FilesystemError> {
+    if (encoding === undefined) {
+      return await fsPromises
+        .readFile(path)
+        .catch((cause) => filesystemError({ operation: "read", path, cause }));
+    }
+    return await fsPromises
+      .readFile(path, encoding)
       .catch((cause) => filesystemError({ operation: "read", path, cause }));
   }
 
@@ -77,9 +96,8 @@ export class FilesystemService {
     data: string | Uint8Array,
     options?: BufferEncoding | { mode?: number },
   ) {
-    return fsPromises
+    return await fsPromises
       .writeFile(path, data, options)
-      .then(() => undefined)
       .catch((cause) => filesystemError({ operation: "write", path, cause }));
   }
 
@@ -87,28 +105,28 @@ export class FilesystemService {
     path: string,
     options?: { recursive?: boolean; mode?: number },
   ) {
-    return fsPromises
+    const created = await fsPromises
       .mkdir(path, options)
-      .then(() => undefined)
       .catch((cause) =>
         filesystemError({ operation: "create directory", path, cause }),
       );
+    if (created instanceof Error) return created;
   }
 
   async listDirectory(path: string) {
-    return fsPromises
+    return await fsPromises
       .readdir(path, { withFileTypes: true })
       .catch((cause) => filesystemError({ operation: "list", path, cause }));
   }
 
   async realpath(path: string) {
-    return fsPromises
+    return await fsPromises
       .realpath(path)
       .catch((cause) => filesystemError({ operation: "resolve", path, cause }));
   }
 
   async stat(path: string) {
-    return fsPromises
+    return await fsPromises
       .stat(path)
       .catch((cause) => filesystemError({ operation: "stat", path, cause }));
   }
@@ -117,17 +135,50 @@ export class FilesystemService {
     path: string,
     options?: { recursive?: boolean; force?: boolean },
   ) {
-    return fsPromises
+    return await fsPromises
       .rm(path, options)
-      .then(() => undefined)
       .catch((cause) => filesystemError({ operation: "remove", path, cause }));
   }
 
+  async unlink(path: string) {
+    return await fsPromises
+      .unlink(path)
+      .catch((cause) => filesystemError({ operation: "unlink", path, cause }));
+  }
+
   async chmod(path: string, mode: number) {
-    return fsPromises
+    return await fsPromises
       .chmod(path, mode)
-      .then(() => undefined)
       .catch((cause) => filesystemError({ operation: "chmod", path, cause }));
+  }
+
+  readFileSync(path: string, encoding: BufferEncoding) {
+    return errore.try({
+      try: () => fs.readFileSync(path, encoding),
+      catch: (cause) => filesystemError({ operation: "read", path, cause }),
+    });
+  }
+
+  writeFileSync(path: string, data: string) {
+    return errore.try({
+      try: () => fs.writeFileSync(path, data),
+      catch: (cause) => filesystemError({ operation: "write", path, cause }),
+    });
+  }
+
+  makeDirectorySync(path: string) {
+    return errore.try({
+      try: () => fs.mkdirSync(path, { recursive: true }),
+      catch: (cause) =>
+        filesystemError({ operation: "create directory", path, cause }),
+    });
+  }
+
+  unlinkSync(path: string) {
+    return errore.try({
+      try: () => fs.unlinkSync(path),
+      catch: (cause) => filesystemError({ operation: "unlink", path, cause }),
+    });
   }
 
   async watch(path: string) {
@@ -137,14 +188,14 @@ export class FilesystemService {
     const subscription = await watcher
       .subscribe(
         path,
-        (error, events) => {
+        async (error, events) => {
           if (error !== null) {
             this.watchEventStream.append(
               new FilesystemWatchError({ watchedPath: path, cause: error }),
             );
             return;
           }
-          void this.emitWatchEvents(path, events);
+          await this.emitWatchEvents(path, events);
         },
         { ignore: [...parcelWatcherIgnore] },
       )
@@ -153,24 +204,21 @@ export class FilesystemService {
     this.watchState = { path, subscription };
   }
 
-  close() {
-    return this.stopWatch();
+  async close() {
+    return await this.stopWatch();
   }
 
   private async stopWatch() {
     const state = this.watchState;
     this.watchState = undefined;
     if (state === undefined) return;
-    return state.subscription
-      .unsubscribe()
-      .then(() => undefined)
-      .catch(
-        (cause) =>
-          new FilesystemWatchError({
-            watchedPath: state.path,
-            cause,
-          }),
-      );
+    return await state.subscription.unsubscribe().catch(
+      (cause) =>
+        new FilesystemWatchError({
+          watchedPath: state.path,
+          cause,
+        }),
+    );
   }
 
   private async emitWatchEvents(

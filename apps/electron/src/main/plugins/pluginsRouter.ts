@@ -75,7 +75,7 @@ export const pluginsRouter = os.router({
       invoke: async (path, toolInput) => {
         const runtime = await context.toolRuntime.get();
         if (runtime instanceof Error) return runtime;
-        return runtime.invokePath({ path, args: toolInput, signal });
+        return await runtime.invokePath({ path, args: toolInput, signal });
       },
     });
     const result = await context.plugins.invoke({

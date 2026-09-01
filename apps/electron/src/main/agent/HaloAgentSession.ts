@@ -18,6 +18,7 @@ import type {
   WorkspaceLayout,
   WorkspaceService,
 } from "../workspace/WorkspaceService.js";
+import type { FilesystemService } from "../filesystem/FilesystemService.js";
 import type { ToolRuntimeService } from "./runtime/ToolRuntimeService.js";
 import { createAuthorizedCodingTools } from "./tools/codingTools.js";
 import { createExecTool } from "./tools/execTool.js";
@@ -69,6 +70,7 @@ type SessionNotification = {
 };
 
 export type HaloAgentSessionOptions = {
+  filesystem: FilesystemService;
   workspace: WorkspaceService;
   toolRuntime: ToolRuntimeService;
 };
@@ -92,7 +94,7 @@ export class HaloAgentSession {
       catch: (e) => new CreateAgentSessionError({ cause: e }),
     });
     if (manager instanceof Error) return manager;
-    return HaloAgentSession.createFromManager(options, layout, manager);
+    return await HaloAgentSession.createFromManager(options, layout, manager);
   }
 
   static async open(options: HaloAgentSessionOptions & { sessionId: string }) {
@@ -118,7 +120,7 @@ export class HaloAgentSession {
         }),
     });
     if (manager instanceof Error) return manager;
-    return HaloAgentSession.createFromManager(options, layout, manager);
+    return await HaloAgentSession.createFromManager(options, layout, manager);
   }
 
   static async list(options: Pick<HaloAgentSessionOptions, "workspace">) {
@@ -175,6 +177,7 @@ export class HaloAgentSession {
       customTools: [
         ...createAuthorizedCodingTools({
           cwd: layout.root,
+          filesystem: options.filesystem,
           authority: runtime,
         }),
         createExecTool({ runtime, runtimeDescription }),

@@ -1,6 +1,6 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import * as errore from "errore";
+import type { FilesystemService } from "../../../filesystem/FilesystemService.js";
 
 export class FilesEditError extends errore.createTaggedError({
   name: "FilesEditError",
@@ -29,20 +29,17 @@ function restoreLineEndings(text: string, ending: "\r\n" | "\n") {
   return ending === "\r\n" ? text.replace(/\n/g, "\r\n") : text;
 }
 
-export async function editFile(
-  cwd: string,
-  {
-    path: filePath,
-    oldText,
-    newText,
-    replaceAll = false,
-  }: {
+export async function editFile(args: {
+  filesystem: FilesystemService;
+  cwd: string;
+  input: {
     path: string;
     oldText: string;
     newText: string;
     replaceAll?: boolean;
-  },
-) {
+  };
+}) {
+  const { path: filePath, oldText, newText, replaceAll = false } = args.input;
   if (oldText === newText) {
     return new FilesEditError({
       path: filePath,
@@ -56,11 +53,11 @@ export async function editFile(
     });
   }
 
-  const absolutePath = path.resolve(cwd, filePath);
-  const raw = await fs
-    .readFile(absolutePath, "utf8")
-    .catch((e) => new FilesEditError({ path: filePath, cause: e }));
-  if (raw instanceof Error) return raw;
+  const absolutePath = path.resolve(args.cwd, filePath);
+  const raw = await args.filesystem.readFile(absolutePath, "utf8");
+  if (raw instanceof Error) {
+    return new FilesEditError({ path: filePath, cause: raw });
+  }
 
   const { bom, text: noBomContent } = stripBom(raw);
   const lineEnding = detectLineEnding(noBomContent);
@@ -92,10 +89,14 @@ export async function editFile(
     : normalizedContent.replace(normalizedOldText, normalizedNewText);
   const finalContent = bom + restoreLineEndings(newContent, lineEnding);
 
-  const written = await fs
-    .writeFile(absolutePath, finalContent, "utf8")
-    .catch((e) => new FilesEditError({ path: filePath, cause: e }));
-  if (written instanceof Error) return written;
+  const written = await args.filesystem.writeFile(
+    absolutePath,
+    finalContent,
+    "utf8",
+  );
+  if (written instanceof Error) {
+    return new FilesEditError({ path: filePath, cause: written });
+  }
 
   return {
     path: filePath,

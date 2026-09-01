@@ -89,7 +89,7 @@ export async function installHaloCli(args: {
 }) {
   const binPath = haloCliBinPath(args.workspaceRoot);
   if (args.filesystem.exists(binPath)) {
-    const existing = await args.filesystem.readTextFile(binPath);
+    const existing = await args.filesystem.readFile(binPath, "utf8");
     if (existing instanceof Error) {
       return new InstallHaloCliError({ detail: "read halo", cause: existing });
     }

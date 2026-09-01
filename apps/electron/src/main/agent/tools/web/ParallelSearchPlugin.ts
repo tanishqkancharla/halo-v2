@@ -158,9 +158,8 @@ export const parallelSearchPlugin: HaloToolPlugin = {
     if (pendingClient === undefined) return;
     const client = await pendingClient;
     if (client instanceof Error) return client;
-    return client
+    return await client
       .close()
-      .then(() => undefined)
       .catch((e) => new ParallelMcpError({ cause: e }));
   },
 };

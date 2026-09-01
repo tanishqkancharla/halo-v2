@@ -1,7 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
 import * as errore from "errore";
 import ts from "typescript6";
+import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 const pluginTsconfig = `${JSON.stringify(
   {
@@ -26,28 +26,40 @@ export class PluginTypesError extends errore.createTaggedError({
   message: "Plugin types failed: $detail",
 }) {}
 
-export async function writePluginTsconfig(directory: string) {
-  return writeFile(join(directory, "tsconfig.json"), pluginTsconfig).catch(
-    (e) => new PluginTypesError({ detail: "write tsconfig.json", cause: e }),
+export async function writePluginTsconfig(args: {
+  filesystem: FilesystemService;
+  directory: string;
+}) {
+  const written = await args.filesystem.writeFile(
+    join(args.directory, "tsconfig.json"),
+    pluginTsconfig,
   );
+  if (written instanceof Error) {
+    return new PluginTypesError({
+      detail: "write tsconfig.json",
+      cause: written,
+    });
+  }
 }
 
-export async function typecheckPlugin(directory: string) {
-  const configPath = join(directory, "tsconfig.json");
-  const raw = await readFile(configPath, "utf8").catch(
-    (e) =>
-      new PluginTypesError({
-        detail: "read tsconfig.json",
-        cause: e,
-      }),
-  );
-  if (raw instanceof Error) return raw;
+export async function typecheckPlugin(args: {
+  filesystem: FilesystemService;
+  directory: string;
+}) {
+  const configPath = join(args.directory, "tsconfig.json");
+  const raw = await args.filesystem.readFile(configPath, "utf8");
+  if (raw instanceof Error) {
+    return new PluginTypesError({
+      detail: "read tsconfig.json",
+      cause: raw,
+    });
+  }
 
   const parsed = ts.parseConfigFileTextToJson(configPath, raw);
   if (parsed.error !== undefined) {
     return [
       diagnosticFields({
-        directory,
+        directory: args.directory,
         diagnostic: parsed.error,
       }),
     ];
@@ -56,13 +68,13 @@ export async function typecheckPlugin(directory: string) {
   const config = ts.parseJsonConfigFileContent(
     parsed.config,
     ts.sys,
-    directory,
+    args.directory,
     undefined,
     configPath,
   );
   if (config.errors.length > 0) {
     return config.errors.map((diagnostic) =>
-      diagnosticFields({ directory, diagnostic }),
+      diagnosticFields({ directory: args.directory, diagnostic }),
     );
   }
 
@@ -73,7 +85,9 @@ export async function typecheckPlugin(directory: string) {
   });
   return ts
     .getPreEmitDiagnostics(program)
-    .map((diagnostic) => diagnosticFields({ directory, diagnostic }));
+    .map((diagnostic) =>
+      diagnosticFields({ directory: args.directory, diagnostic }),
+    );
 }
 
 function diagnosticFields(args: {

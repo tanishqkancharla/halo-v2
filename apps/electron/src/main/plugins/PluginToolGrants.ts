@@ -89,7 +89,7 @@ export class PluginToolGrants {
   private async read() {
     const filePath = this.filePath();
     if (filePath instanceof Error) return filePath;
-    const raw = await this.options.filesystem.readTextFile(filePath);
+    const raw = await this.options.filesystem.readFile(filePath, "utf8");
     if (raw instanceof FilesystemPathNotFoundError) return emptyState();
     if (raw instanceof Error) {
       return new PluginToolGrantsIoError({ operation: "read", cause: raw });

@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { call, getRouter, Procedure, type AnyRouter } from "@orpc/server";
 import type { PluginToolsFacade } from "@halo/plugin-sdk/server";
@@ -7,6 +5,7 @@ import * as errore from "errore";
 import type { PluginInvocationInput } from "../../shared/contract.js";
 import type { PluginList, PluginLoadError } from "../../shared/plugin.js";
 import type { PluginManifest } from "../../shared/pluginManifest.js";
+import type { FilesystemService } from "../filesystem/FilesystemService.js";
 import {
   WorkspaceNotReadyError,
   type WorkspaceService,
@@ -53,12 +52,24 @@ type PluginDirectory = {
 export class PluginService {
   private routers = new Map<string, AnyRouter>();
 
-  constructor(
-    private readonly workspace: WorkspaceService,
-    private readonly dependencyInstaller: (
-      directory: string,
-    ) => Promise<Error | void> = installPluginDependencies,
-  ) {}
+  private readonly filesystem: FilesystemService;
+  private readonly workspace: WorkspaceService;
+  private readonly dependencyInstaller: (
+    directory: string,
+  ) => Promise<Error | void>;
+
+  constructor(options: {
+    filesystem: FilesystemService;
+    workspace: WorkspaceService;
+    dependencyInstaller?: (directory: string) => Promise<Error | void>;
+  }) {
+    this.filesystem = options.filesystem;
+    this.workspace = options.workspace;
+    this.dependencyInstaller =
+      options.dependencyInstaller === undefined
+        ? installPluginDependencies
+        : options.dependencyInstaller;
+  }
 
   async create(input: { id: string; storage?: boolean }) {
     const parsed = parsePluginId(input.id);
@@ -68,9 +79,12 @@ export class PluginService {
     if (layout instanceof Error) return layout;
 
     const directory = join(layout.root, ".halo", "plugins", parsed);
-    if (existsSync(directory)) return new PluginExistsError({ id: parsed });
+    if (this.filesystem.exists(directory)) {
+      return new PluginExistsError({ id: parsed });
+    }
 
     const written = await writePluginScaffold({
+      filesystem: this.filesystem,
       directory,
       id: parsed,
       appVersion: this.workspace.appVersion,
@@ -88,7 +102,10 @@ export class PluginService {
     const built: string[] = [];
     const errors: PluginLoadError[] = [];
     for (const plugin of listed) {
-      const manifest = await readPluginManifest(plugin);
+      const manifest = await readPluginManifest({
+        filesystem: this.filesystem,
+        ...plugin,
+      });
       if (manifest instanceof Error) {
         errors.push({ id: plugin.id, message: manifest.message });
         continue;
@@ -102,6 +119,7 @@ export class PluginService {
       }
 
       const compiled = await compilePluginView({
+        filesystem: this.filesystem,
         id: plugin.id,
         directory: manifest.directory,
         viewPath: manifest.viewPath,
@@ -144,10 +162,16 @@ export class PluginService {
         });
         continue;
       }
-      const prepared = await writePluginTsconfig(plugin.directory);
+      const prepared = await writePluginTsconfig({
+        filesystem: this.filesystem,
+        directory: plugin.directory,
+      });
       if (prepared instanceof Error) return prepared;
       written.push(plugin.id);
-      const checked = await typecheckPlugin(plugin.directory);
+      const checked = await typecheckPlugin({
+        filesystem: this.filesystem,
+        directory: plugin.directory,
+      });
       if (checked instanceof Error) return checked;
       for (const diagnostic of checked) {
         diagnostics.push({ id: plugin.id, ...diagnostic });
@@ -165,7 +189,10 @@ export class PluginService {
     const errors: PluginList["errors"] = [];
     const routers = new Map<string, AnyRouter>();
     for (const plugin of listed) {
-      const manifest = await readPluginManifest(plugin);
+      const manifest = await readPluginManifest({
+        filesystem: this.filesystem,
+        ...plugin,
+      });
       if (manifest instanceof Error) {
         errors.push({ id: plugin.id, message: manifest.message });
         continue;
@@ -180,6 +207,7 @@ export class PluginService {
       let compiled: PluginList["compiledViews"][number] | undefined;
       if (manifest.viewPath !== undefined) {
         const view = await readPluginViewDist({
+          filesystem: this.filesystem,
           id: plugin.id,
           directory: manifest.directory,
         });
@@ -214,7 +242,10 @@ export class PluginService {
     if (listed instanceof Error) return listed;
     const manifests: PluginManifest[] = [];
     for (const plugin of listed) {
-      const manifest = await readPluginManifest(plugin);
+      const manifest = await readPluginManifest({
+        filesystem: this.filesystem,
+        ...plugin,
+      });
       if (manifest instanceof Error) continue;
       manifests.push(manifest);
     }
@@ -226,7 +257,8 @@ export class PluginService {
     if (pluginId instanceof Error) return pluginId;
     const layout = this.workspace.getLayout();
     if (layout instanceof Error) return layout;
-    return readPluginManifest({
+    return await readPluginManifest({
+      filesystem: this.filesystem,
       id: pluginId,
       directory: join(layout.root, ".halo", "plugins", pluginId),
     });
@@ -280,12 +312,10 @@ export class PluginService {
     if (layout instanceof Error) return layout;
 
     const pluginsRoot = join(layout.root, ".halo", "plugins");
-    if (!existsSync(pluginsRoot)) return [];
+    if (!this.filesystem.exists(pluginsRoot)) return [];
 
-    const entries = await readdir(pluginsRoot, { withFileTypes: true }).catch(
-      (e) => new PluginIoError({ cause: e }),
-    );
-    if (entries instanceof Error) return entries;
+    const entries = await this.filesystem.listDirectory(pluginsRoot);
+    if (entries instanceof Error) return new PluginIoError({ cause: entries });
 
     return entries
       .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
@@ -297,7 +327,10 @@ export class PluginService {
   }
 
   private async assertPin(plugin: PluginDirectory) {
-    const pin = await readPluginSdkPinFile(plugin);
+    const pin = await readPluginSdkPinFile({
+      filesystem: this.filesystem,
+      ...plugin,
+    });
     if (pin instanceof Error) return pin;
     return assertPluginSdkPin({
       id: plugin.id,

@@ -56,7 +56,7 @@ export function defineHaloTool<TInputSchema extends TObject>(input: {
       if (!Value.Check(input.inputSchema, value)) {
         return new HaloToolInputError({ tool: input.name });
       }
-      return input.execute(value, context);
+      return await input.execute(value, context);
     },
   };
 }

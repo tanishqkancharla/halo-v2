@@ -8,7 +8,6 @@ import {
   shell,
   type IpcMainEvent,
 } from "electron";
-import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -27,7 +26,7 @@ import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
 import { workspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
-import { workspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
+import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
 import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { FilesystemService } from "./filesystem/FilesystemService.js";
@@ -45,13 +44,17 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const isDevelopment = Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+const filesystemService = new FilesystemService();
 
 if (started) app.quit();
 
-loadDevelopmentEnvironment();
+loadDevelopmentEnvironment(filesystemService);
 configureUserDataPath();
 
-const applicationConfig = getApplicationConfig({ isDevelopment });
+const applicationConfig = getApplicationConfig({
+  isDevelopment,
+  filesystem: filesystemService,
+});
 if (isDevelopment) {
   // Forge closes this process's stdio when it restarts main. A log after
   // that writes EPIPE; Node throws unless the stream has an error listener.
@@ -82,7 +85,6 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 
 process.env.HALO_USER_DATA = applicationConfig.dataDir;
 
-const filesystemService = new FilesystemService();
 const workspaceService = new WorkspaceService({
   appDataDir: applicationConfig.dataDir,
   filesystem: filesystemService,
@@ -97,7 +99,7 @@ const userService = new UserService({
   filesystem: filesystemService,
 });
 const toolPlugins = [
-  workspaceFilesPlugin,
+  createWorkspaceFilesPlugin(filesystemService),
   workspaceBashPlugin,
   parallelSearchPlugin,
 ];
@@ -107,7 +109,10 @@ const authority = new StaticAgentAuthority([
   "workspace.shell.execute",
   "network.web.search",
 ]);
-const pluginService = new PluginService(workspaceService);
+const pluginService = new PluginService({
+  filesystem: filesystemService,
+  workspace: workspaceService,
+});
 const pluginToolGrants = new PluginToolGrants({
   filesystem: filesystemService,
   workspace: workspaceService,
@@ -120,6 +125,7 @@ const toolRuntime = new ToolRuntimeService({
   authority,
 });
 const sessionRegistry = new SessionRegistry({
+  filesystem: filesystemService,
   workspace: workspaceService,
   toolRuntime,
 });
@@ -127,6 +133,7 @@ let mainWindow: BrowserWindow | undefined;
 let rpcHttp: HaloRpcHttp | undefined;
 let shutdownStarted = false;
 
+// oxlint-disable-next-line typescript/no-floating-promises -- Electron owns the app-ready lifecycle and keeps the process alive for this work.
 app.whenReady().then(async () => {
   await workspaceService.restore();
   if (workspaceService.getWorkspace() !== undefined) {
@@ -152,6 +159,7 @@ app.whenReady().then(async () => {
       },
       logger: rpcLogger,
     },
+    filesystem: filesystemService,
     userDataDir: applicationConfig.dataDir,
   });
   if (listening instanceof Error) {
@@ -161,7 +169,7 @@ app.whenReady().then(async () => {
     toolRuntime.setOAuthRedirectUri(listening.oauthRedirectUri);
   }
   installMenu();
-  openMainWindow();
+  await openMainWindow();
   startAppUpdates({
     isDevelopment,
     getWindow: () => mainWindow,
@@ -169,7 +177,9 @@ app.whenReady().then(async () => {
   logger.info({ event: "app-ready" });
 
   app.on("activate", () => {
-    if (mainWindow === undefined) openMainWindow();
+    if (mainWindow !== undefined) return;
+    // oxlint-disable-next-line typescript/no-floating-promises -- Electron activate callbacks cannot await window loading.
+    void openMainWindow();
   });
 });
 
@@ -183,6 +193,7 @@ app.on("will-quit", (event) => {
   shutdownStarted = true;
   const pending = rpcHttp;
   rpcHttp = undefined;
+  // oxlint-disable-next-line typescript/no-floating-promises -- Electron requires will-quit to return while cleanup runs before the second quit call.
   void closeAppServices(pending).finally(() => {
     logger.destroy();
     app.quit();
@@ -213,15 +224,15 @@ async function closeAppServices(http: HaloRpcHttp | undefined) {
   }
 }
 
-function openMainWindow(): void {
-  const window = createWindow();
+async function openMainWindow(): Promise<void> {
+  const window = await createWindow();
   mainWindow = window;
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = undefined;
   });
 }
 
-function createWindow(): BrowserWindow {
+async function createWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     title: "Halo",
     width: 1100,
@@ -240,9 +251,9 @@ function createWindow(): BrowserWindow {
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    await window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    void window.loadFile(
+    await window.loadFile(
       join(currentDirectory, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
@@ -323,12 +334,14 @@ function installMenu(): void {
   const openLogsItem = {
     label: "Open Logs",
     click: () => {
+      // oxlint-disable-next-line typescript/no-floating-promises -- Electron menu callbacks cannot await command work.
       void openLogs();
     },
   };
   const switchWorkspaceItem = {
     label: "Switch Workspace…",
     click: () => {
+      // oxlint-disable-next-line typescript/no-floating-promises -- Electron menu callbacks cannot await command work.
       void switchWorkspace();
     },
   };
@@ -396,7 +409,7 @@ async function openLogs(): Promise<void> {
   if (errorMessage === "") return;
   logger.error({ event: "open-logs-failed", error: errorMessage });
   if (mainWindow === undefined) return;
-  void dialog.showMessageBox(mainWindow, {
+  await dialog.showMessageBox(mainWindow, {
     type: "error",
     title: "Open Logs",
     message: "Could not open the logs folder",
@@ -419,7 +432,7 @@ async function switchWorkspace(): Promise<void> {
   const previous = workspaceService.getWorkspace();
   const workspace = await workspaceService.select(directory);
   if (workspace instanceof Error) {
-    void dialog.showMessageBox(mainWindow, {
+    await dialog.showMessageBox(mainWindow, {
       type: "error",
       title: "Switch Workspace",
       message: "Could not switch workspace",
@@ -464,12 +477,14 @@ function configureUserDataPath(): void {
   app.setPath("userData", join(appDirectory, "../..", ".halo"));
 }
 
-function loadDevelopmentEnvironment(): void {
+function loadDevelopmentEnvironment(filesystem: FilesystemService): void {
   if (!isDevelopment) return;
   const appDirectory = join(currentDirectory, "../..");
   const environmentFile = [
     join(appDirectory, ".env"),
     join(appDirectory, "../../.env"),
-  ].find(existsSync);
-  if (environmentFile !== undefined) process.loadEnvFile(environmentFile);
+  ].find((path) => filesystem.exists(path));
+  if (environmentFile === undefined) return;
+  const loaded = filesystem.loadEnvironmentFile(environmentFile);
+  if (loaded instanceof Error) throw loaded;
 }

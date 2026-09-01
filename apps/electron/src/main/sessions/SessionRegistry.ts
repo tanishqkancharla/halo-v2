@@ -32,7 +32,7 @@ export class SessionRegistry {
     const live = this.sessions.get(sessionId);
     if (live !== undefined) return live;
     const pending = this.opening.get(sessionId);
-    if (pending !== undefined) return pending;
+    if (pending !== undefined) return await pending;
 
     const opening = this.openAndRegister(sessionId);
     this.opening.set(sessionId, opening);
@@ -45,7 +45,7 @@ export class SessionRegistry {
     const session = this.sessions.get(sessionId);
     if (session === undefined) return new SessionNotOpenError({ sessionId });
     this.sessions.delete(sessionId);
-    return session.close();
+    return await session.close();
   }
 
   async shutdown() {
