@@ -1,4 +1,5 @@
 import { homedir } from "node:os";
+import { haloProtocolVersion } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import { createHaloRpcClient } from "./haloRpcClient.js";
 import { findHaloRpcFile } from "./findHaloRpcFile.js";
@@ -9,21 +10,23 @@ export type HaloRpcEnv = {
   HALO_USER_DATA?: string;
 };
 
-export class HaloVersionError extends errore.createTaggedError({
-  name: "HaloVersionError",
+export class HaloProtocolVersionError extends errore.createTaggedError({
+  name: "HaloProtocolVersionError",
   message:
-    "This halo is $cliVersion; the running Halo app is $appVersion. Reopen the workspace.",
+    "This Halo CLI uses protocol $clientProtocolVersion; the server uses protocol $serverProtocolVersion.",
 }) {}
 
 export function cliVersion() {
   return process.env.HALO_VERSION;
 }
 
-export type HaloAppInfoClient = {
-  getAppInfo: () => Promise<{ version: string }>;
+export type HaloProtocolClient = {
+  server: {
+    info: () => Promise<{ protocolVersion: number }>;
+  };
 };
 
-export async function connectHalo<T extends HaloAppInfoClient>(
+export async function connectHalo<T extends HaloProtocolClient>(
   env: HaloRpcEnv,
 ) {
   const file = await findHaloRpcFile({
@@ -36,19 +39,17 @@ export async function connectHalo<T extends HaloAppInfoClient>(
   });
   if (file instanceof Error) return file;
   const client = createHaloRpcClient<T>(file);
-  const expected = cliVersion();
-  if (expected === undefined) return { file, client };
-  const info = await client
-    .getAppInfo()
+  const info = await client.server
+    .info()
     .catch(
-      (e) => new HaloRpcFileError({ detail: "getAppInfo failed", cause: e }),
+      (e) => new HaloRpcFileError({ detail: "server.info failed", cause: e }),
     );
   if (info instanceof Error) return info;
-  if (info.version !== expected) {
-    return new HaloVersionError({
-      cliVersion: expected,
-      appVersion: info.version,
+  if (info.protocolVersion !== haloProtocolVersion) {
+    return new HaloProtocolVersionError({
+      clientProtocolVersion: haloProtocolVersion,
+      serverProtocolVersion: info.protocolVersion,
     });
   }
-  return { file, client };
+  return { file, client, serverInfo: info };
 }

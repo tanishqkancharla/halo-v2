@@ -19,7 +19,9 @@ class PluginCallError extends errore.createTaggedError({
 }) {}
 
 type HaloHost = {
-  getAppInfo: () => Promise<{ version: string }>;
+  server: {
+    info: () => Promise<{ protocolVersion: number }>;
+  };
   workspace: {
     get: () => Promise<WorkspaceInfo | undefined>;
   };
@@ -386,7 +388,7 @@ await Cli.create("halo", {
     description: "Check whether Halo is running and report its workspace",
     env: haloRpcEnv,
     output: z.object({
-      version: z.string(),
+      protocolVersion: z.number(),
       host: z.literal("127.0.0.1"),
       port: z.number(),
       workspace: workspaceInfo.optional(),
@@ -399,15 +401,6 @@ await Cli.create("halo", {
           message: connected.message,
         });
       }
-      const info = await connected.client
-        .getAppInfo()
-        .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
-      if (info instanceof Error) {
-        return c.error({
-          code: "NOT_RUNNING",
-          message: info.message,
-        });
-      }
       const workspace = await connected.client.workspace
         .get()
         .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
@@ -418,7 +411,7 @@ await Cli.create("halo", {
         });
       }
       return c.ok({
-        version: info.version,
+        protocolVersion: connected.serverInfo.protocolVersion,
         host: connected.file.host,
         port: connected.file.port,
         workspace,

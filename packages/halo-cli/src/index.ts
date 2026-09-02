@@ -2,8 +2,8 @@ export { createHaloRpcClient } from "./haloRpcClient.js";
 export {
   cliVersion,
   connectHalo,
-  HaloVersionError,
-  type HaloAppInfoClient,
+  HaloProtocolVersionError,
+  type HaloProtocolClient,
   type HaloRpcEnv,
 } from "./connectHalo.js";
 export {
