@@ -17,7 +17,7 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import { flowSequenceSource, programMapSource } from "../model/diagrams.js";
+import { programMapSource } from "../model/diagrams.js";
 import { haloProgram } from "../model/halo.js";
 import {
   descendants,
@@ -29,25 +29,9 @@ import {
 import { ProcessBadge, StateChip } from "./badges.tsx";
 import { carrierIcons, carrierLabels } from "./carriers.tsx";
 import { MermaidBlock } from "./MermaidBlock.tsx";
-import { FlowGraph } from "./FlowGraph.tsx";
-import { PaneStack } from "./PaneStack.tsx";
-import { CallStack } from "./CallStack.tsx";
-import { StackGraph } from "./StackGraph.tsx";
-import {
-  FlowTree,
-  sourceKey,
-  type Expansion,
-  type TreeLevel,
-} from "./FlowTree.tsx";
+import { CallStack, type Expansion } from "./CallStack.tsx";
 
 type Selection = { kind: "map" } | { kind: "flow"; id: string };
-type FlowView =
-  | "stackGraph"
-  | "tree"
-  | "stack"
-  | "panes"
-  | "graph"
-  | "sequence";
 
 const program = haloProgram;
 const services = new Map(
@@ -61,17 +45,9 @@ export function FlowstackApp() {
       ? { kind: "map" }
       : { kind: "flow", id: firstFlow.id },
   );
-  const [view, setView] = useState<FlowView>("stackGraph");
-  const [level, setLevel] = useState<TreeLevel>("code");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const expansion: Expansion = {
     isExpanded: (key) => expanded.has(key),
-    open: (keys) =>
-      setExpanded((current) => {
-        const next = new Set(current);
-        for (const key of keys) next.add(key);
-        return next;
-      }),
     toggle: (key) =>
       setExpanded((current) => {
         const next = new Set(current);
@@ -94,13 +70,7 @@ export function FlowstackApp() {
     selection.kind === "flow"
       ? program.flows.find((flow) => flow.id === selection.id)
       : undefined;
-  const fullBleed =
-    selectedFlow !== undefined &&
-    (view === "panes" || view === "graph" || view === "stackGraph");
-  const main = useStyles(
-    styles.main,
-    fullBleed ? styles.mainFullBleed : styles.mainPadded,
-  );
+  const main = useStyles(styles.main);
 
   return (
     <div className={shell}>
@@ -108,9 +78,9 @@ export function FlowstackApp() {
         <div>
           <div className={title}>{program.name} — event flows</div>
           <div className={subtitle}>
-            A flow is a tree of events between actors. Open an event to see what
-            its receiver does: the events it sends and, at the code level, the
-            frames that run. Every branch ends in source.
+            A flow is a call stack across services. Open a line to see its
+            source and what it calls or sends; marked source lines lead to the
+            next level.
           </div>
         </div>
       </header>
@@ -150,22 +120,15 @@ export function FlowstackApp() {
               key={selectedFlow.id}
               flow={selectedFlow}
               services={services}
-              view={view}
-              onViewChange={setView}
-              level={level}
-              onLevelChange={setLevel}
               expansion={expansion}
               onExpandAll={() =>
                 setExpanded((current) => {
                   const next = new Set(current);
-                  for (const { key, node } of descendants(
+                  for (const { key } of descendants(
                     selectedFlow.children,
                     selectedFlow.id,
                   )) {
                     next.add(key);
-                    if (node.kind === "frame" && node.source !== undefined) {
-                      next.add(sourceKey(key));
-                    }
                   }
                   return next;
                 })
@@ -208,149 +171,14 @@ function FlowLabel(props: { flow: Flow }) {
 function FlowPage(props: {
   flow: Flow;
   services: Map<string, Service>;
-  view: FlowView;
-  onViewChange: (view: FlowView) => void;
-  level: TreeLevel;
-  onLevelChange: (level: TreeLevel) => void;
   expansion: Expansion;
   onExpandAll: () => void;
   onCollapseAll: () => void;
 }) {
-  const { view, level } = props;
   const page = useStyles(styles.page);
   const heading = useStyles(styles.heading);
   const description = useStyles(styles.description);
   const toolbar = useStyles(styles.toolbar);
-  const toolbarSpacer = useStyles(styles.toolbarSpacer);
-  const toolbarDivider = useStyles(styles.toolbarDivider);
-  const stackShell = useStyles(styles.stackShell);
-  const panesPage = useStyles(styles.panesPage);
-  const panesToolbar = useStyles(styles.panesToolbar);
-  const panesBody = useStyles(styles.panesBody);
-  const sequence = useMemo(
-    () => flowSequenceSource(props.flow, props.services),
-    [props.flow, props.services],
-  );
-
-  const toolbarLabel = useStyles(styles.toolbarLabel);
-  const graphLevel = level === "events" ? "events" : "code";
-  const levelButtons = (withSource: boolean) => (
-    <>
-      <span className={toolbarLabel}>Level</span>
-      <Button
-        variant={level === "events" ? "default" : "quiet"}
-        onClick={() => props.onLevelChange("events")}
-      >
-        Events
-      </Button>
-      <Button
-        variant={
-          level === "code" || (!withSource && level === "source")
-            ? "default"
-            : "quiet"
-        }
-        onClick={() => props.onLevelChange("code")}
-      >
-        Code
-      </Button>
-      {withSource ? (
-        <Button
-          variant={level === "source" ? "default" : "quiet"}
-          onClick={() => props.onLevelChange("source")}
-        >
-          Source
-        </Button>
-      ) : undefined}
-    </>
-  );
-  const viewButtons = (
-    <>
-      <span className={toolbarLabel}>View</span>
-      <Button
-        variant={view === "stackGraph" ? "default" : "quiet"}
-        onClick={() => props.onViewChange("stackGraph")}
-      >
-        Stack graph
-      </Button>
-      <Button
-        variant={view === "tree" ? "default" : "quiet"}
-        onClick={() => props.onViewChange("tree")}
-      >
-        Tree
-      </Button>
-      <Button
-        variant={view === "stack" ? "default" : "quiet"}
-        onClick={() => props.onViewChange("stack")}
-      >
-        Call stack
-      </Button>
-      <Button
-        variant={view === "panes" ? "default" : "quiet"}
-        onClick={() => props.onViewChange("panes")}
-      >
-        Panes
-      </Button>
-      <Button
-        variant={view === "graph" ? "default" : "quiet"}
-        onClick={() => props.onViewChange("graph")}
-      >
-        Graph
-      </Button>
-      <Button
-        variant={view === "sequence" ? "default" : "quiet"}
-        onClick={() => props.onViewChange("sequence")}
-      >
-        Sequence
-      </Button>
-    </>
-  );
-
-  if (view === "panes" || view === "graph" || view === "stackGraph") {
-    return (
-      <div className={panesPage}>
-        <div className={panesToolbar}>
-          {viewButtons}
-          {view === "graph" || view === "stackGraph" ? (
-            <>
-              <span className={toolbarSpacer} />
-              {levelButtons(false)}
-              {view === "stackGraph" ? (
-                <>
-                  <span className={toolbarDivider} />
-                  <Button variant="quiet" onClick={props.onExpandAll}>
-                    Expand all
-                  </Button>
-                  <Button variant="quiet" onClick={props.onCollapseAll}>
-                    Collapse all
-                  </Button>
-                </>
-              ) : undefined}
-            </>
-          ) : undefined}
-        </div>
-        <div className={panesBody}>
-          {view === "panes" ? (
-            <PaneStack flow={props.flow} services={props.services} />
-          ) : view === "stackGraph" ? (
-            <StackGraph
-              nodes={props.flow.children}
-              parentKey={props.flow.id}
-              services={props.services}
-              level={graphLevel}
-              expansion={props.expansion}
-            />
-          ) : (
-            <FlowGraph
-              flow={props.flow}
-              services={props.services}
-              level={graphLevel}
-            />
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={page}>
       <div>
@@ -358,42 +186,19 @@ function FlowPage(props: {
         <p className={description}>{props.flow.description}</p>
       </div>
       <div className={toolbar}>
-        {viewButtons}
-        {view === "tree" || view === "stack" ? (
-          <>
-            <span className={toolbarSpacer} />
-            {levelButtons(true)}
-            <span className={toolbarDivider} />
-            <Button variant="quiet" onClick={props.onExpandAll}>
-              Expand all
-            </Button>
-            <Button variant="quiet" onClick={props.onCollapseAll}>
-              Collapse all
-            </Button>
-          </>
-        ) : undefined}
+        <Button variant="quiet" onClick={props.onExpandAll}>
+          Expand all
+        </Button>
+        <Button variant="quiet" onClick={props.onCollapseAll}>
+          Collapse all
+        </Button>
       </div>
-      {view === "tree" ? (
-        <div className={stackShell}>
-          <FlowTree
-            nodes={props.flow.children}
-            parentKey={props.flow.id}
-            services={props.services}
-            level={level}
-            expansion={props.expansion}
-          />
-        </div>
-      ) : view === "stack" ? (
-        <CallStack
-          nodes={props.flow.children}
-          parentKey={props.flow.id}
-          services={props.services}
-          level={level}
-          expansion={props.expansion}
-        />
-      ) : (
-        <MermaidBlock source={sequence} />
-      )}
+      <CallStack
+        nodes={props.flow.children}
+        parentKey={props.flow.id}
+        services={props.services}
+        expansion={props.expansion}
+      />
       <Legend />
     </div>
   );
@@ -425,10 +230,6 @@ function Legend() {
             </span>
           );
         })}
-      </div>
-      <div className={group}>
-        <span className={muted}>Service state</span>
-        <StateChip field={{ name: "field", type: "what the service stores" }} />
       </div>
     </div>
   );
@@ -549,36 +350,11 @@ const styles = {
     display: "inline-flex",
     color: colors.gray[10],
   }),
-  main: style({
+  main: style(spacing.padding({ x: 12, y: 8 }), {
     flex: "1 1 auto",
     minWidth: 0,
     minHeight: 0,
-  }),
-  mainPadded: style(spacing.padding({ x: 12, y: 8 }), {
     overflowY: "auto",
-  }),
-  mainFullBleed: style(flex({ direction: "column" }), {
-    overflow: "hidden",
-  }),
-  panesPage: style(flex({ direction: "column" }), {
-    width: "100%",
-    height: "100%",
-    minWidth: 0,
-    minHeight: 0,
-  }),
-  panesToolbar: style(
-    flex({ direction: "row", align: "center", gap: 2 }),
-    spacing.padding({ x: 4, y: 2 }),
-    border(["bottom"], "border"),
-    {
-      flex: "0 0 auto",
-      backgroundColor: backgroundColor.app,
-    },
-  ),
-  panesBody: style({
-    flex: "1 1 auto",
-    minWidth: 0,
-    minHeight: 0,
   }),
   page: style(flex({ direction: "column", gap: 6 }), {
     width: "100%",
@@ -600,25 +376,6 @@ const styles = {
   toolbar: style(
     flex({ direction: "row", align: "center", gap: 2, wrap: true }),
   ),
-  toolbarSpacer: style({ flex: "1 1 auto" }),
-  toolbarLabel: style(
-    text({ size: "xs", fontWeight: 500, color: "lowContrast" }),
-    {
-      marginRight: spacing.value(1),
-    },
-  ),
-  toolbarDivider: style({
-    width: "1px",
-    height: "16px",
-    marginInline: spacing.value(2),
-    backgroundColor: colors.gray[6],
-  }),
-  stackShell: style(spacing.padding({ y: 3, x: 2 }), {
-    borderRadius: "8px",
-    border: `1px solid ${colors.gray[5]}`,
-    backgroundColor: backgroundColor.element,
-    minWidth: 0,
-  }),
   legend: style(
     flex({ direction: "row", align: "center", gap: 8, wrap: true }),
     {

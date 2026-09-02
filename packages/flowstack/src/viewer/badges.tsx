@@ -38,23 +38,6 @@ export function serviceProcess(service: Service | undefined): ProcessName {
   return service === undefined ? "outside" : service.process;
 }
 
-/** A service name in its service's colour, no chip. */
-export function ActorText(props: { service: Service | undefined; id: string }) {
-  const actor = useStyles(
-    actorStyle,
-    processText[serviceProcess(props.service)],
-  );
-  return (
-    <span className={actor}>
-      {props.service === undefined ? props.id : props.service.name}
-    </span>
-  );
-}
-
-const actorStyle = style({
-  fontWeight: 600,
-});
-
 const classPattern = /^([A-Za-z_$][\w$]*)(\..*)$/;
 
 /**

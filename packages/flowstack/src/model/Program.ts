@@ -45,25 +45,29 @@ export type Service = {
 /**
  * `from` sends, `to` receives. `children` is what `to` runs to handle it.
  * Nesting is causal: a callee sits under its caller, an event sits under the
- * frame that sends it, and a response sits beside its request.
+ * frame that sends it, and a response sits beside its request. `at` is the
+ * line in the parent frame's source where this node starts: the call for a
+ * frame, the send or the receipt for an event.
  */
-export type EventNode = {
+type EventNode = {
   kind: "event";
   from: string;
   to: string;
   name: string;
   carrier: Carrier;
   detail?: string;
+  at?: number;
   children: FlowNode[];
 };
 
 /** A function in a service. `children` are the frames it calls and the events it sends. */
-export type FrameNode = {
+type FrameNode = {
   kind: "frame";
   service: string;
   entry: string;
   summary?: string;
   source?: Source;
+  at?: number;
   children: FlowNode[];
 };
 
@@ -109,29 +113,10 @@ export function frame(input: FrameInput): FrameNode {
 }
 
 /** A node with its position in the tree, `${parentKey}/${index}` per level. */
-export type Keyed<T extends FlowNode = FlowNode> = { key: string; node: T };
+export type Keyed = { key: string; node: FlowNode };
 
 export function keyed(nodes: FlowNode[], parentKey: string): Keyed[] {
   return nodes.map((node, index) => ({ key: `${parentKey}/${index}`, node }));
-}
-
-/**
- * The children with frame nodes removed. Events nested inside a frame move
- * up to where the frame was, in order, and keep their keys.
- */
-export function eventChildren(
-  nodes: FlowNode[],
-  parentKey: string,
-): Keyed<EventNode>[] {
-  const result: Keyed<EventNode>[] = [];
-  for (const { key, node } of keyed(nodes, parentKey)) {
-    if (node.kind === "frame") {
-      result.push(...eventChildren(node.children, key));
-      continue;
-    }
-    result.push({ key, node });
-  }
-  return result;
 }
 
 /** Every node below `nodes`, pre-order. */

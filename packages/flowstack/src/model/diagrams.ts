@@ -1,11 +1,4 @@
-import {
-  eventChildren,
-  type Flow,
-  type FlowNode,
-  type ProcessName,
-  type Program,
-  type Service,
-} from "./Program.js";
+import type { ProcessName, Program, Service } from "./Program.js";
 
 const processOrder: ProcessName[] = ["outside", "renderer", "preload", "main"];
 
@@ -36,42 +29,4 @@ export function programMapSource(program: Program) {
     }
   }
   return lines.join("\n");
-}
-
-/**
- * The whole event tree as a sequence diagram, events in pre-order. Actors
- * are participants in first-seen order.
- */
-export function flowSequenceSource(flow: Flow, services: Map<string, Service>) {
-  const participants: string[] = [];
-  const seen = new Set<string>();
-  const participantId = (serviceId: string) => {
-    if (!seen.has(serviceId)) {
-      seen.add(serviceId);
-      participants.push(serviceId);
-    }
-    return serviceId;
-  };
-
-  const lines: string[] = [];
-  function emit(nodes: FlowNode[], parentKey: string) {
-    for (const { key, node } of eventChildren(nodes, parentKey)) {
-      const from = participantId(node.from);
-      const to = participantId(node.to);
-      lines.push(`  ${from}->>${to}: ${escapeLabel(node.name)}`);
-      emit(node.children, key);
-    }
-  }
-  emit(flow.children, flow.id);
-
-  const header = participants.map((id) => {
-    const service = services.get(id);
-    const name = service === undefined ? id : service.name;
-    return `  participant ${id} as ${escapeLabel(name)}`;
-  });
-  return ["sequenceDiagram", ...header, ...lines].join("\n");
-}
-
-function escapeLabel(value: string) {
-  return value.replaceAll(":", "∶").replaceAll(";", ",");
 }
