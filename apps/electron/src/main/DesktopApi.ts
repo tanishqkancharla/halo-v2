@@ -8,10 +8,9 @@ import {
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import {
-  DESKTOP_CHANNELS,
-  emptyDesktopRequestSchema,
-  openExternalRequestSchema,
-  type EmptyDesktopRequest,
+  DESKTOP_CHANNEL,
+  desktopRequestSchema,
+  type DesktopRequest,
   type OpenExternalRequest,
 } from "../shared/desktop.js";
 import { getAppInfo, installAppUpdate } from "./app/AppUpdate.js";
@@ -31,73 +30,44 @@ export function registerDesktopApi(args: {
   workspace: WorkspaceService;
   getWindow: () => BrowserWindow | undefined;
 }): void {
-  ipcMain.handle(
-    DESKTOP_CHANNELS.chooseWorkspace,
-    async (event, request: EmptyDesktopRequest) => {
-      const window = assertTrustedSender({ event, getWindow: args.getWindow });
-      const validated = validateEmptyDesktopRequest({
-        operation: "choose workspace",
-        request,
-      });
-      if (validated instanceof Error) throw validated;
-      const workspace = await chooseWorkspace({
-        window,
-        workspace: args.workspace,
-      });
-      if (workspace instanceof Error) throw workspace;
-      return workspace;
-    },
-  );
-  ipcMain.handle(
-    DESKTOP_CHANNELS.getAppInfo,
-    (event, request: EmptyDesktopRequest) => {
-      assertTrustedSender({ event, getWindow: args.getWindow });
-      const validated = validateEmptyDesktopRequest({
-        operation: "get app info",
-        request,
-      });
-      if (validated instanceof Error) throw validated;
+  ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
+    const window = assertTrustedSender({ event, getWindow: args.getWindow });
+    const validated = validateDesktopRequest(request);
+    if (validated instanceof Error) throw validated;
+    const result = await handleDesktopRequest({
+      request: validated,
+      window,
+      workspace: args.workspace,
+    });
+    if (result instanceof Error) throw result;
+    return result;
+  });
+}
+
+function validateDesktopRequest(
+  request: DesktopRequest,
+): DesktopRequest | DesktopRequestError {
+  if (Value.Check(desktopRequestSchema, request)) return request;
+  return new DesktopRequestError({ operation: "desktop API" });
+}
+
+async function handleDesktopRequest(args: {
+  request: DesktopRequest;
+  window: BrowserWindow;
+  workspace: WorkspaceService;
+}) {
+  switch (args.request.type) {
+    case "chooseWorkspace":
+      return chooseWorkspace({ window: args.window, workspace: args.workspace });
+    case "getAppInfo":
       return getAppInfo();
-    },
-  );
-  ipcMain.handle(
-    DESKTOP_CHANNELS.installAppUpdate,
-    (event, request: EmptyDesktopRequest) => {
-      assertTrustedSender({ event, getWindow: args.getWindow });
-      const validated = validateEmptyDesktopRequest({
-        operation: "install app update",
-        request,
-      });
-      if (validated instanceof Error) throw validated;
-      const installed = installAppUpdate();
-      if (installed instanceof Error) throw installed;
-    },
-  );
-  ipcMain.handle(
-    DESKTOP_CHANNELS.openExternal,
-    async (event, request: OpenExternalRequest) => {
-      assertTrustedSender({ event, getWindow: args.getWindow });
-      const validated = validateOpenExternalRequest(request);
-      if (validated instanceof Error) throw validated;
-      const opened = await openExternal(validated);
-      if (opened instanceof Error) throw opened;
-    },
-  );
-}
-
-function validateEmptyDesktopRequest(args: {
-  operation: string;
-  request: EmptyDesktopRequest;
-}): EmptyDesktopRequest | DesktopRequestError {
-  if (Value.Check(emptyDesktopRequestSchema, args.request)) return args.request;
-  return new DesktopRequestError({ operation: args.operation });
-}
-
-function validateOpenExternalRequest(
-  request: OpenExternalRequest,
-): OpenExternalRequest | DesktopRequestError {
-  if (Value.Check(openExternalRequestSchema, request)) return request;
-  return new DesktopRequestError({ operation: "open external URL" });
+    case "installAppUpdate":
+      return installAppUpdate();
+    case "openExternal":
+      return openExternal(args.request);
+    default:
+      return new DesktopRequestError({ operation: "desktop API" });
+  }
 }
 
 async function chooseWorkspace(args: {

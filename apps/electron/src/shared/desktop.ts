@@ -14,27 +14,35 @@ export type AppInfo = {
   update: AppUpdateStatus;
 };
 
-export const DESKTOP_CHANNELS = {
-  chooseWorkspace: "halo:desktop:choose-workspace",
-  getAppInfo: "halo:desktop:get-app-info",
-  installAppUpdate: "halo:desktop:install-app-update",
-  openExternal: "halo:desktop:open-external",
-} as const;
+export const DESKTOP_CHANNEL = "halo:desktop";
 
-export const emptyDesktopRequestSchema = Type.Object(
-  {},
-  { additionalProperties: false },
-);
+export const desktopRequestSchema = Type.Union([
+  Type.Object(
+    { type: Type.Literal("chooseWorkspace") },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    { type: Type.Literal("getAppInfo") },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    { type: Type.Literal("installAppUpdate") },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      type: Type.Literal("openExternal"),
+      url: Type.String(),
+    },
+    { additionalProperties: false },
+  ),
+]);
 
-export const openExternalRequestSchema = Type.Object(
-  {
-    url: Type.String(),
-  },
-  { additionalProperties: false },
-);
-
-export type EmptyDesktopRequest = Static<typeof emptyDesktopRequestSchema>;
-export type OpenExternalRequest = Static<typeof openExternalRequestSchema>;
+export type DesktopRequest = Static<typeof desktopRequestSchema>;
+export type OpenExternalRequest = Extract<
+  DesktopRequest,
+  { type: "openExternal" }
+>;
 
 export type DesktopApi = {
   chooseWorkspace: () => Promise<WorkspaceInfo | undefined>;

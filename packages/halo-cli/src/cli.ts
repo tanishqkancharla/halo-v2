@@ -1,76 +1,20 @@
 #!/usr/bin/env node
 
 import { Cli, z } from "incur";
+import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import { cliVersion, connectHalo } from "./connectHalo.js";
 import { HaloRpcFileError } from "./rpcFile.js";
 import { parsePluginArgv, type PluginJson } from "./parsePluginArgv.js";
 
-type WorkspaceInfo = {
-  name: string;
-  workspaceRoot: string;
-};
-
-type PluginProcedureOutput = PluginJson | undefined | AsyncIterable<PluginJson>;
+type PluginProcedureOutput = Awaited<
+  ReturnType<HaloClient["plugins"]["invoke"]>
+>;
 
 class PluginCallError extends errore.createTaggedError({
   name: "PluginCallError",
   message: "Plugin call failed: $detail",
 }) {}
-
-type HaloHost = {
-  server: {
-    info: () => Promise<{ protocolVersion: number }>;
-  };
-  workspace: {
-    get: () => Promise<WorkspaceInfo | undefined>;
-  };
-  plugins: {
-    list: () => Promise<{
-      plugins: Array<{
-        id: string;
-        directory: string;
-        halo: { name: string };
-      }>;
-      errors: Array<{ id: string; message: string }>;
-    }>;
-    create: (input: { id: string; storage?: boolean }) => Promise<{
-      id: string;
-      directory: string;
-    }>;
-    build: () => Promise<{
-      built: string[];
-      errors: Array<{ id: string; message: string }>;
-    }>;
-    types: () => Promise<{
-      written: string[];
-      diagnostics: Array<{
-        id: string;
-        file: string;
-        line: number;
-        message: string;
-      }>;
-    }>;
-    invoke: (input: {
-      pluginId: string;
-      path: string[];
-      input: unknown;
-    }) => Promise<PluginProcedureOutput>;
-    check: (input: { pluginId: string }) => Promise<{
-      requested: string[];
-      existing: string[];
-      granted: string[];
-      missing: string[];
-    }>;
-    grant: (input: { pluginId: string }) => Promise<{
-      requested: string[];
-      existing: string[];
-      granted: string[];
-      newlyGranted: string[];
-      missing: string[];
-    }>;
-  };
-};
 
 const haloRpcEnv = z.object({
   HALO_RPC_FILE: z.string().optional().describe("Path to Halo rpc.json"),
@@ -422,7 +366,7 @@ await Cli.create("halo", {
   .serve();
 
 function connectHost(env: { HALO_RPC_FILE?: string; HALO_USER_DATA?: string }) {
-  return connectHalo<HaloHost>(env);
+  return connectHalo(env);
 }
 
 function isAsyncIterable(

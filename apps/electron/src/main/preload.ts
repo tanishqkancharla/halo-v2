@@ -3,19 +3,19 @@ import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { contextBridge, ipcRenderer } from "electron";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
-import { DESKTOP_CHANNELS, type DesktopApi } from "../shared/desktop.js";
-
-const emptyRequest = {};
+import { DESKTOP_CHANNEL, type DesktopApi } from "../shared/desktop.js";
 
 const desktopApi: DesktopApi = {
   chooseWorkspace: () =>
-    ipcRenderer.invoke(DESKTOP_CHANNELS.chooseWorkspace, emptyRequest),
-  getAppInfo: () =>
-    ipcRenderer.invoke(DESKTOP_CHANNELS.getAppInfo, emptyRequest),
+    ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "chooseWorkspace" }),
+  getAppInfo: () => ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getAppInfo" }),
   installAppUpdate: () =>
-    ipcRenderer.invoke(DESKTOP_CHANNELS.installAppUpdate, emptyRequest),
+    ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "installAppUpdate" }),
   openExternal: (request) =>
-    ipcRenderer.invoke(DESKTOP_CHANNELS.openExternal, request),
+    ipcRenderer.invoke(DESKTOP_CHANNEL, {
+      type: "openExternal",
+      url: request.url,
+    }),
 };
 
 contextBridge.exposeInMainWorld("haloDesktop", desktopApi);

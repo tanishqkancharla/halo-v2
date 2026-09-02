@@ -1,5 +1,8 @@
 import { homedir } from "node:os";
-import { haloProtocolVersion } from "@get-halo/shared/contract";
+import {
+  haloProtocolVersion,
+  type HaloClient,
+} from "@get-halo/shared/contract";
 import * as errore from "errore";
 import { createHaloRpcClient } from "./haloRpcClient.js";
 import { findHaloRpcFile } from "./findHaloRpcFile.js";
@@ -20,15 +23,7 @@ export function cliVersion() {
   return process.env.HALO_VERSION;
 }
 
-export type HaloProtocolClient = {
-  server: {
-    info: () => Promise<{ protocolVersion: number }>;
-  };
-};
-
-export async function connectHalo<T extends HaloProtocolClient>(
-  env: HaloRpcEnv,
-) {
+export async function connectHalo(env: HaloRpcEnv) {
   const file = await findHaloRpcFile({
     rpcFile: env.HALO_RPC_FILE,
     userDataDir: env.HALO_USER_DATA,
@@ -38,7 +33,7 @@ export async function connectHalo<T extends HaloProtocolClient>(
     appData: process.env.APPDATA,
   });
   if (file instanceof Error) return file;
-  const client = createHaloRpcClient<T>(file);
+  const client = createHaloRpcClient<HaloClient>(file);
   const info = await client.server
     .info()
     .catch(
