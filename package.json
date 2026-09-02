@@ -9,6 +9,7 @@
     "tkstack": "pnpm --silent exec tkstack",
     "spec": "pnpm --silent exec tkstack",
     "walkthrough": "pnpm --silent exec tkstack",
+    "flowstack": "pnpm --silent --filter @get-halo/flowstack cli",
     "infra:deploy": "pnpm --filter @get-halo/infra run deploy",
     "infra:dev": "pnpm --filter @get-halo/infra run dev",
     "infra:login": "pnpm --filter @get-halo/infra run login",
