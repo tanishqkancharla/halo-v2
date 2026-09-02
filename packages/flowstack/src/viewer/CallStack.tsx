@@ -7,9 +7,14 @@ import {
   type Keyed,
   type Service,
 } from "../model/Program.js";
-import { ActorText, processText, serviceProcess } from "./badges.tsx";
+import { NameText, serviceProcess } from "./badges.tsx";
 import { carrierLabels } from "./carriers.tsx";
-import { sourceKey, type Expansion, type TreeLevel } from "./FlowTree.tsx";
+import {
+  sourceKey,
+  toggleChain,
+  type Expansion,
+  type TreeLevel,
+} from "./FlowTree.tsx";
 import { SourceExcerpt } from "./SourceExcerpt.tsx";
 
 /**
@@ -109,6 +114,7 @@ function Line(props: {
   const glyph = useStyles(styles.glyph);
   const trail = useStyles(styles.trail);
   const marker = useStyles(styles.marker);
+  const note = useStyles(styles.note);
   const sourceToggle = useStyles(
     styles.sourceToggle,
     sourceOpen ? styles.sourceToggleOpen : undefined,
@@ -124,7 +130,11 @@ function Line(props: {
           className={lineButton}
           disabled={!canOpen}
           aria-expanded={canOpen ? expansion.isExpanded(primaryKey) : undefined}
-          onClick={() => expansion.toggle(primaryKey)}
+          onClick={() =>
+            hasChildren
+              ? toggleChain(expansion, props.item, props.level)
+              : expansion.toggle(primaryKey)
+          }
         >
           <span className={gutter} aria-hidden="true">
             {" "}
@@ -132,21 +142,21 @@ function Line(props: {
           <span className={glyph} aria-hidden="true">
             {props.glyph}
           </span>
-          {node.kind === "event" ? (
-            <EventText
-              from={node.from}
-              to={node.to}
-              name={node.name}
-              services={props.services}
-            />
-          ) : (
-            <FrameText
-              service={props.services.get(node.service)}
-              entry={node.entry}
-            />
-          )}
+          <NameText
+            name={node.kind === "event" ? node.name : node.entry}
+            process={serviceProcess(
+              props.services.get(
+                node.kind === "event" ? node.from : node.service,
+              ),
+            )}
+          />
           <span className={trail}>
-            {node.kind === "event" ? carrierLabels[node.carrier] : undefined}
+            <span className={note}>
+              {node.kind === "event" ? node.detail : node.summary}
+            </span>
+            {node.kind === "event" ? (
+              <span>{carrierLabels[node.carrier]}</span>
+            ) : undefined}
             {source === undefined
               ? undefined
               : `${shortPath(source.path)}:${source.start}-${source.end}`}
@@ -190,33 +200,6 @@ function Line(props: {
 
 function shortPath(path: string) {
   return path.slice(path.lastIndexOf("/") + 1);
-}
-
-function EventText(props: {
-  from: string;
-  to: string;
-  name: string;
-  services: Map<string, Service>;
-}) {
-  const arrow = useStyles(styles.arrow);
-  const name = useStyles(styles.eventName);
-  return (
-    <>
-      <ActorText id={props.from} service={props.services.get(props.from)} />
-      <span className={arrow}>{"  →  "}</span>
-      <ActorText id={props.to} service={props.services.get(props.to)} />
-      <span className={arrow}>{"   "}</span>
-      <span className={name}>{props.name}</span>
-    </>
-  );
-}
-
-function FrameText(props: { service: Service | undefined; entry: string }) {
-  const entry = useStyles(
-    styles.entry,
-    processText[serviceProcess(props.service)],
-  );
-  return <span className={entry}>{props.entry}</span>;
 }
 
 const styles = {
@@ -274,18 +257,6 @@ const styles = {
     color: colors.gray[7],
     flex: "0 0 auto",
   }),
-  actor: style({
-    fontWeight: 600,
-  }),
-  arrow: style({
-    color: colors.gray[9],
-  }),
-  eventName: style({
-    color: colors.gray[12],
-  }),
-  entry: style({
-    fontWeight: 500,
-  }),
   trail: style({
     marginLeft: spacing.value(6),
     color: colors.gray[10],
@@ -295,6 +266,11 @@ const styles = {
   }),
   marker: style({
     color: colors.accent[11],
+  }),
+  note: style({
+    maxWidth: "64ch",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   }),
   sourceToggle: style(radius.xs, {
     margin: 0,

@@ -7,7 +7,7 @@ import {
   spacing,
   text,
 } from "maui";
-import { ArrowRight, ChevronDown, ChevronRight, Code } from "maui/icons";
+import { ChevronDown, ChevronRight, Code } from "maui/icons";
 import { style, useStyles } from "purse-styles";
 import {
   eventChildren,
@@ -18,12 +18,7 @@ import {
   type Keyed,
   type Service,
 } from "../model/Program.js";
-import {
-  ActorText,
-  processText,
-  serviceProcess,
-  StateChip,
-} from "./badges.tsx";
+import { NameText, serviceProcess, StateChip } from "./badges.tsx";
 import { carrierIcons, carrierLabels } from "./carriers.tsx";
 import { SourceExcerpt } from "./SourceExcerpt.tsx";
 
@@ -36,10 +31,47 @@ export type TreeLevel = "events" | "code" | "source";
 export type Expansion = {
   isExpanded: (key: string) => boolean;
   toggle: (key: string) => void;
+  open: (keys: string[]) => void;
 };
 
 export function sourceKey(key: string) {
   return `${key}#src`;
+}
+
+/**
+ * The keys to open when a node opens: the node, then every node down a
+ * run of single children until it branches. A leaf frame at the end
+ * opens its source too.
+ */
+function chainKeys(item: Keyed, level: TreeLevel): string[] {
+  const keys = [item.key];
+  let current = item;
+  for (;;) {
+    const children = visibleChildren(current.node, current.key, level);
+    if (children.length === 0) {
+      if (current.node.kind === "frame" && current.node.source !== undefined) {
+        keys.push(sourceKey(current.key));
+      }
+      return keys;
+    }
+    const only = children[0];
+    if (children.length !== 1 || only === undefined) return keys;
+    keys.push(only.key);
+    current = only;
+  }
+}
+
+/** Collapse when open; otherwise open the node and walk its single-child chain. */
+export function toggleChain(
+  expansion: Expansion,
+  item: Keyed,
+  level: TreeLevel,
+) {
+  if (expansion.isExpanded(item.key)) {
+    expansion.toggle(item.key);
+    return;
+  }
+  expansion.open(chainKeys(item, level));
 }
 
 function visibleChildren(
@@ -107,7 +139,6 @@ function EventRow(props: {
   const row = useStyles(styles.row, canOpen ? styles.rowClickable : undefined);
   const rowButton = useStyles(styles.rowButton);
   const chevron = useStyles(styles.chevron);
-  const arrow = useStyles(styles.arrow);
   const name = useStyles(styles.eventName);
   const detail = useStyles(styles.detail);
   const carrier = useStyles(styles.carrier);
@@ -121,7 +152,9 @@ function EventRow(props: {
           className={rowButton}
           disabled={!canOpen}
           aria-expanded={canOpen ? open : undefined}
-          onClick={() => expansion.toggle(nodeKey)}
+          onClick={() =>
+            toggleChain(expansion, { key: nodeKey, node }, props.level)
+          }
         >
           <span className={chevron} aria-hidden="true">
             {canOpen ? (
@@ -132,12 +165,12 @@ function EventRow(props: {
               )
             ) : undefined}
           </span>
-          <ActorText service={props.services.get(node.from)} id={node.from} />
-          <span className={arrow} aria-hidden="true">
-            <ArrowRight size="xs" />
+          <span className={name}>
+            <NameText
+              name={node.name}
+              process={serviceProcess(props.services.get(node.from))}
+            />
           </span>
-          <ActorText service={props.services.get(node.to)} id={node.to} />
-          <span className={name}>{node.name}</span>
           {node.detail === undefined ? undefined : (
             <span className={detail}>{node.detail}</span>
           )}
@@ -185,7 +218,7 @@ function FrameRow(props: {
   const row = useStyles(styles.row, canOpen ? styles.rowClickable : undefined);
   const rowButton = useStyles(styles.rowButton);
   const chevron = useStyles(styles.chevron);
-  const entry = useStyles(styles.entry, processText[serviceProcess(service)]);
+  const entry = useStyles(styles.entry);
   const summary = useStyles(styles.detail);
   const stateList = useStyles(styles.stateList);
   const sourceButton = useStyles(
@@ -203,7 +236,11 @@ function FrameRow(props: {
           className={rowButton}
           disabled={!canOpen}
           aria-expanded={canOpen ? primaryOpen : undefined}
-          onClick={() => expansion.toggle(primaryKey)}
+          onClick={() =>
+            hasChildren
+              ? toggleChain(expansion, { key: nodeKey, node }, props.level)
+              : expansion.toggle(primaryKey)
+          }
         >
           <span className={chevron} aria-hidden="true">
             {canOpen ? (
@@ -214,7 +251,9 @@ function FrameRow(props: {
               )
             ) : undefined}
           </span>
-          <span className={entry}>{node.entry}</span>
+          <span className={entry}>
+            <NameText name={node.entry} process={serviceProcess(service)} />
+          </span>
           {node.summary === undefined ? undefined : (
             <span className={summary}>{node.summary}</span>
           )}
@@ -312,10 +351,6 @@ const styles = {
     justifyContent: "center",
     color: colors.gray[10],
     flex: "0 0 auto",
-  }),
-  arrow: style({
-    display: "inline-flex",
-    color: colors.gray[9],
   }),
   eventName: style(
     text({ size: "sm", fontWeight: 500, color: "highContrast" }),

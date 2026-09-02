@@ -8,7 +8,7 @@ import {
   spacing,
   text,
 } from "maui";
-import { ArrowRight, ChevronRight } from "maui/icons";
+import { ChevronRight } from "maui/icons";
 import { style, useStyles } from "purse-styles";
 import {
   keyed,
@@ -17,12 +17,7 @@ import {
   type Keyed,
   type Service,
 } from "../model/Program.js";
-import {
-  ActorText,
-  processText,
-  serviceProcess,
-  StateChip,
-} from "./badges.tsx";
+import { NameText, serviceProcess, StateChip } from "./badges.tsx";
 import { carrierLabels } from "./carriers.tsx";
 import { SourceExcerpt } from "./SourceExcerpt.tsx";
 
@@ -105,7 +100,6 @@ function NodePane(props: {
 }) {
   const { node, key } = props.entry;
   const meta = useStyles(styles.meta);
-  const arrow = useStyles(styles.arrow);
   const stateList = useStyles(styles.stateList);
   const sectionLabel = useStyles(styles.sectionLabel);
   const sourceBlock = useStyles(styles.sourceBlock);
@@ -119,11 +113,6 @@ function NodePane(props: {
     >
       {node.kind === "event" ? (
         <div className={meta}>
-          <ActorText service={props.services.get(node.from)} id={node.from} />
-          <span className={arrow} aria-hidden="true">
-            <ArrowRight size="xs" />
-          </span>
-          <ActorText service={props.services.get(node.to)} id={node.to} />
           <Badge>{carrierLabels[node.carrier]}</Badge>
         </div>
       ) : (
@@ -248,10 +237,9 @@ function PaneRow(props: {
   );
   const service =
     node.kind === "frame" ? props.services.get(node.service) : undefined;
-  const entry = useStyles(styles.entry, processText[serviceProcess(service)]);
+  const entry = useStyles(styles.entry);
   const name = useStyles(styles.eventName);
   const summary = useStyles(styles.summary);
-  const arrow = useStyles(styles.arrow);
   const chevron = useStyles(styles.chevron);
   return (
     <button
@@ -263,19 +251,21 @@ function PaneRow(props: {
     >
       {node.kind === "event" ? (
         <>
-          <ActorText service={props.services.get(node.from)} id={node.from} />
-          <span className={arrow} aria-hidden="true">
-            <ArrowRight size="xs" />
+          <span className={name}>
+            <NameText
+              name={node.name}
+              process={serviceProcess(props.services.get(node.from))}
+            />
           </span>
-          <ActorText service={props.services.get(node.to)} id={node.to} />
-          <span className={name}>{node.name}</span>
           {node.detail === undefined ? undefined : (
             <span className={summary}>{node.detail}</span>
           )}
         </>
       ) : (
         <>
-          <span className={entry}>{node.entry}</span>
+          <span className={entry}>
+            <NameText name={node.entry} process={serviceProcess(service)} />
+          </span>
           {node.summary === undefined ? undefined : (
             <span className={summary}>{node.summary}</span>
           )}
@@ -368,10 +358,6 @@ const styles = {
     },
   ),
   meta: style(flex({ direction: "row", align: "center", gap: 2, wrap: true })),
-  arrow: style({
-    display: "inline-flex",
-    color: colors.gray[9],
-  }),
   stateList: style(
     flex({ direction: "row", align: "center", gap: 1, wrap: true }),
     {

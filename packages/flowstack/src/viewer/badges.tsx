@@ -27,7 +27,7 @@ export function ProcessBadge(props: { process: ProcessName }) {
   return <Badge className={badge}>{processLabels[props.process]}</Badge>;
 }
 
-export const processText = {
+const processText = {
   renderer: style({ color: colors.blue[11] }),
   preload: style({ color: colors.violet[11] }),
   main: style({ color: colors.grass[11] }),
@@ -53,6 +53,37 @@ export function ActorText(props: { service: Service | undefined; id: string }) {
 
 const actorStyle = style({
   fontWeight: 600,
+});
+
+const classPattern = /^([A-Za-z_$][\w$]*)(\..*)$/;
+
+/**
+ * A frame or event name with its class segment in the owning service's
+ * colour: `sessions` in `sessions.prompt`. Names without a class take the
+ * colour whole.
+ */
+export function NameText(props: { name: string; process: ProcessName }) {
+  const coloured = useStyles(nameStyle, processText[props.process]);
+  const rest = useStyles(nameRest);
+  const match = classPattern.exec(props.name);
+  if (match === null || match[1] === undefined || match[2] === undefined) {
+    return <span className={coloured}>{props.name}</span>;
+  }
+  return (
+    <span className={rest}>
+      <span className={coloured}>{match[1]}</span>
+      {match[2]}
+    </span>
+  );
+}
+
+const nameStyle = style({
+  fontWeight: 600,
+});
+
+const nameRest = style({
+  color: colors.gray[12],
+  fontWeight: 500,
 });
 
 export function StateChip(props: { field: StateField }) {

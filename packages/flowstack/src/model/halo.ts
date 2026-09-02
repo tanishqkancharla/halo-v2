@@ -13,7 +13,7 @@ const services: Service[] = [
     id: "inference",
     name: "Inference provider",
     process: "outside",
-    description: "The model API Pi calls for completions.",
+    description: "The Codex responses API at chatgpt.com/backend-api.",
     state: [],
     composes: [],
   },
@@ -33,7 +33,9 @@ const services: Service[] = [
       "The Chromium window: React UI, the oRPC client, and the preload bridge.",
     state: [],
     composes: [
+      "editor",
       "composer",
+      "sessionView",
       "agentSessionHook",
       "sessionState",
       "apiProvider",
@@ -204,13 +206,13 @@ const services: Service[] = [
     id: "piAgentSession",
     name: "Pi AgentSession",
     process: "main",
-    description: "The Pi coding agent loop, with Halo's custom tools.",
+    description:
+      "pi-coding-agent: owns the Agent, queues steering input, persists messages.",
     state: [
-      { name: "messages", type: "AgentMessage[]" },
       { name: "isStreaming", type: "boolean" },
-      { name: "sessions/<id>.jsonl", type: "transcript on disk" },
+      { name: "steeringQueue", type: "string[]" },
     ],
-    composes: [],
+    composes: ["piAgent", "sessionManager"],
   },
   {
     id: "stream",
@@ -277,11 +279,88 @@ const services: Service[] = [
     ],
     composes: [],
   },
+  {
+    id: "shell",
+    name: "Shell",
+    process: "outside",
+    description: "A child shell the bash tool spawns in the workspace.",
+    state: [],
+    composes: [],
+  },
+  {
+    id: "editor",
+    name: "Editor",
+    process: "renderer",
+    description: "TipTap editor inside the composer; Cmd/Ctrl+Enter submits.",
+    state: [],
+    composes: [],
+  },
+  {
+    id: "sessionView",
+    name: "SessionView",
+    process: "renderer",
+    description:
+      "Turns AgentSessionState into transcript rows: user bubbles, tool activity, streamed markdown.",
+    state: [],
+    composes: [],
+  },
+  {
+    id: "piAgent",
+    name: "Pi Agent",
+    process: "main",
+    description:
+      "pi-agent-core: the agent loop that calls the model, runs tools, and emits AgentEvents.",
+    state: [
+      { name: "messages", type: "AgentMessage[]" },
+      { name: "streamingMessage", type: "AssistantMessage | undefined" },
+      { name: "pendingToolCalls", type: "Set<string>" },
+    ],
+    composes: ["modelRuntime", "codingTools"],
+  },
+  {
+    id: "modelRuntime",
+    name: "ModelRuntime",
+    process: "main",
+    description:
+      "Resolves the model and its auth, then delegates to the provider.",
+    state: [{ name: "models.json", type: "model catalog on disk" }],
+    composes: ["codexProvider"],
+  },
+  {
+    id: "codexProvider",
+    name: "openai-codex-responses",
+    process: "main",
+    description:
+      "pi-ai provider: POSTs to the Codex responses API and parses the SSE stream.",
+    state: [],
+    composes: [],
+  },
+  {
+    id: "sessionManager",
+    name: "Pi SessionManager",
+    process: "main",
+    description: "The session transcript as a jsonl tree on disk.",
+    state: [
+      { name: "byId", type: "Map<string, SessionEntry>" },
+      { name: "leafId", type: "string" },
+    ],
+    composes: [],
+  },
+  {
+    id: "codingTools",
+    name: "coding tools",
+    process: "main",
+    description:
+      "read, edit, write, patch, bash, and exec, each behind ToolRuntime.authorize.",
+    state: [],
+    composes: ["filesystemService", "toolRuntime"],
+  },
 ];
 
 const electron = "apps/electron/src";
 const server = "packages/server/src";
 const shared = "packages/shared/src";
+const pi = "node_modules/@earendil-works";
 
 export const haloProgram: Program = {
   name: "Halo",
@@ -291,158 +370,106 @@ export const haloProgram: Program = {
       id: "prompt",
       title: "Send a prompt",
       description:
-        "The user presses Enter in the composer. The text crosses into the main process, Pi calls the model, and events stream back into the transcript.",
+        "The user presses Cmd/Ctrl+Enter in the composer. The text crosses into the main process, Pi runs the agent loop against the model and its tools, and every event streams back into the transcript while the prompt call is still open.",
       children: [
         event({
           from: "human",
           to: "renderer",
-          name: "types into the composer",
+          name: "Cmd/Ctrl+Enter in the composer",
           carrier: "ui",
-          detail: "text: string",
+          detail: "plain Enter is a newline",
           children: [
             frame({
-              service: "composer",
-              entry: "Composer.submit",
-              summary:
-                "Trims the draft, clears it, and restores it when the prompt fails.",
+              service: "editor",
+              entry: "Editor.handleKeyDown",
+              summary: "Enter with meta or ctrl calls onSubmit.",
               source: {
-                path: `${electron}/renderer/main/agent/AgentPane.tsx`,
-                start: 119,
-                end: 127,
+                path: `${electron}/renderer/main/agent/Editor.tsx`,
+                start: 93,
+                end: 100,
               },
               children: [
                 frame({
-                  service: "agentSessionHook",
-                  entry: "useAgentSession.prompt",
+                  service: "composer",
+                  entry: "Composer.submit",
                   summary:
-                    "Needs readySessionId. Calls sessions.prompt, then invalidates the sessions query.",
+                    "Trims the draft, clears it, and restores it when the prompt fails.",
                   source: {
-                    path: `${electron}/renderer/main/agent/useAgentSession.ts`,
-                    start: 89,
-                    end: 118,
+                    path: `${electron}/renderer/main/agent/AgentPane.tsx`,
+                    start: 119,
+                    end: 126,
                   },
                   children: [
-                    event({
-                      from: "renderer",
-                      to: "main",
-                      name: "sessions.prompt",
-                      carrier: "rpc",
-                      detail: "{ sessionId, text } over MessagePort",
+                    frame({
+                      service: "agentSessionHook",
+                      entry: "useAgentSession.prompt",
+                      summary:
+                        "Needs readySessionId. Calls sessions.prompt and waits for the whole agent run; the reply streams in through the sessions.events subscription that the mount effect opened.",
+                      source: {
+                        path: `${electron}/renderer/main/agent/useAgentSession.ts`,
+                        start: 89,
+                        end: 118,
+                      },
                       children: [
-                        frame({
-                          service: "rpcHandler",
-                          entry: "RPCHandler.upgrade(port1)",
-                          summary:
-                            "Dispatches to haloRpcRouter with haloServer.context; logs oRPC errors.",
-                          source: {
-                            path: `${electron}/main/main.ts`,
-                            start: 211,
-                            end: 236,
-                          },
+                        event({
+                          from: "renderer",
+                          to: "main",
+                          name: "sessions.prompt",
+                          carrier: "rpc",
+                          detail:
+                            "{ sessionId, text } over the MessagePort; resolves when the agent run ends",
+                          children: [promptHandling()],
+                        }),
+                        event({
+                          from: "main",
+                          to: "renderer",
+                          name: "sessions.prompt resolves",
+                          carrier: "rpc",
+                          detail: "void, after agent_end",
                           children: [
                             frame({
-                              service: "sessionsRouter",
-                              entry: "sessionsRouter.prompt",
+                              service: "agentSessionHook",
+                              entry:
+                                "queryClient.invalidateQueries(['sessions'])",
                               summary:
-                                "Opens the session and forwards the text.",
+                                "Refetches every sessions query so the sidebar picks up the new title.",
                               source: {
-                                path: `${server}/sessions/sessionsRouter.ts`,
-                                start: 51,
-                                end: 61,
+                                path: `${electron}/renderer/main/agent/useAgentSession.ts`,
+                                start: 114,
+                                end: 117,
                               },
                               children: [
-                                frame({
-                                  service: "sessionRegistry",
-                                  entry: "SessionRegistry.open",
-                                  summary:
-                                    "Returns the live session, or opens and registers it once, even under concurrent calls.",
-                                  source: {
-                                    path: `${server}/sessions/SessionRegistry.ts`,
-                                    start: 31,
-                                    end: 42,
-                                  },
-                                }),
-                                frame({
-                                  service: "haloAgentSession",
-                                  entry: "HaloAgentSession.prompt",
-                                  summary:
-                                    "Rejects empty text. piSession.prompt with streamingBehavior: steer.",
-                                  source: {
-                                    path: `${server}/agent/HaloAgentSession.ts`,
-                                    start: 202,
-                                    end: 214,
-                                  },
+                                event({
+                                  from: "renderer",
+                                  to: "main",
+                                  name: "sessions.list",
+                                  carrier: "rpc",
                                   children: [
                                     frame({
-                                      service: "piAgentSession",
-                                      entry: "AgentSession.prompt",
-                                      summary:
-                                        "Appends the user message and runs the agent loop with Halo's file, bash, and exec tools.",
+                                      service: "sessionsRouter",
+                                      entry: "sessionsRouter.list",
+                                      source: {
+                                        path: `${server}/sessions/sessionsRouter.ts`,
+                                        start: 18,
+                                        end: 22,
+                                      },
                                       children: [
-                                        event({
-                                          from: "main",
-                                          to: "inference",
-                                          name: "POST /v1/messages",
-                                          carrier: "network",
-                                          detail: "streamed completion",
-                                        }),
-                                        event({
-                                          from: "inference",
-                                          to: "main",
-                                          name: "streams tokens and tool calls",
-                                          carrier: "network",
-                                          detail: "SSE chunks",
+                                        frame({
+                                          service: "haloAgentSession",
+                                          entry: "HaloAgentSession.list",
+                                          summary:
+                                            "SessionManager.list over the session dir; title from the name or first message.",
+                                          source: {
+                                            path: `${server}/agent/HaloAgentSession.ts`,
+                                            start: 126,
+                                            end: 136,
+                                          },
                                           children: [
-                                            frame({
-                                              service: "piAgentSession",
-                                              entry:
-                                                "AgentSession (agent loop)",
-                                              summary:
-                                                "Emits message_start/update/end and tool events as the model streams.",
-                                              children: [
-                                                event({
-                                                  from: "main",
-                                                  to: "disk",
-                                                  name: "append .pi/agent/sessions/<id>.jsonl",
-                                                  carrier: "filesystem",
-                                                }),
-                                                event({
-                                                  from: "piAgentSession",
-                                                  to: "haloAgentSession",
-                                                  name: "piSession.subscribe → eventStream.append",
-                                                  carrier: "memory",
-                                                  detail: "AgentSessionEvent",
-                                                  children: [
-                                                    frame({
-                                                      service:
-                                                        "haloAgentSession",
-                                                      entry:
-                                                        "HaloAgentSession (constructor subscription)",
-                                                      summary:
-                                                        "Republishes every Pi event on the Halo stream.",
-                                                      source: {
-                                                        path: `${server}/agent/HaloAgentSession.ts`,
-                                                        start: 83,
-                                                        end: 87,
-                                                      },
-                                                      children: [
-                                                        frame({
-                                                          service: "stream",
-                                                          entry:
-                                                            "Stream.consume(signal)",
-                                                          summary:
-                                                            "Buffers appended values into the async generator that sessions.events returned.",
-                                                          source: {
-                                                            path: `${server}/Stream.ts`,
-                                                            start: 94,
-                                                            end: 134,
-                                                          },
-                                                        }),
-                                                      ],
-                                                    }),
-                                                  ],
-                                                }),
-                                              ],
+                                            event({
+                                              from: "main",
+                                              to: "disk",
+                                              name: "scan .pi/agent/sessions/*.jsonl",
+                                              carrier: "filesystem",
                                             }),
                                           ],
                                         }),
@@ -450,39 +477,26 @@ export const haloProgram: Program = {
                                     }),
                                   ],
                                 }),
+                                event({
+                                  from: "main",
+                                  to: "renderer",
+                                  name: "SessionSummary[]",
+                                  carrier: "rpc",
+                                  children: [
+                                    frame({
+                                      service: "apiProvider",
+                                      entry: "useSessionsQuery",
+                                      summary:
+                                        "The sidebar re-renders with the new list.",
+                                      source: {
+                                        path: `${electron}/renderer/api/ApiProvider.tsx`,
+                                        start: 117,
+                                        end: 128,
+                                      },
+                                    }),
+                                  ],
+                                }),
                               ],
-                            }),
-                          ],
-                        }),
-                      ],
-                    }),
-                    event({
-                      from: "main",
-                      to: "renderer",
-                      name: "sessions.events yields AgentSessionEvent",
-                      carrier: "rpc",
-                      detail: "async iterator over MessagePort",
-                      children: [
-                        frame({
-                          service: "agentSessionHook",
-                          entry: "useAgentSession effect: for await",
-                          summary: "Applies each event to React state.",
-                          source: {
-                            path: `${electron}/renderer/main/agent/useAgentSession.ts`,
-                            start: 51,
-                            end: 87,
-                          },
-                          children: [
-                            frame({
-                              service: "sessionState",
-                              entry: "applyAgentSessionEvent",
-                              summary:
-                                "Folds message_start/update/end and agent_start/end into AgentSessionState.",
-                              source: {
-                                path: `${shared}/AgentSessionState.ts`,
-                                start: 58,
-                                end: 122,
-                              },
                             }),
                           ],
                         }),
@@ -494,13 +508,457 @@ export const haloProgram: Program = {
             }),
           ],
         }),
-        event({
-          from: "renderer",
-          to: "human",
-          name: "streams the reply into the transcript",
-          carrier: "ui",
-        }),
       ],
     },
   ],
 };
+
+function promptHandling() {
+  return frame({
+    service: "rpcHandler",
+    entry: "RPCHandler.upgrade(port1)",
+    summary:
+      "Dispatches to haloRpcRouter with haloServer.context; logs oRPC errors.",
+    source: { path: `${electron}/main/main.ts`, start: 211, end: 235 },
+    children: [
+      frame({
+        service: "sessionsRouter",
+        entry: "sessionsRouter.prompt",
+        summary:
+          "Logs { event: 'prompt', sessionId, textLength }, opens the session, forwards the text.",
+        source: {
+          path: `${server}/sessions/sessionsRouter.ts`,
+          start: 51,
+          end: 60,
+        },
+        children: [
+          frame({
+            service: "sessionRegistry",
+            entry: "SessionRegistry.open",
+            summary:
+              "Returns the live session. The events subscription already opened it, so no disk read here.",
+            source: {
+              path: `${server}/sessions/SessionRegistry.ts`,
+              start: 31,
+              end: 41,
+            },
+          }),
+          frame({
+            service: "haloAgentSession",
+            entry: "HaloAgentSession.prompt",
+            summary:
+              "Rejects empty text. piSession.prompt with streamingBehavior: steer.",
+            source: {
+              path: `${server}/agent/HaloAgentSession.ts`,
+              start: 202,
+              end: 214,
+            },
+            children: [
+              frame({
+                service: "piAgentSession",
+                entry: "AgentSession.prompt",
+                summary:
+                  "Expands templates, checks the model's auth, builds the user message. If a run is already streaming it queues the text as steering and returns.",
+                source: {
+                  path: `${pi}/pi-coding-agent/dist/core/agent-session.js`,
+                  start: 792,
+                  end: 916,
+                },
+                children: [
+                  frame({
+                    service: "piAgentSession",
+                    entry: "AgentSession._runAgentPrompt",
+                    summary:
+                      "agent.prompt, then agent.continue while retries, compaction, or queued input remain.",
+                    source: {
+                      path: `${pi}/pi-coding-agent/dist/core/agent-session.js`,
+                      start: 744,
+                      end: 756,
+                    },
+                    children: [
+                      frame({
+                        service: "piAgent",
+                        entry: "Agent.prompt",
+                        source: {
+                          path: `${pi}/pi-agent-core/dist/agent.js`,
+                          start: 221,
+                          end: 267,
+                        },
+                        children: [
+                          frame({
+                            service: "piAgent",
+                            entry: "runAgentLoop",
+                            summary:
+                              "Emits agent_start and turn_start, then the user message_start/message_end, then runs turns until the model stops asking for tools.",
+                            source: {
+                              path: `${pi}/pi-agent-core/dist/agent-loop.js`,
+                              start: 43,
+                              end: 56,
+                            },
+                            children: [
+                              agentEventFanout(
+                                "agent_start, turn_start, user message_start/message_end",
+                              ),
+                              frame({
+                                service: "piAgent",
+                                entry: "runLoop",
+                                summary:
+                                  "One turn: stream the assistant reply, run its tool calls, repeat.",
+                                source: {
+                                  path: `${pi}/pi-agent-core/dist/agent-loop.js`,
+                                  start: 78,
+                                  end: 172,
+                                },
+                                children: [
+                                  frame({
+                                    service: "piAgent",
+                                    entry: "streamAssistantResponse",
+                                    summary:
+                                      "convertToLlm, then streamFn(model, context). Maps provider deltas to message_start/update/end.",
+                                    source: {
+                                      path: `${pi}/pi-agent-core/dist/agent-loop.js`,
+                                      start: 178,
+                                      end: 254,
+                                    },
+                                    children: [
+                                      frame({
+                                        service: "modelRuntime",
+                                        entry: "ModelRuntime.streamSimple",
+                                        summary:
+                                          "Prepares model and auth, hands off to the provider.",
+                                        source: {
+                                          path: `${pi}/pi-coding-agent/dist/core/model-runtime.js`,
+                                          start: 343,
+                                          end: 347,
+                                        },
+                                        children: [
+                                          frame({
+                                            service: "codexProvider",
+                                            entry:
+                                              "openai-codex-responses.stream",
+                                            summary:
+                                              "Builds the request, retries on transient errors, prefers WebSocket, falls back to SSE.",
+                                            source: {
+                                              path: `${pi}/pi-ai/dist/api/openai-codex-responses.js`,
+                                              start: 262,
+                                              end: 285,
+                                            },
+                                            children: [
+                                              event({
+                                                from: "main",
+                                                to: "inference",
+                                                name: "POST /codex/responses",
+                                                carrier: "network",
+                                                detail:
+                                                  "Bearer OAuth token, accept: text/event-stream",
+                                              }),
+                                              event({
+                                                from: "inference",
+                                                to: "main",
+                                                name: "SSE response deltas",
+                                                carrier: "network",
+                                                detail:
+                                                  "text and tool-call deltas until done",
+                                                children: [
+                                                  frame({
+                                                    service: "codexProvider",
+                                                    entry:
+                                                      "processResponsesStream",
+                                                    summary:
+                                                      "Parses each SSE event into AssistantMessageEvents.",
+                                                  }),
+                                                  agentEventFanout(
+                                                    "assistant message_start, message_update per delta, message_end",
+                                                  ),
+                                                ],
+                                              }),
+                                            ],
+                                          }),
+                                        ],
+                                      }),
+                                    ],
+                                  }),
+                                  frame({
+                                    service: "piAgent",
+                                    entry: "executeToolCalls",
+                                    summary:
+                                      "Only when the assistant message has toolCall parts. Runs each tool, emits tool_execution_start/update/end, appends a toolResult message, then the next turn calls the model again.",
+                                    source: {
+                                      path: `${pi}/pi-agent-core/dist/agent-loop.js`,
+                                      start: 287,
+                                      end: 293,
+                                    },
+                                    children: [
+                                      frame({
+                                        service: "codingTools",
+                                        entry: "withAuthority(tool).execute",
+                                        summary:
+                                          "ToolRuntime.authorize against the static workspace authority, then the tool.",
+                                        source: {
+                                          path: `${server}/agent/tools/codingTools.ts`,
+                                          start: 81,
+                                          end: 92,
+                                        },
+                                        children: [
+                                          frame({
+                                            service: "filesystemService",
+                                            entry:
+                                              "FilesystemService.readFile / writeFile",
+                                            summary:
+                                              "read, edit, write, and patch go through here.",
+                                            source: {
+                                              path: `${server}/filesystem/FilesystemService.ts`,
+                                              start: 94,
+                                              end: 101,
+                                            },
+                                            children: [
+                                              event({
+                                                from: "main",
+                                                to: "disk",
+                                                name: "read or write workspace files",
+                                                carrier: "filesystem",
+                                                children: [fileWatchFanout()],
+                                              }),
+                                            ],
+                                          }),
+                                          event({
+                                            from: "main",
+                                            to: "shell",
+                                            name: "bash: spawn a shell in the workspace",
+                                            carrier: "process",
+                                            detail: "Pi createBashTool(cwd)",
+                                          }),
+                                          frame({
+                                            service: "toolRuntime",
+                                            entry: "ToolRuntime.executeCode",
+                                            summary:
+                                              "exec: runs the model's code in the QuickJS Executor with the workspace plugins.",
+                                            source: {
+                                              path: `${server}/agent/runtime/ToolRuntime.ts`,
+                                              start: 360,
+                                              end: 393,
+                                            },
+                                          }),
+                                        ],
+                                      }),
+                                      agentEventFanout(
+                                        "tool_execution_start/update/end, toolResult message_start/message_end",
+                                      ),
+                                    ],
+                                  }),
+                                  agentEventFanout(
+                                    "turn_end; agent_end after the last turn",
+                                  ),
+                                ],
+                              }),
+                            ],
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+/** Every AgentEvent takes this path from the Pi agent to the transcript. */
+function agentEventFanout(which: string) {
+  return event({
+    from: "piAgent",
+    to: "piAgentSession",
+    name: "AgentEvent",
+    carrier: "memory",
+    detail: which,
+    children: [
+      frame({
+        service: "piAgentSession",
+        entry: "AgentSession._handleAgentEvent",
+        summary:
+          "Runs extension hooks, emits to subscribers, and persists durable messages.",
+        source: {
+          path: `${pi}/pi-coding-agent/dist/core/agent-session.js`,
+          start: 327,
+          end: 386,
+        },
+        children: [
+          frame({
+            service: "sessionManager",
+            entry: "SessionManager.appendMessage",
+            summary:
+              "On message_end for user, assistant, and toolResult messages.",
+            source: {
+              path: `${pi}/pi-coding-agent/dist/core/session-manager.js`,
+              start: 766,
+              end: 775,
+            },
+            children: [
+              event({
+                from: "main",
+                to: "disk",
+                name: "append .pi/agent/sessions/<timestamp>_<id>.jsonl",
+                carrier: "filesystem",
+              }),
+            ],
+          }),
+          event({
+            from: "piAgentSession",
+            to: "haloAgentSession",
+            name: "piSession.subscribe callback",
+            carrier: "memory",
+            detail: "AgentSessionEvent",
+            children: [
+              frame({
+                service: "haloAgentSession",
+                entry: "HaloAgentSession (constructor subscription)",
+                summary: "eventStream.append(event)",
+                source: {
+                  path: `${server}/agent/HaloAgentSession.ts`,
+                  start: 83,
+                  end: 86,
+                },
+                children: [
+                  frame({
+                    service: "stream",
+                    entry: "Stream.consume(signal)",
+                    summary:
+                      "Buffers appended values into the async generator that sessions.events returned when the pane mounted.",
+                    source: {
+                      path: `${server}/Stream.ts`,
+                      start: 94,
+                      end: 133,
+                    },
+                    children: [
+                      event({
+                        from: "main",
+                        to: "renderer",
+                        name: "AgentSessionEvent",
+                        carrier: "rpc",
+                        detail:
+                          "sessions.events async iterator over the MessagePort",
+                        children: [
+                          frame({
+                            service: "agentSessionHook",
+                            entry: "useAgentSession effect: for await",
+                            summary:
+                              "setState(applyAgentSessionEvent(current, event))",
+                            source: {
+                              path: `${electron}/renderer/main/agent/useAgentSession.ts`,
+                              start: 51,
+                              end: 87,
+                            },
+                            children: [
+                              frame({
+                                service: "sessionState",
+                                entry: "applyAgentSessionEvent",
+                                summary:
+                                  "message_start/update/end fold into messages and streamingMessage; agent_start/end flip isWorking. tool_execution_* and turn_* are ignored.",
+                                source: {
+                                  path: `${shared}/AgentSessionState.ts`,
+                                  start: 58,
+                                  end: 121,
+                                },
+                                children: [
+                                  frame({
+                                    service: "sessionView",
+                                    entry: "SessionView → sessionViewItems",
+                                    summary:
+                                      "Rebuilds the transcript rows and scrolls to the bottom.",
+                                    source: {
+                                      path: `${electron}/renderer/main/agent/AgentPane.tsx`,
+                                      start: 164,
+                                      end: 201,
+                                    },
+                                    children: [
+                                      frame({
+                                        service: "sessionView",
+                                        entry: "AssistantMessage",
+                                        summary:
+                                          "Streamdown markdown, animating while part.streaming.",
+                                        source: {
+                                          path: `${electron}/renderer/main/agent/AssistantMessage.tsx`,
+                                          start: 144,
+                                          end: 160,
+                                        },
+                                        children: [
+                                          event({
+                                            from: "renderer",
+                                            to: "human",
+                                            name: "transcript repaints",
+                                            carrier: "ui",
+                                          }),
+                                        ],
+                                      }),
+                                    ],
+                                  }),
+                                ],
+                              }),
+                            ],
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+/** A tool's file write comes back to the sidebar through the watcher. */
+function fileWatchFanout() {
+  return frame({
+    service: "filesystemService",
+    entry: "@parcel/watcher subscription → emitWatchEvents",
+    summary: "watchEventStream.append(batch) for the workspace root.",
+    source: {
+      path: `${server}/filesystem/FilesystemService.ts`,
+      start: 224,
+      end: 246,
+    },
+    children: [
+      frame({
+        service: "workspaceService",
+        entry: "WorkspaceService.handleWatchEvents",
+        summary:
+          "mapFilesystemEventsToTreeEvents, then treeEventStream.append.",
+        source: {
+          path: `${server}/workspace/WorkspaceService.ts`,
+          start: 340,
+          end: 349,
+        },
+        children: [
+          event({
+            from: "main",
+            to: "renderer",
+            name: "WorkspaceTreeEvent[]",
+            carrier: "rpc",
+            detail: "workspace.events async iterator",
+            children: [
+              frame({
+                service: "filesystemSection",
+                entry: "listenWorkspaceTree → setQueryData(workspace-paths)",
+                summary:
+                  "The sidebar tree updates without a full listPaths refetch.",
+                source: {
+                  path: `${electron}/renderer/sidebar/FilesystemSection.tsx`,
+                  start: 136,
+                  end: 143,
+                },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}

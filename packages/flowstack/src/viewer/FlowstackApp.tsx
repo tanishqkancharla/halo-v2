@@ -61,6 +61,12 @@ export function FlowstackApp() {
   );
   const expansion: Expansion = {
     isExpanded: (key) => expanded.has(key),
+    open: (keys) =>
+      setExpanded((current) => {
+        const next = new Set(current);
+        for (const key of keys) next.add(key);
+        return next;
+      }),
     toggle: (key) =>
       setExpanded((current) => {
         const next = new Set(current);
