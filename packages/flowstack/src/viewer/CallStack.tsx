@@ -116,7 +116,7 @@ function Line(props: {
       >
         <span className={lineButton}>
           <span className={gutter} aria-hidden="true">
-            {canOpen ? (open ? "▾" : "▸") : " "}
+            {canOpen ? (open ? "▼" : "▶") : " "}
           </span>
           <span className={glyph} aria-hidden="true">
             {props.glyph}
@@ -216,7 +216,7 @@ const styles = {
     display: "inline-block",
     width: "2ch",
     textAlign: "center",
-    fontSize: "16px",
+    fontSize: "9px",
     color: colors.gray[9],
     flex: "0 0 auto",
   }),
