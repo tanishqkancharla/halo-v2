@@ -1,6 +1,6 @@
 ---
 name: code-walkthrough
-description: Write a markdown walkthrough of code that already landed, store it in a temp directory, and serve it with tkstack. Use when the user asks for a walkthrough, explanation, tour, or review of existing changes rather than a plan for new work.
+description: Write a markdown walkthrough of code that already landed, store it in a temp directory, and serve it with tkstack.
 ---
 
 # Walk through landed code
@@ -110,6 +110,7 @@ Put a `#` comment on a stack line when the symbol name is not enough: why the ca
 The input type is the current `ImportantInput`:
 
 ```12:20:path/to/types.ts
+
 ```
 ````
 
@@ -123,15 +124,15 @@ Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter whe
 
 See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md). Short copy:
 
-| Fence info string | Viewer |
-| --- | --- |
-| `mermaid` | Beautiful Mermaid ([Craft](https://agents.craft.do/mermaid)) |
-| `callstack` or `diff` containing `└──` / `├──` | Pierre patch, no file header |
-| `diff` or `diff:path` with a file path | Pierre patch with Pierre’s file header |
-| `diff` with no path | Pierre patch, no file header |
-| `start:end:path` | Pierre file excerpt with Pierre’s file header |
-| `html` | Trusted HTML from this file. tkstack does not sanitize it. |
-| other langs | Maui `CodeBlock` |
+| Fence info string                              | Viewer                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `mermaid`                                      | Beautiful Mermaid ([Craft](https://agents.craft.do/mermaid)) |
+| `callstack` or `diff` containing `└──` / `├──` | Pierre patch, no file header                                 |
+| `diff` or `diff:path` with a file path         | Pierre patch with Pierre’s file header                       |
+| `diff` with no path                            | Pierre patch, no file header                                 |
+| `start:end:path`                               | Pierre file excerpt with Pierre’s file header                |
+| `html`                                         | Trusted HTML from this file. tkstack does not sanitize it.   |
+| other langs                                    | Maui `CodeBlock`                                             |
 
 Walkthroughs are markdown. Curly braces in prose are plain text. See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for MDC `::file` / `::html` / `::diff` forms.
 
