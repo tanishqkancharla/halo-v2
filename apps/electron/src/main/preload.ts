@@ -1,8 +1,24 @@
 import type { LogLevel, LoggerData, LoggerScope } from "@repo/logger";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import { ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
+import { DESKTOP_CHANNELS, type DesktopApi } from "../shared/desktop.js";
+
+const emptyRequest = {};
+
+const desktopApi: DesktopApi = {
+  chooseWorkspace: () =>
+    ipcRenderer.invoke(DESKTOP_CHANNELS.chooseWorkspace, emptyRequest),
+  getAppInfo: () =>
+    ipcRenderer.invoke(DESKTOP_CHANNELS.getAppInfo, emptyRequest),
+  installAppUpdate: () =>
+    ipcRenderer.invoke(DESKTOP_CHANNELS.installAppUpdate, emptyRequest),
+  openExternal: (request) =>
+    ipcRenderer.invoke(DESKTOP_CHANNELS.openExternal, request),
+};
+
+contextBridge.exposeInMainWorld("haloDesktop", desktopApi);
 
 const windowLoaded = new Promise<void>((resolve) => {
   window.addEventListener("load", () => resolve());

@@ -29,6 +29,7 @@ import { workspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
 import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
 import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
+import { registerDesktopApi } from "./DesktopApi.js";
 import { FilesystemService } from "./filesystem/FilesystemService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -143,6 +144,10 @@ app.whenReady().then(async () => {
     }
   }
   registerLogBridge();
+  registerDesktopApi({
+    workspace: workspaceService,
+    getWindow: () => mainWindow,
+  });
   registerRpcBridge();
   const listening = await listenHaloRpcHttp({
     context: {
