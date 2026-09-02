@@ -43,7 +43,7 @@ export function sourceKey(key: string) {
  * run of single children until it branches. A leaf frame at the end
  * opens its source too.
  */
-function chainKeys(item: Keyed, level: TreeLevel): string[] {
+export function chainKeys(item: Keyed, level: TreeLevel): string[] {
   const keys = [item.key];
   let current = item;
   for (;;) {

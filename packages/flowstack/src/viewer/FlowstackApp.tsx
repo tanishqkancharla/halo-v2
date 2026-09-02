@@ -32,6 +32,7 @@ import { MermaidBlock } from "./MermaidBlock.tsx";
 import { FlowGraph } from "./FlowGraph.tsx";
 import { PaneStack } from "./PaneStack.tsx";
 import { CallStack } from "./CallStack.tsx";
+import { StackGraph } from "./StackGraph.tsx";
 import {
   FlowTree,
   sourceKey,
@@ -40,7 +41,13 @@ import {
 } from "./FlowTree.tsx";
 
 type Selection = { kind: "map" } | { kind: "flow"; id: string };
-type FlowView = "tree" | "stack" | "panes" | "graph" | "sequence";
+type FlowView =
+  | "stackGraph"
+  | "tree"
+  | "stack"
+  | "panes"
+  | "graph"
+  | "sequence";
 
 const program = haloProgram;
 const services = new Map(
@@ -54,11 +61,9 @@ export function FlowstackApp() {
       ? { kind: "map" }
       : { kind: "flow", id: firstFlow.id },
   );
-  const [view, setView] = useState<FlowView>("tree");
-  const [level, setLevel] = useState<TreeLevel>("events");
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(program.flows.flatMap((flow) => eventKeys(flow))),
-  );
+  const [view, setView] = useState<FlowView>("stackGraph");
+  const [level, setLevel] = useState<TreeLevel>("code");
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const expansion: Expansion = {
     isExpanded: (key) => expanded.has(key),
     open: (keys) =>
@@ -90,7 +95,8 @@ export function FlowstackApp() {
       ? program.flows.find((flow) => flow.id === selection.id)
       : undefined;
   const fullBleed =
-    selectedFlow !== undefined && (view === "panes" || view === "graph");
+    selectedFlow !== undefined &&
+    (view === "panes" || view === "graph" || view === "stackGraph");
   const main = useStyles(
     styles.main,
     fullBleed ? styles.mainFullBleed : styles.mainPadded,
@@ -181,12 +187,6 @@ export function FlowstackApp() {
   );
 }
 
-function eventKeys(flow: Flow) {
-  return descendants(flow.children, flow.id)
-    .filter(({ node }) => node.kind === "event")
-    .map(({ key }) => key);
-}
-
 function FlowLabel(props: { flow: Flow }) {
   const first = props.flow.children[0];
   const label = useStyles(styles.flowLabel);
@@ -267,6 +267,12 @@ function FlowPage(props: {
     <>
       <span className={toolbarLabel}>View</span>
       <Button
+        variant={view === "stackGraph" ? "default" : "quiet"}
+        onClick={() => props.onViewChange("stackGraph")}
+      >
+        Stack graph
+      </Button>
+      <Button
         variant={view === "tree" ? "default" : "quiet"}
         onClick={() => props.onViewChange("tree")}
       >
@@ -299,21 +305,40 @@ function FlowPage(props: {
     </>
   );
 
-  if (view === "panes" || view === "graph") {
+  if (view === "panes" || view === "graph" || view === "stackGraph") {
     return (
       <div className={panesPage}>
         <div className={panesToolbar}>
           {viewButtons}
-          {view === "graph" ? (
+          {view === "graph" || view === "stackGraph" ? (
             <>
               <span className={toolbarSpacer} />
               {levelButtons(false)}
+              {view === "stackGraph" ? (
+                <>
+                  <span className={toolbarDivider} />
+                  <Button variant="quiet" onClick={props.onExpandAll}>
+                    Expand all
+                  </Button>
+                  <Button variant="quiet" onClick={props.onCollapseAll}>
+                    Collapse all
+                  </Button>
+                </>
+              ) : undefined}
             </>
           ) : undefined}
         </div>
         <div className={panesBody}>
           {view === "panes" ? (
             <PaneStack flow={props.flow} services={props.services} />
+          ) : view === "stackGraph" ? (
+            <StackGraph
+              nodes={props.flow.children}
+              parentKey={props.flow.id}
+              services={props.services}
+              level={graphLevel}
+              expansion={props.expansion}
+            />
           ) : (
             <FlowGraph
               flow={props.flow}

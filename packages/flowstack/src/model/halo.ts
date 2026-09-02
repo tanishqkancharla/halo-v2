@@ -370,7 +370,7 @@ export const haloProgram: Program = {
       id: "prompt",
       title: "Send a prompt",
       description:
-        "The user presses Cmd/Ctrl+Enter in the composer. The text crosses into the main process, Pi runs the agent loop against the model and its tools, and every event streams back into the transcript while the prompt call is still open.",
+        "The user presses Cmd/Ctrl+Enter. The text crosses into the main process over one RPC, Pi starts the agent run, and the call resolves when the run ends. The run itself is the next flow.",
       children: [
         event({
           from: "human",
@@ -510,6 +510,213 @@ export const haloProgram: Program = {
         }),
       ],
     },
+    {
+      id: "agentRun",
+      title: "Agent run (work in progress)",
+      description:
+        "What AgentSession.prompt starts: Pi's agent loop calls the model and its tools, and every AgentEvent streams back through the sessions.events subscription into the transcript.",
+      children: [
+        event({
+          from: "piAgentSession",
+          to: "piAgent",
+          name: "AgentSession._runAgentPrompt",
+          carrier: "memory",
+          detail: "the run sessions.prompt is waiting on",
+          children: [
+            frame({
+              service: "piAgentSession",
+              entry: "AgentSession._runAgentPrompt",
+              summary:
+                "agent.prompt, then agent.continue while retries, compaction, or queued input remain.",
+              source: {
+                path: `${pi}/pi-coding-agent/dist/core/agent-session.js`,
+                start: 744,
+                end: 756,
+              },
+              children: [
+                frame({
+                  service: "piAgent",
+                  entry: "Agent.prompt",
+                  source: {
+                    path: `${pi}/pi-agent-core/dist/agent.js`,
+                    start: 221,
+                    end: 267,
+                  },
+                  children: [
+                    frame({
+                      service: "piAgent",
+                      entry: "runAgentLoop",
+                      summary:
+                        "Emits agent_start and turn_start, then the user message_start/message_end, then runs turns until the model stops asking for tools.",
+                      source: {
+                        path: `${pi}/pi-agent-core/dist/agent-loop.js`,
+                        start: 43,
+                        end: 56,
+                      },
+                      children: [
+                        agentEventFanout(
+                          "agent_start, turn_start, user message_start/message_end",
+                        ),
+                        frame({
+                          service: "piAgent",
+                          entry: "runLoop",
+                          summary:
+                            "One turn: stream the assistant reply, run its tool calls, repeat.",
+                          source: {
+                            path: `${pi}/pi-agent-core/dist/agent-loop.js`,
+                            start: 78,
+                            end: 172,
+                          },
+                          children: [
+                            frame({
+                              service: "piAgent",
+                              entry: "streamAssistantResponse",
+                              summary:
+                                "convertToLlm, then streamFn(model, context). Maps provider deltas to message_start/update/end.",
+                              source: {
+                                path: `${pi}/pi-agent-core/dist/agent-loop.js`,
+                                start: 178,
+                                end: 254,
+                              },
+                              children: [
+                                frame({
+                                  service: "modelRuntime",
+                                  entry: "ModelRuntime.streamSimple",
+                                  summary:
+                                    "Prepares model and auth, hands off to the provider.",
+                                  source: {
+                                    path: `${pi}/pi-coding-agent/dist/core/model-runtime.js`,
+                                    start: 343,
+                                    end: 347,
+                                  },
+                                  children: [
+                                    frame({
+                                      service: "codexProvider",
+                                      entry: "openai-codex-responses.stream",
+                                      summary:
+                                        "Builds the request, retries on transient errors, prefers WebSocket, falls back to SSE.",
+                                      source: {
+                                        path: `${pi}/pi-ai/dist/api/openai-codex-responses.js`,
+                                        start: 262,
+                                        end: 285,
+                                      },
+                                      children: [
+                                        event({
+                                          from: "main",
+                                          to: "inference",
+                                          name: "POST /codex/responses",
+                                          carrier: "network",
+                                          detail:
+                                            "Bearer OAuth token, accept: text/event-stream",
+                                        }),
+                                        event({
+                                          from: "inference",
+                                          to: "main",
+                                          name: "SSE response deltas",
+                                          carrier: "network",
+                                          detail:
+                                            "text and tool-call deltas until done",
+                                          children: [
+                                            frame({
+                                              service: "codexProvider",
+                                              entry: "processResponsesStream",
+                                              summary:
+                                                "Parses each SSE event into AssistantMessageEvents.",
+                                            }),
+                                            agentEventFanout(
+                                              "assistant message_start, message_update per delta, message_end",
+                                            ),
+                                          ],
+                                        }),
+                                      ],
+                                    }),
+                                  ],
+                                }),
+                              ],
+                            }),
+                            frame({
+                              service: "piAgent",
+                              entry: "executeToolCalls",
+                              summary:
+                                "Only when the assistant message has toolCall parts. Runs each tool, emits tool_execution_start/update/end, appends a toolResult message, then the next turn calls the model again.",
+                              source: {
+                                path: `${pi}/pi-agent-core/dist/agent-loop.js`,
+                                start: 287,
+                                end: 293,
+                              },
+                              children: [
+                                frame({
+                                  service: "codingTools",
+                                  entry: "withAuthority(tool).execute",
+                                  summary:
+                                    "ToolRuntime.authorize against the static workspace authority, then the tool.",
+                                  source: {
+                                    path: `${server}/agent/tools/codingTools.ts`,
+                                    start: 81,
+                                    end: 92,
+                                  },
+                                  children: [
+                                    frame({
+                                      service: "filesystemService",
+                                      entry:
+                                        "FilesystemService.readFile / writeFile",
+                                      summary:
+                                        "read, edit, write, and patch go through here.",
+                                      source: {
+                                        path: `${server}/filesystem/FilesystemService.ts`,
+                                        start: 94,
+                                        end: 101,
+                                      },
+                                      children: [
+                                        event({
+                                          from: "main",
+                                          to: "disk",
+                                          name: "read or write workspace files",
+                                          carrier: "filesystem",
+                                          children: [fileWatchFanout()],
+                                        }),
+                                      ],
+                                    }),
+                                    event({
+                                      from: "main",
+                                      to: "shell",
+                                      name: "bash: spawn a shell in the workspace",
+                                      carrier: "process",
+                                      detail: "Pi createBashTool(cwd)",
+                                    }),
+                                    frame({
+                                      service: "toolRuntime",
+                                      entry: "ToolRuntime.executeCode",
+                                      summary:
+                                        "exec: runs the model's code in the QuickJS Executor with the workspace plugins.",
+                                      source: {
+                                        path: `${server}/agent/runtime/ToolRuntime.ts`,
+                                        start: 360,
+                                        end: 393,
+                                      },
+                                    }),
+                                  ],
+                                }),
+                                agentEventFanout(
+                                  "tool_execution_start/update/end, toolResult message_start/message_end",
+                                ),
+                              ],
+                            }),
+                            agentEventFanout(
+                              "turn_end; agent_end after the last turn",
+                            ),
+                          ],
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    },
   ],
 };
 
@@ -558,206 +765,13 @@ function promptHandling() {
                 service: "piAgentSession",
                 entry: "AgentSession.prompt",
                 summary:
-                  "Expands templates, checks the model's auth, builds the user message. If a run is already streaming it queues the text as steering and returns.",
+                  "Expands templates, checks the model's auth, builds the user message, and starts the agent run. The run and its event stream are the next flow.",
                 source: {
                   path: `${pi}/pi-coding-agent/dist/core/agent-session.js`,
                   start: 792,
                   end: 916,
                 },
-                children: [
-                  frame({
-                    service: "piAgentSession",
-                    entry: "AgentSession._runAgentPrompt",
-                    summary:
-                      "agent.prompt, then agent.continue while retries, compaction, or queued input remain.",
-                    source: {
-                      path: `${pi}/pi-coding-agent/dist/core/agent-session.js`,
-                      start: 744,
-                      end: 756,
-                    },
-                    children: [
-                      frame({
-                        service: "piAgent",
-                        entry: "Agent.prompt",
-                        source: {
-                          path: `${pi}/pi-agent-core/dist/agent.js`,
-                          start: 221,
-                          end: 267,
-                        },
-                        children: [
-                          frame({
-                            service: "piAgent",
-                            entry: "runAgentLoop",
-                            summary:
-                              "Emits agent_start and turn_start, then the user message_start/message_end, then runs turns until the model stops asking for tools.",
-                            source: {
-                              path: `${pi}/pi-agent-core/dist/agent-loop.js`,
-                              start: 43,
-                              end: 56,
-                            },
-                            children: [
-                              agentEventFanout(
-                                "agent_start, turn_start, user message_start/message_end",
-                              ),
-                              frame({
-                                service: "piAgent",
-                                entry: "runLoop",
-                                summary:
-                                  "One turn: stream the assistant reply, run its tool calls, repeat.",
-                                source: {
-                                  path: `${pi}/pi-agent-core/dist/agent-loop.js`,
-                                  start: 78,
-                                  end: 172,
-                                },
-                                children: [
-                                  frame({
-                                    service: "piAgent",
-                                    entry: "streamAssistantResponse",
-                                    summary:
-                                      "convertToLlm, then streamFn(model, context). Maps provider deltas to message_start/update/end.",
-                                    source: {
-                                      path: `${pi}/pi-agent-core/dist/agent-loop.js`,
-                                      start: 178,
-                                      end: 254,
-                                    },
-                                    children: [
-                                      frame({
-                                        service: "modelRuntime",
-                                        entry: "ModelRuntime.streamSimple",
-                                        summary:
-                                          "Prepares model and auth, hands off to the provider.",
-                                        source: {
-                                          path: `${pi}/pi-coding-agent/dist/core/model-runtime.js`,
-                                          start: 343,
-                                          end: 347,
-                                        },
-                                        children: [
-                                          frame({
-                                            service: "codexProvider",
-                                            entry:
-                                              "openai-codex-responses.stream",
-                                            summary:
-                                              "Builds the request, retries on transient errors, prefers WebSocket, falls back to SSE.",
-                                            source: {
-                                              path: `${pi}/pi-ai/dist/api/openai-codex-responses.js`,
-                                              start: 262,
-                                              end: 285,
-                                            },
-                                            children: [
-                                              event({
-                                                from: "main",
-                                                to: "inference",
-                                                name: "POST /codex/responses",
-                                                carrier: "network",
-                                                detail:
-                                                  "Bearer OAuth token, accept: text/event-stream",
-                                              }),
-                                              event({
-                                                from: "inference",
-                                                to: "main",
-                                                name: "SSE response deltas",
-                                                carrier: "network",
-                                                detail:
-                                                  "text and tool-call deltas until done",
-                                                children: [
-                                                  frame({
-                                                    service: "codexProvider",
-                                                    entry:
-                                                      "processResponsesStream",
-                                                    summary:
-                                                      "Parses each SSE event into AssistantMessageEvents.",
-                                                  }),
-                                                  agentEventFanout(
-                                                    "assistant message_start, message_update per delta, message_end",
-                                                  ),
-                                                ],
-                                              }),
-                                            ],
-                                          }),
-                                        ],
-                                      }),
-                                    ],
-                                  }),
-                                  frame({
-                                    service: "piAgent",
-                                    entry: "executeToolCalls",
-                                    summary:
-                                      "Only when the assistant message has toolCall parts. Runs each tool, emits tool_execution_start/update/end, appends a toolResult message, then the next turn calls the model again.",
-                                    source: {
-                                      path: `${pi}/pi-agent-core/dist/agent-loop.js`,
-                                      start: 287,
-                                      end: 293,
-                                    },
-                                    children: [
-                                      frame({
-                                        service: "codingTools",
-                                        entry: "withAuthority(tool).execute",
-                                        summary:
-                                          "ToolRuntime.authorize against the static workspace authority, then the tool.",
-                                        source: {
-                                          path: `${server}/agent/tools/codingTools.ts`,
-                                          start: 81,
-                                          end: 92,
-                                        },
-                                        children: [
-                                          frame({
-                                            service: "filesystemService",
-                                            entry:
-                                              "FilesystemService.readFile / writeFile",
-                                            summary:
-                                              "read, edit, write, and patch go through here.",
-                                            source: {
-                                              path: `${server}/filesystem/FilesystemService.ts`,
-                                              start: 94,
-                                              end: 101,
-                                            },
-                                            children: [
-                                              event({
-                                                from: "main",
-                                                to: "disk",
-                                                name: "read or write workspace files",
-                                                carrier: "filesystem",
-                                                children: [fileWatchFanout()],
-                                              }),
-                                            ],
-                                          }),
-                                          event({
-                                            from: "main",
-                                            to: "shell",
-                                            name: "bash: spawn a shell in the workspace",
-                                            carrier: "process",
-                                            detail: "Pi createBashTool(cwd)",
-                                          }),
-                                          frame({
-                                            service: "toolRuntime",
-                                            entry: "ToolRuntime.executeCode",
-                                            summary:
-                                              "exec: runs the model's code in the QuickJS Executor with the workspace plugins.",
-                                            source: {
-                                              path: `${server}/agent/runtime/ToolRuntime.ts`,
-                                              start: 360,
-                                              end: 393,
-                                            },
-                                          }),
-                                        ],
-                                      }),
-                                      agentEventFanout(
-                                        "tool_execution_start/update/end, toolResult message_start/message_end",
-                                      ),
-                                    ],
-                                  }),
-                                  agentEventFanout(
-                                    "turn_end; agent_end after the last turn",
-                                  ),
-                                ],
-                              }),
-                            ],
-                          }),
-                        ],
-                      }),
-                    ],
-                  }),
-                ],
+                children: [],
               }),
             ],
           }),
