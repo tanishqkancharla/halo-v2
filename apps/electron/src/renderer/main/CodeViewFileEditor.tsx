@@ -78,4 +78,20 @@ const hostClass = style({
   minWidth: 0,
   minHeight: "100%",
   height: "100%",
+  display: "flex",
+  flexDirection: "column",
+  "& > div": {
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: "100%",
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+  },
+  "& > div > *": {
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: "100%",
+    height: "100%",
+  },
 });
