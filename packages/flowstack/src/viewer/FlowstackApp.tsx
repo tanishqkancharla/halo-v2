@@ -29,7 +29,8 @@ import {
 import { ProcessBadge, StateChip } from "./badges.tsx";
 import { carrierIcons, carrierLabels } from "./carriers.tsx";
 import { MermaidBlock } from "./MermaidBlock.tsx";
-import { CallStack, type Expansion } from "./CallStack.tsx";
+import { ancestorKeys, CallStack, type Expansion } from "./CallStack.tsx";
+import { FlowOverview } from "./FlowOverview.tsx";
 
 type Selection = { kind: "map" } | { kind: "flow"; id: string };
 
@@ -55,6 +56,12 @@ export function FlowstackApp() {
         else next.add(key);
         return next;
       }),
+    open: (keys) =>
+      setExpanded((current) => {
+        const next = new Set(current);
+        for (const key of keys) next.add(key);
+        return next;
+      }),
   };
 
   const shell = useStyles(styles.shell);
@@ -78,9 +85,9 @@ export function FlowstackApp() {
         <div>
           <div className={title}>{program.name} — event flows</div>
           <div className={subtitle}>
-            A flow is a call stack across services. Open a line to see its
-            source and what it calls or sends; marked source lines lead to the
-            next level.
+            A flow is a call stack across services. The top block shows the
+            events between the main services; the call stack below opens line by
+            line down to source, where marked lines lead to the next level.
           </div>
         </div>
       </header>
@@ -179,13 +186,33 @@ function FlowPage(props: {
   const heading = useStyles(styles.heading);
   const description = useStyles(styles.description);
   const toolbar = useStyles(styles.toolbar);
+  const sectionTitle = useStyles(styles.sectionTitle);
+  const reveal = (key: string) => {
+    props.expansion.open([...ancestorKeys(key), key]);
+    const scrollTo = () =>
+      document
+        .querySelector(`[data-flowstack-key="${key}"]`)
+        ?.scrollIntoView({ block: "center" });
+    // Source excerpts above the line render async (Pierre in a shadow root),
+    // so scroll once on paint and again after they have taken their height.
+    requestAnimationFrame(scrollTo);
+    setTimeout(scrollTo, 400);
+  };
   return (
     <div className={page}>
       <div>
         <h1 className={heading}>{props.flow.title}</h1>
         <p className={description}>{props.flow.description}</p>
       </div>
+      <div className={sectionTitle}>Services</div>
+      <FlowOverview
+        nodes={props.flow.children}
+        parentKey={props.flow.id}
+        services={props.services}
+        onReveal={reveal}
+      />
       <div className={toolbar}>
+        <span className={sectionTitle}>Call stack</span>
         <Button variant="quiet" onClick={props.onExpandAll}>
           Expand all
         </Button>
@@ -375,6 +402,12 @@ const styles = {
   ),
   toolbar: style(
     flex({ direction: "row", align: "center", gap: 2, wrap: true }),
+  ),
+  sectionTitle: style(
+    text({ size: "sm", fontWeight: 600, color: "highContrast" }),
+    {
+      marginRight: "auto",
+    },
   ),
   legend: style(
     flex({ direction: "row", align: "center", gap: 8, wrap: true }),

@@ -14,7 +14,14 @@ import { SourceExcerpt, type SourceMark } from "./SourceExcerpt.tsx";
 export type Expansion = {
   isExpanded: (key: string) => boolean;
   toggle: (key: string) => void;
+  open: (keys: string[]) => void;
 };
+
+/** The node keys above `key`, outermost first, the flow id excluded. */
+export function ancestorKeys(key: string) {
+  const parts = key.split("/");
+  return parts.slice(2).map((_, index) => parts.slice(0, index + 2).join("/"));
+}
 
 /**
  * The flow as a call stack in a code block: one line per node, tree glyphs
@@ -106,7 +113,7 @@ function Line(props: {
   const lineButton = useStyles(styles.lineButton);
 
   return (
-    <div data-flowstack-line={nodeName(node)}>
+    <div data-flowstack-line={nodeName(node)} data-flowstack-key={key}>
       <button
         type="button"
         className={line}

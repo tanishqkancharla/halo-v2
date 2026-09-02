@@ -38,6 +38,27 @@ export function serviceProcess(service: Service | undefined): ProcessName {
   return service === undefined ? "outside" : service.process;
 }
 
+/**
+ * The top-level actor a service belongs to: its process for renderer, preload
+ * and main, the service itself for the outside world (human, disk, provider).
+ */
+export function actorOf(service: Service | undefined, id: string) {
+  const process = serviceProcess(service);
+  if (process !== "outside") return { name: actorLabels[process], process };
+  return { name: service === undefined ? id : service.name, process };
+}
+
+const actorLabels = {
+  renderer: "Renderer",
+  preload: "Preload",
+  main: "Main",
+} satisfies Record<Exclude<ProcessName, "outside">, string>;
+
+export function ActorName(props: { name: string; process: ProcessName }) {
+  const coloured = useStyles(nameStyle, processText[props.process]);
+  return <span className={coloured}>{props.name}</span>;
+}
+
 const classPattern = /^([A-Za-z_$][\w$]*)(\..*)$/;
 
 /**

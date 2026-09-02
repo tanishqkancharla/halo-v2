@@ -49,7 +49,7 @@ export type Service = {
  * line in the parent frame's source where this node starts: the call for a
  * frame, the send or the receipt for an event.
  */
-type EventNode = {
+export type EventNode = {
   kind: "event";
   from: string;
   to: string;
@@ -117,6 +117,25 @@ export type Keyed = { key: string; node: FlowNode };
 
 export function keyed(nodes: FlowNode[], parentKey: string): Keyed[] {
   return nodes.map((node, index) => ({ key: `${parentKey}/${index}`, node }));
+}
+
+/**
+ * The children with frame nodes removed. Events nested inside a frame move
+ * up to where the frame was, in order, and keep their keys.
+ */
+export function eventChildren(
+  nodes: FlowNode[],
+  parentKey: string,
+): { key: string; node: EventNode }[] {
+  const result: { key: string; node: EventNode }[] = [];
+  for (const { key, node } of keyed(nodes, parentKey)) {
+    if (node.kind === "frame") {
+      result.push(...eventChildren(node.children, key));
+      continue;
+    }
+    result.push({ key, node });
+  }
+  return result;
 }
 
 /** Every node below `nodes`, pre-order. */
