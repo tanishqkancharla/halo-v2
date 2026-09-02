@@ -1,7 +1,11 @@
 import { implement } from "@orpc/server";
 import type { Logger } from "@repo/logger";
 import { contract } from "@get-halo/shared/contract";
-import { connectionRequestLabel } from "@get-halo/shared/connectionRequests";
+import {
+  connectionRequestLabel,
+  type ConnectionRequest,
+} from "@get-halo/shared/connectionRequests";
+import type { HaloAgentSession } from "../agent/HaloAgentSession.js";
 import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { SessionRegistry } from "./SessionRegistry.js";
@@ -65,15 +69,43 @@ export const sessionsRouter = os.router({
       sessionId: input.sessionId,
       integration: input.request.integration,
     });
-    const connected = await context.toolRuntime.startConnection(input.request);
-    if (connected instanceof Error) return orpcErrors.badRequest(connected);
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    const notified = await session.notify({
-      customType: "halo.integration.connected",
-      content: `[System] The user connected ${connectionRequestLabel(input.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
+    const started = await context.toolRuntime.startConnection({
+      sessionId: input.sessionId,
+      request: input.request,
+      onEvent: async (event) => {
+        session.appendConnectionEvent(event);
+        if (event.status !== "connected") return;
+        const notified = await notifyConnectedSession({
+          session,
+          request: event.request,
+        });
+        if (notified instanceof Error) {
+          context.logger.warn({
+            event: "agentSession.connectionNotificationFailed",
+            error: notified,
+          });
+        }
+      },
+    });
+    if (started instanceof Error) return orpcErrors.badRequest(started);
+    if (started.status === "authorization-required") return started;
+    const notified = await notifyConnectedSession({
+      session,
+      request: input.request,
     });
     if (notified instanceof Error) return orpcErrors.badRequest(notified);
+    return started;
+  }),
+  cancelConnection: os.cancelConnection.handler(async ({ input, context }) => {
+    context.logger.info({
+      event: "agentSession.cancelConnection",
+      sessionId: input.sessionId,
+      connectionId: input.connectionId,
+    });
+    const cancelled = await context.toolRuntime.cancelConnection(input);
+    if (cancelled instanceof Error) return orpcErrors.badRequest(cancelled);
   }),
   abort: os.abort.handler(async ({ input, context }) => {
     context.logger.info({
@@ -94,3 +126,13 @@ export const sessionsRouter = os.router({
     if (closed instanceof Error) return orpcErrors.badRequest(closed);
   }),
 });
+
+function notifyConnectedSession(args: {
+  session: HaloAgentSession;
+  request: ConnectionRequest;
+}) {
+  return args.session.notify({
+    customType: "halo.integration.connected",
+    content: `[System] The user connected ${connectionRequestLabel(args.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
+  });
+}

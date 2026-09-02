@@ -58,7 +58,10 @@ async function handleDesktopRequest(args: {
 }) {
   switch (args.request.type) {
     case "chooseWorkspace":
-      return chooseWorkspace({ window: args.window, workspace: args.workspace });
+      return chooseWorkspace({
+        window: args.window,
+        workspace: args.workspace,
+      });
     case "getAppInfo":
       return getAppInfo();
     case "installAppUpdate":

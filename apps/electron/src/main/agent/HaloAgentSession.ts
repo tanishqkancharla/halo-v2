@@ -12,7 +12,11 @@ import {
   agentSessionStateFromSession,
   type AgentSessionState,
 } from "@get-halo/shared/AgentSessionState";
-import type { AgentSessionEvent, SessionSummary } from "@get-halo/shared/rpc";
+import type {
+  HaloConnectionEvent,
+  HaloSessionEvent,
+} from "@get-halo/shared/contract";
+import type { SessionSummary } from "@get-halo/shared/rpc";
 import { type ReadonlyStream, Stream } from "../../shared/Stream.js";
 import type {
   WorkspaceLayout,
@@ -76,8 +80,8 @@ export type HaloAgentSessionOptions = {
 };
 
 export class HaloAgentSession {
-  private readonly eventStream = new Stream<AgentSessionEvent>();
-  readonly events: ReadonlyStream<AgentSessionEvent> = this.eventStream;
+  private readonly eventStream = new Stream<HaloSessionEvent>();
+  readonly events: ReadonlyStream<HaloSessionEvent> = this.eventStream;
   private readonly unsubscribePiEvents: () => void;
 
   private constructor(private readonly piSession: AgentSession) {
@@ -197,6 +201,10 @@ export class HaloAgentSession {
       messages: this.piSession.messages,
       isStreaming: this.piSession.isStreaming,
     });
+  }
+
+  appendConnectionEvent(event: HaloConnectionEvent): void {
+    this.eventStream.append(event);
   }
 
   async prompt(text: string) {

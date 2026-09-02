@@ -1,8 +1,16 @@
+import { useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as errore from "errore";
 import { background, Button, Flex, radius, shadow, Spacer, Text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { connectionRequestLabel } from "@get-halo/shared/connectionRequests";
 import { useApi } from "../../api/ApiProvider.tsx";
+import { desktopApi } from "../../api/electron.ts";
+import {
+  connectionStateQueryKey,
+  idleConnectionState,
+  type ConnectionState,
+} from "./ConnectionState.ts";
 import type { SessionViewPart } from "./sessionView.ts";
 import { integrationBrands } from "./IntegrationBrands.ts";
 
@@ -10,8 +18,11 @@ type ExecutorConnectionPart = Extract<
   SessionViewPart,
   { kind: "executorConnection" }
 >;
-type ConnectionStatus = "idle" | "connecting" | "connected";
-const idleStatus: ConnectionStatus = "idle";
+class OpenAuthorizationError extends errore.createTaggedError({
+  name: "OpenAuthorizationError",
+  message: "Halo could not open the authorization page",
+}) {}
+
 const card = style(background.element, radius.lg, shadow.subtle, {
   width: "100%",
   maxWidth: "400px",
@@ -38,36 +49,119 @@ export function ExecutorConnectionCard({
   const brandLogoClassName = useStyles(brandLogo);
   const brandButtonClassName = useStyles(brandButton);
   const queryClient = useQueryClient();
-  const statusKey = [
-    "executorConnection",
-    part.request.integration,
-    part.request.connectionName,
-  ] as const;
-  const status = useQuery({
+  const statusKey = useMemo(
+    () => connectionStateQueryKey(part.request),
+    [part.request],
+  );
+  const connection = useQuery<ConnectionState>({
     queryKey: statusKey,
-    queryFn: async () => idleStatus,
-    initialData: idleStatus,
+    queryFn: async () => idleConnectionState,
+    initialData: idleConnectionState,
     enabled: false,
   }).data;
+  const wasConnected = connection.status === "connected";
   const connect = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       // SAFETY: the button is disabled until sessionId is a string.
-      return api.sessions.startConnection({
-        sessionId: sessionId as string,
+      const activeSessionId = sessionId as string;
+      const started = await api.sessions.startConnection({
+        sessionId: activeSessionId,
         request: part.request,
       });
+      if (started.status === "connected") return started;
+      const connecting: ConnectionState = {
+        status: "connecting",
+        connectionId: started.connectionId,
+        expiresAt: Date.now() + started.expiresInMs,
+        wasConnected,
+      };
+      queryClient.setQueryData(statusKey, connecting);
+      const opened = await desktopApi
+        .openExternal({
+          type: "openExternal",
+          url: started.authorizationUrl,
+        })
+        .catch((cause) => new OpenAuthorizationError({ cause }));
+      if (opened instanceof Error) {
+        const cancelled = await api.sessions
+          .cancelConnection({
+            sessionId: activeSessionId,
+            connectionId: started.connectionId,
+          })
+          .then(() => undefined)
+          .catch((cause) => new OpenAuthorizationError({ cause }));
+        if (cancelled instanceof Error) {
+          console.warn("OAuth cleanup failed:", cancelled);
+        }
+        throw opened;
+      }
+      return started;
     },
     onMutate: () => {
-      queryClient.setQueryData(statusKey, "connecting");
+      const starting: ConnectionState = {
+        status: "starting",
+        wasConnected,
+      };
+      queryClient.setQueryData(statusKey, starting);
     },
-    onSuccess: () => {
-      queryClient.setQueryData(statusKey, "connected");
+    onSuccess: (started) => {
+      if (started.status !== "connected") return;
+      queryClient.setQueryData<ConnectionState>(statusKey, {
+        status: "connected",
+      });
     },
     onError: (error) => {
-      queryClient.setQueryData(statusKey, "idle");
+      queryClient.setQueryData<ConnectionState>(statusKey, (current) => {
+        if (
+          (current?.status === "starting" ||
+            current?.status === "connecting") &&
+          current.wasConnected
+        ) {
+          return { status: "connected" };
+        }
+        return idleConnectionState;
+      });
       console.warn("Connection failed:", error);
     },
   });
+  const cancel = useMutation({
+    mutationFn: async () => {
+      if (sessionId === undefined || connection.status !== "connecting") return;
+      await api.sessions.cancelConnection({
+        sessionId,
+        connectionId: connection.connectionId,
+      });
+      queryClient.setQueryData<ConnectionState>(statusKey, (current) => {
+        if (current?.status !== "connecting") return current;
+        return current.wasConnected
+          ? { status: "connected" }
+          : { status: "cancelled" };
+      });
+    },
+    onError: (error) => {
+      console.warn("Connection cancellation failed:", error);
+    },
+  });
+
+  useEffect(() => {
+    if (connection.status !== "connecting") return;
+    const connectionId = connection.connectionId;
+    const timeout = window.setTimeout(
+      () => {
+        queryClient.setQueryData<ConnectionState>(statusKey, (current) => {
+          if (current?.status !== "connecting") return current;
+          if (current.connectionId !== connectionId) return current;
+          return current.wasConnected
+            ? { status: "connected" }
+            : { status: "expired" };
+        });
+      },
+      Math.max(0, connection.expiresAt - Date.now()),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [connection, queryClient, statusKey]);
+
+  const status = connection.status;
   const label = connectionRequestLabel(part.request);
   const brand = integrationBrands.google;
 
@@ -91,9 +185,15 @@ export function ExecutorConnectionCard({
             <Text size="sm" color="lowContrast">
               {status === "connected"
                 ? "Connected"
-                : status === "connecting"
-                  ? "Finish connecting in your browser"
-                  : "Connect your account so the agent can continue"}
+                : status === "expired"
+                  ? "Authorization expired"
+                  : status === "cancelled"
+                    ? "Authorization cancelled"
+                    : status === "connecting"
+                      ? "Finish connecting in your browser"
+                      : status === "starting"
+                        ? "Preparing authorization"
+                        : "Connect your account so the agent can continue"}
             </Text>
           </Flex>
           <Spacer />
@@ -102,15 +202,34 @@ export function ExecutorConnectionCard({
             variantColor={brand.buttonColor}
             style={{ color: brand.buttonForeground }}
             className={brandButtonClassName}
-            disabled={sessionId === undefined || status !== "idle"}
+            disabled={
+              sessionId === undefined ||
+              status === "starting" ||
+              status === "connecting"
+            }
             onClick={() => connect.mutate()}
           >
             {status === "connected"
-              ? "Connected"
-              : status === "connecting"
-                ? "Connecting"
-                : "Connect"}
+              ? "Connect again"
+              : status === "expired"
+                ? "Expired - connect again"
+                : status === "cancelled"
+                  ? "Try again"
+                  : status === "connecting"
+                    ? "Connecting"
+                    : status === "starting"
+                      ? "Starting"
+                      : "Connect"}
           </Button>
+          {status === "connecting" ? (
+            <Button
+              variant="quiet"
+              disabled={cancel.isPending}
+              onClick={() => cancel.mutate()}
+            >
+              Cancel
+            </Button>
+          ) : undefined}
         </Flex>
       </Flex>
     </section>

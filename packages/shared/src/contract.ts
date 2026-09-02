@@ -16,7 +16,7 @@ import type {
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const haloProtocolVersion = 1 as const;
+export const haloProtocolVersion = 2 as const;
 
 export const RequestRejectedError = error("BAD_REQUEST", {
   message: "Halo could not complete the request.",
@@ -57,6 +57,24 @@ export type PluginInvocationInput = {
   input: unknown;
 };
 
+export type ConnectionStarted =
+  | { status: "connected" }
+  | {
+      status: "authorization-required";
+      authorizationUrl: string;
+      connectionId: string;
+      expiresInMs: number;
+    };
+
+export type HaloConnectionEvent = {
+  type: "halo.connection";
+  connectionId: string;
+  request: ConnectionRequest;
+  status: "connected" | "cancelled" | "expired";
+};
+
+export type HaloSessionEvent = AgentSessionEvent | HaloConnectionEvent;
+
 export const contract = publicProcedure.router({
   server: {
     info: oc.output(type<{ protocolVersion: typeof haloProtocolVersion }>()),
@@ -78,10 +96,13 @@ export const contract = publicProcedure.router({
       .output(type<{ sessionId: string; state: AgentSessionState }>()),
     events: oc
       .input(type<{ sessionId: string }>())
-      .output(asyncIteratorObject(type<AgentSessionEvent>())),
+      .output(asyncIteratorObject(type<HaloSessionEvent>())),
     prompt: oc.input(type<{ sessionId: string; text: string }>()),
-    startConnection:
-      oc.input(type<{ sessionId: string; request: ConnectionRequest }>()),
+    startConnection: oc
+      .input(type<{ sessionId: string; request: ConnectionRequest }>())
+      .output(type<ConnectionStarted>()),
+    cancelConnection:
+      oc.input(type<{ sessionId: string; connectionId: string }>()),
     abort: oc.input(type<{ sessionId: string }>()),
     close: oc.input(type<{ sessionId: string }>()),
   },

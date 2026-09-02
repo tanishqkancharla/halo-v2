@@ -8,6 +8,11 @@ import {
 } from "@get-halo/shared/AgentSessionState";
 import { useApi } from "../../api/ApiProvider.tsx";
 import type { HaloClient } from "@get-halo/shared/contract";
+import {
+  applyConnectionEvent,
+  connectionStateQueryKey,
+  type ConnectionState,
+} from "./ConnectionState.ts";
 
 class PromptFailedError extends errore.createTaggedError({
   name: "PromptFailedError",
@@ -36,6 +41,7 @@ type UseAgentSessionResult = {
 export function useAgentSession(sessionId: string): UseAgentSessionResult {
   const api = useApi();
   const queryClient = useQueryClient();
+  const queryClientRef = useRef(queryClient);
   const [readySessionId, setReadySessionId] = useState<string | undefined>(
     undefined,
   );
@@ -71,6 +77,13 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       setReadySessionId(opened.sessionId);
       iterator = await api.sessions.events({ sessionId: opened.sessionId });
       for await (const event of iterator) {
+        if (event.type === "halo.connection") {
+          queryClientRef.current.setQueryData<ConnectionState>(
+            connectionStateQueryKey(event.request),
+            (current) => applyConnectionEvent(current, event),
+          );
+          continue;
+        }
         setState((current) => applyAgentSessionEvent(current, event));
       }
     })().catch((cause) => {
