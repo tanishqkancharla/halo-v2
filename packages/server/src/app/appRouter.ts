@@ -1,26 +1,20 @@
 import { implement } from "@orpc/server";
 import type { Logger } from "@get-halo/logger";
 import { contract } from "@get-halo/shared/contract";
-import { orpcErrors } from "../orpcErrors.js";
-import type { ServerHost } from "../ServerHost.js";
+import type { WorkspaceService } from "../workspace/WorkspaceService.js";
 
 export type AppRouterContext = {
-  host: ServerHost;
+  workspace: WorkspaceService;
   logger: Logger;
 };
 
 const os = implement({
-  getAppInfo: contract.getAppInfo,
-  installAppUpdate: contract.installAppUpdate,
+  getServerInfo: contract.getServerInfo,
 }).$context<AppRouterContext>();
 
 export const appRouter = os.router({
-  getAppInfo: os.getAppInfo.handler(({ context }) => {
-    context.logger.info({ event: "getAppInfo" });
-    return context.host.getAppInfo();
-  }),
-  installAppUpdate: os.installAppUpdate.handler(({ context }) => {
-    const result = context.host.installAppUpdate();
-    if (result instanceof Error) return orpcErrors.badRequest(result);
+  getServerInfo: os.getServerInfo.handler(({ context }) => {
+    context.logger.info({ event: "getServerInfo" });
+    return { version: context.workspace.appVersion };
   }),
 });

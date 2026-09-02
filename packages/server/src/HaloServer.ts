@@ -90,7 +90,6 @@ export class HaloServer {
       pluginToolGrants,
       sessions: this.sessions,
       toolRuntime: this.toolRuntime,
-      host: options.host,
       logger: this.logger,
     };
   }

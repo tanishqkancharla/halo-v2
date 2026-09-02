@@ -1,6 +1,5 @@
 import { implement } from "@orpc/server";
 import type { Logger } from "@get-halo/logger";
-import { connectionRequestLabel } from "@get-halo/shared/connectionRequests";
 import { contract } from "@get-halo/shared/contract";
 import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import { orpcErrors } from "../orpcErrors.js";
@@ -65,15 +64,35 @@ export const sessionsRouter = os.router({
       sessionId: input.sessionId,
       integration: input.request.integration,
     });
-    const connected = await context.toolRuntime.startConnection(input.request);
-    if (connected instanceof Error) return orpcErrors.badRequest(connected);
+    const started = await context.toolRuntime.startConnection({
+      sessionId: input.sessionId,
+      request: input.request,
+    });
+    if (started instanceof Error) return orpcErrors.badRequest(started);
+    if (started.status === "authorization-required") return started;
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    const notified = await session.notify({
-      customType: "halo.integration.connected",
-      content: `[System] The user connected ${connectionRequestLabel(input.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
+    const changed = await session.connectionChanged({
+      request: input.request,
+      status: "connected",
     });
-    if (notified instanceof Error) return orpcErrors.badRequest(notified);
+    if (changed instanceof Error) return orpcErrors.badRequest(changed);
+    return started;
+  }),
+  cancelConnection: os.cancelConnection.handler(async ({ input, context }) => {
+    context.logger.info({
+      event: "agentSession.cancelConnection",
+      sessionId: input.sessionId,
+    });
+    const cancelled = await context.toolRuntime.cancelConnection(input);
+    if (cancelled instanceof Error) return orpcErrors.badRequest(cancelled);
+    if (cancelled === undefined) return;
+    const session = await context.sessions.open(cancelled.sessionId);
+    if (session instanceof Error) return orpcErrors.badRequest(session);
+    await session.connectionChanged({
+      request: cancelled.request,
+      status: "cancelled",
+    });
   }),
   abort: os.abort.handler(async ({ input, context }) => {
     context.logger.info({

@@ -17,7 +17,8 @@ import {
 import { style, useStyles } from "purse-styles";
 import { Router, useLocation } from "wouter";
 import type { PluginLoadError } from "@get-halo/shared/contract";
-import type { AppInfo, SessionSummary } from "@get-halo/shared/rpc";
+import type { SessionSummary } from "@get-halo/shared/rpc";
+import type { AppInfo } from "../../shared/desktop.js";
 import { useInstallAppUpdateMutation } from "../api/ApiProvider.tsx";
 import type { LoadedPluginView } from "../evaluatePluginView.js";
 import { FilesystemSection } from "./FilesystemSection.tsx";

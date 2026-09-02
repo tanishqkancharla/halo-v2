@@ -41,9 +41,7 @@ const rpcHttpTest = test.extend<{
       appDataDir: userDataDir,
       appVersion: "0.0.0",
       filesystem,
-      host: new ElectronServerHost(() => {
-        throw new Error("Halo main window is not open.");
-      }),
+      host: new ElectronServerHost(),
       logger: new Logger(),
     });
     await server.start();
@@ -62,7 +60,7 @@ const rpcHttpTest = test.extend<{
 
 describe("listenHaloRpcHttp", () => {
   rpcHttpTest(
-    "writes rpc.json and serves workspace.get",
+    "writes rpc.json and serves transport-neutral server state",
     async ({ rpc, userDataDir, workspaceRoot }) => {
       const file = await readHaloRpcFile(rpcFilePath(userDataDir));
       if (file instanceof Error) throw file;
@@ -75,6 +73,9 @@ describe("listenHaloRpcHttp", () => {
       );
 
       const client = createHaloRpcClient<HaloClient>(file);
+      await expect(client.getServerInfo()).resolves.toEqual({
+        version: "0.0.0",
+      });
       const workspace = await client.workspace.get();
       const resolvedRoot = await realpath(workspaceRoot);
       expect(workspace).toEqual({

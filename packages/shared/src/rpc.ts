@@ -21,19 +21,6 @@ export type SessionSummary = {
   updatedAt: string;
 };
 
-export type AppUpdateStatus =
-  | { state: "disabled"; reason: string }
-  | { state: "idle" }
-  | { state: "checking" }
-  | { state: "available" }
-  | { state: "downloaded"; version: string }
-  | { state: "error"; message: string };
-
-export type AppInfo = {
-  version: string;
-  update: AppUpdateStatus;
-};
-
 export type WorkspaceTreeEvent =
   | { type: "create"; path: string }
   | { type: "delete"; path: string };

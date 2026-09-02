@@ -36,6 +36,7 @@ type UseAgentSessionResult = {
 export function useAgentSession(sessionId: string): UseAgentSessionResult {
   const api = useApi();
   const queryClient = useQueryClient();
+  const queryClientRef = useRef(queryClient);
   const [readySessionId, setReadySessionId] = useState<string | undefined>(
     undefined,
   );
@@ -71,6 +72,18 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       setReadySessionId(opened.sessionId);
       iterator = await api.sessions.events({ sessionId: opened.sessionId });
       for await (const event of iterator) {
+        if (event.type === "halo.connection") {
+          queryClientRef.current.setQueryData(
+            [
+              "executorConnection",
+              opened.sessionId,
+              event.request.integration,
+              event.request.connectionName,
+            ],
+            event.status === "connected" ? "connected" : "idle",
+          );
+          continue;
+        }
         setState((current) => applyAgentSessionEvent(current, event));
       }
     })().catch((cause) => {

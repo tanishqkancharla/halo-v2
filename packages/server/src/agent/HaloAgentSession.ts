@@ -12,7 +12,12 @@ import {
   agentSessionStateFromSession,
   type AgentSessionState,
 } from "@get-halo/shared/AgentSessionState";
-import type { AgentSessionEvent, SessionSummary } from "@get-halo/shared/rpc";
+import { connectionRequestLabel } from "@get-halo/shared/connectionRequests";
+import type {
+  ConnectionEvent,
+  HaloSessionEvent,
+} from "@get-halo/shared/contract";
+import type { SessionSummary } from "@get-halo/shared/rpc";
 import { type ReadonlyStream, Stream } from "../Stream.js";
 import type {
   WorkspaceLayout,
@@ -76,8 +81,8 @@ export type HaloAgentSessionOptions = {
 };
 
 export class HaloAgentSession {
-  private readonly eventStream = new Stream<AgentSessionEvent>();
-  readonly events: ReadonlyStream<AgentSessionEvent> = this.eventStream;
+  private readonly eventStream = new Stream<HaloSessionEvent>();
+  readonly events: ReadonlyStream<HaloSessionEvent> = this.eventStream;
   private readonly unsubscribePiEvents: () => void;
 
   private constructor(private readonly piSession: AgentSession) {
@@ -236,6 +241,15 @@ export class HaloAgentSession {
       )
       .catch((e) => new NotifyIntegrationEventError({ cause: e }));
     if (sent instanceof Error) return sent;
+  }
+
+  async connectionChanged(event: Omit<ConnectionEvent, "type">) {
+    this.eventStream.append({ type: "halo.connection", ...event });
+    if (event.status === "cancelled") return;
+    return await this.notify({
+      customType: "halo.integration.connected",
+      content: `[System] The user connected ${connectionRequestLabel(event.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
+    });
   }
 
   async close() {

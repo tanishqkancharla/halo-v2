@@ -14,7 +14,8 @@ export class ConnectionCancelledError extends errore.createTaggedError({
 }) {}
 
 type PendingConnection = {
-  complete: (result: Error | undefined) => void;
+  sessionId: string;
+  request: ConnectionRequest;
 };
 
 type ToolRuntimeServiceOptions = {
@@ -82,19 +83,15 @@ export class ToolRuntimeService {
     this.runtime = undefined;
     this.workspaceRoot = undefined;
     this.userId = undefined;
-    const closedError = new ToolRuntimeError({
-      operation: "OAuth connection",
-      cause: new Error("Executor runtime closed"),
-    });
-    for (const pending of this.pendingConnections.values()) {
-      pending.complete(closedError);
-    }
     this.pendingConnections.clear();
     if (runtime === undefined) return;
     return await runtime.close();
   }
 
-  async startConnection(request: ConnectionRequest) {
+  async startConnection(input: {
+    sessionId: string;
+    request: ConnectionRequest;
+  }) {
     if (this.runtime === undefined) {
       return new ToolRuntimeError({
         operation: "OAuth start",
@@ -102,27 +99,16 @@ export class ToolRuntimeService {
       });
     }
 
-    const started = await this.runtime.startOAuth(request);
+    const started = await this.runtime.startOAuth(input.request);
     if (started instanceof Error) return started;
-    if (started.status === "connected") return;
+    if (started.status === "connected") return { status: "connected" } as const;
 
-    const completed = new Promise<Error | undefined>((resolve) => {
-      this.pendingConnections.set(started.state, { complete: resolve });
-    });
-    const opened = await this.options.host.openExternal(
-      started.authorizationUrl,
-    );
-    if (opened instanceof Error) {
-      this.pendingConnections.delete(started.state);
-      const cancelled = await this.runtime.cancelOAuth(started.state);
-      if (cancelled instanceof Error)
-        console.warn("OAuth cleanup failed:", cancelled);
-      return new ToolRuntimeError({
-        operation: "opening OAuth authorization",
-        cause: opened,
-      });
-    }
-    return completed;
+    this.pendingConnections.set(started.state, input);
+    return {
+      status: "authorization-required",
+      authorizationUrl: started.authorizationUrl,
+      connectionId: started.state,
+    } as const;
   }
 
   async completeOAuth(input: { state: string; code: string }) {
@@ -132,13 +118,15 @@ export class ToolRuntimeService {
         cause: new Error("Executor runtime is not open"),
       });
     }
-    const completed = await this.runtime.completeOAuth(input);
     const pending = this.pendingConnections.get(input.state);
-    if (pending !== undefined) {
-      this.pendingConnections.delete(input.state);
-      pending.complete(completed instanceof Error ? completed : undefined);
-    }
-    return completed;
+    this.pendingConnections.delete(input.state);
+    const completed = await this.runtime.completeOAuth(input);
+    if (completed instanceof Error) return completed;
+    return pending;
+  }
+
+  getPendingConnection(connectionId: string) {
+    return this.pendingConnections.get(connectionId);
   }
 
   async cancelOAuth(state: string) {
@@ -152,8 +140,16 @@ export class ToolRuntimeService {
     const pending = this.pendingConnections.get(state);
     if (pending !== undefined) {
       this.pendingConnections.delete(state);
-      pending.complete(new ConnectionCancelledError());
     }
     if (cancelled instanceof Error) return cancelled;
+    return pending;
+  }
+
+  async cancelConnection(input: { sessionId: string; connectionId: string }) {
+    const pending = this.pendingConnections.get(input.connectionId);
+    if (pending === undefined || pending.sessionId !== input.sessionId) {
+      return new ConnectionCancelledError();
+    }
+    return await this.cancelOAuth(input.connectionId);
   }
 }

@@ -2,12 +2,10 @@ import { implement } from "@orpc/server";
 import type { Logger } from "@get-halo/logger";
 import { contract } from "@get-halo/shared/contract";
 import { orpcErrors } from "../orpcErrors.js";
-import type { ServerHost } from "../ServerHost.js";
 import type { WorkspaceService } from "./WorkspaceService.js";
 
 export type WorkspaceRouterContext = {
   workspace: WorkspaceService;
-  host: ServerHost;
   logger: Logger;
 };
 
@@ -17,15 +15,6 @@ export const workspaceRouter = os.router({
   get: os.get.handler(({ context }) => {
     context.logger.info({ event: "getWorkspace" });
     return context.workspace.getWorkspace();
-  }),
-  choose: os.choose.handler(async ({ context }) => {
-    context.logger.info({ event: "chooseWorkspace" });
-    const directory = await context.host.chooseWorkspace();
-    if (directory instanceof Error) return orpcErrors.badRequest(directory);
-    if (directory === undefined) return undefined;
-    const workspace = await context.workspace.select(directory);
-    if (workspace instanceof Error) return orpcErrors.badRequest(workspace);
-    return workspace;
   }),
   listPaths: os.listPaths.handler(async ({ context }) => {
     context.logger.info({ event: "listWorkspacePaths" });

@@ -7,6 +7,7 @@ import {
   MessageChannelMain,
   shell,
   type IpcMainEvent,
+  type IpcMainInvokeEvent,
 } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,14 +20,21 @@ import {
 import { JsonlLoggerSink } from "@get-halo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@get-halo/logger/PrettyConsoleLoggerSink";
 import { FilesystemService, HaloServer } from "@get-halo/server";
+import * as errore from "errore";
 import type { HaloContext } from "@get-halo/server/router";
 import { resolveHaloCliEntry } from "@get-halo/server/workspace/installHaloCli";
 import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
+import { DESKTOP_CHANNEL, type DesktopRequest } from "../shared/desktop.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
-import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
+import {
+  checkForUpdates,
+  getAppInfo,
+  installAppUpdate,
+  startAppUpdates,
+} from "./app/AppUpdate.js";
 import { ElectronServerHost } from "./ElectronServerHost.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
 
@@ -39,6 +47,11 @@ const filesystemService = new FilesystemService();
 let mainWindow: BrowserWindow | undefined;
 let rpcHttp: HaloRpcHttp | undefined;
 let shutdownStarted = false;
+
+class DesktopBridgeError extends errore.createTaggedError({
+  name: "DesktopBridgeError",
+  message: "Desktop action failed during $operation",
+}) {}
 
 if (started) app.quit();
 
@@ -79,12 +92,7 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 
 process.env.HALO_USER_DATA = applicationConfig.dataDir;
 
-const serverHost = new ElectronServerHost(() => {
-  if (mainWindow === undefined) {
-    throw new Error("Halo main window is not open.");
-  }
-  return mainWindow;
-});
+const serverHost = new ElectronServerHost();
 const haloServer = new HaloServer({
   appDataDir: applicationConfig.dataDir,
   filesystem: filesystemService,
@@ -102,6 +110,7 @@ app.whenReady().then(async () => {
   await haloServer.start();
   registerLogBridge();
   registerRpcBridge();
+  registerDesktopBridge();
   const listening = await listenHaloRpcHttp({
     context: haloServer.context,
     router: haloServer.router,
@@ -235,7 +244,42 @@ function registerRpcBridge(): void {
   });
 }
 
-function assertTrustedSender(event: IpcMainEvent): BrowserWindow {
+function registerDesktopBridge(): void {
+  ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
+    const window = assertTrustedSender(event);
+    switch (request.method) {
+      case "chooseWorkspace": {
+        const workspace = await chooseWorkspace(window, {
+          title: "Choose a Halo workspace",
+          buttonLabel: "Choose workspace",
+        });
+        if (workspace instanceof Error) throw workspace;
+        return workspace;
+      }
+      case "getAppInfo":
+        return getAppInfo();
+      case "installAppUpdate": {
+        const installed = installAppUpdate();
+        if (installed instanceof Error) throw installed;
+        return;
+      }
+      case "openExternal": {
+        const opened = await shell.openExternal(request.url).catch(
+          (cause) =>
+            new DesktopBridgeError({
+              operation: "opening an external URL",
+              cause,
+            }),
+        );
+        if (opened instanceof Error) throw opened;
+      }
+    }
+  });
+}
+
+function assertTrustedSender(
+  event: IpcMainEvent | IpcMainInvokeEvent,
+): BrowserWindow {
   const senderWindow = BrowserWindow.fromWebContents(event.sender);
   if (senderWindow === null || senderWindow !== mainWindow) {
     throw new Error("Halo rejected IPC from an unknown renderer.");
@@ -337,17 +381,12 @@ async function openLogs(): Promise<void> {
 async function switchWorkspace(): Promise<void> {
   if (mainWindow === undefined) return;
 
-  const selection = await dialog.showOpenDialog(mainWindow, {
+  const previous = haloServer.getWorkspace();
+  const workspace = await chooseWorkspace(mainWindow, {
     title: "Switch workspace",
     buttonLabel: "Switch workspace",
-    properties: ["openDirectory"],
   });
-  if (selection.canceled) return;
-  const directory = selection.filePaths[0];
-  if (directory === undefined) return;
-
-  const previous = haloServer.getWorkspace();
-  const workspace = await haloServer.selectWorkspace(directory);
+  if (workspace === undefined) return;
   if (workspace instanceof Error) {
     await dialog.showMessageBox(mainWindow, {
       type: "error",
@@ -365,6 +404,31 @@ async function switchWorkspace(): Promise<void> {
   }
 
   mainWindow.reload();
+}
+
+async function chooseWorkspace(
+  window: BrowserWindow,
+  labels: { title: string; buttonLabel: string },
+) {
+  const selection = await dialog
+    .showOpenDialog(window, {
+      ...labels,
+      properties: ["openDirectory"],
+    })
+    .catch(
+      (cause) =>
+        new DesktopBridgeError({ operation: "workspace selection", cause }),
+    );
+  if (selection instanceof Error) return selection;
+  if (selection.canceled) return undefined;
+  const directory = selection.filePaths[0];
+  if (directory === undefined) {
+    return new DesktopBridgeError({
+      operation: "workspace selection",
+      cause: new Error("Electron returned no selected directory"),
+    });
+  }
+  return await haloServer.selectWorkspace(directory);
 }
 
 function ignoreClosedStdioPipe(stream: NodeJS.WriteStream) {

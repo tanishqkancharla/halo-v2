@@ -19,7 +19,7 @@ class PluginCallError extends errore.createTaggedError({
 }) {}
 
 type HaloHost = {
-  getAppInfo: () => Promise<{ version: string }>;
+  getServerInfo: () => Promise<{ version: string }>;
   workspace: {
     get: () => Promise<WorkspaceInfo | undefined>;
   };
@@ -401,7 +401,7 @@ async function main() {
           });
         }
         const info = await connected.client
-          .getAppInfo()
+          .getServerInfo()
           .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
         if (info instanceof Error) {
           return c.error({

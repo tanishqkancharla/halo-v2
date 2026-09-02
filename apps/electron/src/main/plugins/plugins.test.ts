@@ -86,9 +86,7 @@ const pluginTest = test.extend<{
       filesystem: filesystemService,
       workspace: workspaceService,
     });
-    const host = new ElectronServerHost(() => {
-      throw new Error("Halo main window is not open.");
-    });
+    const host = new ElectronServerHost();
     const toolRuntime = new ToolRuntimeService({
       filesystem: filesystemService,
       workspace: workspaceService,
@@ -111,7 +109,6 @@ const pluginTest = test.extend<{
       toolRuntime,
       pluginToolGrants: grants,
       plugins: pluginService,
-      host,
       logger: new Logger(),
     };
     const rpc = await listenHaloRpcHttp({

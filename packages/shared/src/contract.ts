@@ -9,11 +9,30 @@ import {
 import type { AgentSessionState } from "./AgentSessionState.js";
 import type { ConnectionRequest } from "./connectionRequests.js";
 import type {
-  AppInfo,
   SessionSummary,
   WorkspaceInfo,
   WorkspaceTreeEvent,
 } from "./rpc.js";
+
+export type ServerInfo = {
+  version: string;
+};
+
+export type ConnectionStarted =
+  | { status: "connected" }
+  | {
+      status: "authorization-required";
+      authorizationUrl: string;
+      connectionId: string;
+    };
+
+export type ConnectionEvent = {
+  type: "halo.connection";
+  request: ConnectionRequest;
+  status: "connected" | "cancelled";
+};
+
+export type HaloSessionEvent = AgentSessionEvent | ConnectionEvent;
 
 export type PluginManifest = {
   id: string;
@@ -54,11 +73,9 @@ export type PluginInvocationInput = {
 };
 
 export const contract = {
-  getAppInfo: oc.output(type<AppInfo>()),
-  installAppUpdate: oc,
+  getServerInfo: oc.output(type<ServerInfo>()),
   workspace: {
     get: oc.output(type<WorkspaceInfo | undefined>()),
-    choose: oc.output(type<WorkspaceInfo | undefined>()),
     listPaths: oc.output(type<string[]>()),
     readFile: oc.input(type<{ path: string }>()).output(type<string>()),
     writeFile: oc
@@ -74,10 +91,13 @@ export const contract = {
       .output(type<{ sessionId: string; state: AgentSessionState }>()),
     events: oc
       .input(type<{ sessionId: string }>())
-      .output(asyncIteratorObject(type<AgentSessionEvent>())),
+      .output(asyncIteratorObject(type<HaloSessionEvent>())),
     prompt: oc.input(type<{ sessionId: string; text: string }>()),
-    startConnection:
-      oc.input(type<{ sessionId: string; request: ConnectionRequest }>()),
+    startConnection: oc
+      .input(type<{ sessionId: string; request: ConnectionRequest }>())
+      .output(type<ConnectionStarted>()),
+    cancelConnection:
+      oc.input(type<{ sessionId: string; connectionId: string }>()),
     abort: oc.input(type<{ sessionId: string }>()),
     close: oc.input(type<{ sessionId: string }>()),
   },
