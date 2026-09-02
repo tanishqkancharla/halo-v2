@@ -2,7 +2,7 @@
   "extends": "@get-halo/typescript-config/react-library.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable", "ESNext.Disposable"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "ESNext.Disposable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,

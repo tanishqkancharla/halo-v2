@@ -1,3 +1,7 @@
+import {
+  generatedPromptFlow,
+  generatedPromptServices,
+} from "./generated/prompt.js";
 import { event, frame, type Program, type Service } from "./Program.js";
 
 const services: Service[] = [
@@ -364,8 +368,9 @@ const pi = "node_modules/@earendil-works";
 
 export const haloProgram: Program = {
   name: "Halo",
-  services,
+  services: [...services, ...generatedPromptServices],
   flows: [
+    generatedPromptFlow,
     {
       id: "prompt",
       title: "Send a prompt",
