@@ -164,7 +164,7 @@ const editorShellClass = style(
     minWidth: 0,
     "& .ProseMirror": {
       outline: "none",
-      minHeight: "2.75em",
+      minHeight: "max(2.75em, 100%)",
     },
     "& .ProseMirror p.is-editor-empty:first-child::before": {
       color: colors.gray[9],

@@ -66,7 +66,7 @@ export function CodeViewFileEditor({
           onItemEditChange={(_item, file) => {
             autosave.onChange(file.contents);
           }}
-          style={{ height: "100%", width: "100%" }}
+          style={{ height: "100%", minHeight: "100%", width: "100%" }}
         />
       </EditProvider>
     </div>
@@ -76,6 +76,6 @@ export function CodeViewFileEditor({
 const hostClass = style({
   flex: "1 1 auto",
   minWidth: 0,
-  minHeight: 0,
+  minHeight: "100%",
   height: "100%",
 });
