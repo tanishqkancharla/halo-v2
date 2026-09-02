@@ -27,18 +27,27 @@ export function ProcessBadge(props: { process: ProcessName }) {
   return <Badge className={badge}>{processLabels[props.process]}</Badge>;
 }
 
-/** A service name coloured by its process; unknown ids fall in `outside`. */
-export function ActorBadge(props: {
-  service: Service | undefined;
-  id: string;
-}) {
-  const process =
-    props.service === undefined ? "outside" : props.service.process;
-  const badge = useStyles(processStyles[process], actorStyle);
+export const processText = {
+  renderer: style({ color: colors.blue[11] }),
+  preload: style({ color: colors.violet[11] }),
+  main: style({ color: colors.grass[11] }),
+  outside: style({ color: colors.gray[11] }),
+} satisfies Record<ProcessName, ReturnType<typeof style>>;
+
+export function serviceProcess(service: Service | undefined): ProcessName {
+  return service === undefined ? "outside" : service.process;
+}
+
+/** A service name in its service's colour, no chip. */
+export function ActorText(props: { service: Service | undefined; id: string }) {
+  const actor = useStyles(
+    actorStyle,
+    processText[serviceProcess(props.service)],
+  );
   return (
-    <Badge className={badge}>
+    <span className={actor}>
       {props.service === undefined ? props.id : props.service.name}
-    </Badge>
+    </span>
   );
 }
 

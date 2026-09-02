@@ -18,7 +18,12 @@ import {
   type Keyed,
   type Service,
 } from "../model/Program.js";
-import { ActorBadge, ProcessBadge, StateChip } from "./badges.tsx";
+import {
+  ActorText,
+  processText,
+  serviceProcess,
+  StateChip,
+} from "./badges.tsx";
 import { carrierIcons, carrierLabels } from "./carriers.tsx";
 import { SourceExcerpt } from "./SourceExcerpt.tsx";
 
@@ -127,11 +132,11 @@ function EventRow(props: {
               )
             ) : undefined}
           </span>
-          <ActorBadge service={props.services.get(node.from)} id={node.from} />
+          <ActorText service={props.services.get(node.from)} id={node.from} />
           <span className={arrow} aria-hidden="true">
             <ArrowRight size="xs" />
           </span>
-          <ActorBadge service={props.services.get(node.to)} id={node.to} />
+          <ActorText service={props.services.get(node.to)} id={node.to} />
           <span className={name}>{node.name}</span>
           {node.detail === undefined ? undefined : (
             <span className={detail}>{node.detail}</span>
@@ -180,7 +185,7 @@ function FrameRow(props: {
   const row = useStyles(styles.row, canOpen ? styles.rowClickable : undefined);
   const rowButton = useStyles(styles.rowButton);
   const chevron = useStyles(styles.chevron);
-  const entry = useStyles(styles.entry);
+  const entry = useStyles(styles.entry, processText[serviceProcess(service)]);
   const summary = useStyles(styles.detail);
   const stateList = useStyles(styles.stateList);
   const sourceButton = useStyles(
@@ -209,9 +214,6 @@ function FrameRow(props: {
               )
             ) : undefined}
           </span>
-          {service === undefined ? undefined : (
-            <ProcessBadge process={service.process} />
-          )}
           <span className={entry}>{node.entry}</span>
           {node.summary === undefined ? undefined : (
             <span className={summary}>{node.summary}</span>
@@ -262,16 +264,16 @@ const monospace =
   'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace';
 
 const styles = {
-  list: style(flex({ direction: "column" }), {
+  list: style(flex({ direction: "column", gap: 1 }), {
     minWidth: 0,
   }),
   node: style(flex({ direction: "column" }), {
     minWidth: 0,
   }),
   row: style(
-    flex({ direction: "row", align: "center", gap: 3, wrap: true }),
+    flex({ direction: "row", align: "center", gap: 4, wrap: true }),
     radius.sm,
-    spacing.padding({ right: 3 }),
+    spacing.padding({ right: 4 }),
     {
       minWidth: 0,
     },
@@ -282,8 +284,8 @@ const styles = {
     },
   }),
   rowButton: style(
-    flex({ direction: "row", align: "center", gap: 2, wrap: true }),
-    spacing.padding({ x: 2, y: 2 }),
+    flex({ direction: "row", align: "center", gap: 3, wrap: true }),
+    spacing.padding({ x: 2, y: 3 }),
     {
       flex: "1 1 auto",
       minWidth: 0,
@@ -363,9 +365,9 @@ const styles = {
     color: colors.accent[11],
     backgroundColor: colors.accentAlpha[3],
   }),
-  children: style(spacing.padding({ left: 4 }), {
-    marginLeft: "13px",
-    borderLeft: `1px solid ${colors.gray[6]}`,
+  children: style(spacing.padding({ left: 6 }), {
+    marginLeft: "15px",
+    borderLeft: `1px solid ${colors.gray[5]}`,
     minWidth: 0,
   }),
   sourceBlock: style(spacing.padding({ y: 2, right: 2 }), {

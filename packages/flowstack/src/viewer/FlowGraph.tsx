@@ -26,7 +26,7 @@ import type {
   ProcessName,
   Service,
 } from "../model/Program.js";
-import { ActorBadge, ProcessBadge, StateChip } from "./badges.tsx";
+import { ActorText, StateChip } from "./badges.tsx";
 import { carrierLabels } from "./carriers.tsx";
 import { SourceExcerpt } from "./SourceExcerpt.tsx";
 
@@ -676,14 +676,11 @@ function DetailPanel(props: {
           {closeControl}
         </div>
         <div className={meta}>
-          <ActorBadge
-            service={props.services.get(event.from)}
-            id={event.from}
-          />
+          <ActorText service={props.services.get(event.from)} id={event.from} />
           <span className={arrow} aria-hidden="true">
             <ArrowRight size="xs" />
           </span>
-          <ActorBadge service={props.services.get(event.to)} id={event.to} />
+          <ActorText service={props.services.get(event.to)} id={event.to} />
           <Badge>{carrierLabels[event.carrier]}</Badge>
         </div>
         {event.detail === undefined ? undefined : (
@@ -711,7 +708,6 @@ function DetailPanel(props: {
       </div>
       {service === undefined ? undefined : (
         <div className={meta}>
-          <ProcessBadge process={service.process} />
           {service.state.length === 0 ? undefined : (
             <ul className={stateList} aria-label={`${service.name} state`}>
               {service.state.map((field) => (

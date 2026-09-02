@@ -17,7 +17,12 @@ import {
   type Keyed,
   type Service,
 } from "../model/Program.js";
-import { ActorBadge, ProcessBadge, StateChip } from "./badges.tsx";
+import {
+  ActorText,
+  processText,
+  serviceProcess,
+  StateChip,
+} from "./badges.tsx";
 import { carrierLabels } from "./carriers.tsx";
 import { SourceExcerpt } from "./SourceExcerpt.tsx";
 
@@ -114,18 +119,15 @@ function NodePane(props: {
     >
       {node.kind === "event" ? (
         <div className={meta}>
-          <ActorBadge service={props.services.get(node.from)} id={node.from} />
+          <ActorText service={props.services.get(node.from)} id={node.from} />
           <span className={arrow} aria-hidden="true">
             <ArrowRight size="xs" />
           </span>
-          <ActorBadge service={props.services.get(node.to)} id={node.to} />
+          <ActorText service={props.services.get(node.to)} id={node.to} />
           <Badge>{carrierLabels[node.carrier]}</Badge>
         </div>
       ) : (
         <div className={meta}>
-          {service === undefined ? undefined : (
-            <ProcessBadge process={service.process} />
-          )}
           {service === undefined || service.state.length === 0 ? undefined : (
             <ul className={stateList} aria-label={`${service.name} state`}>
               {service.state.map((field) => (
@@ -244,13 +246,13 @@ function PaneRow(props: {
     canOpen ? styles.rowClickable : undefined,
     props.selected ? styles.rowSelected : undefined,
   );
-  const entry = useStyles(styles.entry);
+  const service =
+    node.kind === "frame" ? props.services.get(node.service) : undefined;
+  const entry = useStyles(styles.entry, processText[serviceProcess(service)]);
   const name = useStyles(styles.eventName);
   const summary = useStyles(styles.summary);
   const arrow = useStyles(styles.arrow);
   const chevron = useStyles(styles.chevron);
-  const service =
-    node.kind === "frame" ? props.services.get(node.service) : undefined;
   return (
     <button
       type="button"
@@ -261,11 +263,11 @@ function PaneRow(props: {
     >
       {node.kind === "event" ? (
         <>
-          <ActorBadge service={props.services.get(node.from)} id={node.from} />
+          <ActorText service={props.services.get(node.from)} id={node.from} />
           <span className={arrow} aria-hidden="true">
             <ArrowRight size="xs" />
           </span>
-          <ActorBadge service={props.services.get(node.to)} id={node.to} />
+          <ActorText service={props.services.get(node.to)} id={node.to} />
           <span className={name}>{node.name}</span>
           {node.detail === undefined ? undefined : (
             <span className={summary}>{node.detail}</span>
@@ -273,9 +275,6 @@ function PaneRow(props: {
         </>
       ) : (
         <>
-          {service === undefined ? undefined : (
-            <ProcessBadge process={service.process} />
-          )}
           <span className={entry}>{node.entry}</span>
           {node.summary === undefined ? undefined : (
             <span className={summary}>{node.summary}</span>

@@ -5,9 +5,9 @@ import {
   keyed,
   type FlowNode,
   type Keyed,
-  type ProcessName,
   type Service,
 } from "../model/Program.js";
+import { ActorText, processText, serviceProcess } from "./badges.tsx";
 import { carrierLabels } from "./carriers.tsx";
 import { sourceKey, type Expansion, type TreeLevel } from "./FlowTree.tsx";
 import { SourceExcerpt } from "./SourceExcerpt.tsx";
@@ -203,45 +203,28 @@ function EventText(props: {
   return (
     <>
       <ActorText id={props.from} service={props.services.get(props.from)} />
-      <span className={arrow}> → </span>
+      <span className={arrow}>{"  →  "}</span>
       <ActorText id={props.to} service={props.services.get(props.to)} />
-      <span className={arrow}> · </span>
+      <span className={arrow}>{"   "}</span>
       <span className={name}>{props.name}</span>
     </>
   );
 }
 
-function ActorText(props: { id: string; service: Service | undefined }) {
-  const process =
-    props.service === undefined ? "outside" : props.service.process;
-  const actor = useStyles(styles.actor, processText[process]);
-  return (
-    <span className={actor}>
-      {props.service === undefined ? props.id : props.service.name}
-    </span>
-  );
-}
-
 function FrameText(props: { service: Service | undefined; entry: string }) {
-  const process =
-    props.service === undefined ? "outside" : props.service.process;
-  const entry = useStyles(styles.entry, processText[process]);
+  const entry = useStyles(
+    styles.entry,
+    processText[serviceProcess(props.service)],
+  );
   return <span className={entry}>{props.entry}</span>;
 }
 
-const processText = {
-  renderer: style({ color: colors.blue[11] }),
-  preload: style({ color: colors.violet[11] }),
-  main: style({ color: colors.grass[11] }),
-  outside: style({ color: colors.gray[11] }),
-} satisfies Record<ProcessName, ReturnType<typeof style>>;
-
 const styles = {
-  block: style(radius.md, spacing.padding({ y: 3 }), {
+  block: style(radius.md, spacing.padding({ y: 4, x: 2 }), {
     fontFamily:
       'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    fontSize: "12.5px",
-    lineHeight: "20px",
+    fontSize: "13px",
+    lineHeight: "30px",
     border: `1px solid ${colors.gray[5]}`,
     backgroundColor: backgroundColor.element,
     overflowX: "auto",
@@ -288,7 +271,7 @@ const styles = {
     flex: "0 0 auto",
   }),
   glyph: style({
-    color: colors.gray[8],
+    color: colors.gray[7],
     flex: "0 0 auto",
   }),
   actor: style({
@@ -304,7 +287,7 @@ const styles = {
     fontWeight: 500,
   }),
   trail: style({
-    marginLeft: spacing.value(4),
+    marginLeft: spacing.value(6),
     color: colors.gray[10],
     fontSize: "11px",
     display: "inline-flex",
@@ -333,7 +316,7 @@ const styles = {
     color: colors.accent[11],
     borderColor: colors.accent[8],
   }),
-  excerpt: style(spacing.padding({ y: 2 }), {
+  excerpt: style(spacing.padding({ y: 3 }), {
     marginRight: spacing.value(3),
     whiteSpace: "normal",
     minWidth: 0,
