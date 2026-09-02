@@ -93,5 +93,17 @@ const hostClass = style({
     minWidth: 0,
     minHeight: "100%",
     height: "100%",
+    display: "flex",
+    flexDirection: "column",
+  },
+  "& > div > div > div:has(diffs-container)": {
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: "100%",
+    height: "100%",
+  },
+  "& diffs-container": {
+    minHeight: "100%",
+    height: "100%",
   },
 });
