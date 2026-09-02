@@ -19,21 +19,27 @@ import {
 import { style, useStyles } from "purse-styles";
 import { flowSequenceSource, programMapSource } from "../model/diagrams.js";
 import { haloProgram } from "../model/halo.js";
-import type { Flow, ProcessName, Program, Service } from "../model/Program.js";
+import {
+  descendants,
+  type Flow,
+  type ProcessName,
+  type Program,
+  type Service,
+} from "../model/Program.js";
+import { ProcessBadge, StateChip } from "./badges.tsx";
 import { carrierIcons, carrierLabels } from "./carriers.tsx";
 import { MermaidBlock } from "./MermaidBlock.tsx";
 import { FlowGraph } from "./FlowGraph.tsx";
 import { PaneStack } from "./PaneStack.tsx";
 import {
-  frameKeys,
-  PathStack,
-  ProcessBadge,
-  StateChip,
+  FlowTree,
+  sourceKey,
   type Expansion,
-} from "./PathStack.tsx";
+  type TreeLevel,
+} from "./FlowTree.tsx";
 
 type Selection = { kind: "map" } | { kind: "flow"; id: string };
-type FlowView = "stack" | "panes" | "graph" | "sequence";
+type FlowView = "tree" | "panes" | "graph" | "sequence";
 
 const program = haloProgram;
 const services = new Map(
@@ -47,9 +53,10 @@ export function FlowstackApp() {
       ? { kind: "map" }
       : { kind: "flow", id: firstFlow.id },
   );
-  const [view, setView] = useState<FlowView>("stack");
+  const [view, setView] = useState<FlowView>("tree");
+  const [level, setLevel] = useState<TreeLevel>("events");
   const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(program.flows.map((flow) => rootFrameKey(flow))),
+    () => new Set(program.flows.flatMap((flow) => eventKeys(flow))),
   );
   const expansion: Expansion = {
     isExpanded: (key) => expanded.has(key),
@@ -88,9 +95,9 @@ export function FlowstackApp() {
         <div>
           <div className={title}>{program.name} — event flows</div>
           <div className={subtitle}>
-            Each flow is one inbound event and the path it takes through the
-            program. Click a frame to open the services it composes; leaf frames
-            open their source.
+            A flow is a tree of events between actors. Open an event to see what
+            its receiver does: the events it sends and, at the code level, the
+            frames that run. Every branch ends in source.
           </div>
         </div>
       </header>
@@ -132,15 +139,21 @@ export function FlowstackApp() {
               services={services}
               view={view}
               onViewChange={setView}
+              level={level}
+              onLevelChange={setLevel}
               expansion={expansion}
               onExpandAll={() =>
                 setExpanded((current) => {
                   const next = new Set(current);
-                  for (const key of frameKeys(
-                    selectedFlow.path,
+                  for (const { key, node } of descendants(
+                    selectedFlow.children,
                     selectedFlow.id,
-                  ))
+                  )) {
                     next.add(key);
+                    if (node.kind === "frame" && node.source !== undefined) {
+                      next.add(sourceKey(key));
+                    }
+                  }
                   return next;
                 })
               }
@@ -161,19 +174,20 @@ export function FlowstackApp() {
   );
 }
 
-function rootFrameKey(flow: Flow) {
-  const index = flow.path.findIndex((step) => step.kind === "frame");
-  return `${flow.id}/${index}`;
+function eventKeys(flow: Flow) {
+  return descendants(flow.children, flow.id)
+    .filter(({ node }) => node.kind === "event")
+    .map(({ key }) => key);
 }
 
 function FlowLabel(props: { flow: Flow }) {
-  const first = props.flow.path.find((step) => step.kind === "in");
+  const first = props.flow.children[0];
   const label = useStyles(styles.flowLabel);
   const icon = useStyles(styles.flowIcon);
-  if (first === undefined || first.kind !== "in") {
+  if (first === undefined || first.kind !== "event") {
     return <span>{props.flow.title}</span>;
   }
-  const Icon = carrierIcons[first.event.carrier];
+  const Icon = carrierIcons[first.carrier];
   return (
     <span className={label}>
       <span className={icon}>
@@ -189,16 +203,19 @@ function FlowPage(props: {
   services: Map<string, Service>;
   view: FlowView;
   onViewChange: (view: FlowView) => void;
+  level: TreeLevel;
+  onLevelChange: (level: TreeLevel) => void;
   expansion: Expansion;
   onExpandAll: () => void;
   onCollapseAll: () => void;
 }) {
-  const { view } = props;
+  const { view, level } = props;
   const page = useStyles(styles.page);
   const heading = useStyles(styles.heading);
   const description = useStyles(styles.description);
   const toolbar = useStyles(styles.toolbar);
   const toolbarSpacer = useStyles(styles.toolbarSpacer);
+  const toolbarDivider = useStyles(styles.toolbarDivider);
   const stackShell = useStyles(styles.stackShell);
   const panesPage = useStyles(styles.panesPage);
   const panesToolbar = useStyles(styles.panesToolbar);
@@ -208,13 +225,45 @@ function FlowPage(props: {
     [props.flow, props.services],
   );
 
+  const toolbarLabel = useStyles(styles.toolbarLabel);
+  const graphLevel = level === "events" ? "events" : "code";
+  const levelButtons = (withSource: boolean) => (
+    <>
+      <span className={toolbarLabel}>Level</span>
+      <Button
+        variant={level === "events" ? "default" : "quiet"}
+        onClick={() => props.onLevelChange("events")}
+      >
+        Events
+      </Button>
+      <Button
+        variant={
+          level === "code" || (!withSource && level === "source")
+            ? "default"
+            : "quiet"
+        }
+        onClick={() => props.onLevelChange("code")}
+      >
+        Code
+      </Button>
+      {withSource ? (
+        <Button
+          variant={level === "source" ? "default" : "quiet"}
+          onClick={() => props.onLevelChange("source")}
+        >
+          Source
+        </Button>
+      ) : undefined}
+    </>
+  );
   const viewButtons = (
     <>
+      <span className={toolbarLabel}>View</span>
       <Button
-        variant={view === "stack" ? "default" : "quiet"}
-        onClick={() => props.onViewChange("stack")}
+        variant={view === "tree" ? "default" : "quiet"}
+        onClick={() => props.onViewChange("tree")}
       >
-        Call stack
+        Tree
       </Button>
       <Button
         variant={view === "panes" ? "default" : "quiet"}
@@ -240,12 +289,24 @@ function FlowPage(props: {
   if (view === "panes" || view === "graph") {
     return (
       <div className={panesPage}>
-        <div className={panesToolbar}>{viewButtons}</div>
+        <div className={panesToolbar}>
+          {viewButtons}
+          {view === "graph" ? (
+            <>
+              <span className={toolbarSpacer} />
+              {levelButtons(false)}
+            </>
+          ) : undefined}
+        </div>
         <div className={panesBody}>
           {view === "panes" ? (
             <PaneStack flow={props.flow} services={props.services} />
           ) : (
-            <FlowGraph flow={props.flow} services={props.services} />
+            <FlowGraph
+              flow={props.flow}
+              services={props.services}
+              level={graphLevel}
+            />
           )}
         </div>
       </div>
@@ -260,9 +321,11 @@ function FlowPage(props: {
       </div>
       <div className={toolbar}>
         {viewButtons}
-        {view === "stack" ? (
+        {view === "tree" ? (
           <>
             <span className={toolbarSpacer} />
+            {levelButtons(true)}
+            <span className={toolbarDivider} />
             <Button variant="quiet" onClick={props.onExpandAll}>
               Expand all
             </Button>
@@ -272,13 +335,14 @@ function FlowPage(props: {
           </>
         ) : undefined}
       </div>
-      {view === "stack" ? (
+      {view === "tree" ? (
         <div className={stackShell}>
-          <PathStack
-            path={props.flow.path}
-            services={props.services}
-            expansion={props.expansion}
+          <FlowTree
+            nodes={props.flow.children}
             parentKey={props.flow.id}
+            services={props.services}
+            level={level}
+            expansion={props.expansion}
           />
         </div>
       ) : (
@@ -289,13 +353,7 @@ function FlowPage(props: {
   );
 }
 
-const processOrder: ProcessName[] = [
-  "app",
-  "renderer",
-  "preload",
-  "main",
-  "outside",
-];
+const processOrder: ProcessName[] = ["outside", "renderer", "preload", "main"];
 
 function Legend() {
   const legend = useStyles(styles.legend);
@@ -493,8 +551,22 @@ const styles = {
       maxWidth: "72ch",
     },
   ),
-  toolbar: style(flex({ direction: "row", align: "center", gap: 2 })),
+  toolbar: style(
+    flex({ direction: "row", align: "center", gap: 2, wrap: true }),
+  ),
   toolbarSpacer: style({ flex: "1 1 auto" }),
+  toolbarLabel: style(
+    text({ size: "xs", fontWeight: 500, color: "lowContrast" }),
+    {
+      marginRight: spacing.value(1),
+    },
+  ),
+  toolbarDivider: style({
+    width: "1px",
+    height: "16px",
+    marginInline: spacing.value(2),
+    backgroundColor: colors.gray[6],
+  }),
   stackShell: style(spacing.padding({ y: 3, x: 2 }), {
     borderRadius: "8px",
     border: `1px solid ${colors.gray[5]}`,

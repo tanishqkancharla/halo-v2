@@ -35,7 +35,6 @@ export const carrierLabels = {
 } satisfies Record<Carrier, string>;
 
 export const processLabels = {
-  app: "app",
   renderer: "renderer",
   preload: "preload",
   main: "main",

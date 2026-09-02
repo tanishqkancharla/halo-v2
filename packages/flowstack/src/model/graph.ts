@@ -1,167 +1,105 @@
-import type { Frame, Path, ProgramEvent } from "./Program.js";
+import {
+  eventChildren,
+  keyed,
+  type EventNode,
+  type FlowNode,
+  type FrameNode,
+  type Keyed,
+} from "./Program.js";
 
-export type FrameNode = {
+type ActorNode = { kind: "actor"; id: string; serviceId: string };
+type FrameGraphNode = {
   kind: "frame";
   id: string;
-  serviceId: string;
-  frames: { key: string; frame: Frame }[];
+  entry: Keyed<FrameNode>;
 };
+export type GraphNode = ActorNode | FrameGraphNode;
 
-type EventNode = {
-  kind: "event";
-  id: string;
-  direction: "in" | "out";
-  event: ProgramEvent;
-};
-
-/** The neighbour just outside the zoomed frame, drawn as a ghost. */
-type BoundaryNode = {
-  kind: "boundary";
-  id: string;
-  direction: "in" | "out";
-  label: string;
-};
-
-export type GraphNode = FrameNode | EventNode | BoundaryNode;
-
+/** An event edge carries its node; a call edge (frame to frame) carries none. */
 export type GraphEdge = {
   id: string;
   from: string;
   to: string;
   step: number;
-  hop?: ProgramEvent;
+  event?: Keyed<EventNode>;
 };
 
-export type PathGraph = { nodes: GraphNode[]; edges: GraphEdge[] };
+export type Graph = { nodes: GraphNode[]; edges: GraphEdge[] };
 
-export type Boundary = { from?: string; to?: string };
+/** What the chain of frames hangs off: the receiving actor or the calling frame. */
+export type GraphRoot =
+  | { kind: "actor"; serviceId: string }
+  | { kind: "frame"; entry: Keyed<FrameNode> };
 
 /**
- * One node per service, so a service the path visits twice (renderer → main
- * → renderer) is one box with two entries. Edges follow path order and carry
- * the hop event that sits between two frames.
+ * The tree below a node as a graph, flattened to `depth` event levels.
+ * Events are edges between actors, numbered in reading order. At the `code`
+ * level frames appear too, chained by call order from the root or from the
+ * actor that received their event; at the `events` level they are hidden and
+ * their events hoisted.
  */
-export function pathGraph(
-  path: Path,
+export function levelGraph(
+  children: FlowNode[],
   parentKey: string,
-  boundary: Boundary,
-): PathGraph {
+  root: GraphRoot | undefined,
+  level: "events" | "code",
+  depth: number,
+): Graph {
   const nodes = new Map<string, GraphNode>();
   const edges: GraphEdge[] = [];
   let step = 0;
-  let previous: string | undefined;
-  let lastFrame: string | undefined;
-  let pendingHop: ProgramEvent | undefined;
 
-  function connect(from: string, to: string) {
-    if (from === to) return;
-    step += 1;
-    edges.push({ id: `e${step}`, from, to, step, hop: pendingHop });
-    pendingHop = undefined;
+  function actor(serviceId: string) {
+    const id = `actor:${serviceId}`;
+    if (!nodes.has(id)) nodes.set(id, { kind: "actor", id, serviceId });
+    return id;
+  }
+  function frameNode(entry: Keyed<FrameNode>) {
+    const id = `frame:${entry.key}`;
+    nodes.set(id, { kind: "frame", id, entry });
+    return id;
   }
 
-  if (boundary.from !== undefined) {
-    const id = "boundary:in";
-    nodes.set(id, {
-      kind: "boundary",
-      id,
-      direction: "in",
-      label: boundary.from,
-    });
-    previous = id;
-  }
-
-  path.forEach((current, index) => {
-    const key = `${parentKey}/${index}`;
-    switch (current.kind) {
-      case "in": {
-        const id = `in:${index}`;
-        nodes.set(id, {
-          kind: "event",
-          id,
-          direction: "in",
-          event: current.event,
+  function visit(
+    items: FlowNode[],
+    itemsKey: string,
+    start: string | undefined,
+    depthLeft: number,
+  ) {
+    let cursor = start;
+    const visible: Keyed[] =
+      level === "events"
+        ? eventChildren(items, itemsKey)
+        : keyed(items, itemsKey);
+    for (const item of visible) {
+      step += 1;
+      if (item.node.kind === "event") {
+        const to = actor(item.node.to);
+        edges.push({
+          id: `e${step}`,
+          from: actor(item.node.from),
+          to,
+          step,
+          event: { key: item.key, node: item.node },
         });
-        previous = id;
-        return;
+        if (depthLeft > 1)
+          visit(item.node.children, item.key, to, depthLeft - 1);
+        continue;
       }
-      case "hop": {
-        pendingHop = current.event;
-        return;
+      const id = frameNode({ key: item.key, node: item.node });
+      if (cursor !== undefined) {
+        edges.push({ id: `e${step}`, from: cursor, to: id, step });
       }
-      case "frame": {
-        const id = `svc:${current.frame.service}`;
-        const existing = nodes.get(id);
-        if (existing === undefined || existing.kind !== "frame") {
-          nodes.set(id, {
-            kind: "frame",
-            id,
-            serviceId: current.frame.service,
-            frames: [{ key, frame: current.frame }],
-          });
-        } else {
-          existing.frames.push({ key, frame: current.frame });
-        }
-        if (previous !== undefined) connect(previous, id);
-        previous = id;
-        lastFrame = id;
-        return;
-      }
-      case "out": {
-        const id = `out:${index}`;
-        nodes.set(id, {
-          kind: "event",
-          id,
-          direction: "out",
-          event: current.event,
-        });
-        if (previous !== undefined) connect(previous, id);
-        return;
-      }
+      cursor = id;
     }
-  });
-
-  if (boundary.to !== undefined && lastFrame !== undefined) {
-    const id = "boundary:out";
-    nodes.set(id, {
-      kind: "boundary",
-      id,
-      direction: "out",
-      label: boundary.to,
-    });
-    connect(lastFrame, id);
   }
+
+  let start: string | undefined;
+  if (root !== undefined) {
+    start =
+      root.kind === "actor" ? actor(root.serviceId) : frameNode(root.entry);
+  }
+  visit(children, parentKey, start, depth);
 
   return { nodes: [...nodes.values()], edges };
-}
-
-/** The frames on either side of `index` in `path`, for a zoomed-in boundary. */
-export function boundaryAround(
-  path: Path,
-  index: number,
-  serviceName: (id: string) => string,
-): Boundary {
-  let from: string | undefined;
-  for (let i = index - 1; i >= 0; i -= 1) {
-    const step = path[i];
-    if (step === undefined) continue;
-    if (step.kind === "frame") {
-      from = serviceName(step.frame.service);
-      break;
-    }
-    if (step.kind === "in") {
-      from = step.event.name;
-      break;
-    }
-  }
-  let to: string | undefined;
-  for (let i = index + 1; i < path.length; i += 1) {
-    const step = path[i];
-    if (step === undefined) continue;
-    if (step.kind === "frame") {
-      to = serviceName(step.frame.service);
-      break;
-    }
-  }
-  return { from, to };
 }

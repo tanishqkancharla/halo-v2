@@ -1,107 +1,119 @@
 import { useMemo, useState } from "react";
 import { graphlib, layout } from "@dagrejs/dagre";
-import { Button, backgroundColor, colors, flex, spacing, text } from "maui";
-import { ChevronRight, Close } from "maui/icons";
+import {
+  Badge,
+  Button,
+  backgroundColor,
+  colors,
+  flex,
+  spacing,
+  text,
+} from "maui";
+import { ArrowRight, ChevronRight, Close } from "maui/icons";
 import { style, useStyles } from "purse-styles";
 import {
-  boundaryAround,
-  pathGraph,
-  type Boundary,
-  type FrameNode,
+  levelGraph,
+  type Graph,
   type GraphEdge,
   type GraphNode,
-  type PathGraph,
+  type GraphRoot,
 } from "../model/graph.js";
 import type {
+  EventNode,
   Flow,
-  Frame,
-  Path,
+  FlowNode,
+  Keyed,
   ProcessName,
   Service,
 } from "../model/Program.js";
+import { ActorBadge, ProcessBadge, StateChip } from "./badges.tsx";
 import { carrierLabels } from "./carriers.tsx";
-import { ProcessBadge, StateChip } from "./PathStack.tsx";
 import { SourceExcerpt } from "./SourceExcerpt.tsx";
 
-type Level = { key: string; frame: Frame; boundary: Boundary };
+type Selected =
+  | { kind: "node"; node: GraphNode }
+  | { kind: "event"; entry: Keyed<EventNode> };
 
-const nodeHeight = 46;
-const eventHeight = 28;
+const frameHeight = 46;
+const actorHeight = 34;
 const charWidth = 6.6;
 const monoCharWidth = 7.6;
 
 /**
- * The path as a graph. Services are boxes, numbered edges follow the path,
- * and clicking a box that composes other services zooms into its inner path.
+ * One level of the flow as a graph. Actors are boxes, events are numbered
+ * edges between them, and at the code level frames chain from the receiver.
+ * Clicking an edge badge or a frame with children zooms into it.
  */
 export function FlowGraph(props: {
   flow: Flow;
   services: Map<string, Service>;
+  level: "events" | "code";
 }) {
-  const serviceName = (id: string) => {
-    const service = props.services.get(id);
-    return service === undefined ? id : service.name;
-  };
-  const [levels, setLevels] = useState<Level[]>(() => {
-    const index = props.flow.path.findIndex((step) => step.kind === "frame");
-    const root = props.flow.path[index];
-    if (root === undefined || root.kind !== "frame") return [];
-    return [
-      {
-        key: `${props.flow.id}/${index}`,
-        frame: root.frame,
-        boundary: boundaryAround(props.flow.path, index, serviceName),
-      },
-    ];
-  });
-  const [selectedId, setSelectedId] = useState<string>();
+  const [trail, setTrail] = useState<Keyed[]>([]);
+  const [selected, setSelected] = useState<Selected>();
+  const [depth, setDepth] = useState<number>(3);
 
-  const current = levels[levels.length - 1];
-  const path: Path =
-    current === undefined
-      ? props.flow.path
-      : current.frame.inner === undefined
-        ? []
-        : current.frame.inner;
-
-  const graph = useMemo(
-    () =>
-      current === undefined
-        ? pathGraph(props.flow.path, props.flow.id, {})
-        : pathGraph(
-            current.frame.inner === undefined ? [] : current.frame.inner,
-            current.key,
-            current.boundary,
-          ),
-    [current, props.flow],
-  );
+  const current = trail[trail.length - 1];
+  const graph = useMemo(() => {
+    if (current === undefined) {
+      return levelGraph(
+        props.flow.children,
+        props.flow.id,
+        undefined,
+        props.level,
+        depth,
+      );
+    }
+    const root: GraphRoot =
+      current.node.kind === "event"
+        ? { kind: "actor", serviceId: current.node.to }
+        : { kind: "frame", entry: { key: current.key, node: current.node } };
+    return levelGraph(
+      current.node.children,
+      current.key,
+      root,
+      props.level,
+      depth,
+    );
+  }, [current, depth, props.flow, props.level]);
   const positioned = useMemo(
     () => layoutGraph(graph, props.services),
     [graph, props.services],
   );
 
-  function zoomInto(node: FrameNode) {
-    const target = node.frames.find((entry) => entry.frame.inner !== undefined);
-    if (target === undefined) return false;
-    const index = Number(target.key.slice(target.key.lastIndexOf("/") + 1));
-    setLevels((existing) => [
-      ...existing,
-      {
-        key: target.key,
-        frame: target.frame,
-        boundary: boundaryAround(path, index, serviceName),
-      },
-    ]);
-    setSelectedId(undefined);
-    return true;
+  function zoomInto(entry: Keyed) {
+    setTrail((existing) => [...existing, entry]);
+    setSelected(undefined);
   }
 
   function onNodeClick(node: GraphNode) {
-    if (node.kind === "frame" && zoomInto(node)) return;
-    setSelectedId((existing) => (existing === node.id ? undefined : node.id));
+    if (node.kind === "frame" && node.entry.node.children.length > 0) {
+      const isRoot = current !== undefined && current.key === node.entry.key;
+      if (!isRoot) {
+        zoomInto(node.entry);
+        return;
+      }
+    }
+    setSelected((existing) =>
+      existing?.kind === "node" && existing.node.id === node.id
+        ? undefined
+        : { kind: "node", node },
+    );
   }
 
-  const selected = graph.nodes.find((node) => node.id === selectedId);
+  function onEdgeClick(edge: GraphEdge) {
+    if (edge.event === undefined) return;
+    if (edge.event.node.children.length > 0) {
+      zoomInto(edge.event);
+      return;
+    }
+    const entry = edge.event;
+    setSelected((existing) =>
+      existing?.kind === "event" && existing.entry.key === entry.key
+        ? undefined
+        : { kind: "event", entry },
+    );
+  }
 
   const shell = useStyles(styles.shell);
   const crumbs = useStyles(styles.crumbs);
@@ -109,57 +121,76 @@ export function FlowGraph(props: {
   const body = useStyles(styles.body);
   const canvas = useStyles(styles.canvas);
   const hint = useStyles(styles.hint);
+  const depthLabel = useStyles(styles.depthLabel);
 
   return (
     <div className={shell}>
       <div className={crumbs}>
         <Button
-          variant={levels.length === 0 ? "default" : "quiet"}
+          variant={trail.length === 0 ? "default" : "quiet"}
           onClick={() => {
-            setLevels([]);
-            setSelectedId(undefined);
+            setTrail([]);
+            setSelected(undefined);
           }}
         >
           {props.flow.title}
         </Button>
-        {levels.map((level, index) => (
-          <span key={level.key} className={crumbs}>
+        {trail.map((entry, index) => (
+          <span key={entry.key} className={crumbs}>
             <span className={crumbSeparator}>
               <ChevronRight size="xs" />
             </span>
             <Button
-              variant={index === levels.length - 1 ? "default" : "quiet"}
+              variant={index === trail.length - 1 ? "default" : "quiet"}
               onClick={() => {
-                setLevels((existing) => existing.slice(0, index + 1));
-                setSelectedId(undefined);
+                setTrail((existing) => existing.slice(0, index + 1));
+                setSelected(undefined);
               }}
             >
-              {level.frame.entry}
+              {nodeTitle(entry.node)}
             </Button>
           </span>
         ))}
         <span className={hint}>
-          Click a service with a + to zoom in. Click a leaf to read its source.
+          Click a numbered event to zoom into what its receiver does. Click a
+          box for details.
         </span>
+        <span className={depthLabel}>Depth</span>
+        {depthChoices.map((choice) => (
+          <Button
+            key={choice}
+            variant={depth === choice ? "default" : "quiet"}
+            onClick={() => setDepth(choice)}
+          >
+            {choice === Number.POSITIVE_INFINITY ? "all" : String(choice)}
+          </Button>
+        ))}
       </div>
       <div className={body}>
         <div className={canvas}>
           <GraphSvg
             positioned={positioned}
-            selectedId={selectedId}
+            selected={selected}
             onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
           />
         </div>
         {selected === undefined ? undefined : (
           <DetailPanel
-            node={selected}
+            selected={selected}
             services={props.services}
-            onClose={() => setSelectedId(undefined)}
+            onClose={() => setSelected(undefined)}
           />
         )}
       </div>
     </div>
   );
+}
+
+const depthChoices = [1, 2, 3, Number.POSITIVE_INFINITY];
+
+function nodeTitle(node: FlowNode) {
+  return node.kind === "event" ? node.name : node.entry;
 }
 
 type PositionedNode = {
@@ -170,7 +201,7 @@ type PositionedNode = {
   height: number;
   title: string;
   subtitle: string | undefined;
-  process: ProcessName | undefined;
+  process: ProcessName;
   zoomable: boolean;
 };
 
@@ -193,78 +224,67 @@ function describeNode(
   node: GraphNode,
   services: Map<string, Service>,
 ): Omit<PositionedNode, "x" | "y" | "node"> {
-  if (node.kind === "frame") {
+  if (node.kind === "actor") {
     const service = services.get(node.serviceId);
     const title = service === undefined ? node.serviceId : service.name;
-    const subtitle = node.frames
-      .map((entry) => entryLabel(entry.frame.entry, title))
-      .join(" · ");
-    const width = clamp(
-      Math.max(
-        title.length * monoCharWidth + 44,
-        subtitle.length * charWidth + 28,
-      ),
-      140,
-      300,
-    );
     return {
-      width,
-      height: nodeHeight,
+      width: clamp(title.length * monoCharWidth + 32, 120, 280),
+      height: actorHeight,
       title,
-      subtitle,
-      process: service?.process,
-      zoomable: node.frames.some((entry) => entry.frame.inner !== undefined),
+      subtitle: undefined,
+      process: service === undefined ? "outside" : service.process,
+      zoomable: false,
     };
   }
-  const title = node.kind === "event" ? node.event.name : node.label;
-  const prefix = node.kind === "boundary" ? 5 : 0;
+  const frame = node.entry.node;
+  const service = services.get(frame.service);
+  const title = frame.entry;
+  const subtitle = frame.summary;
   return {
-    width: clamp((title.length + prefix) * charWidth + 32, 96, 280),
-    height: eventHeight,
+    width: clamp(
+      Math.max(
+        title.length * monoCharWidth + 44,
+        subtitle === undefined
+          ? 0
+          : Math.min(subtitle.length, 40) * charWidth + 28,
+      ),
+      160,
+      320,
+    ),
+    height: frameHeight,
     title,
-    subtitle: undefined,
-    process: undefined,
-    zoomable: false,
+    subtitle,
+    process: service === undefined ? "outside" : service.process,
+    zoomable: frame.children.length > 0,
   };
 }
 
-/** `SessionRegistry.open` inside the `SessionRegistry` box reads as `.open`. */
-function entryLabel(entry: string, serviceName: string) {
-  if (entry.startsWith(`${serviceName}.`))
-    return entry.slice(serviceName.length);
-  if (entry === serviceName) return "";
-  return entry;
-}
-
 function edgeLabel(edge: GraphEdge) {
-  if (edge.hop === undefined) return undefined;
-  return `${carrierLabels[edge.hop.carrier]} · ${edge.hop.name}`;
+  if (edge.event === undefined) return undefined;
+  return `${carrierLabels[edge.event.node.carrier]} · ${edge.event.node.name}`;
 }
 
-// A long path laid out left to right scales down past legibility; past this
+// A long chain laid out left to right scales down past legibility; past this
 // width the graph runs top to bottom and scrolls instead.
 const maxReadableWidth = 1400;
 
-function layoutGraph(
-  graph: PathGraph,
-  services: Map<string, Service>,
-): Positioned {
+function layoutGraph(graph: Graph, services: Map<string, Service>): Positioned {
   const wide = layoutGraphIn(graph, services, "LR");
   if (wide.width <= maxReadableWidth) return wide;
   return layoutGraphIn(graph, services, "TB");
 }
 
 function layoutGraphIn(
-  graph: PathGraph,
+  graph: Graph,
   services: Map<string, Service>,
   rankdir: "LR" | "TB",
 ): Positioned {
   const g = new graphlib.Graph({ multigraph: true })
     .setGraph({
       rankdir,
-      nodesep: rankdir === "LR" ? 28 : 48,
-      ranksep: rankdir === "LR" ? 72 : 44,
-      edgesep: 16,
+      nodesep: rankdir === "LR" ? 32 : 48,
+      ranksep: rankdir === "LR" ? 80 : 48,
+      edgesep: 20,
       marginx: 24,
       marginy: 24,
     })
@@ -284,8 +304,8 @@ function layoutGraphIn(
       edge.from,
       edge.to,
       {
-        width: Math.max(20, chars * charWidth + 8),
-        height: label === undefined ? 20 : 38,
+        width: Math.max(24, chars * charWidth + 8),
+        height: label === undefined ? 24 : 40,
         labelpos: "c",
       },
       edge.id,
@@ -355,11 +375,6 @@ function smoothPath(points: { x: number; y: number }[]) {
 }
 
 const processFill = {
-  app: {
-    fill: colors.accentAlpha[3],
-    stroke: colors.accent[8],
-    text: colors.accent[11],
-  },
   renderer: {
     fill: colors.blueAlpha[3],
     stroke: colors.blue[8],
@@ -376,7 +391,7 @@ const processFill = {
     text: colors.grass[11],
   },
   outside: {
-    fill: colors.grayAlpha[3],
+    fill: colors.grayAlpha[2],
     stroke: colors.gray[8],
     text: colors.gray[11],
   },
@@ -384,10 +399,12 @@ const processFill = {
 
 function GraphSvg(props: {
   positioned: Positioned;
-  selectedId: string | undefined;
+  selected: Selected | undefined;
   onNodeClick: (node: GraphNode) => void;
+  onEdgeClick: (edge: GraphEdge) => void;
 }) {
   const svg = useStyles(styles.svg);
+  const badge = useStyles(styles.badge);
   const { positioned } = props;
   return (
     <svg
@@ -396,7 +413,7 @@ function GraphSvg(props: {
       viewBox={`0 0 ${positioned.width} ${positioned.height}`}
       preserveAspectRatio="xMinYMin meet"
       role="img"
-      aria-label="Path graph"
+      aria-label="Flow graph"
     >
       <defs>
         <marker
@@ -411,48 +428,84 @@ function GraphSvg(props: {
           <path d="M 0 0 L 10 5 L 0 10 z" style={{ fill: colors.gray[9] }} />
         </marker>
       </defs>
-      {positioned.edges.map((edge) => (
-        <g key={edge.edge.id}>
-          <path
-            d={smoothPath(edge.points)}
-            fill="none"
-            style={{ stroke: colors.gray[8] }}
-            strokeWidth={1.5}
-            markerEnd="url(#flowstack-arrow)"
-          />
-          <g
-            transform={`translate(${edge.labelX}, ${edge.labelY - (edge.label === undefined ? 0 : 9)})`}
-          >
-            <circle r={9} style={{ fill: colors.accent[9] }} />
-            <text
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={10}
-              fontWeight={600}
-              style={{ fill: "white" }}
+      {positioned.edges.map((edge) => {
+        const isEvent = edge.edge.event !== undefined;
+        const zoomable =
+          edge.edge.event !== undefined &&
+          edge.edge.event.node.children.length > 0;
+        const isSelected =
+          props.selected?.kind === "event" &&
+          edge.edge.event !== undefined &&
+          props.selected.entry.key === edge.edge.event.key;
+        return (
+          <g key={edge.edge.id}>
+            <path
+              d={smoothPath(edge.points)}
+              fill="none"
+              style={{ stroke: isEvent ? colors.gray[9] : colors.gray[7] }}
+              strokeWidth={isEvent ? 1.5 : 1.25}
+              strokeDasharray={isEvent ? undefined : "3 3"}
+              markerEnd="url(#flowstack-arrow)"
+            />
+            <g
+              className={isEvent ? badge : undefined}
+              transform={`translate(${edge.labelX}, ${edge.labelY - (edge.label === undefined ? 0 : 10)})`}
+              onClick={isEvent ? () => props.onEdgeClick(edge.edge) : undefined}
+              role={isEvent ? "button" : undefined}
+              aria-label={
+                edge.edge.event === undefined
+                  ? undefined
+                  : `Step ${edge.edge.step}: ${edge.edge.event.node.name}`
+              }
+              tabIndex={isEvent ? 0 : undefined}
             >
-              {edge.edge.step}
-            </text>
+              {zoomable ? (
+                <circle
+                  r={13}
+                  fill="none"
+                  style={{
+                    stroke: isSelected ? colors.accent[11] : colors.accent[7],
+                  }}
+                  strokeWidth={1.5}
+                />
+              ) : undefined}
+              <circle
+                r={isEvent ? 10 : 8}
+                style={{ fill: isEvent ? colors.accent[9] : colors.gray[8] }}
+              />
+              <text
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={isEvent ? 11 : 10}
+                fontWeight={600}
+                style={{ fill: "white" }}
+              >
+                {edge.edge.step}
+              </text>
+            </g>
+            {edge.label === undefined ? undefined : (
+              <text
+                x={edge.labelX}
+                y={edge.labelY + 14}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={10.5}
+                style={{ fill: colors.gray[11] }}
+              >
+                {truncate(edge.label, 36)}
+              </text>
+            )}
           </g>
-          {edge.label === undefined ? undefined : (
-            <text
-              x={edge.labelX}
-              y={edge.labelY + 12}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={10.5}
-              style={{ fill: colors.gray[11] }}
-            >
-              {truncate(edge.label, 36)}
-            </text>
-          )}
-        </g>
-      ))}
+        );
+      })}
       {positioned.nodes.map((placed) => (
         <NodeBox
           key={placed.node.id}
           placed={placed}
-          selected={props.selectedId === placed.node.id}
+          selected={
+            props.selected?.kind === "node" &&
+            props.selected.node.id === placed.node.id
+          }
           onClick={() => props.onNodeClick(placed.node)}
         />
       ))}
@@ -469,26 +522,10 @@ function NodeBox(props: {
   const nodeGroup = useStyles(styles.node);
   const left = placed.x - placed.width / 2;
   const top = placed.y - placed.height / 2;
-  const maxChars = Math.floor((placed.width - 24) / charWidth);
+  const palette = processFill[placed.process];
+  const ghost = placed.process === "outside";
 
-  if (placed.node.kind !== "frame") {
-    const isIn = placed.node.direction === "in";
-    const ghost = placed.node.kind === "boundary";
-    const stroke = ghost
-      ? colors.gray[8]
-      : isIn
-        ? colors.green[8]
-        : colors.orange[8];
-    const fill = ghost
-      ? "transparent"
-      : isIn
-        ? colors.greenAlpha[3]
-        : colors.orangeAlpha[3];
-    const textColor = ghost
-      ? colors.gray[11]
-      : isIn
-        ? colors.green[11]
-        : colors.orange[11];
+  if (placed.node.kind === "actor") {
     return (
       <g
         className={nodeGroup}
@@ -497,13 +534,17 @@ function NodeBox(props: {
         role="button"
         aria-label={placed.title}
         tabIndex={0}
+        data-flowstack-actor={placed.node.serviceId}
       >
         <rect
           width={placed.width}
           height={placed.height}
           rx={placed.height / 2}
-          style={{ fill, stroke }}
-          strokeWidth={props.selected ? 2 : 1}
+          style={{
+            fill: palette.fill,
+            stroke: props.selected ? colors.accent[9] : palette.stroke,
+          }}
+          strokeWidth={props.selected ? 2 : 1.5}
           strokeDasharray={ghost ? "4 3" : undefined}
         />
         <text
@@ -511,20 +552,21 @@ function NodeBox(props: {
           y={placed.height / 2}
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize={11}
-          fontWeight={500}
-          style={{ fill: textColor }}
+          fontSize={12.5}
+          fontWeight={600}
+          fontFamily='ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+          style={{ fill: colors.gray[12] }}
         >
-          {ghost
-            ? `${isIn ? "from" : "to"} ${truncate(placed.title, maxChars - 5)}`
-            : truncate(placed.title, maxChars)}
+          {truncate(
+            placed.title,
+            Math.floor((placed.width - 24) / monoCharWidth),
+          )}
         </text>
       </g>
     );
   }
 
-  const palette =
-    processFill[placed.process === undefined ? "outside" : placed.process];
+  const maxChars = Math.floor((placed.width - 24) / charWidth);
   return (
     <g
       className={nodeGroup}
@@ -533,25 +575,27 @@ function NodeBox(props: {
       role="button"
       aria-label={placed.title}
       tabIndex={0}
-      data-flowstack-node={placed.node.serviceId}
+      data-flowstack-frame={placed.node.entry.node.service}
     >
       <rect
         width={placed.width}
         height={placed.height}
         rx={8}
         style={{
-          fill: palette.fill,
+          fill: backgroundColor.element,
           stroke: props.selected ? colors.accent[9] : palette.stroke,
         }}
         strokeWidth={props.selected || placed.zoomable ? 2 : 1}
       />
+      <rect
+        width={4}
+        height={placed.height}
+        rx={2}
+        style={{ fill: palette.stroke }}
+      />
       <text
         x={12}
-        y={
-          placed.subtitle === undefined || placed.subtitle.length === 0
-            ? placed.height / 2
-            : 17
-        }
+        y={placed.subtitle === undefined ? placed.height / 2 : 17}
         dominantBaseline="central"
         fontSize={12.5}
         fontWeight={600}
@@ -563,14 +607,13 @@ function NodeBox(props: {
           Math.floor((placed.width - 36) / monoCharWidth),
         )}
       </text>
-      {placed.subtitle === undefined ||
-      placed.subtitle.length === 0 ? undefined : (
+      {placed.subtitle === undefined ? undefined : (
         <text
           x={12}
           y={33}
           dominantBaseline="central"
           fontSize={10.5}
-          style={{ fill: palette.text }}
+          style={{ fill: colors.gray[11] }}
         >
           {truncate(placed.subtitle, maxChars)}
         </text>
@@ -599,7 +642,7 @@ function truncate(value: string, maxChars: number) {
 }
 
 function DetailPanel(props: {
-  node: GraphNode;
+  selected: Selected;
   services: Map<string, Service>;
   onClose: () => void;
 }) {
@@ -609,85 +652,91 @@ function DetailPanel(props: {
   const closeButton = useStyles(styles.closeButton);
   const description = useStyles(styles.description);
   const meta = useStyles(styles.meta);
+  const arrow = useStyles(styles.crumbSeparator);
   const stateList = useStyles(styles.stateList);
-  const entryBlock = useStyles(styles.entryBlock);
-  const entryTitle = useStyles(styles.entryTitle);
-  const { node } = props;
+  const { selected } = props;
 
-  if (node.kind !== "frame") {
-    const title = node.kind === "event" ? node.event.name : node.label;
+  const closeControl = (
+    <button
+      type="button"
+      className={closeButton}
+      onClick={props.onClose}
+      aria-label="Close"
+    >
+      <Close size="xs" />
+    </button>
+  );
+
+  if (selected.kind === "event") {
+    const event = selected.entry.node;
     return (
-      <aside className={panel} aria-label={title}>
+      <aside className={panel} aria-label={event.name}>
         <div className={panelHeader}>
-          <span className={panelTitle}>{title}</span>
-          <button
-            type="button"
-            className={closeButton}
-            onClick={props.onClose}
-            aria-label="Close"
-          >
-            <Close size="xs" />
-          </button>
+          <span className={panelTitle}>{event.name}</span>
+          {closeControl}
         </div>
-        {node.kind === "event" ? (
-          <p className={description}>
-            {node.direction === "in" ? "Inbound" : "Outbound"} over{" "}
-            {carrierLabels[node.event.carrier]}
-            {node.event.detail === undefined ? "" : ` — ${node.event.detail}`}
-          </p>
-        ) : (
-          <p className={description}>
-            The {node.direction === "in" ? "previous" : "next"} service on the
-            enclosing path.
-          </p>
+        <div className={meta}>
+          <ActorBadge
+            service={props.services.get(event.from)}
+            id={event.from}
+          />
+          <span className={arrow} aria-hidden="true">
+            <ArrowRight size="xs" />
+          </span>
+          <ActorBadge service={props.services.get(event.to)} id={event.to} />
+          <Badge>{carrierLabels[event.carrier]}</Badge>
+        </div>
+        {event.detail === undefined ? undefined : (
+          <p className={description}>{event.detail}</p>
         )}
       </aside>
     );
   }
 
-  const service = props.services.get(node.serviceId);
-  const title = service === undefined ? node.serviceId : service.name;
+  const { node } = selected;
+  const service = props.services.get(
+    node.kind === "actor" ? node.serviceId : node.entry.node.service,
+  );
+  const title =
+    node.kind === "actor"
+      ? service === undefined
+        ? node.serviceId
+        : service.name
+      : node.entry.node.entry;
   return (
     <aside className={panel} aria-label={title}>
       <div className={panelHeader}>
         <span className={panelTitle}>{title}</span>
-        <button
-          type="button"
-          className={closeButton}
-          onClick={props.onClose}
-          aria-label="Close"
-        >
-          <Close size="xs" />
-        </button>
+        {closeControl}
       </div>
       {service === undefined ? undefined : (
-        <>
-          <div className={meta}>
-            <ProcessBadge process={service.process} />
-            {service.state.length === 0 ? undefined : (
-              <ul className={stateList} aria-label={`${service.name} state`}>
-                {service.state.map((field) => (
-                  <li key={field.name}>
-                    <StateChip field={field} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <p className={description}>{service.description}</p>
-        </>
-      )}
-      {node.frames.map((entry) => (
-        <div key={entry.key} className={entryBlock}>
-          <div className={entryTitle}>{entry.frame.entry}</div>
-          {entry.frame.summary === undefined ? undefined : (
-            <p className={description}>{entry.frame.summary}</p>
-          )}
-          {entry.frame.source === undefined ? undefined : (
-            <SourceExcerpt source={entry.frame.source} />
+        <div className={meta}>
+          <ProcessBadge process={service.process} />
+          {service.state.length === 0 ? undefined : (
+            <ul className={stateList} aria-label={`${service.name} state`}>
+              {service.state.map((field) => (
+                <li key={field.name}>
+                  <StateChip field={field} />
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-      ))}
+      )}
+      {node.kind === "actor" ? (
+        service === undefined ? undefined : (
+          <p className={description}>{service.description}</p>
+        )
+      ) : (
+        <>
+          {node.entry.node.summary === undefined ? undefined : (
+            <p className={description}>{node.entry.node.summary}</p>
+          )}
+          {node.entry.node.source === undefined ? undefined : (
+            <SourceExcerpt source={node.entry.node.source} />
+          )}
+        </>
+      )}
     </aside>
   );
 }
@@ -714,6 +763,12 @@ const styles = {
   hint: style(text({ size: "xs", fontWeight: 400, color: "lowContrast" }), {
     marginLeft: "auto",
   }),
+  depthLabel: style(
+    text({ size: "xs", fontWeight: 500, color: "lowContrast" }),
+    {
+      marginLeft: spacing.value(4),
+    },
+  ),
   body: style(flex({ direction: "row" }), {
     flex: "1 1 auto",
     minWidth: 0,
@@ -745,6 +800,15 @@ const styles = {
     "&:focus-visible rect": {
       stroke: colors.accent[9],
       strokeWidth: 2,
+    },
+  }),
+  badge: style({
+    cursor: "pointer",
+    "&:hover circle": {
+      filter: "brightness(0.9)",
+    },
+    "&:focus-visible": {
+      outline: "none",
     },
   }),
   panel: style(
@@ -789,25 +853,13 @@ const styles = {
       margin: 0,
     },
   ),
-  meta: style(flex({ direction: "row", align: "center", gap: 3, wrap: true })),
+  meta: style(flex({ direction: "row", align: "center", gap: 2, wrap: true })),
   stateList: style(
     flex({ direction: "row", align: "center", gap: 1, wrap: true }),
     {
       listStyle: "none",
       margin: 0,
       padding: 0,
-    },
-  ),
-  entryBlock: style(flex({ direction: "column", gap: 2 }), {
-    paddingTop: spacing.value(3),
-    borderTop: `1px solid ${colors.gray[5]}`,
-    minWidth: 0,
-  }),
-  entryTitle: style(
-    text({ size: "sm", fontWeight: 500, color: "highContrast" }),
-    {
-      fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-      fontSize: "12.5px",
     },
   ),
 };

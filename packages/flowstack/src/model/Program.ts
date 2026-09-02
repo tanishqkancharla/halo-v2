@@ -1,9 +1,9 @@
 /**
- * A program is a DAG of services. Events cross its boundary in both
- * directions. A flow is one inbound event and the path it follows.
- *
- * A path at any level reads `[E_in, S, E_out]`. Clicking into `S` shows the
- * path through the services `S` composes, down to source lines.
+ * A program is a DAG of services. Events cross between them, and between
+ * them and the outside world. A flow is a tree: each event node holds what
+ * its receiver does in response (its activation), which is more events and
+ * the code frames that run. Frames nest by call, and the leaves are frames
+ * with source. Go deep enough and every branch ends in code.
  */
 
 /** The boundary an event crosses. */
@@ -17,12 +17,6 @@ export type Carrier =
   | "network"
   | "memory";
 
-export type ProgramEvent = {
-  name: string;
-  carrier: Carrier;
-  detail?: string;
-};
-
 export type StateField = {
   name: string;
   type: string;
@@ -35,28 +29,10 @@ export type Source = {
   end: number;
 };
 
-export type Frame = {
-  service: string;
-  entry: string;
-  summary?: string;
-  source?: Source;
-  inner?: Path;
-};
+export type ProcessName = "renderer" | "preload" | "main" | "outside";
 
-/**
- * `in` enters the enclosing service from outside it, `out` leaves it, and
- * `hop` moves between two services the enclosing service composes.
- */
-type Step =
-  | { kind: "in"; event: ProgramEvent }
-  | { kind: "hop"; event: ProgramEvent }
-  | { kind: "out"; event: ProgramEvent }
-  | { kind: "frame"; frame: Frame };
-
-export type Path = Step[];
-
-export type ProcessName = "app" | "renderer" | "preload" | "main" | "outside";
-
+/** A node of the program DAG. Actors outside the program (a human, a model
+ * provider, the disk) are services too, with process `outside`. */
 export type Service = {
   id: string;
   name: string;
@@ -66,11 +42,38 @@ export type Service = {
   composes: string[];
 };
 
+/**
+ * `from` sends, `to` receives. `children` is everything that happens while
+ * `to` is handling this event: frames it runs, events it sends, and events
+ * that come back to it before it is done.
+ */
+export type EventNode = {
+  kind: "event";
+  from: string;
+  to: string;
+  name: string;
+  carrier: Carrier;
+  detail?: string;
+  children: FlowNode[];
+};
+
+/** A function in a service. `children` are the frames it calls. */
+export type FrameNode = {
+  kind: "frame";
+  service: string;
+  entry: string;
+  summary?: string;
+  source?: Source;
+  children: FlowNode[];
+};
+
+export type FlowNode = EventNode | FrameNode;
+
 export type Flow = {
   id: string;
   title: string;
   description: string;
-  path: Path;
+  children: FlowNode[];
 };
 
 export type Program = {
@@ -79,18 +82,63 @@ export type Program = {
   flows: Flow[];
 };
 
-export function inbound(event: ProgramEvent): Step {
-  return { kind: "in", event };
+type EventInput = Omit<EventNode, "kind" | "children"> & {
+  children?: FlowNode[];
+};
+
+type FrameInput = Omit<FrameNode, "kind" | "children"> & {
+  children?: FlowNode[];
+};
+
+export function event(input: EventInput): EventNode {
+  const { children, ...rest } = input;
+  return {
+    kind: "event",
+    children: children === undefined ? [] : children,
+    ...rest,
+  };
 }
 
-export function hop(event: ProgramEvent): Step {
-  return { kind: "hop", event };
+export function frame(input: FrameInput): FrameNode {
+  const { children, ...rest } = input;
+  return {
+    kind: "frame",
+    children: children === undefined ? [] : children,
+    ...rest,
+  };
 }
 
-export function outbound(event: ProgramEvent): Step {
-  return { kind: "out", event };
+/** A node with its position in the tree, `${parentKey}/${index}` per level. */
+export type Keyed<T extends FlowNode = FlowNode> = { key: string; node: T };
+
+export function keyed(nodes: FlowNode[], parentKey: string): Keyed[] {
+  return nodes.map((node, index) => ({ key: `${parentKey}/${index}`, node }));
 }
 
-export function frame(value: Frame): Step {
-  return { kind: "frame", frame: value };
+/**
+ * The children with frame nodes removed. Events nested inside a frame move
+ * up to where the frame was, in order, and keep their keys.
+ */
+export function eventChildren(
+  nodes: FlowNode[],
+  parentKey: string,
+): Keyed<EventNode>[] {
+  const result: Keyed<EventNode>[] = [];
+  for (const { key, node } of keyed(nodes, parentKey)) {
+    if (node.kind === "frame") {
+      result.push(...eventChildren(node.children, key));
+      continue;
+    }
+    result.push({ key, node });
+  }
+  return result;
+}
+
+/** Every node below `nodes`, pre-order. */
+export function descendants(nodes: FlowNode[], parentKey: string): Keyed[] {
+  const result: Keyed[] = [];
+  for (const entry of keyed(nodes, parentKey)) {
+    result.push(entry, ...descendants(entry.node.children, entry.key));
+  }
+  return result;
 }

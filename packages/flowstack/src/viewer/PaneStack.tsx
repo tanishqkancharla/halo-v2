@@ -1,35 +1,42 @@
 import { useRef, useState } from "react";
-import { backgroundColor, colors, flex, radius, spacing, text } from "maui";
-import { ChevronRight } from "maui/icons";
+import {
+  Badge,
+  backgroundColor,
+  colors,
+  flex,
+  radius,
+  spacing,
+  text,
+} from "maui";
+import { ArrowRight, ChevronRight } from "maui/icons";
 import { style, useStyles } from "purse-styles";
-import type { Flow, Frame, Path, Service } from "../model/Program.js";
-import { EventRow } from "./EventRow.tsx";
-import { ProcessBadge, StateChip } from "./PathStack.tsx";
+import {
+  keyed,
+  type Flow,
+  type FlowNode,
+  type Keyed,
+  type Service,
+} from "../model/Program.js";
+import { ActorBadge, ProcessBadge, StateChip } from "./badges.tsx";
+import { carrierLabels } from "./carriers.tsx";
 import { SourceExcerpt } from "./SourceExcerpt.tsx";
 
 const paneWidth = 560;
 const stripWidth = 40;
 
-type OpenFrame = { key: string; frame: Frame };
-
 /**
  * Sliding panes, after Andy Matuschak's notes: the flow is the first pane,
- * and each frame you click opens to the right. Earlier panes stick to the
+ * and each node you click opens to the right. Earlier panes stick to the
  * left edge and collapse to a title strip as later ones slide over them.
  */
 export function PaneStack(props: {
   flow: Flow;
   services: Map<string, Service>;
 }) {
-  const [open, setOpen] = useState<OpenFrame[]>(() => {
-    const index = props.flow.path.findIndex((step) => step.kind === "frame");
-    const root = props.flow.path[index];
-    if (root === undefined || root.kind !== "frame") return [];
-    return [{ key: `${props.flow.id}/${index}`, frame: root.frame }];
-  });
+  const [open, setOpen] = useState<Keyed[]>([]);
   const container = useRef<HTMLDivElement>(null);
 
-  function openFrame(depth: number, next: OpenFrame) {
+  function openNode(depth: number, next: Keyed) {
     setOpen((current) => [...current.slice(0, depth), next]);
     // The new pane exists after React commits; scroll on the next frame.
     requestAnimationFrame(() => {
@@ -58,21 +65,20 @@ export function PaneStack(props: {
       >
         <PaneDescription text={props.flow.description} />
         <PaneRows
-          path={props.flow.path}
-          parentKey={props.flow.id}
+          items={keyed(props.flow.children, props.flow.id)}
           services={props.services}
           selectedKey={open[0]?.key}
-          onOpen={(next) => openFrame(0, next)}
+          onOpen={(next) => openNode(0, next)}
         />
       </Pane>
       {open.map((entry, index) => (
-        <FramePane
+        <NodePane
           key={entry.key}
           index={index + 1}
           entry={entry}
           services={props.services}
           selectedKey={open[index + 1]?.key}
-          onOpen={(next) => openFrame(index + 1, next)}
+          onOpen={(next) => openNode(index + 1, next)}
           onFocusPane={() => scrollToPane(index + 1)}
         />
       ))}
@@ -80,63 +86,84 @@ export function PaneStack(props: {
   );
 }
 
-function FramePane(props: {
+function nodeTitle(node: FlowNode) {
+  return node.kind === "event" ? node.name : node.entry;
+}
+
+function NodePane(props: {
   index: number;
-  entry: OpenFrame;
+  entry: Keyed;
   services: Map<string, Service>;
   selectedKey: string | undefined;
-  onOpen: (next: OpenFrame) => void;
+  onOpen: (next: Keyed) => void;
   onFocusPane: () => void;
 }) {
-  const { frame } = props.entry;
-  const service = props.services.get(frame.service);
+  const { node, key } = props.entry;
   const meta = useStyles(styles.meta);
+  const arrow = useStyles(styles.arrow);
   const stateList = useStyles(styles.stateList);
   const sectionLabel = useStyles(styles.sectionLabel);
   const sourceBlock = useStyles(styles.sourceBlock);
+  const service =
+    node.kind === "frame" ? props.services.get(node.service) : undefined;
   return (
     <Pane
       index={props.index}
-      title={frame.entry}
+      title={nodeTitle(node)}
       onFocusPane={props.onFocusPane}
     >
-      <div className={meta}>
-        {service === undefined ? undefined : (
-          <ProcessBadge process={service.process} />
-        )}
-        {service === undefined || service.state.length === 0 ? undefined : (
-          <ul className={stateList} aria-label={`${service.name} state`}>
-            {service.state.map((field) => (
-              <li key={field.name}>
-                <StateChip field={field} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      {frame.summary === undefined ? undefined : (
-        <PaneDescription text={frame.summary} />
+      {node.kind === "event" ? (
+        <div className={meta}>
+          <ActorBadge service={props.services.get(node.from)} id={node.from} />
+          <span className={arrow} aria-hidden="true">
+            <ArrowRight size="xs" />
+          </span>
+          <ActorBadge service={props.services.get(node.to)} id={node.to} />
+          <Badge>{carrierLabels[node.carrier]}</Badge>
+        </div>
+      ) : (
+        <div className={meta}>
+          {service === undefined ? undefined : (
+            <ProcessBadge process={service.process} />
+          )}
+          {service === undefined || service.state.length === 0 ? undefined : (
+            <ul className={stateList} aria-label={`${service.name} state`}>
+              {service.state.map((field) => (
+                <li key={field.name}>
+                  <StateChip field={field} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
-      {frame.inner === undefined ? undefined : (
+      {node.kind === "event" && node.detail !== undefined ? (
+        <PaneDescription text={node.detail} />
+      ) : undefined}
+      {node.kind === "frame" && node.summary !== undefined ? (
+        <PaneDescription text={node.summary} />
+      ) : undefined}
+      {node.children.length === 0 ? undefined : (
         <>
-          <div className={sectionLabel}>Path</div>
+          <div className={sectionLabel}>
+            {node.kind === "event" ? "Handled by" : "Calls"}
+          </div>
           <PaneRows
-            path={frame.inner}
-            parentKey={props.entry.key}
+            items={keyed(node.children, key)}
             services={props.services}
             selectedKey={props.selectedKey}
             onOpen={props.onOpen}
           />
         </>
       )}
-      {frame.source === undefined ? undefined : (
+      {node.kind === "frame" && node.source !== undefined ? (
         <>
           <div className={sectionLabel}>Source</div>
           <div className={sourceBlock}>
-            <SourceExcerpt source={frame.source} />
+            <SourceExcerpt source={node.source} />
           </div>
         </>
-      )}
+      ) : undefined}
     </Pane>
   );
 }
@@ -181,52 +208,49 @@ function PaneDescription(props: { text: string }) {
 }
 
 function PaneRows(props: {
-  path: Path;
-  parentKey: string;
+  items: Keyed[];
   services: Map<string, Service>;
   selectedKey: string | undefined;
-  onOpen: (next: OpenFrame) => void;
+  onOpen: (next: Keyed) => void;
 }) {
   const list = useStyles(styles.rows);
   return (
     <div className={list}>
-      {props.path.map((step, index) => {
-        const key = `${props.parentKey}/${index}`;
-        if (step.kind !== "frame") {
-          return (
-            <EventRow key={key} direction={step.kind} event={step.event} />
-          );
-        }
-        return (
-          <PaneFrameRow
-            key={key}
-            frame={step.frame}
-            service={props.services.get(step.frame.service)}
-            selected={props.selectedKey === key}
-            onOpen={() => props.onOpen({ key, frame: step.frame })}
-          />
-        );
-      })}
+      {props.items.map((item) => (
+        <PaneRow
+          key={item.key}
+          item={item}
+          services={props.services}
+          selected={props.selectedKey === item.key}
+          onOpen={() => props.onOpen(item)}
+        />
+      ))}
     </div>
   );
 }
 
-function PaneFrameRow(props: {
-  frame: Frame;
-  service: Service | undefined;
+function PaneRow(props: {
+  item: Keyed;
+  services: Map<string, Service>;
   selected: boolean;
   onOpen: () => void;
 }) {
-  const { frame } = props;
-  const canOpen = frame.inner !== undefined || frame.source !== undefined;
+  const { node } = props.item;
+  const canOpen =
+    node.children.length > 0 ||
+    (node.kind === "frame" && node.source !== undefined);
   const row = useStyles(
     styles.row,
     canOpen ? styles.rowClickable : undefined,
     props.selected ? styles.rowSelected : undefined,
   );
   const entry = useStyles(styles.entry);
+  const name = useStyles(styles.eventName);
   const summary = useStyles(styles.summary);
   const arrow = useStyles(styles.arrow);
+  const chevron = useStyles(styles.chevron);
+  const service =
+    node.kind === "frame" ? props.services.get(node.service) : undefined;
   return (
     <button
       type="button"
@@ -235,15 +259,31 @@ function PaneFrameRow(props: {
       aria-current={props.selected ? "true" : undefined}
       onClick={props.onOpen}
     >
-      {props.service === undefined ? undefined : (
-        <ProcessBadge process={props.service.process} />
-      )}
-      <span className={entry}>{frame.entry}</span>
-      {frame.summary === undefined ? undefined : (
-        <span className={summary}>{frame.summary}</span>
+      {node.kind === "event" ? (
+        <>
+          <ActorBadge service={props.services.get(node.from)} id={node.from} />
+          <span className={arrow} aria-hidden="true">
+            <ArrowRight size="xs" />
+          </span>
+          <ActorBadge service={props.services.get(node.to)} id={node.to} />
+          <span className={name}>{node.name}</span>
+          {node.detail === undefined ? undefined : (
+            <span className={summary}>{node.detail}</span>
+          )}
+        </>
+      ) : (
+        <>
+          {service === undefined ? undefined : (
+            <ProcessBadge process={service.process} />
+          )}
+          <span className={entry}>{node.entry}</span>
+          {node.summary === undefined ? undefined : (
+            <span className={summary}>{node.summary}</span>
+          )}
+        </>
       )}
       {canOpen ? (
-        <span className={arrow} aria-hidden="true">
+        <span className={chevron} aria-hidden="true">
           <ChevronRight size="xs" />
         </span>
       ) : undefined}
@@ -328,7 +368,11 @@ const styles = {
       margin: 0,
     },
   ),
-  meta: style(flex({ direction: "row", align: "center", gap: 3, wrap: true })),
+  meta: style(flex({ direction: "row", align: "center", gap: 2, wrap: true })),
+  arrow: style({
+    display: "inline-flex",
+    color: colors.gray[9],
+  }),
   stateList: style(
     flex({ direction: "row", align: "center", gap: 1, wrap: true }),
     {
@@ -351,7 +395,7 @@ const styles = {
     paddingBlock: spacing.value(1),
   }),
   row: style(
-    flex({ direction: "row", align: "center", gap: 3, wrap: true }),
+    flex({ direction: "row", align: "center", gap: 2, wrap: true }),
     spacing.padding({ x: 3, y: 2 }),
     {
       width: "100%",
@@ -386,10 +430,16 @@ const styles = {
     fontSize: "12.5px",
     minWidth: 0,
   }),
+  eventName: style(
+    text({ size: "sm", fontWeight: 500, color: "highContrast" }),
+    {
+      minWidth: 0,
+    },
+  ),
   summary: style(text({ size: "xs", fontWeight: 400, color: "lowContrast" }), {
     minWidth: 0,
   }),
-  arrow: style({
+  chevron: style({
     display: "inline-flex",
     marginLeft: "auto",
     color: colors.gray[10],
