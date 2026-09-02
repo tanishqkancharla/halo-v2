@@ -22,6 +22,7 @@ import { haloProgram } from "../model/halo.js";
 import type { Flow, ProcessName, Program, Service } from "../model/Program.js";
 import { carrierIcons, carrierLabels } from "./carriers.tsx";
 import { MermaidBlock } from "./MermaidBlock.tsx";
+import { FlowGraph } from "./FlowGraph.tsx";
 import { PaneStack } from "./PaneStack.tsx";
 import {
   frameKeys,
@@ -32,7 +33,7 @@ import {
 } from "./PathStack.tsx";
 
 type Selection = { kind: "map" } | { kind: "flow"; id: string };
-type FlowView = "stack" | "panes" | "sequence";
+type FlowView = "stack" | "panes" | "graph" | "sequence";
 
 const program = haloProgram;
 const services = new Map(
@@ -74,7 +75,8 @@ export function FlowstackApp() {
     selection.kind === "flow"
       ? program.flows.find((flow) => flow.id === selection.id)
       : undefined;
-  const fullBleed = selectedFlow !== undefined && view === "panes";
+  const fullBleed =
+    selectedFlow !== undefined && (view === "panes" || view === "graph");
   const main = useStyles(
     styles.main,
     fullBleed ? styles.mainFullBleed : styles.mainPadded,
@@ -221,6 +223,12 @@ function FlowPage(props: {
         Panes
       </Button>
       <Button
+        variant={view === "graph" ? "default" : "quiet"}
+        onClick={() => props.onViewChange("graph")}
+      >
+        Graph
+      </Button>
+      <Button
         variant={view === "sequence" ? "default" : "quiet"}
         onClick={() => props.onViewChange("sequence")}
       >
@@ -229,12 +237,16 @@ function FlowPage(props: {
     </>
   );
 
-  if (view === "panes") {
+  if (view === "panes" || view === "graph") {
     return (
       <div className={panesPage}>
         <div className={panesToolbar}>{viewButtons}</div>
         <div className={panesBody}>
-          <PaneStack flow={props.flow} services={props.services} />
+          {view === "panes" ? (
+            <PaneStack flow={props.flow} services={props.services} />
+          ) : (
+            <FlowGraph flow={props.flow} services={props.services} />
+          )}
         </div>
       </div>
     );

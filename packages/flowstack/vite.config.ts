@@ -17,6 +17,7 @@ export default defineConfig({
       "maui",
       "purse-styles",
       "@pierre/diffs/react",
+      "@dagrejs/dagre",
       "beautiful-mermaid",
       "errore",
     ],
