@@ -10,7 +10,7 @@ const diffsTheme = {
   light: "pierre-light",
 } as const;
 
-const pierreUnsafeCss = `:host { --diffs-font-family: ${monoFontFamily}; }`;
+const pierreUnsafeCss = `:host { --diffs-font-family: ${monoFontFamily}; display: block; height: 100%; min-height: 100%; }`;
 
 function createPierreEditor(options: EditorOptions<undefined>) {
   return new Editor(options);

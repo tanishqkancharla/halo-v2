@@ -51,6 +51,7 @@ export function AgentPane({
           <Composer
             key={sessionId}
             autoFocus
+            fill={false}
             error={state.error}
             isWorking={state.isWorking}
             onSubmit={prompt}
@@ -85,6 +86,7 @@ export function DraftAgentPane({ draftId }: { draftId: string }) {
           <Composer
             key={draftId}
             autoFocus
+            fill={!hasMessages}
             error={state.error}
             isWorking={state.isWorking}
             onSubmit={prompt}
@@ -99,18 +101,23 @@ export function DraftAgentPane({ draftId }: { draftId: string }) {
 function Composer({
   autoFocus,
   error,
+  fill,
   isWorking,
   onSubmit,
   onStop,
 }: {
   autoFocus: boolean;
   error: string | undefined;
+  fill: boolean;
   isWorking: boolean;
   onSubmit: (prompt: string) => Promise<void | Error>;
   onStop: () => Promise<void | Error>;
 }) {
   const [draft, setDraft] = useState("");
-  const composer = useStyles(styles.composer);
+  const composer = useStyles(
+    styles.composer,
+    fill ? styles.composerFill : styles.composerHug,
+  );
   const liveStatus = useStyles(styles.liveStatus);
   const sendButton = useStyles(styles.sendButton);
   const trimmedText = draft.trim();
@@ -300,7 +307,7 @@ const styles = {
       "&::-webkit-scrollbar": { display: "none" },
     },
   ),
-  composer: style(flexItem({ size: "hug" }), {
+  composer: style({
     width: "100%",
     maxWidth: "none",
     minWidth: 0,
@@ -322,6 +329,21 @@ const styles = {
       content: "''",
       pointerEvents: "none",
       background: `linear-gradient(to bottom, transparent, ${backgroundColor.app})`,
+    },
+  }),
+  composerHug: style(flexItem({ size: "hug" })),
+  composerFill: style(flexItem({ size: "fill" }), {
+    minHeight: "100%",
+    height: "100%",
+    "& > div:first-child": {
+      flex: "1 1 auto",
+      minHeight: "100%",
+      display: "flex",
+      flexDirection: "column",
+    },
+    "& .ProseMirror": {
+      flex: "1 1 auto",
+      minHeight: "100%",
     },
   }),
   liveStatus: style(
