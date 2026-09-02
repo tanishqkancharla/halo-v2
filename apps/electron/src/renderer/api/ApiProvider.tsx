@@ -12,8 +12,8 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import type {
   HaloClient,
   PluginInvocationInput,
-} from "../../shared/contract.js";
-import type { WorkspaceInfo } from "../../shared/rpc.js";
+} from "@get-halo/shared/contract";
+import type { WorkspaceInfo } from "@get-halo/shared/rpc";
 import {
   loadPluginViews,
   type LoadedPluginList,

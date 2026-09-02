@@ -1,5 +1,5 @@
 import * as errore from "errore";
-import { reservedPluginIds } from "../../shared/contract.js";
+import { reservedPluginIds } from "@get-halo/shared/contract";
 
 export class PluginIdError extends errore.createTaggedError({
   name: "PluginIdError",

@@ -5,7 +5,7 @@ import {
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import { backgroundColor, flex, spacing } from "maui";
 import { style, useStyles } from "purse-styles";
-import type { LoadedPluginView } from "../../shared/plugin.js";
+import type { LoadedPluginView } from "@get-halo/shared/plugin";
 import { PaneHeader } from "./PaneHeader.tsx";
 
 export function PluginPane({

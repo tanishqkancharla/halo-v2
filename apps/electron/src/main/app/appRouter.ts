@@ -1,6 +1,6 @@
 import { implement } from "@orpc/server";
 import type { Logger } from "@repo/logger";
-import { contract } from "../../shared/contract.js";
+import { contract } from "@get-halo/shared/contract";
 import { orpcErrors } from "../orpcErrors.js";
 import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
 

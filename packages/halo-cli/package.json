@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@get-halo/shared": "workspace:*",
     "@orpc/client": "2.0.0-beta.29",
     "@sinclair/typebox": "^0.34.52",
     "errore": "^0.14.1",

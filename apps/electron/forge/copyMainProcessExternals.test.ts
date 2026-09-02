@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti";
 import { describe, expect, test } from "vitest";
-import { isCallable } from "../src/shared/isCallable.js";
+import { isCallable } from "@get-halo/shared/isCallable";
 import { copyMainProcessExternals } from "./copyMainProcessExternals.js";
 
 const copyTest = test.extend<{ buildPath: string }>({

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import * as errore from "errore";
 import { useQueryClient } from "@tanstack/react-query";
-import type { AgentSessionState } from "../../../shared/AgentSessionState.js";
+import type { AgentSessionState } from "@get-halo/shared/AgentSessionState";
 import {
   applyAgentSessionEvent,
   emptyAgentSessionState,
-} from "../../../shared/AgentSessionState.js";
+} from "@get-halo/shared/AgentSessionState";
 import { useApi } from "../../api/ApiProvider.tsx";
-import type { HaloClient } from "../../../shared/contract.js";
+import type { HaloClient } from "@get-halo/shared/contract";
 
 class PromptFailedError extends errore.createTaggedError({
   name: "PromptFailedError",

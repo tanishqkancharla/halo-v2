@@ -1,6 +1,6 @@
 import { shell } from "electron";
 import * as errore from "errore";
-import type { ConnectionRequest } from "../../../shared/connectionRequests.js";
+import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type { UserService } from "../../UserService.js";
 import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 import type { WorkspaceService } from "../../workspace/WorkspaceService.js";

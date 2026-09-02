@@ -1,6 +1,7 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import {
   asyncIteratorObject,
+  error,
   oc,
   type,
   type RouterContractClient,
@@ -15,6 +16,22 @@ import type {
   WorkspaceInfo,
   WorkspaceTreeEvent,
 } from "./rpc.js";
+
+export const haloProtocolVersion = 1 as const;
+
+export const RequestRejectedError = error("BAD_REQUEST", {
+  message: "Halo could not complete the request.",
+  data: type<{ message: string }>(),
+});
+
+export const PluginInvocationError = error("PLUGIN_ERROR", {
+  message: "Halo could not invoke the plugin.",
+  data: type<{ message: string }>(),
+});
+
+const publicProcedure = oc.errors({
+  [RequestRejectedError.code]: RequestRejectedError,
+});
 
 export const reservedPluginIds = [
   "new",
@@ -41,7 +58,10 @@ export type PluginInvocationInput = {
   input: unknown;
 };
 
-export const contract = {
+export const contract = publicProcedure.router({
+  server: {
+    info: oc.output(type<{ protocolVersion: typeof haloProtocolVersion }>()),
+  },
   getAppInfo: oc.output(type<AppInfo>()),
   installAppUpdate: oc,
   workspace: {
@@ -82,7 +102,12 @@ export const contract = {
           diagnostics: PluginTypeDiagnostic[];
         }>(),
       ),
-    invoke: oc.input(type<PluginInvocationInput>()).output(type<unknown>()),
+    invoke: oc
+      .input(type<PluginInvocationInput>())
+      .output(type<unknown>())
+      .errors({
+        [PluginInvocationError.code]: PluginInvocationError,
+      }),
     check: oc.input(type<{ pluginId: string }>()).output(
       type<{
         requested: string[];
@@ -101,6 +126,6 @@ export const contract = {
       }>(),
     ),
   },
-};
+});
 
 export type HaloClient = RouterContractClient<typeof contract>;

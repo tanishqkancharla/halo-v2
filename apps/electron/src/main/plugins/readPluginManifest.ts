@@ -7,7 +7,7 @@ import * as errore from "errore";
 import {
   PluginManifestError,
   type PluginManifest,
-} from "../../shared/pluginManifest.js";
+} from "@get-halo/shared/pluginManifest";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 const viewFallbacks = [

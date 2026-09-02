@@ -4,10 +4,7 @@ export const orpcErrors = {
   badRequest(error: Error) {
     return new ORPCError("BAD_REQUEST", {
       message: error.message,
-      cause: error,
+      data: { message: error.message },
     });
-  },
-  notImplemented() {
-    return new ORPCError("NOT_IMPLEMENTED");
   },
 };

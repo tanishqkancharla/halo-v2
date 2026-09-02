@@ -1,7 +1,7 @@
 import { dialog, type BrowserWindow } from "electron";
 import { implement } from "@orpc/server";
 import type { Logger } from "@repo/logger";
-import { contract } from "../../shared/contract.js";
+import { contract } from "@get-halo/shared/contract";
 import { orpcErrors } from "../orpcErrors.js";
 import type { WorkspaceService } from "./WorkspaceService.js";
 

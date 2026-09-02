@@ -4,9 +4,12 @@ import { colors, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
-import type { AppInfo, SessionSummary } from "../shared/rpc.ts";
+import type { AppInfo, SessionSummary } from "@get-halo/shared/rpc";
 import { SidebarNavigationProvider } from "@halo/plugin-sdk/view";
-import type { LoadedPluginView, PluginLoadError } from "../shared/plugin.js";
+import type {
+  LoadedPluginView,
+  PluginLoadError,
+} from "@get-halo/shared/plugin";
 import { LoadingPage } from "./LoadingPage.tsx";
 import { MainPane } from "./main/MainPane.tsx";
 import { Onboarding } from "./Onboarding.tsx";

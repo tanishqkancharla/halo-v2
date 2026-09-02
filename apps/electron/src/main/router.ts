@@ -1,3 +1,5 @@
+import { contract, haloProtocolVersion } from "@get-halo/shared/contract";
+import { implement } from "@orpc/server";
 import { appRouter, type AppRouterContext } from "./app/appRouter.js";
 import {
   pluginsRouter,
@@ -17,8 +19,15 @@ export type HaloContext = AppRouterContext &
   SessionsRouterContext &
   PluginsRouterContext;
 
+const server = implement(contract.server);
+
+const serverRouter = server.router({
+  info: server.info.handler(() => ({ protocolVersion: haloProtocolVersion })),
+});
+
 export const haloRpcRouter = {
   ...appRouter,
+  server: serverRouter,
   workspace: workspaceRouter,
   sessions: sessionsRouter,
   plugins: pluginsRouter,

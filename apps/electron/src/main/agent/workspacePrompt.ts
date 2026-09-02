@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
-import { mauiSkillsDirName } from "../../shared/mauiSkills.js";
+import { mauiSkillsDirName } from "@get-halo/shared/mauiSkills";
 
 function mauiSkillsDirectory() {
   const bundled = join(

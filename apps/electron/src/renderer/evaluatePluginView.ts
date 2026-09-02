@@ -9,12 +9,12 @@ import * as jsxRuntime from "react/jsx-runtime";
 import * as reactDom from "react-dom";
 import type { ComponentType } from "react";
 import * as wouter from "wouter";
-import { isCallable } from "../shared/isCallable.js";
+import { isCallable } from "@get-halo/shared/isCallable";
 import type {
   LoadedPluginView,
   PluginList,
   PluginLoadError,
-} from "../shared/plugin.js";
+} from "@get-halo/shared/plugin";
 
 type PluginViewExports = {
   Sidebar?: ComponentType;

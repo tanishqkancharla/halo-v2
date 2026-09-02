@@ -5,7 +5,10 @@ import { basename, join } from "node:path";
 import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
-import type { HaloClient } from "../shared/contract.js";
+import {
+  haloProtocolVersion,
+  type HaloClient,
+} from "@get-halo/shared/contract";
 import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
 import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
 import { FilesystemService } from "./filesystem/FilesystemService.js";
@@ -101,7 +104,7 @@ const rpcHttpTest = test.extend<{
 
 describe("listenHaloRpcHttp", () => {
   rpcHttpTest(
-    "writes rpc.json and serves workspace.get",
+    "writes rpc.json and serves server.info and workspace.get",
     async ({ rpc, userDataDir, workspaceRoot }) => {
       const file = await readHaloRpcFile(rpcFilePath(userDataDir));
       if (file instanceof Error) throw file;
@@ -114,6 +117,9 @@ describe("listenHaloRpcHttp", () => {
       );
 
       const client = createHaloRpcClient<HaloClient>(file);
+      expect(await client.server.info()).toEqual({
+        protocolVersion: haloProtocolVersion,
+      });
       const workspace = await client.workspace.get();
       const resolvedRoot = await realpath(workspaceRoot);
       expect(workspace).toEqual({

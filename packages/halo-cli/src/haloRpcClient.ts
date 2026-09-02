@@ -1,8 +1,9 @@
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
+import type { HaloClient } from "@get-halo/shared/contract";
 import type { HaloRpcFile } from "./rpcFile.js";
 
-export function createHaloRpcClient<T>(file: HaloRpcFile): T {
+export function createHaloRpcClient<T = HaloClient>(file: HaloRpcFile): T {
   const link = new RPCLink({
     origin: `http://${file.host}:${file.port}`,
     url: "/rpc",

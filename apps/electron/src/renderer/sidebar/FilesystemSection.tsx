@@ -3,8 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as errore from "errore";
 import { useEffect, useMemo } from "react";
 import { File, Folder } from "maui/icons";
-import type { HaloClient } from "../../shared/contract.js";
-import type { WorkspaceTreeEvent } from "../../shared/rpc.js";
+import type { HaloClient } from "@get-halo/shared/contract";
+import type { WorkspaceTreeEvent } from "@get-halo/shared/rpc";
 import {
   useApi,
   useWorkspacePathsQuery,
