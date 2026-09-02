@@ -43,9 +43,9 @@ export type Service = {
 };
 
 /**
- * `from` sends, `to` receives. `children` is everything that happens while
- * `to` is handling this event: frames it runs, events it sends, and events
- * that come back to it before it is done.
+ * `from` sends, `to` receives. `children` is what `to` runs to handle it.
+ * Nesting is causal: a callee sits under its caller, an event sits under the
+ * frame that sends it, and a response sits beside its request.
  */
 export type EventNode = {
   kind: "event";
@@ -57,7 +57,7 @@ export type EventNode = {
   children: FlowNode[];
 };
 
-/** A function in a service. `children` are the frames it calls. */
+/** A function in a service. `children` are the frames it calls and the events it sends. */
 export type FrameNode = {
   kind: "frame";
   service: string;

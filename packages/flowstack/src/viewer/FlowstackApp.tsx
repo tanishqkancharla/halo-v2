@@ -31,6 +31,7 @@ import { carrierIcons, carrierLabels } from "./carriers.tsx";
 import { MermaidBlock } from "./MermaidBlock.tsx";
 import { FlowGraph } from "./FlowGraph.tsx";
 import { PaneStack } from "./PaneStack.tsx";
+import { CallStack } from "./CallStack.tsx";
 import {
   FlowTree,
   sourceKey,
@@ -39,7 +40,7 @@ import {
 } from "./FlowTree.tsx";
 
 type Selection = { kind: "map" } | { kind: "flow"; id: string };
-type FlowView = "tree" | "panes" | "graph" | "sequence";
+type FlowView = "tree" | "stack" | "panes" | "graph" | "sequence";
 
 const program = haloProgram;
 const services = new Map(
@@ -266,6 +267,12 @@ function FlowPage(props: {
         Tree
       </Button>
       <Button
+        variant={view === "stack" ? "default" : "quiet"}
+        onClick={() => props.onViewChange("stack")}
+      >
+        Call stack
+      </Button>
+      <Button
         variant={view === "panes" ? "default" : "quiet"}
         onClick={() => props.onViewChange("panes")}
       >
@@ -321,7 +328,7 @@ function FlowPage(props: {
       </div>
       <div className={toolbar}>
         {viewButtons}
-        {view === "tree" ? (
+        {view === "tree" || view === "stack" ? (
           <>
             <span className={toolbarSpacer} />
             {levelButtons(true)}
@@ -345,6 +352,14 @@ function FlowPage(props: {
             expansion={props.expansion}
           />
         </div>
+      ) : view === "stack" ? (
+        <CallStack
+          nodes={props.flow.children}
+          parentKey={props.flow.id}
+          services={props.services}
+          level={level}
+          expansion={props.expansion}
+        />
       ) : (
         <MermaidBlock source={sequence} />
       )}
