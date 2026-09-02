@@ -1,7 +1,7 @@
 import { implement, ORPCError } from "@orpc/server";
-import { createPluginToolsFacade } from "@halo/plugin-sdk/host";
-import type { Logger } from "@repo/logger";
-import { contract } from "@repo/shared/contract";
+import { createPluginToolsFacade } from "@get-halo/plugin-sdk/host";
+import type { Logger } from "@get-halo/logger";
+import { contract } from "@get-halo/shared/contract";
 import { orpcErrors } from "../orpcErrors.js";
 import type { WorkspaceService } from "../workspace/WorkspaceService.js";
 import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";

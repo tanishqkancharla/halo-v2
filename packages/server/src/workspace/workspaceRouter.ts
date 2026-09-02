@@ -1,13 +1,13 @@
-import { dialog, type BrowserWindow } from "electron";
 import { implement } from "@orpc/server";
-import type { Logger } from "@repo/logger";
-import { contract } from "@repo/shared/contract";
+import type { Logger } from "@get-halo/logger";
+import { contract } from "@get-halo/shared/contract";
 import { orpcErrors } from "../orpcErrors.js";
+import type { ServerHost } from "../ServerHost.js";
 import type { WorkspaceService } from "./WorkspaceService.js";
 
 export type WorkspaceRouterContext = {
   workspace: WorkspaceService;
-  getWindow: () => BrowserWindow;
+  host: ServerHost;
   logger: Logger;
 };
 
@@ -20,13 +20,10 @@ export const workspaceRouter = os.router({
   }),
   choose: os.choose.handler(async ({ context }) => {
     context.logger.info({ event: "chooseWorkspace" });
-    const selection = await dialog.showOpenDialog(context.getWindow(), {
-      title: "Choose a Halo workspace",
-      buttonLabel: "Choose workspace",
-      properties: ["openDirectory"],
-    });
-    if (selection.canceled) return undefined;
-    const workspace = await context.workspace.select(selection.filePaths[0]!);
+    const directory = await context.host.chooseWorkspace();
+    if (directory instanceof Error) return orpcErrors.badRequest(directory);
+    if (directory === undefined) return undefined;
+    const workspace = await context.workspace.select(directory);
     if (workspace instanceof Error) return orpcErrors.badRequest(workspace);
     return workspace;
   }),

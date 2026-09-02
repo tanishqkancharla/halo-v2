@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { writeContractPackage } from "@halo/plugin-sdk/contract";
+import { writeContractPackage } from "@get-halo/plugin-sdk/contract";
 import { pluginSdkDistDirectory } from "./sdkDist.js";
 
 export async function installPluginSdkContract(args: {

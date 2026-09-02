@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 
 export function pluginSdkDistDirectory() {
   return join(
-    dirname(require.resolve("@halo/plugin-sdk/package.json")),
+    dirname(require.resolve("@get-halo/plugin-sdk/package.json")),
     "dist",
   );
 }

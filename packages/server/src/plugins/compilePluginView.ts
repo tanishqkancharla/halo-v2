@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import * as errore from "errore";
-import type { CompiledPluginView } from "@repo/shared/contract";
+import type { CompiledPluginView } from "@get-halo/shared/contract";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 const viewExternals = [

@@ -1,24 +1,25 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createHaloRpcClient } from "@halo/cli";
-import type { PluginToolResult } from "@halo/plugin-sdk/server";
-import { Logger } from "@repo/logger";
+import { createHaloRpcClient } from "@get-halo/cli";
+import type { PluginToolResult } from "@get-halo/plugin-sdk/server";
+import { StaticAgentAuthority } from "@get-halo/server/agent/runtime/AgentAuthority";
+import { ToolRuntimeService } from "@get-halo/server/agent/runtime/ToolRuntimeService";
+import { createWorkspaceFilesPlugin } from "@get-halo/server/agent/tools/files/WorkspaceFilesPlugin";
+import { FilesystemService } from "@get-halo/server/filesystem/FilesystemService";
+import { copyPluginWorkspacePackages } from "@get-halo/server/plugins/copyPluginWorkspacePackages";
+import { installPluginSdkContract } from "@get-halo/server/plugins/installPluginSdk";
+import { PluginService } from "@get-halo/server/plugins/PluginService";
+import { PluginToolGrants } from "@get-halo/server/plugins/PluginToolGrants";
+import { haloRpcRouter, type HaloContext } from "@get-halo/server/router";
+import { SessionRegistry } from "@get-halo/server/sessions/SessionRegistry";
+import { UserService } from "@get-halo/server/UserService";
+import { WorkspaceService } from "@get-halo/server/workspace/WorkspaceService";
+import { Logger } from "@get-halo/logger";
 import { expect, test } from "vitest";
-import type { HaloClient } from "@repo/shared/contract";
-import { StaticAgentAuthority } from "../agent/runtime/AgentAuthority.js";
-import { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
-import { createWorkspaceFilesPlugin } from "../agent/tools/files/WorkspaceFilesPlugin.js";
-import { FilesystemService } from "../filesystem/FilesystemService.js";
+import type { HaloClient } from "@get-halo/shared/contract";
+import { ElectronServerHost } from "../ElectronServerHost.js";
 import { listenHaloRpcHttp } from "../HaloRpcHttp.js";
-import type { HaloContext } from "../router.js";
-import { SessionRegistry } from "../sessions/SessionRegistry.js";
-import { UserService } from "../UserService.js";
-import { WorkspaceService } from "../workspace/WorkspaceService.js";
-import { PluginService } from "./PluginService.js";
-import { installPluginSdkContract } from "./installPluginSdk.js";
-import { copyPluginWorkspacePackages } from "./copyPluginWorkspacePackages.js";
-import { PluginToolGrants } from "./PluginToolGrants.js";
 
 type PluginHandle = {
   id: string;
@@ -85,6 +86,9 @@ const pluginTest = test.extend<{
       filesystem: filesystemService,
       workspace: workspaceService,
     });
+    const host = new ElectronServerHost(() => {
+      throw new Error("Halo main window is not open.");
+    });
     const toolRuntime = new ToolRuntimeService({
       filesystem: filesystemService,
       workspace: workspaceService,
@@ -94,6 +98,7 @@ const pluginTest = test.extend<{
       }),
       toolPlugins: [createWorkspaceFilesPlugin(filesystemService)],
       authority: new StaticAgentAuthority(["workspace.files.read"]),
+      host,
     });
     const sessions = new SessionRegistry({
       filesystem: filesystemService,
@@ -106,13 +111,12 @@ const pluginTest = test.extend<{
       toolRuntime,
       pluginToolGrants: grants,
       plugins: pluginService,
-      getWindow: () => {
-        throw new Error("Halo main window is not open.");
-      },
+      host,
       logger: new Logger(),
     };
     const rpc = await listenHaloRpcHttp({
       context,
+      router: haloRpcRouter,
       filesystem: filesystemService,
       userDataDir,
     });

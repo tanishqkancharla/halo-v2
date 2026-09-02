@@ -2,7 +2,7 @@ import {
   PluginServerProvider,
   Sidebar as NavigationSidebar,
   sidebarPadding,
-} from "@halo/plugin-sdk/view";
+} from "@get-halo/plugin-sdk/view";
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import {
   Button,
@@ -16,8 +16,8 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router, useLocation } from "wouter";
-import type { PluginLoadError } from "@repo/shared/contract";
-import type { AppInfo, SessionSummary } from "@repo/shared/rpc";
+import type { PluginLoadError } from "@get-halo/shared/contract";
+import type { AppInfo, SessionSummary } from "@get-halo/shared/rpc";
 import { useInstallAppUpdateMutation } from "../api/ApiProvider.tsx";
 import type { LoadedPluginView } from "../evaluatePluginView.js";
 import { FilesystemSection } from "./FilesystemSection.tsx";

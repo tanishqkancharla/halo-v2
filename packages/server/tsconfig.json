@@ -2,14 +2,12 @@
   "extends": "@get-halo/typescript-config/base.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
-    "lib": ["ES2022"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "ESNext.Disposable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
-    "rootDir": ".",
-    "target": "ESNext",
-    "types": ["node"]
+    "noUncheckedIndexedAccess": false,
+    "types": ["node", "vitest"]
   },
-  "include": ["alchemy.run.ts", "src/**/*.ts"],
-  "exclude": ["node_modules", ".alchemy"]
+  "include": ["src"]
 }

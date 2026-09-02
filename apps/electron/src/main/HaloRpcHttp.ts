@@ -6,13 +6,13 @@ import {
 } from "node:http";
 import type { AddressInfo } from "node:net";
 import { RPCHandler } from "@orpc/server/node";
-import { rpcFilePath, type HaloRpcFile } from "@halo/cli";
-import * as errore from "errore";
+import type { HaloContext, HaloRouter } from "@get-halo/server/router";
 import {
   FilesystemPathNotFoundError,
   type FilesystemService,
-} from "./filesystem/FilesystemService.js";
-import { haloRpcRouter, type HaloContext } from "./router.js";
+} from "@get-halo/server/filesystem/FilesystemService";
+import { rpcFilePath, type HaloRpcFile } from "@get-halo/cli";
+import * as errore from "errore";
 
 export type HaloRpcHttp = {
   host: "127.0.0.1";
@@ -29,11 +29,12 @@ export class HaloRpcHttpError extends errore.createTaggedError({
 
 export async function listenHaloRpcHttp(args: {
   context: HaloContext;
+  router: HaloRouter;
   filesystem: FilesystemService;
   userDataDir: string;
 }): Promise<HaloRpcHttp | HaloRpcHttpError> {
   const token = randomBytes(32).toString("base64url");
-  const handler = new RPCHandler<HaloContext>(haloRpcRouter);
+  const handler = new RPCHandler<HaloContext>(args.router);
   const server = createServer((req, res) => {
     // oxlint-disable-next-line typescript/no-floating-promises -- Node owns this synchronous request callback; handleRpcRequest writes the response.
     void handleRpcRequest({

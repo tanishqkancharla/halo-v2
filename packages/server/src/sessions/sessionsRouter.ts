@@ -1,7 +1,7 @@
 import { implement } from "@orpc/server";
-import type { Logger } from "@repo/logger";
-import { connectionRequestLabel } from "@repo/shared/connectionRequests";
-import { contract } from "@repo/shared/contract";
+import type { Logger } from "@get-halo/logger";
+import { connectionRequestLabel } from "@get-halo/shared/connectionRequests";
+import { contract } from "@get-halo/shared/contract";
 import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { SessionRegistry } from "./SessionRegistry.js";

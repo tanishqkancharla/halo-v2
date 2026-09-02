@@ -143,7 +143,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Pack contract
-        run: pnpm --filter @halo/plugin-sdk pack:contract ${{ needs.prepare.outputs.version }}
+        run: pnpm --filter @get-halo/plugin-sdk pack:contract ${{ needs.prepare.outputs.version }}
 
       - name: Publish contract
         working-directory: packages/plugin-sdk/contract

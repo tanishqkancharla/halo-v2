@@ -1,15 +1,16 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { safeStorage } from "electron";
+import type { CredentialVaultInput } from "@get-halo/server/host";
 import * as errore from "errore";
 import {
   type CredentialVault,
   CredentialVaultError,
-} from "./CredentialVault.js";
+} from "@get-halo/server/agent/runtime/CredentialVault";
 import {
   type FilesystemService,
   FilesystemPathNotFoundError,
-} from "../../filesystem/FilesystemService.js";
+} from "@get-halo/server/filesystem/FilesystemService";
 
 class EncryptedFileCredentialVault implements CredentialVault {
   private readonly filesystem: FilesystemService;
@@ -82,10 +83,9 @@ class EncryptedFileCredentialVault implements CredentialVault {
   }
 }
 
-export function createEncryptedFileCredentialVault(input: {
-  filesystem: FilesystemService;
-  workspaceRoot: string;
-}): CredentialVault {
+export function createEncryptedFileCredentialVault(
+  input: CredentialVaultInput,
+): CredentialVault {
   return new EncryptedFileCredentialVault({
     filesystem: input.filesystem,
     directory: path.join(

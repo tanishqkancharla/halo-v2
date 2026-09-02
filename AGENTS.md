@@ -24,7 +24,7 @@ Bump `apps/electron/package.json` `version`, commit, then create and push a git 
 - Prefer TypeScript `private` / `private readonly` over `#` private fields, matching the rest of the codebase.
 - TypeScript uses strict mode with `noUncheckedIndexedAccess` enabled.
 - ESM imports use `.js` extensions even for TypeScript files.
-- Workspace packages use the `@repo/*` naming convention.
+- Workspace packages use the `@get-halo/*` naming convention.
 - File names: no hyphens. Name the file after the main abstraction it implements, in ClassNameCase (e.g. `MessagePortMainTransport.ts`). For a small bundle of related exports with no single primary type, use a lowercase single name (e.g. `rpc.ts`, `channels.ts`).
 - Generally, you should avoid adding comments and instead aim to make code readable. The only exception is when there is external context that is not easily traced back (e.g. external dependency behavior, or explicit business logic decisions).
 - Ignore migrations or backwards-compatability - Halo is unreleased and pre-1.0 so we can break/rebuild anything as necessary.
@@ -74,7 +74,7 @@ Review every prose output against these rules before delivering.
 
 ## Cursor Cloud specific instructions
 
-The one service is the Halo Electron app. Start it from the repo root with `pnpm --filter @halo/desktop dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo-web` (see the halo-web skill). After edits, run `pnpm run check-affected` (see Commands).
+The one service is the Halo Electron app. Start it from the repo root with `pnpm --filter @get-halo/desktop dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo-web` (see the halo-web skill). After edits, run `pnpm run check-affected` (see Commands).
 
 Cursor Cloud agents must record a short demo video when they add or change any UI, attach it to the PR, and show it in the walkthrough. Use screen recording against the running Halo app; do not skip this for “small” UI tweaks. This requirement does not apply to agents outside Cursor Cloud.
 

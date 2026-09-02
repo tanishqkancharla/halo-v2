@@ -1,5 +1,5 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { HaloManifest } from "@halo/plugin-sdk/schema";
+import type { HaloManifest } from "@get-halo/plugin-sdk/schema";
 import {
   asyncIteratorObject,
   oc,

@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import { createJiti } from "jiti";
 import { Lazy, Procedure, type AnyRouter } from "@orpc/server";
 import * as errore from "errore";
-import { isCallable } from "../../shared/isCallable.js";
+import { isCallable } from "@get-halo/shared/isCallable";
 
 export class PluginServerLoadError extends errore.createTaggedError({
   name: "PluginServerLoadError",
@@ -106,5 +106,5 @@ function sdkEntry(
   requireFromThisFile: NodeRequire,
   subpath: "schema" | "server" | "storage" | "view",
 ) {
-  return requireFromThisFile.resolve(`@halo/plugin-sdk/${subpath}`);
+  return requireFromThisFile.resolve(`@get-halo/plugin-sdk/${subpath}`);
 }

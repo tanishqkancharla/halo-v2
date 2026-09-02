@@ -1,5 +1,5 @@
 {
-  "name": "@repo/shared",
+  "name": "@get-halo/shared",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,6 +7,8 @@
     "./AgentSessionState": "./src/AgentSessionState.ts",
     "./connectionRequests": "./src/connectionRequests.ts",
     "./contract": "./src/contract.ts",
+    "./isCallable": "./src/isCallable.ts",
+    "./mauiSkills": "./src/mauiSkills.ts",
     "./rpc": "./src/rpc.ts"
   },
   "scripts": {
@@ -19,13 +21,13 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.83.0",
-    "@halo/plugin-sdk": "workspace:*",
+    "@get-halo/plugin-sdk": "workspace:*",
     "@orpc/contract": "2.0.0-beta.29",
     "@sinclair/typebox": "^0.34.52",
     "errore": "^0.14.1"
   },
   "devDependencies": {
-    "@repo/typescript-config": "workspace:*",
+    "@get-halo/typescript-config": "workspace:*",
     "@types/node": "^22.20.1",
     "typescript": "7.0.2",
     "vitest": "^4.1.11"

@@ -1,5 +1,5 @@
 import nodePath from "node:path";
-import { parseVersioned, Type, type Static } from "@halo/plugin-sdk/schema";
+import { parseVersioned, Type, type Static } from "@get-halo/plugin-sdk/schema";
 import * as errore from "errore";
 import {
   type FilesystemService,

@@ -1,6 +1,6 @@
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import { Route, Switch } from "wouter";
-import type { SessionSummary } from "@repo/shared/rpc";
+import type { SessionSummary } from "@get-halo/shared/rpc";
 import type { LoadedPluginView } from "../evaluatePluginView.js";
 import { AgentPane, DraftAgentPane } from "./agent/AgentPane.tsx";
 import { FilePane } from "./FilePane.tsx";

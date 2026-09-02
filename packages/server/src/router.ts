@@ -23,3 +23,5 @@ export const haloRpcRouter = {
   sessions: sessionsRouter,
   plugins: pluginsRouter,
 };
+
+export type HaloRouter = typeof haloRpcRouter;

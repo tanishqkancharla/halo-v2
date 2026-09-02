@@ -3,7 +3,7 @@ import * as errore from "errore";
 import {
   contractPeerDependencies,
   mauiPackage,
-} from "@halo/plugin-sdk/contract";
+} from "@get-halo/plugin-sdk/contract";
 import { writePluginTsconfig } from "./typecheckPlugin.js";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 

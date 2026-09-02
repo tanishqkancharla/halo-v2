@@ -25,7 +25,7 @@ On Linux hosts without a real GPU (including Cursor cloud agents on Xvfb), set `
 
 ```sh
 export HALO_USE_SWIFTSHADER=1
-pnpm --filter @halo/desktop dev
+pnpm --filter @get-halo/desktop dev
 ```
 
 Set a model provider key for the same process:
@@ -87,8 +87,8 @@ First login stores Cloudflare credentials in `~/.alchemy/profiles.json`. CI uses
 ## Packaging
 
 ```sh
-pnpm --filter @halo/desktop build
-pnpm --filter @halo/desktop make
+pnpm --filter @get-halo/desktop build
+pnpm --filter @get-halo/desktop make
 ```
 
 Electron Forge writes packaged apps to `apps/electron/out`.

@@ -303,7 +303,7 @@ describe("workspace path helpers", () => {
     );
     await writeFile(
       skillPath,
-      '---\nversion: 1.2.3\n---\n# stale skill\nimport from "@halo/plugin-sdk/view"\n',
+      '---\nversion: 1.2.3\n---\n# stale skill\nimport from "@get-halo/plugin-sdk/view"\n',
     );
 
     const packaged = new WorkspaceService({
@@ -314,7 +314,7 @@ describe("workspace path helpers", () => {
     const packagedSelect = await packaged.select(root);
     if (packagedSelect instanceof Error) throw packagedSelect;
     expect(await readFile(skillPath, "utf8")).toContain(
-      "@halo/plugin-sdk/view",
+      "@get-halo/plugin-sdk/view",
     );
 
     const development = new WorkspaceService({

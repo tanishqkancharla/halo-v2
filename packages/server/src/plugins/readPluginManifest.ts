@@ -2,9 +2,9 @@ import { join } from "node:path";
 import {
   parseVersioned,
   pluginPackageJsonSchema,
-} from "@halo/plugin-sdk/schema";
+} from "@get-halo/plugin-sdk/schema";
 import * as errore from "errore";
-import type { PluginManifest } from "@repo/shared/contract";
+import type { PluginManifest } from "@get-halo/shared/contract";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 export class PluginManifestError extends errore.createTaggedError({

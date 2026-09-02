@@ -1,7 +1,7 @@
 import {
   PluginServerProvider,
   useSidebarNavigation,
-} from "@halo/plugin-sdk/view";
+} from "@get-halo/plugin-sdk/view";
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import { backgroundColor, flex, spacing } from "maui";
 import { style, useStyles } from "purse-styles";

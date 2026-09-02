@@ -13,7 +13,7 @@ export default defineConfig({
     include: [
       "@tanishqkancharla/tandem-core",
       "@tanishqkancharla/tandem-core",
-      "@halo/plugin-sdk/storage",
+      "@get-halo/plugin-sdk/storage",
       "@pierre/diffs/react",
       "@pierre/diffs/edit",
     ],

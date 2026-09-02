@@ -1,12 +1,11 @@
-import { shell } from "electron";
 import * as errore from "errore";
-import type { ConnectionRequest } from "@repo/shared/connectionRequests";
+import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type { UserService } from "../../UserService.js";
 import type { FilesystemService } from "../../filesystem/FilesystemService.js";
+import type { ServerHost } from "../../ServerHost.js";
 import type { WorkspaceService } from "../../workspace/WorkspaceService.js";
 import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import type { AgentAuthority } from "./AgentAuthority.js";
-import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
 import { ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
 
 export class ConnectionCancelledError extends errore.createTaggedError({
@@ -24,6 +23,7 @@ type ToolRuntimeServiceOptions = {
   user: UserService;
   toolPlugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
+  host: ServerHost;
 };
 
 export class ToolRuntimeService {
@@ -56,7 +56,7 @@ export class ToolRuntimeService {
     const closed = await this.close();
     if (closed instanceof Error) return closed;
 
-    const credentialVault = createEncryptedFileCredentialVault({
+    const credentialVault = this.options.host.createCredentialVault({
       filesystem: this.options.filesystem,
       workspaceRoot: layout.root,
     });
@@ -109,19 +109,18 @@ export class ToolRuntimeService {
     const completed = new Promise<Error | undefined>((resolve) => {
       this.pendingConnections.set(started.state, { complete: resolve });
     });
-    const opened = await shell.openExternal(started.authorizationUrl).catch(
-      (cause) =>
-        new ToolRuntimeError({
-          operation: "opening OAuth authorization",
-          cause,
-        }),
+    const opened = await this.options.host.openExternal(
+      started.authorizationUrl,
     );
     if (opened instanceof Error) {
       this.pendingConnections.delete(started.state);
       const cancelled = await this.runtime.cancelOAuth(started.state);
       if (cancelled instanceof Error)
         console.warn("OAuth cleanup failed:", cancelled);
-      return opened;
+      return new ToolRuntimeError({
+        operation: "opening OAuth authorization",
+        cause: opened,
+      });
     }
     return completed;
   }

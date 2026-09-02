@@ -11,7 +11,7 @@ export const mainProcessExternals = [
 // jiti loads plugin servers from disk. Those files import this package, so
 // require.resolve must work in the asar. Keep it out of viteMainExternals:
 // the host still bundles the TypeScript sources into main.cjs.
-export const mainProcessDiskPackages = ["@halo/plugin-sdk"] as const;
+export const mainProcessDiskPackages = ["@get-halo/plugin-sdk"] as const;
 
 // schema.ts and server.ts imports. Skip view-only deps (maui, wouter, react).
 export const pluginSdkJitiDependencies = [

@@ -1,12 +1,12 @@
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import type { AgentSessionState } from "@repo/shared/AgentSessionState";
-import type { AgentMessage } from "@repo/shared/rpc";
+import type { AgentSessionState } from "@get-halo/shared/AgentSessionState";
+import type { AgentMessage } from "@get-halo/shared/rpc";
 import {
   connectionRequestLabel,
   connectionRequestSchema,
   type ConnectionRequest,
-} from "@repo/shared/connectionRequests";
+} from "@get-halo/shared/connectionRequests";
 
 export type SessionViewItem =
   | { kind: "user"; id: string; text: string }

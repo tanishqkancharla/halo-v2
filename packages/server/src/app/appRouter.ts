@@ -1,10 +1,11 @@
 import { implement } from "@orpc/server";
-import type { Logger } from "@repo/logger";
-import { contract } from "@repo/shared/contract";
+import type { Logger } from "@get-halo/logger";
+import { contract } from "@get-halo/shared/contract";
 import { orpcErrors } from "../orpcErrors.js";
-import { getAppInfo, installAppUpdate } from "./AppUpdate.js";
+import type { ServerHost } from "../ServerHost.js";
 
 export type AppRouterContext = {
+  host: ServerHost;
   logger: Logger;
 };
 
@@ -16,10 +17,10 @@ const os = implement({
 export const appRouter = os.router({
   getAppInfo: os.getAppInfo.handler(({ context }) => {
     context.logger.info({ event: "getAppInfo" });
-    return getAppInfo();
+    return context.host.getAppInfo();
   }),
-  installAppUpdate: os.installAppUpdate.handler(() => {
-    const result = installAppUpdate();
+  installAppUpdate: os.installAppUpdate.handler(({ context }) => {
+    const result = context.host.installAppUpdate();
     if (result instanceof Error) return orpcErrors.badRequest(result);
   }),
 });

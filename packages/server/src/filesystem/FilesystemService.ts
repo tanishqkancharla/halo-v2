@@ -2,7 +2,7 @@ import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import * as watcher from "@parcel/watcher";
 import * as errore from "errore";
-import { type ReadonlyStream, Stream } from "../../shared/Stream.js";
+import { type ReadonlyStream, Stream } from "../Stream.js";
 
 export type FilesystemWatchEvent =
   | {
