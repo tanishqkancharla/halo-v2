@@ -18,10 +18,9 @@ export function FilePane({ path }: { path: string }) {
   const file = useWorkspaceFileQuery(path);
   const kind = fileKind(path);
   const pane = useStyles(styles.pane);
-  const body = useStyles(kind === "code" ? styles.codeBody : styles.body);
-  const content = useStyles(
-    kind === "code" ? styles.codeContent : styles.content,
-  );
+  const fillsPane = kind === "markdown" || kind === "code";
+  const body = useStyles(fillsPane ? styles.editorBody : styles.body);
+  const content = useStyles(fillsPane ? styles.editorContent : styles.content);
   const status = useStyles(styles.status);
 
   return (
@@ -58,8 +57,10 @@ function MarkdownFileEditor({
   loaded: string;
 }) {
   const autosave = useAutosaveFile({ path, loaded });
+  const editor = useStyles(styles.editor);
   return (
     <Editor
+      className={editor}
       content={loaded}
       onChange={autosave.onChange}
       placeholder="Write…"
@@ -84,7 +85,7 @@ const styles = {
     overflow: "auto",
     overscrollBehavior: "contain",
   }),
-  codeBody: style(spacing.padding({ all: 12 }), {
+  editorBody: style(spacing.padding({ all: 12 }), {
     flex: "1 1 auto",
     minWidth: 0,
     minHeight: 0,
@@ -97,14 +98,21 @@ const styles = {
     marginInline: "auto",
     minWidth: 0,
   }),
-  codeContent: style({
+  editorContent: style({
     width: "100%",
     maxWidth: proseMaxWidth,
     marginInline: "auto",
     flex: "1 1 auto",
     minWidth: 0,
-    minHeight: 0,
+    minHeight: "100%",
     display: "flex",
+  }),
+  editor: style({
+    minHeight: "100%",
+    height: "100%",
+    "& .maui-editor-prose": {
+      minHeight: "100%",
+    },
   }),
   status: style(text({ size: "sm", color: "lowContrast" })),
 };

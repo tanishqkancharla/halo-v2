@@ -10,7 +10,7 @@ const diffsTheme = {
   light: "pierre-light",
 } as const;
 
-const pierreUnsafeCss = `:host { --diffs-font-family: ${monoFontFamily}; }`;
+const pierreUnsafeCss = `:host { --diffs-font-family: ${monoFontFamily}; display: block; height: 100%; min-height: 100%; }`;
 
 function createPierreEditor(options: EditorOptions<undefined>) {
   return new Editor(options);
@@ -66,7 +66,7 @@ export function CodeViewFileEditor({
           onItemEditChange={(_item, file) => {
             autosave.onChange(file.contents);
           }}
-          style={{ height: "100%", width: "100%" }}
+          style={{ height: "100%", minHeight: "100%", width: "100%" }}
         />
       </EditProvider>
     </div>
@@ -76,6 +76,34 @@ export function CodeViewFileEditor({
 const hostClass = style({
   flex: "1 1 auto",
   minWidth: 0,
-  minHeight: 0,
+  minHeight: "100%",
   height: "100%",
+  display: "flex",
+  flexDirection: "column",
+  "& > div": {
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: "100%",
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+  },
+  "& > div > *": {
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: "100%",
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+  },
+  "& > div > div > div:has(diffs-container)": {
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: "100%",
+    height: "100%",
+  },
+  "& diffs-container": {
+    minHeight: "100%",
+    height: "100%",
+  },
 });
