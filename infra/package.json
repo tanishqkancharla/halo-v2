@@ -1,5 +1,5 @@
 {
-  "name": "@get-halo/infra",
+  "name": "@halo/infra",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -21,7 +21,7 @@
     "effect": "4.0.0-beta.103"
   },
   "devDependencies": {
-    "@get-halo/typescript-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.20.1",
     "typescript": "7.0.2"
   }

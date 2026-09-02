@@ -6,14 +6,13 @@ import {
 } from "node:http";
 import type { AddressInfo } from "node:net";
 import { RPCHandler } from "@orpc/server/node";
-import type { HaloContext, HaloRouter } from "@get-halo/server/router";
+import { rpcFilePath, type HaloRpcFile } from "@halo/cli";
+import * as errore from "errore";
 import {
   FilesystemPathNotFoundError,
   type FilesystemService,
-} from "@get-halo/server/filesystem/FilesystemService";
-import { rpcFilePath, type HaloRpcFile } from "@get-halo/cli";
-import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
-import * as errore from "errore";
+} from "./filesystem/FilesystemService.js";
+import { haloRpcRouter, type HaloContext } from "./router.js";
 
 export type HaloRpcHttp = {
   host: "127.0.0.1";
@@ -30,12 +29,11 @@ export class HaloRpcHttpError extends errore.createTaggedError({
 
 export async function listenHaloRpcHttp(args: {
   context: HaloContext;
-  router: HaloRouter;
   filesystem: FilesystemService;
   userDataDir: string;
 }): Promise<HaloRpcHttp | HaloRpcHttpError> {
   const token = randomBytes(32).toString("base64url");
-  const handler = new RPCHandler<HaloContext>(args.router);
+  const handler = new RPCHandler<HaloContext>(haloRpcRouter);
   const server = createServer((req, res) => {
     // oxlint-disable-next-line typescript/no-floating-promises -- Node owns this synchronous request callback; handleRpcRequest writes the response.
     void handleRpcRequest({
@@ -161,26 +159,12 @@ async function handleOAuthCallback(args: {
   if (providerError !== null) {
     const state = args.url.searchParams.get("state");
     if (state !== null) {
-      const pending = args.context.toolRuntime.getPendingConnection(state);
       const cancelled = await args.context.toolRuntime.cancelOAuth(state);
       if (cancelled instanceof Error) {
         args.context.logger.warn({
           event: "oauth-cancel-failed",
           error: cancelled,
         });
-      }
-      if (pending !== undefined) {
-        const changed = await publishConnectionStatus({
-          context: args.context,
-          connection: pending,
-          status: "cancelled",
-        });
-        if (changed instanceof Error) {
-          args.context.logger.warn({
-            event: "oauth-session-cancel-notify-failed",
-            error: changed,
-          });
-        }
       }
     }
     args.res.statusCode = 400;
@@ -196,25 +180,11 @@ async function handleOAuthCallback(args: {
     return;
   }
 
-  const pending = args.context.toolRuntime.getPendingConnection(state);
   const completed = await args.context.toolRuntime.completeOAuth({
     state,
     code,
   });
   if (completed instanceof Error) {
-    if (pending !== undefined) {
-      const changed = await publishConnectionStatus({
-        context: args.context,
-        connection: pending,
-        status: "cancelled",
-      });
-      if (changed instanceof Error) {
-        args.context.logger.warn({
-          event: "oauth-session-cancel-notify-failed",
-          error: changed,
-        });
-      }
-    }
     args.context.logger.warn({
       event: "oauth-callback-failed",
       error: completed,
@@ -223,43 +193,11 @@ async function handleOAuthCallback(args: {
     args.res.end("Authorization could not be completed.");
     return;
   }
-  if (completed !== undefined) {
-    const changed = await publishConnectionStatus({
-      context: args.context,
-      connection: completed,
-      status: "connected",
-    });
-    if (changed instanceof Error) {
-      args.context.logger.warn({
-        event: "oauth-session-resume-failed",
-        error: changed,
-      });
-      args.res.statusCode = 400;
-      args.res.end("Authorization completed, but the agent could not resume.");
-      return;
-    }
-  }
 
   args.res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   args.res.end(
     '<!doctype html><html><head><meta charset="utf-8"><title>Halo</title></head><body>You can close this tab.</body></html>',
   );
-}
-
-async function publishConnectionStatus(args: {
-  context: HaloContext;
-  connection: {
-    sessionId: string;
-    request: ConnectionRequest;
-  };
-  status: "connected" | "cancelled";
-}) {
-  const session = await args.context.sessions.open(args.connection.sessionId);
-  if (session instanceof Error) return session;
-  return await session.connectionChanged({
-    request: args.connection.request,
-    status: args.status,
-  });
 }
 
 function listenPort(address: string | AddressInfo | null) {

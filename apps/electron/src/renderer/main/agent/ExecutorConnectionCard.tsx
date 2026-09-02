@@ -1,10 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as errore from "errore";
 import { background, Button, Flex, radius, shadow, Spacer, Text } from "maui";
 import { style, useStyles } from "purse-styles";
-import { connectionRequestLabel } from "@get-halo/shared/connectionRequests";
+import { connectionRequestLabel } from "../../../shared/connectionRequests.js";
 import { useApi } from "../../api/ApiProvider.tsx";
-import { desktopApi } from "../../api/desktop.ts";
 import type { SessionViewPart } from "./sessionView.ts";
 import { integrationBrands } from "./IntegrationBrands.ts";
 
@@ -14,21 +12,6 @@ type ExecutorConnectionPart = Extract<
 >;
 type ConnectionStatus = "idle" | "connecting" | "connected";
 const idleStatus: ConnectionStatus = "idle";
-
-class OpenAuthorizationError extends errore.createTaggedError({
-  name: "OpenAuthorizationError",
-  message: "Could not open the authorization page",
-}) {}
-
-class ConnectionUnavailableError extends errore.createTaggedError({
-  name: "ConnectionUnavailableError",
-  message: "The agent session is not ready",
-}) {}
-
-class CancelConnectionError extends errore.createTaggedError({
-  name: "CancelConnectionError",
-  message: "Could not cancel the connection",
-}) {}
 const card = style(background.element, radius.lg, shadow.subtle, {
   width: "100%",
   maxWidth: "400px",
@@ -57,7 +40,6 @@ export function ExecutorConnectionCard({
   const queryClient = useQueryClient();
   const statusKey = [
     "executorConnection",
-    sessionId,
     part.request.integration,
     part.request.connectionName,
   ] as const;
@@ -68,42 +50,18 @@ export function ExecutorConnectionCard({
     enabled: false,
   }).data;
   const connect = useMutation({
-    mutationFn: async () => {
-      if (sessionId === undefined) return new ConnectionUnavailableError();
-      const started = await api.sessions.startConnection({
-        sessionId,
+    mutationFn: () => {
+      // SAFETY: the button is disabled until sessionId is a string.
+      return api.sessions.startConnection({
+        sessionId: sessionId as string,
         request: part.request,
       });
-      if (started.status === "connected") return started;
-      const opened = await desktopApi
-        .openExternal(started.authorizationUrl)
-        .then(() => undefined)
-        .catch((cause) => new OpenAuthorizationError({ cause }));
-      if (!(opened instanceof Error)) return started;
-      const cancelled = await api.sessions
-        .cancelConnection({
-          sessionId,
-          connectionId: started.connectionId,
-        })
-        .then(() => undefined)
-        .catch((cause) => new CancelConnectionError({ cause }));
-      if (cancelled instanceof Error) {
-        console.warn("Connection cleanup failed:", cancelled);
-      }
-      return opened;
     },
     onMutate: () => {
       queryClient.setQueryData(statusKey, "connecting");
     },
-    onSuccess: (started) => {
-      if (started instanceof Error) {
-        queryClient.setQueryData(statusKey, "idle");
-        console.warn("Connection failed:", started);
-        return;
-      }
-      if (started.status === "connected") {
-        queryClient.setQueryData(statusKey, "connected");
-      }
+    onSuccess: () => {
+      queryClient.setQueryData(statusKey, "connected");
     },
     onError: (error) => {
       queryClient.setQueryData(statusKey, "idle");

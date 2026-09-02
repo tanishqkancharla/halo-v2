@@ -3,7 +3,7 @@ export {
   cliVersion,
   connectHalo,
   HaloVersionError,
-  type HaloServerInfoClient,
+  type HaloAppInfoClient,
   type HaloRpcEnv,
 } from "./connectHalo.js";
 export {

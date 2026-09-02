@@ -12,14 +12,13 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import type {
   HaloClient,
   PluginInvocationInput,
-} from "@get-halo/shared/contract";
-import type { WorkspaceInfo } from "@get-halo/shared/rpc";
+} from "../../shared/contract.js";
+import type { WorkspaceInfo } from "../../shared/rpc.js";
 import {
   loadPluginViews,
   type LoadedPluginList,
 } from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
-import { desktopApi } from "./desktop.ts";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
   name: "WorkspaceRestoreError",
@@ -104,9 +103,9 @@ export function useWorkspaceQuery() {
 }
 
 export function useChooseWorkspaceMutation() {
-  const { queryClient } = useContext(ApiContext);
+  const { api, queryClient } = useContext(ApiContext);
   return useMutation({
-    mutationFn: () => desktopApi.chooseWorkspace(),
+    mutationFn: () => api.workspace.choose(),
     onSuccess: (workspace) => {
       if (workspace !== undefined) {
         queryClient.setQueryData(workspaceQueryKey, readyWorkspace(workspace));
@@ -156,16 +155,18 @@ export function useWorkspaceFileQuery(path: string) {
 }
 
 export function useAppInfoQuery() {
+  const api = useApi();
   return useQuery({
     queryKey: ["app-info"],
-    queryFn: () => desktopApi.getAppInfo(),
+    queryFn: () => api.getAppInfo(),
     refetchInterval: 5_000,
   });
 }
 
 export function useInstallAppUpdateMutation() {
+  const api = useApi();
   return useMutation({
-    mutationFn: () => desktopApi.installAppUpdate(),
+    mutationFn: () => api.installAppUpdate(),
   });
 }
 
@@ -233,7 +234,15 @@ async function restoreWorkspace(api: HaloClient): Promise<WorkspaceState> {
   }
   if (active !== undefined) return readyWorkspace(active);
 
-  return { status: "needs-workspace" };
+  const selected = await api.workspace
+    .choose()
+    .catch((e) => new WorkspaceRestoreError({ cause: e }));
+  if (selected instanceof Error) {
+    return { status: "needs-workspace", message: selected.message };
+  }
+  return selected === undefined
+    ? { status: "needs-workspace" }
+    : readyWorkspace(selected);
 }
 
 function readyWorkspace(workspace: WorkspaceInfo): WorkspaceState {

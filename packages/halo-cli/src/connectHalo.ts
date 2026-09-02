@@ -19,11 +19,11 @@ export function cliVersion() {
   return process.env.HALO_VERSION;
 }
 
-export type HaloServerInfoClient = {
-  getServerInfo: () => Promise<{ version: string }>;
+export type HaloAppInfoClient = {
+  getAppInfo: () => Promise<{ version: string }>;
 };
 
-export async function connectHalo<T extends HaloServerInfoClient>(
+export async function connectHalo<T extends HaloAppInfoClient>(
   env: HaloRpcEnv,
 ) {
   const file = await findHaloRpcFile({
@@ -39,9 +39,9 @@ export async function connectHalo<T extends HaloServerInfoClient>(
   const expected = cliVersion();
   if (expected === undefined) return { file, client };
   const info = await client
-    .getServerInfo()
+    .getAppInfo()
     .catch(
-      (e) => new HaloRpcFileError({ detail: "getServerInfo failed", cause: e }),
+      (e) => new HaloRpcFileError({ detail: "getAppInfo failed", cause: e }),
     );
   if (info instanceof Error) return info;
   if (info.version !== expected) {

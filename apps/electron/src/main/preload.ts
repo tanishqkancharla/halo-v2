@@ -1,30 +1,8 @@
-import type { LogLevel, LoggerData, LoggerScope } from "@get-halo/logger";
+import type { LogLevel, LoggerData, LoggerScope } from "@repo/logger";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import { contextBridge, ipcRenderer } from "electron";
+import { ipcRenderer } from "electron";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
-import {
-  DESKTOP_CHANNEL,
-  type DesktopApi,
-  type DesktopRequest,
-  type DesktopResponse,
-} from "../shared/desktop.js";
-
-const desktopApi: DesktopApi = {
-  chooseWorkspace: () => invokeDesktop({ method: "chooseWorkspace" }),
-  getAppInfo: () => invokeDesktop({ method: "getAppInfo" }),
-  installAppUpdate: () => invokeDesktop({ method: "installAppUpdate" }),
-  openExternal: (url) => invokeDesktop({ method: "openExternal", url }),
-};
-
-contextBridge.exposeInMainWorld("haloDesktop", desktopApi);
-
-function invokeDesktop<T extends DesktopRequest>(request: T) {
-  // SAFETY: DesktopResponse maps each request method to its main-process result.
-  return ipcRenderer.invoke(DESKTOP_CHANNEL, request) as Promise<
-    DesktopResponse<T>
-  >;
-}
 
 const windowLoaded = new Promise<void>((resolve) => {
   window.addEventListener("load", () => resolve());

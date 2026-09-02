@@ -1,7 +1,7 @@
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/message-port";
 import { RPC_CHANNELS } from "../../shared/channels.js";
-import type { HaloClient } from "@get-halo/shared/contract";
+import type { HaloClient } from "../../shared/contract.js";
 
 export async function connectHaloRpc(): Promise<HaloClient> {
   const port = await requestRpcPort();

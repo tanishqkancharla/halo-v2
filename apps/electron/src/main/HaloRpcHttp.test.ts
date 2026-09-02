@@ -2,17 +2,21 @@ import { existsSync } from "node:fs";
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import {
-  createHaloRpcClient,
-  readHaloRpcFile,
-  rpcFilePath,
-} from "@get-halo/cli";
-import { FilesystemService, HaloServer } from "@get-halo/server";
-import { Logger } from "@get-halo/logger";
+import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
+import { Logger } from "@repo/logger";
 import { describe, expect, test } from "vitest";
-import type { HaloClient } from "@get-halo/shared/contract";
-import { ElectronServerHost } from "./ElectronServerHost.js";
+import type { HaloClient } from "../shared/contract.js";
+import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
+import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
+import { FilesystemService } from "./filesystem/FilesystemService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
+import { PluginService } from "./plugins/PluginService.js";
+import { installPluginSdkContract } from "./plugins/installPluginSdk.js";
+import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
+import type { HaloContext } from "./router.js";
+import { SessionRegistry } from "./sessions/SessionRegistry.js";
+import { UserService } from "./UserService.js";
+import { WorkspaceService } from "./workspace/WorkspaceService.js";
 
 const rpcHttpTest = test.extend<{
   userDataDir: string;
@@ -33,34 +37,71 @@ const rpcHttpTest = test.extend<{
   },
   rpc: async ({ userDataDir, workspaceRoot }, use) => {
     const filesystem = new FilesystemService();
+    const workspace = new WorkspaceService({
+      appDataDir: userDataDir,
+      filesystem,
+      appVersion: "0.0.0",
+    });
     await writeFile(
       join(userDataDir, "workspace.json"),
       `${JSON.stringify({ workspaceRoot })}\n`,
     );
-    const server = new HaloServer({
-      appDataDir: userDataDir,
-      appVersion: "0.0.0",
+    const restored = await workspace.restore();
+    if (restored === undefined) {
+      throw new Error("workspace restore returned undefined");
+    }
+
+    const user = new UserService({ filesystem, appDataDir: userDataDir });
+    const plugins = new PluginService({
       filesystem,
-      host: new ElectronServerHost(),
+      workspace,
+      dependencyInstaller: (directory) =>
+        installPluginSdkContract({
+          directory,
+          appVersion: workspace.appVersion,
+        }),
+    });
+    const pluginToolGrants = new PluginToolGrants({ filesystem, workspace });
+    const toolRuntime = new ToolRuntimeService({
+      filesystem,
+      workspace,
+      user,
+      toolPlugins: [],
+      authority: new StaticAgentAuthority([]),
+    });
+    const sessions = new SessionRegistry({
+      filesystem,
+      workspace,
+      toolRuntime,
+    });
+    const context: HaloContext = {
+      workspace,
+      sessions,
+      toolRuntime,
+      pluginToolGrants,
+      plugins,
+      getWindow: () => {
+        throw new Error("Halo main window is not open.");
+      },
       logger: new Logger(),
-    });
-    await server.start();
-    const rpc = await listenHaloRpcHttp({
-      context: server.context,
-      router: server.router,
-      filesystem,
-      userDataDir,
-    });
+    };
+    const rpc = await listenHaloRpcHttp({ context, filesystem, userDataDir });
     if (rpc instanceof Error) throw rpc;
     await use(rpc);
     await rpc.close();
-    await server.close();
+    const sessionsClosed = await sessions.shutdown();
+    if (sessionsClosed instanceof Error) throw sessionsClosed;
+    const runtimeClosed = await toolRuntime.close();
+    if (runtimeClosed instanceof Error) throw runtimeClosed;
+    workspace.close();
+    const filesystemClosed = await filesystem.close();
+    if (filesystemClosed instanceof Error) throw filesystemClosed;
   },
 });
 
 describe("listenHaloRpcHttp", () => {
   rpcHttpTest(
-    "writes rpc.json and serves transport-neutral server state",
+    "writes rpc.json and serves workspace.get",
     async ({ rpc, userDataDir, workspaceRoot }) => {
       const file = await readHaloRpcFile(rpcFilePath(userDataDir));
       if (file instanceof Error) throw file;
@@ -73,9 +114,6 @@ describe("listenHaloRpcHttp", () => {
       );
 
       const client = createHaloRpcClient<HaloClient>(file);
-      await expect(client.getServerInfo()).resolves.toEqual({
-        version: "0.0.0",
-      });
       const workspace = await client.workspace.get();
       const resolvedRoot = await realpath(workspaceRoot);
       expect(workspace).toEqual({

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import * as errore from "errore";
 import { useQueryClient } from "@tanstack/react-query";
-import type { AgentSessionState } from "@get-halo/shared/AgentSessionState";
+import type { AgentSessionState } from "../../../shared/AgentSessionState.js";
 import {
   applyAgentSessionEvent,
   emptyAgentSessionState,
-} from "@get-halo/shared/AgentSessionState";
+} from "../../../shared/AgentSessionState.js";
 import { useApi } from "../../api/ApiProvider.tsx";
-import type { HaloClient } from "@get-halo/shared/contract";
+import type { HaloClient } from "../../../shared/contract.js";
 
 class PromptFailedError extends errore.createTaggedError({
   name: "PromptFailedError",
@@ -36,7 +36,6 @@ type UseAgentSessionResult = {
 export function useAgentSession(sessionId: string): UseAgentSessionResult {
   const api = useApi();
   const queryClient = useQueryClient();
-  const queryClientRef = useRef(queryClient);
   const [readySessionId, setReadySessionId] = useState<string | undefined>(
     undefined,
   );
@@ -72,18 +71,6 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       setReadySessionId(opened.sessionId);
       iterator = await api.sessions.events({ sessionId: opened.sessionId });
       for await (const event of iterator) {
-        if (event.type === "halo.connection") {
-          queryClientRef.current.setQueryData(
-            [
-              "executorConnection",
-              opened.sessionId,
-              event.request.integration,
-              event.request.connectionName,
-            ],
-            event.status === "connected" ? "connected" : "idle",
-          );
-          continue;
-        }
         setState((current) => applyAgentSessionEvent(current, event));
       }
     })().catch((cause) => {

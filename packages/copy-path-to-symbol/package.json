@@ -1,5 +1,5 @@
 {
-  "name": "@get-halo/copy-path-to-symbol",
+  "name": "halo-copy-path-to-symbol",
   "displayName": "Copy Path to Symbol",
   "version": "0.1.0",
   "private": true,

@@ -1,5 +1,5 @@
-import { SidebarItem, SidebarSection } from "@get-halo/plugin-sdk/view";
-import type { SessionSummary } from "@get-halo/shared/rpc";
+import { SidebarItem, SidebarSection } from "@halo/plugin-sdk/view";
+import type { SessionSummary } from "../../shared/rpc.js";
 
 export function SessionsSection({ sessions }: { sessions: SessionSummary[] }) {
   if (sessions.length === 0) return undefined;

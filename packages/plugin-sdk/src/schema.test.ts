@@ -3,7 +3,7 @@ import {
   haloManifestSchema,
   parseVersioned,
   SchemaParseError,
-} from "@get-halo/plugin-sdk/schema";
+} from "@halo/plugin-sdk/schema";
 
 describe("parseVersioned", () => {
   test("accepts version 1 with a name", () => {

@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import * as errore from "errore";
 import { useQueryClient } from "@tanstack/react-query";
-import type { HaloClient } from "@get-halo/shared/contract";
 import { useApi } from "../api/ApiProvider.tsx";
+import type { HaloClient } from "../../shared/contract.js";
 
 const autosaveDelayMs = 400;
 

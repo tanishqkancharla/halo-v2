@@ -18,12 +18,12 @@ import { sessionViewItems, type SessionViewItem } from "./sessionView.ts";
 import {
   lastAssistantTurnWasAborted,
   type AgentSessionState,
-} from "@get-halo/shared/AgentSessionState";
+} from "../../../shared/AgentSessionState.ts";
 import { AssistantMessage } from "./AssistantMessage.tsx";
 import { Editor } from "./Editor.tsx";
 import { ExecutorConnectionCard } from "./ExecutorConnectionCard.tsx";
 import { ToolActivity } from "./ToolActivity.tsx";
-import { type SessionSummary } from "@get-halo/shared/rpc";
+import { type SessionSummary } from "../../../shared/rpc.ts";
 import { PaneHeader } from "../PaneHeader.tsx";
 
 export function AgentPane({

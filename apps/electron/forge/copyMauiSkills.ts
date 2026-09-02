@@ -2,7 +2,7 @@ import { cpSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import type { Plugin } from "vite";
-import { mauiSkillsDirName } from "@get-halo/shared/mauiSkills";
+import { mauiSkillsDirName } from "../src/shared/mauiSkills.js";
 
 const require = createRequire(import.meta.url);
 

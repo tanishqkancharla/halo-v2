@@ -35,7 +35,7 @@ class PackageJsonReadError extends errore.createTaggedError({
 /**
  * Copy Vite-external main-process packages (and their runtime closure) into
  * the packaged app so require() resolves after Forge Vite's `.vite`-only pack.
- * Also copy @get-halo/plugin-sdk for jiti; the host still bundles that package.
+ * Also copy @halo/plugin-sdk for jiti; the host still bundles that package.
  */
 export async function copyMainProcessExternals(
   buildPath: string,

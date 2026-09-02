@@ -19,7 +19,7 @@ class PluginCallError extends errore.createTaggedError({
 }) {}
 
 type HaloHost = {
-  getServerInfo: () => Promise<{ version: string }>;
+  getAppInfo: () => Promise<{ version: string }>;
   workspace: {
     get: () => Promise<WorkspaceInfo | undefined>;
   };
@@ -378,62 +378,55 @@ const plugin = Cli.create("plugin", {
 
 const haloVersion = cliVersion();
 
-async function main() {
-  await Cli.create("halo", {
-    description: "Talk to a running Halo app",
-    version: haloVersion === undefined ? "dev" : haloVersion,
-  })
-    .command("status", {
-      description: "Check whether Halo is running and report its workspace",
-      env: haloRpcEnv,
-      output: z.object({
-        version: z.string(),
-        host: z.literal("127.0.0.1"),
-        port: z.number(),
-        workspace: workspaceInfo.optional(),
-      }),
-      async run(c) {
-        const connected = await connectHost(c.env);
-        if (connected instanceof Error) {
-          return c.error({
-            code: "NOT_RUNNING",
-            message: connected.message,
-          });
-        }
-        const info = await connected.client
-          .getServerInfo()
-          .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
-        if (info instanceof Error) {
-          return c.error({
-            code: "NOT_RUNNING",
-            message: info.message,
-          });
-        }
-        const workspace = await connected.client.workspace
-          .get()
-          .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
-        if (workspace instanceof Error) {
-          return c.error({
-            code: "NOT_RUNNING",
-            message: workspace.message,
-          });
-        }
-        return c.ok({
-          version: info.version,
-          host: connected.file.host,
-          port: connected.file.port,
-          workspace,
+await Cli.create("halo", {
+  description: "Talk to a running Halo app",
+  version: haloVersion === undefined ? "dev" : haloVersion,
+})
+  .command("status", {
+    description: "Check whether Halo is running and report its workspace",
+    env: haloRpcEnv,
+    output: z.object({
+      version: z.string(),
+      host: z.literal("127.0.0.1"),
+      port: z.number(),
+      workspace: workspaceInfo.optional(),
+    }),
+    async run(c) {
+      const connected = await connectHost(c.env);
+      if (connected instanceof Error) {
+        return c.error({
+          code: "NOT_RUNNING",
+          message: connected.message,
         });
-      },
-    })
-    .command(plugin)
-    .serve();
-}
-
-main().catch((cause: unknown) => {
-  console.error(cause);
-  process.exitCode = 1;
-});
+      }
+      const info = await connected.client
+        .getAppInfo()
+        .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
+      if (info instanceof Error) {
+        return c.error({
+          code: "NOT_RUNNING",
+          message: info.message,
+        });
+      }
+      const workspace = await connected.client.workspace
+        .get()
+        .catch((e) => wrapRpc(e instanceof Error ? e : new Error(String(e))));
+      if (workspace instanceof Error) {
+        return c.error({
+          code: "NOT_RUNNING",
+          message: workspace.message,
+        });
+      }
+      return c.ok({
+        version: info.version,
+        host: connected.file.host,
+        port: connected.file.port,
+        workspace,
+      });
+    },
+  })
+  .command(plugin)
+  .serve();
 
 function connectHost(env: { HALO_RPC_FILE?: string; HALO_USER_DATA?: string }) {
   return connectHalo<HaloHost>(env);

@@ -1,5 +1,5 @@
-import * as pluginSdkStorage from "@get-halo/plugin-sdk/storage";
-import * as pluginSdkView from "@get-halo/plugin-sdk/view";
+import * as pluginSdkStorage from "@halo/plugin-sdk/storage";
+import * as pluginSdkView from "@halo/plugin-sdk/view";
 import * as errore from "errore";
 import * as maui from "maui";
 import * as purseStyles from "purse-styles";
@@ -9,14 +9,12 @@ import * as jsxRuntime from "react/jsx-runtime";
 import * as reactDom from "react-dom";
 import type { ComponentType } from "react";
 import * as wouter from "wouter";
-import type { PluginList, PluginLoadError } from "@get-halo/shared/contract";
-import { isCallable } from "@get-halo/shared/isCallable";
-
-export type LoadedPluginView = {
-  id: string;
-  Sidebar?: ComponentType;
-  Routes?: ComponentType;
-};
+import { isCallable } from "../shared/isCallable.js";
+import type {
+  LoadedPluginView,
+  PluginList,
+  PluginLoadError,
+} from "../shared/plugin.js";
 
 type PluginViewExports = {
   Sidebar?: ComponentType;

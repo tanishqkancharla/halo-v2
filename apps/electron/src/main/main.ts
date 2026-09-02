@@ -7,7 +7,6 @@ import {
   MessageChannelMain,
   shell,
   type IpcMainEvent,
-  type IpcMainInvokeEvent,
 } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,27 +15,29 @@ import {
   type LogLevel,
   type LoggerData,
   type LoggerScope,
-} from "@get-halo/logger";
-import { JsonlLoggerSink } from "@get-halo/logger/JsonlLoggerSink";
-import { PrettyConsoleLoggerSink } from "@get-halo/logger/PrettyConsoleLoggerSink";
-import { FilesystemService, HaloServer } from "@get-halo/server";
-import * as errore from "errore";
-import type { HaloContext } from "@get-halo/server/router";
-import { resolveHaloCliEntry } from "@get-halo/server/workspace/installHaloCli";
+} from "@repo/logger";
+import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
+import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
-import { DESKTOP_CHANNEL, type DesktopRequest } from "../shared/desktop.js";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
-import {
-  checkForUpdates,
-  getAppInfo,
-  installAppUpdate,
-  startAppUpdates,
-} from "./app/AppUpdate.js";
-import { ElectronServerHost } from "./ElectronServerHost.js";
+import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
+import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
+import { workspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
+import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
+import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
+import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
+import { FilesystemService } from "./filesystem/FilesystemService.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
+import { PluginService } from "./plugins/PluginService.js";
+import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
+import { haloRpcRouter, type HaloContext } from "./router.js";
+import { SessionRegistry } from "./sessions/SessionRegistry.js";
+import { UserService } from "./UserService.js";
+import { resolveHaloCliEntry } from "./workspace/installHaloCli.js";
+import { WorkspaceService } from "./workspace/WorkspaceService.js";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -44,14 +45,6 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const isDevelopment = Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL);
 const filesystemService = new FilesystemService();
-let mainWindow: BrowserWindow | undefined;
-let rpcHttp: HaloRpcHttp | undefined;
-let shutdownStarted = false;
-
-class DesktopBridgeError extends errore.createTaggedError({
-  name: "DesktopBridgeError",
-  message: "Desktop action failed during $operation",
-}) {}
 
 if (started) app.quit();
 
@@ -92,8 +85,7 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 
 process.env.HALO_USER_DATA = applicationConfig.dataDir;
 
-const serverHost = new ElectronServerHost();
-const haloServer = new HaloServer({
+const workspaceService = new WorkspaceService({
   appDataDir: applicationConfig.dataDir,
   filesystem: filesystemService,
   appVersion: app.getVersion(),
@@ -101,19 +93,72 @@ const haloServer = new HaloServer({
   cliNodeExecutable: isDevelopment ? "node" : process.execPath,
   cliElectronRunAsNode: !isDevelopment,
   isDevelopment,
-  host: serverHost,
-  logger: rpcLogger,
 });
+const userService = new UserService({
+  appDataDir: applicationConfig.dataDir,
+  filesystem: filesystemService,
+});
+const toolPlugins = [
+  createWorkspaceFilesPlugin(filesystemService),
+  workspaceBashPlugin,
+  parallelSearchPlugin,
+];
+const authority = new StaticAgentAuthority([
+  "workspace.files.read",
+  "workspace.files.write",
+  "workspace.shell.execute",
+  "network.web.search",
+]);
+const pluginService = new PluginService({
+  filesystem: filesystemService,
+  workspace: workspaceService,
+});
+const pluginToolGrants = new PluginToolGrants({
+  filesystem: filesystemService,
+  workspace: workspaceService,
+});
+const toolRuntime = new ToolRuntimeService({
+  filesystem: filesystemService,
+  workspace: workspaceService,
+  user: userService,
+  toolPlugins,
+  authority,
+});
+const sessionRegistry = new SessionRegistry({
+  filesystem: filesystemService,
+  workspace: workspaceService,
+  toolRuntime,
+});
+let mainWindow: BrowserWindow | undefined;
+let rpcHttp: HaloRpcHttp | undefined;
+let shutdownStarted = false;
 
 // oxlint-disable-next-line typescript/no-floating-promises -- Electron owns the app-ready lifecycle and keeps the process alive for this work.
 app.whenReady().then(async () => {
-  await haloServer.start();
+  await workspaceService.restore();
+  if (workspaceService.getWorkspace() !== undefined) {
+    const listed = await pluginService.list();
+    if (listed instanceof Error) {
+      logger.warn({ event: "plugin-startup-load-failed", error: listed });
+    }
+  }
   registerLogBridge();
   registerRpcBridge();
-  registerDesktopBridge();
   const listening = await listenHaloRpcHttp({
-    context: haloServer.context,
-    router: haloServer.router,
+    context: {
+      workspace: workspaceService,
+      plugins: pluginService,
+      pluginToolGrants,
+      sessions: sessionRegistry,
+      toolRuntime,
+      getWindow: () => {
+        if (mainWindow === undefined) {
+          throw new Error("Halo main window is not open.");
+        }
+        return mainWindow;
+      },
+      logger: rpcLogger,
+    },
     filesystem: filesystemService,
     userDataDir: applicationConfig.dataDir,
   });
@@ -121,7 +166,7 @@ app.whenReady().then(async () => {
     logger.error({ event: "rpc-http-listen-failed", error: listening });
   } else {
     rpcHttp = listening;
-    haloServer.setOAuthRedirectUri(listening.oauthRedirectUri);
+    toolRuntime.setOAuthRedirectUri(listening.oauthRedirectUri);
   }
   installMenu();
   await openMainWindow();
@@ -156,7 +201,22 @@ app.on("will-quit", (event) => {
 });
 
 async function closeAppServices(http: HaloRpcHttp | undefined) {
-  await haloServer.close();
+  const sessionsClosed = await sessionRegistry.shutdown();
+  if (sessionsClosed instanceof Error) {
+    logger.error({
+      event: "session-registry-close-failed",
+      error: sessionsClosed,
+    });
+  }
+  const runtimeClosed = await toolRuntime.close();
+  if (runtimeClosed instanceof Error) {
+    logger.error({ event: "tool-runtime-close-failed", error: runtimeClosed });
+  }
+  workspaceService.close();
+  const filesystemClosed = await filesystemService.close();
+  if (filesystemClosed instanceof Error) {
+    logger.error({ event: "filesystem-close-failed", error: filesystemClosed });
+  }
   if (http !== undefined) {
     await http.close().catch((error) => {
       logger.error({ event: "rpc-http-close-failed", error });
@@ -225,7 +285,21 @@ function registerRpcBridge(): void {
       throw new Error("Halo rejected RPC without a sender frame.");
     }
     const { port1, port2 } = new MessageChannelMain();
-    const handler = new RPCHandler<HaloContext>(haloServer.router, {
+    const context: HaloContext = {
+      workspace: workspaceService,
+      plugins: pluginService,
+      pluginToolGrants,
+      sessions: sessionRegistry,
+      toolRuntime,
+      getWindow: () => {
+        if (mainWindow === undefined) {
+          throw new Error("Halo main window is not open.");
+        }
+        return mainWindow;
+      },
+      logger: rpcLogger,
+    };
+    const handler = new RPCHandler<HaloContext>(haloRpcRouter, {
       interceptors: [
         onError((error) => {
           if (error instanceof Error) {
@@ -236,7 +310,7 @@ function registerRpcBridge(): void {
         }),
       ],
     });
-    handler.upgrade(port1, { context: haloServer.context });
+    handler.upgrade(port1, { context });
     port1.start();
     // Electron's postMessage payload; the ports carry the RPC transport.
     // oxlint-disable-next-line unicorn/no-null
@@ -244,42 +318,7 @@ function registerRpcBridge(): void {
   });
 }
 
-function registerDesktopBridge(): void {
-  ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
-    const window = assertTrustedSender(event);
-    switch (request.method) {
-      case "chooseWorkspace": {
-        const workspace = await chooseWorkspace(window, {
-          title: "Choose a Halo workspace",
-          buttonLabel: "Choose workspace",
-        });
-        if (workspace instanceof Error) throw workspace;
-        return workspace;
-      }
-      case "getAppInfo":
-        return getAppInfo();
-      case "installAppUpdate": {
-        const installed = installAppUpdate();
-        if (installed instanceof Error) throw installed;
-        return;
-      }
-      case "openExternal": {
-        const opened = await shell.openExternal(request.url).catch(
-          (cause) =>
-            new DesktopBridgeError({
-              operation: "opening an external URL",
-              cause,
-            }),
-        );
-        if (opened instanceof Error) throw opened;
-      }
-    }
-  });
-}
-
-function assertTrustedSender(
-  event: IpcMainEvent | IpcMainInvokeEvent,
-): BrowserWindow {
+function assertTrustedSender(event: IpcMainEvent): BrowserWindow {
   const senderWindow = BrowserWindow.fromWebContents(event.sender);
   if (senderWindow === null || senderWindow !== mainWindow) {
     throw new Error("Halo rejected IPC from an unknown renderer.");
@@ -381,12 +420,17 @@ async function openLogs(): Promise<void> {
 async function switchWorkspace(): Promise<void> {
   if (mainWindow === undefined) return;
 
-  const previous = haloServer.getWorkspace();
-  const workspace = await chooseWorkspace(mainWindow, {
+  const selection = await dialog.showOpenDialog(mainWindow, {
     title: "Switch workspace",
     buttonLabel: "Switch workspace",
+    properties: ["openDirectory"],
   });
-  if (workspace === undefined) return;
+  if (selection.canceled) return;
+  const directory = selection.filePaths[0];
+  if (directory === undefined) return;
+
+  const previous = workspaceService.getWorkspace();
+  const workspace = await workspaceService.select(directory);
   if (workspace instanceof Error) {
     await dialog.showMessageBox(mainWindow, {
       type: "error",
@@ -403,32 +447,21 @@ async function switchWorkspace(): Promise<void> {
     return;
   }
 
-  mainWindow.reload();
-}
-
-async function chooseWorkspace(
-  window: BrowserWindow,
-  labels: { title: string; buttonLabel: string },
-) {
-  const selection = await dialog
-    .showOpenDialog(window, {
-      ...labels,
-      properties: ["openDirectory"],
-    })
-    .catch(
-      (cause) =>
-        new DesktopBridgeError({ operation: "workspace selection", cause }),
-    );
-  if (selection instanceof Error) return selection;
-  if (selection.canceled) return undefined;
-  const directory = selection.filePaths[0];
-  if (directory === undefined) {
-    return new DesktopBridgeError({
-      operation: "workspace selection",
-      cause: new Error("Electron returned no selected directory"),
+  const sessionsClosed = await sessionRegistry.shutdown();
+  if (sessionsClosed instanceof Error) {
+    logger.error({
+      event: "session-registry-workspace-close-failed",
+      error: sessionsClosed,
     });
   }
-  return await haloServer.selectWorkspace(directory);
+  const runtimeClosed = await toolRuntime.close();
+  if (runtimeClosed instanceof Error) {
+    logger.error({
+      event: "tool-runtime-workspace-close-failed",
+      error: runtimeClosed,
+    });
+  }
+  mainWindow.reload();
 }
 
 function ignoreClosedStdioPipe(stream: NodeJS.WriteStream) {
