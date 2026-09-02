@@ -83,9 +83,6 @@ const rpcHttpTest = test.extend<{
       toolRuntime,
       pluginToolGrants,
       plugins,
-      getWindow: () => {
-        throw new Error("Halo main window is not open.");
-      },
       logger: new Logger(),
     };
     const rpc = await listenHaloRpcHttp({ context, filesystem, userDataDir });

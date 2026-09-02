@@ -19,6 +19,7 @@ import {
   type LoadedPluginList,
 } from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
+import { desktopApi } from "./electron.js";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
   name: "WorkspaceRestoreError",
@@ -103,9 +104,9 @@ export function useWorkspaceQuery() {
 }
 
 export function useChooseWorkspaceMutation() {
-  const { api, queryClient } = useContext(ApiContext);
+  const { queryClient } = useContext(ApiContext);
   return useMutation({
-    mutationFn: () => api.workspace.choose(),
+    mutationFn: () => desktopApi.chooseWorkspace(),
     onSuccess: (workspace) => {
       if (workspace !== undefined) {
         queryClient.setQueryData(workspaceQueryKey, readyWorkspace(workspace));
@@ -155,18 +156,16 @@ export function useWorkspaceFileQuery(path: string) {
 }
 
 export function useAppInfoQuery() {
-  const api = useApi();
   return useQuery({
     queryKey: ["app-info"],
-    queryFn: () => api.getAppInfo(),
+    queryFn: () => desktopApi.getAppInfo(),
     refetchInterval: 5_000,
   });
 }
 
 export function useInstallAppUpdateMutation() {
-  const api = useApi();
   return useMutation({
-    mutationFn: () => api.installAppUpdate(),
+    mutationFn: () => desktopApi.installAppUpdate(),
   });
 }
 
@@ -234,8 +233,8 @@ async function restoreWorkspace(api: HaloClient): Promise<WorkspaceState> {
   }
   if (active !== undefined) return readyWorkspace(active);
 
-  const selected = await api.workspace
-    .choose()
+  const selected = await desktopApi
+    .chooseWorkspace()
     .catch((e) => new WorkspaceRestoreError({ cause: e }));
   if (selected instanceof Error) {
     return { status: "needs-workspace", message: selected.message };

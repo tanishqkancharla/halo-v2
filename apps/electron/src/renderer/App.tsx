@@ -4,7 +4,8 @@ import { colors, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
-import type { AppInfo, SessionSummary } from "@get-halo/shared/rpc";
+import type { SessionSummary } from "@get-halo/shared/rpc";
+import type { AppInfo } from "../shared/desktop.js";
 import { SidebarNavigationProvider } from "@halo/plugin-sdk/view";
 import type {
   LoadedPluginView,

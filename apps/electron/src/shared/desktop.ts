@@ -1,5 +1,18 @@
 import { type Static, Type } from "@sinclair/typebox";
-import type { AppInfo, WorkspaceInfo } from "@get-halo/shared/rpc";
+import type { WorkspaceInfo } from "@get-halo/shared/rpc";
+
+export type AppUpdateStatus =
+  | { state: "disabled"; reason: string }
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "available" }
+  | { state: "downloaded"; version: string }
+  | { state: "error"; message: string };
+
+export type AppInfo = {
+  version: string;
+  update: AppUpdateStatus;
+};
 
 export const DESKTOP_CHANNELS = {
   chooseWorkspace: "halo:desktop:choose-workspace",

@@ -9,7 +9,6 @@ import {
 import type { AgentSessionState } from "./AgentSessionState.js";
 import type { ConnectionRequest } from "./connectionRequests.js";
 import type {
-  AppInfo,
   PluginList,
   PluginLoadError,
   SessionSummary,
@@ -62,11 +61,8 @@ export const contract = publicProcedure.router({
   server: {
     info: oc.output(type<{ protocolVersion: typeof haloProtocolVersion }>()),
   },
-  getAppInfo: oc.output(type<AppInfo>()),
-  installAppUpdate: oc,
   workspace: {
     get: oc.output(type<WorkspaceInfo | undefined>()),
-    choose: oc.output(type<WorkspaceInfo | undefined>()),
     listPaths: oc.output(type<string[]>()),
     readFile: oc.input(type<{ path: string }>()).output(type<string>()),
     writeFile: oc

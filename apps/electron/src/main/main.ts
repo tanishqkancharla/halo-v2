@@ -156,12 +156,6 @@ app.whenReady().then(async () => {
       pluginToolGrants,
       sessions: sessionRegistry,
       toolRuntime,
-      getWindow: () => {
-        if (mainWindow === undefined) {
-          throw new Error("Halo main window is not open.");
-        }
-        return mainWindow;
-      },
       logger: rpcLogger,
     },
     filesystem: filesystemService,
@@ -296,12 +290,6 @@ function registerRpcBridge(): void {
       pluginToolGrants,
       sessions: sessionRegistry,
       toolRuntime,
-      getWindow: () => {
-        if (mainWindow === undefined) {
-          throw new Error("Halo main window is not open.");
-        }
-        return mainWindow;
-      },
       logger: rpcLogger,
     };
     const handler = new RPCHandler<HaloContext>(haloRpcRouter, {

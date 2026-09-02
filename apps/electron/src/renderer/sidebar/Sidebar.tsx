@@ -16,7 +16,8 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router, useLocation } from "wouter";
-import type { AppInfo, SessionSummary } from "@get-halo/shared/rpc";
+import type { SessionSummary } from "@get-halo/shared/rpc";
+import type { AppInfo } from "../../shared/desktop.js";
 import type {
   LoadedPluginView,
   PluginLoadError,
