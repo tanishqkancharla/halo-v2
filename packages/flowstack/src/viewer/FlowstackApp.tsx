@@ -22,6 +22,7 @@ import { haloProgram } from "../model/halo.js";
 import type { Flow, ProcessName, Program, Service } from "../model/Program.js";
 import { carrierIcons, carrierLabels } from "./carriers.tsx";
 import { MermaidBlock } from "./MermaidBlock.tsx";
+import { PaneStack } from "./PaneStack.tsx";
 import {
   frameKeys,
   PathStack,
@@ -31,7 +32,7 @@ import {
 } from "./PathStack.tsx";
 
 type Selection = { kind: "map" } | { kind: "flow"; id: string };
-type FlowView = "stack" | "sequence";
+type FlowView = "stack" | "panes" | "sequence";
 
 const program = haloProgram;
 const services = new Map(
@@ -45,6 +46,7 @@ export function FlowstackApp() {
       ? { kind: "map" }
       : { kind: "flow", id: firstFlow.id },
   );
+  const [view, setView] = useState<FlowView>("stack");
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(program.flows.map((flow) => rootFrameKey(flow))),
   );
@@ -67,12 +69,16 @@ export function FlowstackApp() {
   const sidebar = useStyles(styles.sidebar);
   const sectionLabel = useStyles(styles.sectionLabel);
   const navItem = useStyles(navigationItem, styles.navItem);
-  const main = useStyles(styles.main);
 
   const selectedFlow =
     selection.kind === "flow"
       ? program.flows.find((flow) => flow.id === selection.id)
       : undefined;
+  const fullBleed = selectedFlow !== undefined && view === "panes";
+  const main = useStyles(
+    styles.main,
+    fullBleed ? styles.mainFullBleed : styles.mainPadded,
+  );
 
   return (
     <div className={shell}>
@@ -122,6 +128,8 @@ export function FlowstackApp() {
               key={selectedFlow.id}
               flow={selectedFlow}
               services={services}
+              view={view}
+              onViewChange={setView}
               expansion={expansion}
               onExpandAll={() =>
                 setExpanded((current) => {
@@ -177,21 +185,60 @@ function FlowLabel(props: { flow: Flow }) {
 function FlowPage(props: {
   flow: Flow;
   services: Map<string, Service>;
+  view: FlowView;
+  onViewChange: (view: FlowView) => void;
   expansion: Expansion;
   onExpandAll: () => void;
   onCollapseAll: () => void;
 }) {
-  const [view, setView] = useState<FlowView>("stack");
+  const { view } = props;
   const page = useStyles(styles.page);
   const heading = useStyles(styles.heading);
   const description = useStyles(styles.description);
   const toolbar = useStyles(styles.toolbar);
   const toolbarSpacer = useStyles(styles.toolbarSpacer);
   const stackShell = useStyles(styles.stackShell);
+  const panesPage = useStyles(styles.panesPage);
+  const panesToolbar = useStyles(styles.panesToolbar);
+  const panesBody = useStyles(styles.panesBody);
   const sequence = useMemo(
     () => flowSequenceSource(props.flow, props.services),
     [props.flow, props.services],
   );
+
+  const viewButtons = (
+    <>
+      <Button
+        variant={view === "stack" ? "default" : "quiet"}
+        onClick={() => props.onViewChange("stack")}
+      >
+        Call stack
+      </Button>
+      <Button
+        variant={view === "panes" ? "default" : "quiet"}
+        onClick={() => props.onViewChange("panes")}
+      >
+        Panes
+      </Button>
+      <Button
+        variant={view === "sequence" ? "default" : "quiet"}
+        onClick={() => props.onViewChange("sequence")}
+      >
+        Sequence
+      </Button>
+    </>
+  );
+
+  if (view === "panes") {
+    return (
+      <div className={panesPage}>
+        <div className={panesToolbar}>{viewButtons}</div>
+        <div className={panesBody}>
+          <PaneStack flow={props.flow} services={props.services} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={page}>
@@ -200,18 +247,7 @@ function FlowPage(props: {
         <p className={description}>{props.flow.description}</p>
       </div>
       <div className={toolbar}>
-        <Button
-          variant={view === "stack" ? "default" : "quiet"}
-          onClick={() => setView("stack")}
-        >
-          Call stack
-        </Button>
-        <Button
-          variant={view === "sequence" ? "default" : "quiet"}
-          onClick={() => setView("sequence")}
-        >
-          Sequence
-        </Button>
+        {viewButtons}
         {view === "stack" ? (
           <>
             <span className={toolbarSpacer} />
@@ -397,11 +433,36 @@ const styles = {
     display: "inline-flex",
     color: colors.gray[10],
   }),
-  main: style(spacing.padding({ x: 12, y: 8 }), {
+  main: style({
     flex: "1 1 auto",
     minWidth: 0,
     minHeight: 0,
+  }),
+  mainPadded: style(spacing.padding({ x: 12, y: 8 }), {
     overflowY: "auto",
+  }),
+  mainFullBleed: style(flex({ direction: "column" }), {
+    overflow: "hidden",
+  }),
+  panesPage: style(flex({ direction: "column" }), {
+    width: "100%",
+    height: "100%",
+    minWidth: 0,
+    minHeight: 0,
+  }),
+  panesToolbar: style(
+    flex({ direction: "row", align: "center", gap: 2 }),
+    spacing.padding({ x: 4, y: 2 }),
+    border(["bottom"], "border"),
+    {
+      flex: "0 0 auto",
+      backgroundColor: backgroundColor.app,
+    },
+  ),
+  panesBody: style({
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: 0,
   }),
   page: style(flex({ direction: "column", gap: 6 }), {
     width: "100%",
