@@ -423,90 +423,79 @@ export const haloProgram: Program = {
                             "{ sessionId, text } over the MessagePort; resolves when the agent run ends",
                           children: [promptHandling()],
                         }),
-                        event({
-                          from: "main",
-                          to: "renderer",
-                          name: "sessions.prompt resolves",
-                          carrier: "rpc",
-                          at: 106,
-                          detail: "void, after agent_end",
+                        frame({
+                          service: "agentSessionHook",
+                          entry: "queryClient.invalidateQueries(['sessions'])",
+                          at: 114,
+                          summary:
+                            "Runs once sessions.prompt resolves, after agent_end. Refetches every sessions query so the sidebar picks up the new title.",
+                          source: {
+                            path: `${electron}/renderer/main/agent/useAgentSession.ts`,
+                            start: 114,
+                            end: 117,
+                          },
                           children: [
                             frame({
-                              service: "agentSessionHook",
-                              entry:
-                                "queryClient.invalidateQueries(['sessions'])",
+                              service: "apiProvider",
+                              entry: "useSessionsQuery",
                               at: 114,
                               summary:
-                                "Refetches every sessions query so the sidebar picks up the new title.",
+                                "TanStack Query reruns queryFn, then the sidebar re-renders with the result.",
                               source: {
-                                path: `${electron}/renderer/main/agent/useAgentSession.ts`,
-                                start: 114,
-                                end: 117,
+                                path: `${electron}/renderer/api/ApiProvider.tsx`,
+                                start: 117,
+                                end: 128,
                               },
                               children: [
-                                frame({
-                                  service: "apiProvider",
-                                  entry: "useSessionsQuery",
-                                  at: 114,
-                                  summary:
-                                    "TanStack Query reruns queryFn, then the sidebar re-renders with the result.",
-                                  source: {
-                                    path: `${electron}/renderer/api/ApiProvider.tsx`,
-                                    start: 117,
-                                    end: 128,
-                                  },
+                                event({
+                                  from: "renderer",
+                                  to: "main",
+                                  name: "sessions.list",
+                                  carrier: "rpc",
+                                  at: 126,
                                   children: [
-                                    event({
-                                      from: "renderer",
-                                      to: "main",
-                                      name: "sessions.list",
-                                      carrier: "rpc",
+                                    frame({
+                                      service: "sessionsRouter",
+                                      entry: "sessionsRouter.list",
                                       at: 126,
+                                      source: {
+                                        path: `${server}/sessions/sessionsRouter.ts`,
+                                        start: 18,
+                                        end: 22,
+                                      },
                                       children: [
                                         frame({
-                                          service: "sessionsRouter",
-                                          entry: "sessionsRouter.list",
-                                          at: 126,
+                                          service: "haloAgentSession",
+                                          entry: "HaloAgentSession.list",
+                                          at: 20,
+                                          summary:
+                                            "SessionManager.list over the session dir; title from the name or first message.",
                                           source: {
-                                            path: `${server}/sessions/sessionsRouter.ts`,
-                                            start: 18,
-                                            end: 22,
+                                            path: `${server}/agent/HaloAgentSession.ts`,
+                                            start: 126,
+                                            end: 136,
                                           },
                                           children: [
-                                            frame({
-                                              service: "haloAgentSession",
-                                              entry: "HaloAgentSession.list",
-                                              at: 20,
-                                              summary:
-                                                "SessionManager.list over the session dir; title from the name or first message.",
-                                              source: {
-                                                path: `${server}/agent/HaloAgentSession.ts`,
-                                                start: 126,
-                                                end: 136,
-                                              },
-                                              children: [
-                                                event({
-                                                  from: "main",
-                                                  to: "disk",
-                                                  name: "scan .pi/agent/sessions/*.jsonl",
-                                                  carrier: "filesystem",
-                                                  at: 129,
-                                                }),
-                                              ],
+                                            event({
+                                              from: "main",
+                                              to: "disk",
+                                              name: "scan .pi/agent/sessions/*.jsonl",
+                                              carrier: "filesystem",
+                                              at: 129,
                                             }),
                                           ],
                                         }),
                                       ],
                                     }),
-                                    event({
-                                      from: "main",
-                                      to: "renderer",
-                                      name: "SessionSummary[]",
-                                      carrier: "rpc",
-                                      at: 126,
-                                      detail: "useQuery re-renders the sidebar",
-                                    }),
                                   ],
+                                }),
+                                event({
+                                  from: "main",
+                                  to: "renderer",
+                                  name: "SessionSummary[]",
+                                  carrier: "rpc",
+                                  at: 126,
+                                  detail: "useQuery re-renders the sidebar",
                                 }),
                               ],
                             }),
