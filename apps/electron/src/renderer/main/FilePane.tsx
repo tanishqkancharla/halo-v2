@@ -58,6 +58,7 @@ function MarkdownFileEditor({
   loaded: string;
 }) {
   const autosave = useAutosaveFile({ path, loaded });
+  const editor = useStyles(styles.markdownEditor);
   return (
     <Editor
       content={loaded}
@@ -65,6 +66,7 @@ function MarkdownFileEditor({
       placeholder="Write…"
       aria-label={path}
       size="sm"
+      className={editor}
     />
   );
 }
@@ -96,7 +98,9 @@ const styles = {
     maxWidth: proseMaxWidth,
     marginInline: "auto",
     minWidth: 0,
+    height: "100%",
   }),
+  markdownEditor: style({ minHeight: "100%" }),
   codeContent: style({
     width: "100%",
     maxWidth: proseMaxWidth,
