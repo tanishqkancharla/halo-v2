@@ -591,6 +591,9 @@ importers:
         specifier: npm:typescript@5.9.3
         version: typescript@5.9.3
     devDependencies:
+      '@halo/cli':
+        specifier: workspace:*
+        version: link:../halo-cli
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config

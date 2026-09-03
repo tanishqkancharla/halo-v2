@@ -26,7 +26,7 @@ export type HaloServerOptions = {
   cliNodeExecutable?: string;
   cliElectronRunAsNode?: boolean;
   isDevelopment?: boolean;
-  ownerUserId: string;
+  ownerUserId: Promise<string | Error>;
   logger: Logger;
   createCredentialVault: (input: {
     filesystem: FilesystemService;
@@ -55,7 +55,7 @@ export class HaloServer {
     const toolRuntime = new ToolRuntimeService({
       filesystem,
       workspace,
-      ownerUserId: Promise.resolve(options.ownerUserId),
+      ownerUserId: options.ownerUserId,
       createCredentialVault: ({ workspaceRoot }) =>
         options.createCredentialVault({ filesystem, workspaceRoot }),
       toolPlugins: [
@@ -114,8 +114,34 @@ export class HaloServer {
     return listening.connection;
   }
 
-  selectWorkspace(directory: string) {
-    return this.context.workspace.select(directory);
+  getWorkspace() {
+    return this.context.workspace.getWorkspace();
+  }
+
+  async selectWorkspace(directory: string) {
+    const previous = this.context.workspace.getWorkspace();
+    const selected = await this.context.workspace.select(directory);
+    if (selected instanceof Error) return selected;
+    if (
+      previous !== undefined &&
+      previous.workspaceRoot === selected.workspaceRoot
+    ) {
+      return selected;
+    }
+
+    const sessionsClosed = await this.context.sessions.shutdown();
+    if (sessionsClosed instanceof Error) return sessionsClosed;
+    const runtimeClosed = await this.context.toolRuntime.close();
+    if (runtimeClosed instanceof Error) return runtimeClosed;
+
+    const pluginsLoaded = await this.context.plugins.load();
+    if (pluginsLoaded instanceof Error) {
+      this.context.logger.warn({
+        event: "plugin-workspace-load-failed",
+        error: pluginsLoaded,
+      });
+    }
+    return selected;
   }
 
   async close() {

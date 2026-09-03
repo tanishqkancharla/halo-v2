@@ -4,7 +4,6 @@ import {
   dialog,
   ipcMain,
   Menu,
-  MessageChannelMain,
   shell,
   type IpcMainEvent,
 } from "electron";
@@ -18,28 +17,17 @@ import {
 } from "@repo/logger";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
-import { onError } from "@orpc/server";
-import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
-import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
-import {
-  createWorkspaceFilesPlugin,
-  parallelSearchPlugin,
-  StaticAgentAuthority,
-  ToolRuntimeService,
-  workspaceBashPlugin,
-} from "@get-halo/server/agent";
+import { LOG_CHANNELS } from "../shared/channels.js";
+import type { HaloRpcConnection } from "../shared/rpc.js";
+import { HaloServer } from "@get-halo/server";
 import { resolveHaloCliEntry } from "@get-halo/server/cli";
 import { FilesystemService } from "@get-halo/server/filesystem";
-import { PluginService, PluginToolGrants } from "@get-halo/server/plugins";
-import { haloRpcRouter, type HaloContext } from "@get-halo/server/router";
-import { SessionRegistry } from "@get-halo/server/sessions";
-import { WorkspaceService } from "@get-halo/server/workspace";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { registerDesktopApi } from "./DesktopApi.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
-import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
+import { removeHaloRpcFile, writeHaloRpcFile } from "./rpcFile.js";
 import { UserService } from "./UserService.js";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -88,15 +76,6 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 
 process.env.HALO_USER_DATA = applicationConfig.dataDir;
 
-const workspaceService = new WorkspaceService({
-  appDataDir: applicationConfig.dataDir,
-  filesystem: filesystemService,
-  appVersion: app.getVersion(),
-  cliEntry: resolveHaloCliEntry(filesystemService, import.meta.url),
-  cliNodeExecutable: isDevelopment ? "node" : process.execPath,
-  cliElectronRunAsNode: !isDevelopment,
-  isDevelopment,
-});
 const userService = new UserService({
   appDataDir: applicationConfig.dataDir,
   filesystem: filesystemService,
@@ -104,80 +83,57 @@ const userService = new UserService({
 const ownerUserId = userService
   .getUser()
   .then((user) => (user instanceof Error ? user : user.id));
-const toolPlugins = [
-  createWorkspaceFilesPlugin(filesystemService),
-  workspaceBashPlugin,
-  parallelSearchPlugin,
-];
-const authority = new StaticAgentAuthority([
-  "workspace.files.read",
-  "workspace.files.write",
-  "workspace.shell.execute",
-  "network.web.search",
-]);
-const pluginService = new PluginService({
-  filesystem: filesystemService,
-  workspace: workspaceService,
-});
-const pluginToolGrants = new PluginToolGrants({
-  filesystem: filesystemService,
-  workspace: workspaceService,
-});
-const toolRuntime = new ToolRuntimeService({
-  filesystem: filesystemService,
-  workspace: workspaceService,
+const haloServer = new HaloServer({
+  appDataDir: applicationConfig.dataDir,
+  appVersion: app.getVersion(),
+  cliEntry: resolveHaloCliEntry(filesystemService, import.meta.url),
+  cliNodeExecutable: isDevelopment ? "node" : process.execPath,
+  cliElectronRunAsNode: !isDevelopment,
+  isDevelopment,
   ownerUserId,
-  createCredentialVault: ({ workspaceRoot }) =>
+  logger: rpcLogger,
+  createCredentialVault: ({ filesystem, workspaceRoot }) =>
     createEncryptedFileCredentialVault({
-      filesystem: filesystemService,
+      filesystem,
       workspaceRoot,
     }),
-  toolPlugins,
-  authority,
-});
-const sessionRegistry = new SessionRegistry({
-  filesystem: filesystemService,
-  workspace: workspaceService,
-  toolRuntime,
 });
 let mainWindow: BrowserWindow | undefined;
-let rpcHttp: HaloRpcHttp | undefined;
+let rpcConnection: HaloRpcConnection | undefined;
 let shutdownStarted = false;
 
 // oxlint-disable-next-line typescript/no-floating-promises -- Electron owns the app-ready lifecycle and keeps the process alive for this work.
 app.whenReady().then(async () => {
-  await workspaceService.restore();
-  if (workspaceService.getWorkspace() !== undefined) {
-    const listed = await pluginService.load();
-    if (listed instanceof Error) {
-      logger.warn({ event: "plugin-startup-load-failed", error: listed });
-    }
-  }
   registerLogBridge();
   registerDesktopApi({
-    selectWorkspace: (directory) => workspaceService.select(directory),
+    selectWorkspace: (directory) => haloServer.selectWorkspace(directory),
     getWindow: () => mainWindow,
   });
-  registerRpcBridge();
-  const listening = await listenHaloRpcHttp({
-    context: {
-      workspace: workspaceService,
-      plugins: pluginService,
-      pluginToolGrants,
-      sessions: sessionRegistry,
-      toolRuntime,
-      logger: rpcLogger,
-    },
-    userDataDir: applicationConfig.dataDir,
+  const listening = await haloServer.listen({
+    host: "127.0.0.1",
+    port: 0,
+    corsOrigins: [getRendererOrigin()],
   });
   if (listening instanceof Error) {
     logger.error({ event: "rpc-http-listen-failed", error: listening });
-  } else {
-    rpcHttp = listening;
-    toolRuntime.setOAuthRedirectUri(listening.oauthRedirectUri);
+    app.quit();
+    return;
   }
+  const rpcFile = await writeHaloRpcFile({
+    userDataDir: applicationConfig.dataDir,
+    connection: listening,
+  });
+  if (rpcFile instanceof Error) {
+    logger.error({ event: "rpc-file-write-failed", error: rpcFile });
+    app.quit();
+    return;
+  }
+  rpcConnection = {
+    origin: `http://${rpcFile.host}:${rpcFile.port}`,
+    token: rpcFile.token,
+  };
   installMenu();
-  await openMainWindow();
+  await openMainWindow(rpcConnection);
   startAppUpdates({
     isDevelopment,
     getWindow: () => mainWindow,
@@ -186,8 +142,11 @@ app.whenReady().then(async () => {
 
   app.on("activate", () => {
     if (mainWindow !== undefined) return;
+    if (rpcConnection === undefined) {
+      throw new Error("Halo RPC is unavailable after startup.");
+    }
     // oxlint-disable-next-line typescript/no-floating-promises -- Electron activate callbacks cannot await window loading.
-    void openMainWindow();
+    void openMainWindow(rpcConnection);
   });
 });
 
@@ -199,48 +158,41 @@ app.on("will-quit", (event) => {
   if (shutdownStarted) return;
   event.preventDefault();
   shutdownStarted = true;
-  const pending = rpcHttp;
-  rpcHttp = undefined;
   // oxlint-disable-next-line typescript/no-floating-promises -- Electron requires will-quit to return while cleanup runs before the second quit call.
-  void closeAppServices(pending).finally(() => {
+  void closeAppServices().finally(() => {
     logger.destroy();
     app.quit();
   });
 });
 
-async function closeAppServices(http: HaloRpcHttp | undefined) {
-  const sessionsClosed = await sessionRegistry.shutdown();
-  if (sessionsClosed instanceof Error) {
-    logger.error({
-      event: "session-registry-close-failed",
-      error: sessionsClosed,
-    });
+async function closeAppServices() {
+  const serverClosed = await haloServer.close();
+  if (serverClosed instanceof Error) {
+    logger.error({ event: "halo-server-close-failed", error: serverClosed });
   }
-  const runtimeClosed = await toolRuntime.close();
-  if (runtimeClosed instanceof Error) {
-    logger.error({ event: "tool-runtime-close-failed", error: runtimeClosed });
+  const rpcFileRemoved = await removeHaloRpcFile({
+    userDataDir: applicationConfig.dataDir,
+  });
+  if (rpcFileRemoved instanceof Error) {
+    logger.error({ event: "rpc-file-remove-failed", error: rpcFileRemoved });
   }
-  workspaceService.close();
   const filesystemClosed = await filesystemService.close();
   if (filesystemClosed instanceof Error) {
     logger.error({ event: "filesystem-close-failed", error: filesystemClosed });
   }
-  if (http !== undefined) {
-    await http.close().catch((error) => {
-      logger.error({ event: "rpc-http-close-failed", error });
-    });
-  }
 }
 
-async function openMainWindow(): Promise<void> {
-  const window = await createWindow();
+async function openMainWindow(connection: HaloRpcConnection): Promise<void> {
+  const window = await createWindow(connection);
   mainWindow = window;
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = undefined;
   });
 }
 
-async function createWindow(): Promise<BrowserWindow> {
+async function createWindow(
+  connection: HaloRpcConnection,
+): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     title: "Halo",
     width: 1100,
@@ -255,6 +207,10 @@ async function createWindow(): Promise<BrowserWindow> {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      additionalArguments: [
+        `--halo-rpc-origin=${connection.origin}`,
+        `--halo-rpc-token=${connection.token}`,
+      ],
     },
   });
 
@@ -283,41 +239,6 @@ function registerLogBridge(): void {
       rendererLogger.write(payload, payload.scopes);
     },
   );
-}
-
-function registerRpcBridge(): void {
-  ipcMain.on(RPC_CHANNELS.requestRpc, (event) => {
-    assertTrustedSender(event);
-    const frame = event.senderFrame;
-    if (frame === null) {
-      throw new Error("Halo rejected RPC without a sender frame.");
-    }
-    const { port1, port2 } = new MessageChannelMain();
-    const context: HaloContext = {
-      workspace: workspaceService,
-      plugins: pluginService,
-      pluginToolGrants,
-      sessions: sessionRegistry,
-      toolRuntime,
-      logger: rpcLogger,
-    };
-    const handler = new RPCHandler<HaloContext>(haloRpcRouter, {
-      interceptors: [
-        onError((error) => {
-          if (error instanceof Error) {
-            rpcLogger.warn({ event: "orpc", error });
-            return;
-          }
-          rpcLogger.warn({ event: "orpc", error: String(error) });
-        }),
-      ],
-    });
-    handler.upgrade(port1, { context });
-    port1.start();
-    // Electron's postMessage payload; the ports carry the RPC transport.
-    // oxlint-disable-next-line unicorn/no-null
-    frame.postMessage(RPC_CHANNELS.provideRpc, null, [port2]);
-  });
 }
 
 function assertTrustedSender(event: IpcMainEvent): BrowserWindow {
@@ -431,8 +352,8 @@ async function switchWorkspace(): Promise<void> {
   const directory = selection.filePaths[0];
   if (directory === undefined) return;
 
-  const previous = workspaceService.getWorkspace();
-  const workspace = await workspaceService.select(directory);
+  const previous = haloServer.getWorkspace();
+  const workspace = await haloServer.selectWorkspace(directory);
   if (workspace instanceof Error) {
     await dialog.showMessageBox(mainWindow, {
       type: "error",
@@ -449,21 +370,14 @@ async function switchWorkspace(): Promise<void> {
     return;
   }
 
-  const sessionsClosed = await sessionRegistry.shutdown();
-  if (sessionsClosed instanceof Error) {
-    logger.error({
-      event: "session-registry-workspace-close-failed",
-      error: sessionsClosed,
-    });
-  }
-  const runtimeClosed = await toolRuntime.close();
-  if (runtimeClosed instanceof Error) {
-    logger.error({
-      event: "tool-runtime-workspace-close-failed",
-      error: runtimeClosed,
-    });
-  }
   mainWindow.reload();
+}
+
+function getRendererOrigin() {
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    return new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin;
+  }
+  return "null";
 }
 
 function ignoreClosedStdioPipe(stream: NodeJS.WriteStream) {

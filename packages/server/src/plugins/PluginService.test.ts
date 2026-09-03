@@ -8,22 +8,21 @@ import { expect, test } from "vitest";
 import type { HaloClient } from "@get-halo/shared/contract";
 import {
   createWorkspaceFilesPlugin,
+  type CredentialVault,
   StaticAgentAuthority,
   ToolRuntimeService,
-} from "@get-halo/server/agent";
-import { FilesystemService } from "@get-halo/server/filesystem";
+} from "../agent.js";
+import { FilesystemService } from "../filesystem.js";
+import { closeHaloHttp, listenHaloHttp } from "../http.js";
 import {
   copyPluginWorkspacePackages,
   installPluginSdkContract,
   PluginService,
   PluginToolGrants,
-} from "@get-halo/server/plugins";
-import type { HaloContext } from "@get-halo/server/router";
-import { SessionRegistry } from "@get-halo/server/sessions";
-import { WorkspaceService } from "@get-halo/server/workspace";
-import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
-import { listenHaloRpcHttp } from "./HaloRpcHttp.js";
-import { UserService } from "./UserService.js";
+} from "../plugins.js";
+import type { HaloContext } from "../router.js";
+import { SessionRegistry } from "../sessions.js";
+import { WorkspaceService } from "../workspace.js";
 
 type PluginHandle = {
   id: string;
@@ -93,17 +92,8 @@ const pluginTest = test.extend<{
     const toolRuntime = new ToolRuntimeService({
       filesystem: filesystemService,
       workspace: workspaceService,
-      ownerUserId: new UserService({
-        appDataDir: userDataDir,
-        filesystem: filesystemService,
-      })
-        .getUser()
-        .then((result) => (result instanceof Error ? result : result.id)),
-      createCredentialVault: (input) =>
-        createEncryptedFileCredentialVault({
-          filesystem: filesystemService,
-          workspaceRoot: input.workspaceRoot,
-        }),
+      ownerUserId: Promise.resolve("plugin-test-user"),
+      createCredentialVault: () => new TestCredentialVault(),
       toolPlugins: [createWorkspaceFilesPlugin(filesystemService)],
       authority: new StaticAgentAuthority(["workspace.files.read"]),
     });
@@ -120,16 +110,18 @@ const pluginTest = test.extend<{
       plugins: pluginService,
       logger: new Logger(),
     };
-    const rpc = await listenHaloRpcHttp({
+    const rpc = await listenHaloHttp({
       context,
-      userDataDir,
+      host: "127.0.0.1",
+      port: 0,
+      corsOrigins: [],
     });
     if (rpc instanceof Error) throw rpc;
     const client = createHaloRpcClient<HaloClient>({
       version: 1,
-      host: rpc.host,
-      port: rpc.port,
-      token: rpc.token,
+      host: "127.0.0.1",
+      port: rpc.connection.port,
+      token: rpc.connection.token,
     });
 
     const driver: PluginDriver = {
@@ -174,7 +166,8 @@ const pluginTest = test.extend<{
     };
 
     await use(driver);
-    await rpc.close();
+    const httpClosed = await closeHaloHttp(rpc.server);
+    if (httpClosed instanceof Error) throw httpClosed;
     const sessionsClosed = await sessions.shutdown();
     if (sessionsClosed instanceof Error) throw sessionsClosed;
     const runtimeClosed = await toolRuntime.close();
@@ -185,6 +178,22 @@ const pluginTest = test.extend<{
     await fs.rm(userDataDir, { recursive: true, force: true });
   },
 });
+
+class TestCredentialVault implements CredentialVault {
+  private readonly values = new Map<string, string>();
+
+  async get(id: string) {
+    return this.values.get(id);
+  }
+
+  async set(id: string, value: string) {
+    this.values.set(id, value);
+  }
+
+  async delete(id: string) {
+    this.values.delete(id);
+  }
+}
 
 pluginTest(
   "creates, builds, invokes, and reloads a plugin",

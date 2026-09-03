@@ -1,25 +1,16 @@
 import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/message-port";
-import { RPC_CHANNELS } from "../../shared/channels.js";
+import { RPCLink } from "@orpc/client/fetch";
 import type { HaloClient } from "@get-halo/shared/contract";
+import type { HaloRpcConnection } from "../../shared/rpc.js";
 
-export async function connectHaloRpc(): Promise<HaloClient> {
-  const port = await requestRpcPort();
-  const link = new RPCLink({ port });
-  port.start();
-  // SAFETY: this port is upgraded to the Halo router; HaloClient is that contract plus plugins.
-  return createORPCClient(link) as HaloClient;
-}
-
-function requestRpcPort(): Promise<MessagePort> {
-  return new Promise((resolve) => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.source !== window) return;
-      if (event.data !== RPC_CHANNELS.provideRpc) return;
-      window.removeEventListener("message", onMessage);
-      resolve(event.ports[0]!);
-    };
-    window.addEventListener("message", onMessage);
-    window.postMessage(RPC_CHANNELS.requestRpc, "*");
+export async function connectHaloRpc(
+  connection: HaloRpcConnection,
+): Promise<HaloClient> {
+  const link = new RPCLink({
+    origin: connection.origin,
+    url: "/rpc",
+    headers: { authorization: `Bearer ${connection.token}` },
   });
+  // SAFETY: HaloRpcConnection points to the Halo router.
+  return createORPCClient(link) as HaloClient;
 }

@@ -8,7 +8,7 @@ export const desktopApi: DesktopApi = window.haloDesktop;
 
 export function createElectronApi(): Promise<HaloClient> {
   if (electronApiPromise === undefined) {
-    electronApiPromise = connectHaloRpc();
+    electronApiPromise = connectHaloRpc(window.haloRpc);
   }
   return electronApiPromise;
 }

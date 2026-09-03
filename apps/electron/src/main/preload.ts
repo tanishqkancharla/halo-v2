@@ -2,8 +2,9 @@ import type { LogLevel, LoggerData, LoggerScope } from "@repo/logger";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { contextBridge, ipcRenderer } from "electron";
-import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
+import { LOG_CHANNELS } from "../shared/channels.js";
 import { DESKTOP_CHANNEL, type DesktopApi } from "../shared/desktop.js";
+import type { HaloRpcConnection } from "../shared/rpc.js";
 
 const desktopApi: DesktopApi = {
   chooseWorkspace: () =>
@@ -19,10 +20,7 @@ const desktopApi: DesktopApi = {
 };
 
 contextBridge.exposeInMainWorld("haloDesktop", desktopApi);
-
-const windowLoaded = new Promise<void>((resolve) => {
-  window.addEventListener("load", () => resolve());
-});
+contextBridge.exposeInMainWorld("haloRpc", readHaloRpcConnection());
 
 const logMessageSchema = Type.Object({
   channel: Type.Literal(LOG_CHANNELS.log),
@@ -39,26 +37,28 @@ const logMessageSchema = Type.Object({
   }),
 });
 
-// Renderer requests an oRPC MessagePort; we forward it into the main world.
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   const log = parseLogMessage({ data: event.data });
   if (log !== undefined) {
     ipcRenderer.send(LOG_CHANNELS.log, log.payload);
-    return;
   }
-  if (event.data !== RPC_CHANNELS.requestRpc) return;
-  // Electron IPC payload; the MessagePort is transferred separately.
-  // oxlint-disable-next-line unicorn/no-null
-  ipcRenderer.postMessage(RPC_CHANNELS.requestRpc, null);
 });
 
-ipcRenderer.on(RPC_CHANNELS.provideRpc, (event) => {
-  // oxlint-disable-next-line typescript/no-floating-promises -- Electron owns this synchronous event callback; the message must wait for the window.
-  void windowLoaded.then(() => {
-    window.postMessage(RPC_CHANNELS.provideRpc, "*", event.ports);
-  });
-});
+function readHaloRpcConnection(): HaloRpcConnection {
+  return {
+    origin: readArgument("--halo-rpc-origin="),
+    token: readArgument("--halo-rpc-token="),
+  };
+}
+
+function readArgument(prefix: string) {
+  const argument = process.argv.find((value) => value.startsWith(prefix));
+  if (argument === undefined) {
+    throw new Error(`Halo preload is missing ${prefix.slice(2, -1)}.`);
+  }
+  return argument.slice(prefix.length);
+}
 
 type LogMessage = {
   channel: typeof LOG_CHANNELS.log;
