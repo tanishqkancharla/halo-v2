@@ -148,7 +148,7 @@ let shutdownStarted = false;
 app.whenReady().then(async () => {
   await workspaceService.restore();
   if (workspaceService.getWorkspace() !== undefined) {
-    const listed = await pluginService.list();
+    const listed = await pluginService.load();
     if (listed instanceof Error) {
       logger.warn({ event: "plugin-startup-load-failed", error: listed });
     }

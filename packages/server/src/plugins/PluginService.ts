@@ -132,7 +132,7 @@ export class PluginService {
       built.push(plugin.id);
     }
 
-    const remounted = await this.list();
+    const remounted = await this.load();
     if (remounted instanceof Error) return remounted;
     return { built, errors };
   }
@@ -180,7 +180,7 @@ export class PluginService {
     return { written, diagnostics };
   }
 
-  async list() {
+  async load() {
     const listed = await this.listPluginDirectories();
     if (listed instanceof Error) return listed;
 

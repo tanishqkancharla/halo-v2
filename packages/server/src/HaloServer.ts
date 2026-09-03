@@ -93,7 +93,7 @@ export class HaloServer {
   }): Promise<HaloHttpConnection | HaloHttpError> {
     await this.context.workspace.restore();
     if (this.context.workspace.getWorkspace() !== undefined) {
-      const listed = await this.context.plugins.list();
+      const listed = await this.context.plugins.load();
       if (listed instanceof Error) {
         this.context.logger.warn({
           event: "plugin-startup-load-failed",
