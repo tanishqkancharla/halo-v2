@@ -1,12 +1,5 @@
 import { useMemo } from "react";
-import {
-  backgroundColor,
-  colors,
-  fontFamily,
-  radius,
-  shadow,
-  spacing,
-} from "maui";
+import { backgroundColor, colors, fontFamily } from "maui";
 import { style, useStyles } from "purse-styles";
 import { mermaidSvg } from "../mermaid.js";
 
@@ -43,8 +36,18 @@ export function MermaidBlock(props: { source: string }) {
 }
 
 const styles = {
-  shell: style(radius.md, shadow.subtle, spacing.padding({ all: 4 }), {
-    overflowX: "auto",
+  shell: style({
+    width: "100%",
+    maxHeight: "60vh",
+    overflow: "auto",
     minWidth: 0,
+    border: 0,
+    boxShadow: "none",
+    "& svg": {
+      display: "block",
+      width: "100%",
+      height: "auto",
+      maxHeight: "60vh",
+    },
   }),
 };

@@ -28,7 +28,7 @@ export function ViewerApp() {
   const heading = useStyles(styles.heading);
   const titleClass = useStyles(styles.title);
   const article = useStyles(styles.article);
-  const prose = useStyles(styles.prose, proseHtml("md"));
+  const prose = useStyles(proseHtml("md"), styles.prose);
   const closed = useStyles(styles.closed);
 
   useEffect(() => {
@@ -117,10 +117,21 @@ const styles = {
     backgroundColor: backgroundColor.app,
   }),
   prose: style({
+    display: "grid",
+    gridTemplateColumns: `minmax(0, 1fr) minmax(0, ${proseMaxWidth}) minmax(0, 1fr)`,
     width: "100%",
-    maxWidth: proseMaxWidth,
-    marginInline: "auto",
+    maxWidth: "none",
     minWidth: 0,
+    "& > *": {
+      gridColumn: "2 / 3",
+      width: "100%",
+      maxWidth: "none",
+      minWidth: 0,
+    },
+    "& > [data-tkstack-kind='mermaid']": {
+      gridColumn: "1 / -1",
+      maxWidth: "none",
+    },
     "& ul > li[data-task]::before, & ol > li[data-task]::before": {
       content: "none",
     },
