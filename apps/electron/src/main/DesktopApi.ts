@@ -14,7 +14,7 @@ import {
   type OpenExternalRequest,
 } from "../shared/desktop.js";
 import { getAppInfo, installAppUpdate } from "./app/AppUpdate.js";
-import type { WorkspaceService } from "./workspace/WorkspaceService.js";
+import type { WorkspaceService } from "@get-halo/server/workspace";
 
 class DesktopRequestError extends errore.createTaggedError({
   name: "DesktopRequestError",

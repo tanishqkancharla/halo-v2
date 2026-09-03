@@ -6,12 +6,11 @@ import type {
   ConnectionStarted,
   HaloConnectionEvent,
 } from "@get-halo/shared/contract";
-import type { UserService } from "../../UserService.js";
 import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 import type { WorkspaceService } from "../../workspace/WorkspaceService.js";
 import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
 import type { AgentAuthority } from "./AgentAuthority.js";
-import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
+import type { CredentialVault } from "./CredentialVault.js";
 import { ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
 
 export class ConnectionSessionMismatchError extends errore.createTaggedError({
@@ -37,7 +36,8 @@ type StartConnectionInput = {
 type ToolRuntimeServiceOptions = {
   filesystem: FilesystemService;
   workspace: WorkspaceService;
-  user: UserService;
+  ownerUserId: Promise<string | Error>;
+  createCredentialVault: (input: { workspaceRoot: string }) => CredentialVault;
   toolPlugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
 };
@@ -45,7 +45,6 @@ type ToolRuntimeServiceOptions = {
 export class ToolRuntimeService {
   private runtime: ToolRuntime | undefined;
   private workspaceRoot: string | undefined;
-  private userId: string | undefined;
   private oauthRedirectUri: string | undefined;
   private readonly pendingConnections = new Map<string, PendingConnection>();
   private readonly connectionIdsByState = new Map<string, string>();
@@ -59,29 +58,24 @@ export class ToolRuntimeService {
   async get() {
     const layout = this.options.workspace.getLayout();
     if (layout instanceof Error) return layout;
-    const user = await this.options.user.getUser();
-    if (user instanceof Error) return user;
+    const ownerUserId = await this.options.ownerUserId;
+    if (ownerUserId instanceof Error) return ownerUserId;
 
-    if (
-      this.runtime !== undefined &&
-      this.workspaceRoot === layout.root &&
-      this.userId === user.id
-    ) {
+    if (this.runtime !== undefined && this.workspaceRoot === layout.root) {
       return this.runtime;
     }
 
     const closed = await this.close();
     if (closed instanceof Error) return closed;
 
-    const credentialVault = createEncryptedFileCredentialVault({
-      filesystem: this.options.filesystem,
+    const credentialVault = this.options.createCredentialVault({
       workspaceRoot: layout.root,
     });
 
     const runtime = await ToolRuntime.create({
       filesystem: this.options.filesystem,
       workspaceRoot: layout.root,
-      userId: user.id,
+      userId: ownerUserId,
       credentialVault,
       toolPlugins: this.options.toolPlugins,
       authority: this.options.authority,
@@ -90,7 +84,6 @@ export class ToolRuntimeService {
     if (runtime instanceof Error) return runtime;
     this.runtime = runtime;
     this.workspaceRoot = layout.root;
-    this.userId = user.id;
     return runtime;
   }
 
@@ -98,7 +91,6 @@ export class ToolRuntimeService {
     const runtime = this.runtime;
     this.runtime = undefined;
     this.workspaceRoot = undefined;
-    this.userId = undefined;
     for (const pending of this.pendingConnections.values()) {
       clearTimeout(pending.expires);
     }

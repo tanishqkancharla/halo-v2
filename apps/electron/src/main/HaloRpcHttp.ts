@@ -11,8 +11,8 @@ import * as errore from "errore";
 import {
   FilesystemPathNotFoundError,
   type FilesystemService,
-} from "./filesystem/FilesystemService.js";
-import { haloRpcRouter, type HaloContext } from "./router.js";
+} from "@get-halo/server/filesystem";
+import { haloRpcRouter, type HaloContext } from "@get-halo/server/router";
 
 export type HaloRpcHttp = {
   host: "127.0.0.1";

@@ -3,7 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import type { WorkspaceTreeEvent } from "@get-halo/shared/rpc";
-import { type ReadonlyStream, Stream } from "../../shared/Stream.js";
+import { type ReadonlyStream, Stream } from "../Stream.js";
 import {
   type FilesystemWatchBatch,
   type FilesystemWatchEvent,

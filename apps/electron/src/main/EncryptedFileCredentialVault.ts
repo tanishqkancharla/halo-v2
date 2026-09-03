@@ -5,11 +5,11 @@ import * as errore from "errore";
 import {
   type CredentialVault,
   CredentialVaultError,
-} from "./CredentialVault.js";
+} from "@get-halo/server/agent";
 import {
   type FilesystemService,
   FilesystemPathNotFoundError,
-} from "../../filesystem/FilesystemService.js";
+} from "@get-halo/server/filesystem";
 
 class EncryptedFileCredentialVault implements CredentialVault {
   private readonly filesystem: FilesystemService;

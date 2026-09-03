@@ -22,23 +22,25 @@ import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/message-port";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS, RPC_CHANNELS } from "../shared/channels.js";
+import {
+  createWorkspaceFilesPlugin,
+  parallelSearchPlugin,
+  StaticAgentAuthority,
+  ToolRuntimeService,
+  workspaceBashPlugin,
+} from "@get-halo/server/agent";
+import { resolveHaloCliEntry } from "@get-halo/server/cli";
+import { FilesystemService } from "@get-halo/server/filesystem";
+import { PluginService, PluginToolGrants } from "@get-halo/server/plugins";
+import { haloRpcRouter, type HaloContext } from "@get-halo/server/router";
+import { SessionRegistry } from "@get-halo/server/sessions";
+import { WorkspaceService } from "@get-halo/server/workspace";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
-import { StaticAgentAuthority } from "./agent/runtime/AgentAuthority.js";
-import { ToolRuntimeService } from "./agent/runtime/ToolRuntimeService.js";
-import { workspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
-import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
-import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { registerDesktopApi } from "./DesktopApi.js";
-import { FilesystemService } from "./filesystem/FilesystemService.js";
+import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
 import { listenHaloRpcHttp, type HaloRpcHttp } from "./HaloRpcHttp.js";
-import { PluginService } from "./plugins/PluginService.js";
-import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
-import { haloRpcRouter, type HaloContext } from "./router.js";
-import { SessionRegistry } from "./sessions/SessionRegistry.js";
 import { UserService } from "./UserService.js";
-import { resolveHaloCliEntry } from "./workspace/installHaloCli.js";
-import { WorkspaceService } from "./workspace/WorkspaceService.js";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -99,6 +101,9 @@ const userService = new UserService({
   appDataDir: applicationConfig.dataDir,
   filesystem: filesystemService,
 });
+const ownerUserId = userService
+  .getUser()
+  .then((user) => (user instanceof Error ? user : user.id));
 const toolPlugins = [
   createWorkspaceFilesPlugin(filesystemService),
   workspaceBashPlugin,
@@ -121,7 +126,12 @@ const pluginToolGrants = new PluginToolGrants({
 const toolRuntime = new ToolRuntimeService({
   filesystem: filesystemService,
   workspace: workspaceService,
-  user: userService,
+  ownerUserId,
+  createCredentialVault: ({ workspaceRoot }) =>
+    createEncryptedFileCredentialVault({
+      filesystem: filesystemService,
+      workspaceRoot,
+    }),
   toolPlugins,
   authority,
 });

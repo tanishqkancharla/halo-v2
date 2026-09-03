@@ -33,6 +33,7 @@
     "@executor-js/plugin-openapi": "1.6.0",
     "@executor-js/runtime-quickjs": "1.6.0",
     "@executor-js/sdk": "1.6.0",
+    "@get-halo/server": "workspace:*",
     "@get-halo/shared": "workspace:*",
     "@halo/cli": "workspace:*",
     "@halo/plugin-sdk": "workspace:*",

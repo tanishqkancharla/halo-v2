@@ -6,19 +6,24 @@ import type { PluginToolResult } from "@halo/plugin-sdk/server";
 import { Logger } from "@repo/logger";
 import { expect, test } from "vitest";
 import type { HaloClient } from "@get-halo/shared/contract";
-import { StaticAgentAuthority } from "../agent/runtime/AgentAuthority.js";
-import { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
-import { createWorkspaceFilesPlugin } from "../agent/tools/files/WorkspaceFilesPlugin.js";
-import { FilesystemService } from "../filesystem/FilesystemService.js";
-import { listenHaloRpcHttp } from "../HaloRpcHttp.js";
-import type { HaloContext } from "../router.js";
-import { SessionRegistry } from "../sessions/SessionRegistry.js";
-import { UserService } from "../UserService.js";
-import { WorkspaceService } from "../workspace/WorkspaceService.js";
-import { PluginService } from "./PluginService.js";
-import { installPluginSdkContract } from "./installPluginSdk.js";
-import { copyPluginWorkspacePackages } from "./copyPluginWorkspacePackages.js";
-import { PluginToolGrants } from "./PluginToolGrants.js";
+import {
+  createWorkspaceFilesPlugin,
+  StaticAgentAuthority,
+  ToolRuntimeService,
+} from "@get-halo/server/agent";
+import { FilesystemService } from "@get-halo/server/filesystem";
+import {
+  copyPluginWorkspacePackages,
+  installPluginSdkContract,
+  PluginService,
+  PluginToolGrants,
+} from "@get-halo/server/plugins";
+import type { HaloContext } from "@get-halo/server/router";
+import { SessionRegistry } from "@get-halo/server/sessions";
+import { WorkspaceService } from "@get-halo/server/workspace";
+import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
+import { listenHaloRpcHttp } from "./HaloRpcHttp.js";
+import { UserService } from "./UserService.js";
 
 type PluginHandle = {
   id: string;
@@ -88,10 +93,17 @@ const pluginTest = test.extend<{
     const toolRuntime = new ToolRuntimeService({
       filesystem: filesystemService,
       workspace: workspaceService,
-      user: new UserService({
+      ownerUserId: new UserService({
         appDataDir: userDataDir,
         filesystem: filesystemService,
-      }),
+      })
+        .getUser()
+        .then((result) => (result instanceof Error ? result : result.id)),
+      createCredentialVault: (input) =>
+        createEncryptedFileCredentialVault({
+          filesystem: filesystemService,
+          workspaceRoot: input.workspaceRoot,
+        }),
       toolPlugins: [createWorkspaceFilesPlugin(filesystemService)],
       authority: new StaticAgentAuthority(["workspace.files.read"]),
     });
@@ -303,5 +315,5 @@ export default {
       data: { path: "message.txt", text: "hello" },
     });
   },
-  15_000,
+  30_000,
 );

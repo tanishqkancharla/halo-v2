@@ -17,7 +17,7 @@ import type {
   HaloSessionEvent,
 } from "@get-halo/shared/contract";
 import type { SessionSummary } from "@get-halo/shared/rpc";
-import { type ReadonlyStream, Stream } from "../../shared/Stream.js";
+import { type ReadonlyStream, Stream } from "../Stream.js";
 import type {
   WorkspaceLayout,
   WorkspaceService,
