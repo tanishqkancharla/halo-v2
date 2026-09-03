@@ -1,4 +1,9 @@
-import { createORPCClient } from "@orpc/client";
+import {
+  createORPCClient,
+  onAsyncIteratorObjectError,
+  onError,
+  ORPCError,
+} from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import * as errore from "errore";
 import {
@@ -18,16 +23,35 @@ export class IncompatibleServerError extends errore.createTaggedError({
     "Halo protocol $clientProtocolVersion cannot use server protocol $serverProtocolVersion.",
 }) {}
 
-export async function connectHaloRpc(
-  connection: HaloRpcConnection,
-): Promise<Error | HaloClient> {
+export async function connectHaloRpc({
+  connection,
+  onDisconnect,
+}: {
+  connection: HaloRpcConnection;
+  onDisconnect: (error: HaloRpcConnectionError) => void;
+}): Promise<Error | HaloClient> {
+  const reportDisconnect = (cause: unknown) => {
+    if (errore.isAbortError(cause)) return;
+    if (
+      cause instanceof ORPCError &&
+      cause.code !== "MALFORMED_ORPC_RESPONSE"
+    ) {
+      return;
+    }
+    onDisconnect(new HaloRpcConnectionError({ cause }));
+  };
   const link = new RPCLink({
     origin: connection.origin,
     url: "/rpc",
     headers: { authorization: `Bearer ${connection.token}` },
   });
   // SAFETY: HaloRpcConnection points to the Halo router.
-  const client = createORPCClient(link) as HaloClient;
+  const client = createORPCClient(link, {
+    interceptors: [
+      onError(reportDisconnect),
+      onAsyncIteratorObjectError(reportDisconnect),
+    ],
+  }) as HaloClient;
   const info = await client.server
     .info()
     .catch((cause) => new HaloRpcConnectionError({ cause }));

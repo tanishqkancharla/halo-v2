@@ -1,6 +1,5 @@
 import { SidebarItem, SidebarSection } from "@halo/plugin-sdk/view";
 import { useQueryClient } from "@tanstack/react-query";
-import * as errore from "errore";
 import { useEffect, useMemo } from "react";
 import { File, Folder } from "maui/icons";
 import type { HaloClient } from "@get-halo/shared/contract";
@@ -11,11 +10,6 @@ import {
   useWorkspaceQuery,
   workspacePathsQueryKey,
 } from "../api/ApiProvider.tsx";
-
-class WorkspaceTreeStreamError extends errore.createTaggedError({
-  name: "WorkspaceTreeStreamError",
-  message: "Workspace tree stream failed",
-}) {}
 
 type FileNavigationNode = {
   path: string;
@@ -52,8 +46,8 @@ export function FilesystemSection() {
         },
       );
     }).catch((cause) => {
-      const error = new WorkspaceTreeStreamError({ cause });
-      if (!controller.signal.aborted) console.warn(error.message, error);
+      if (controller.signal.aborted) return;
+      console.warn("Workspace tree stream failed:", cause);
     });
 
     return () => controller.abort();

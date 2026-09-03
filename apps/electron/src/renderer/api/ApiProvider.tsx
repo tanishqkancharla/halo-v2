@@ -8,7 +8,13 @@ import {
 } from "@tanstack/react-query";
 import type { AnyRouter, RouterClient } from "@orpc/server";
 import * as errore from "errore";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  type ReactNode,
+} from "react";
 import type {
   HaloClient,
   PluginInvocationInput,
@@ -21,7 +27,10 @@ import {
 import { LoadingPage } from "../LoadingPage.tsx";
 import { ConnectionPage } from "../ConnectionPage.tsx";
 import { desktopApi } from "./electron.js";
-import { IncompatibleServerError } from "./HaloRpcClient.js";
+import {
+  IncompatibleServerError,
+  type HaloRpcConnectionError,
+} from "./HaloRpcClient.js";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
   name: "WorkspaceRestoreError",
@@ -45,7 +54,9 @@ export function ApiProvider({
   createApi,
   children,
 }: {
-  createApi: () => Promise<Error | HaloClient>;
+  createApi: (options: {
+    onDisconnect: (error: HaloRpcConnectionError) => void;
+  }) => Promise<Error | HaloClient>;
   children: ReactNode;
 }) {
   const [queryClient] = useState(
@@ -74,13 +85,20 @@ function ResolveApi({
   createApi,
   children,
 }: {
-  createApi: () => Promise<Error | HaloClient>;
+  createApi: (options: {
+    onDisconnect: (error: HaloRpcConnectionError) => void;
+  }) => Promise<Error | HaloClient>;
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
+  const [disconnected, setDisconnected] = useState(false);
+  const disconnect = useCallback((error: Error) => {
+    console.warn("Halo disconnected from its server:", error);
+    setDisconnected(true);
+  }, []);
   const apiQuery = useQuery({
     queryKey: haloApiQueryKey,
-    queryFn: createApi,
+    queryFn: () => createApi({ onDisconnect: disconnect }),
   });
 
   if (apiQuery.isPending) return <LoadingPage />;
@@ -88,6 +106,7 @@ function ResolveApi({
     console.warn("Halo API initialization failed:", apiQuery.error);
     return <ConnectionPage status="disconnected" />;
   }
+  if (disconnected) return <ConnectionPage status="disconnected" />;
   if (apiQuery.data instanceof IncompatibleServerError) {
     return <ConnectionPage status="incompatible" error={apiQuery.data} />;
   }

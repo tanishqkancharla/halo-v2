@@ -24,11 +24,6 @@ class AbortFailedError extends errore.createTaggedError({
   message: "$reason",
 }) {}
 
-class SessionEventStreamError extends errore.createTaggedError({
-  name: "SessionEventStreamError",
-  message: "Session event stream failed",
-}) {}
-
 type UseAgentSessionResult = {
   state: AgentSessionState;
   prompt: (text: string) => Promise<void | PromptFailedError>;
@@ -87,14 +82,16 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
         setState((current) => applyAgentSessionEvent(current, event));
       }
     })().catch((cause) => {
-      reportSessionEventStreamError(cause, cancelled);
+      if (cancelled && errore.isAbortError(cause)) return;
+      console.warn("Session event stream failed:", cause);
     });
 
     return () => {
       cancelled = true;
       if (iterator === undefined) return;
       void iterator.return().catch((cause) => {
-        reportSessionEventStreamError(cause, true);
+        if (errore.isAbortError(cause)) return;
+        console.warn("Failed to close session event stream:", cause);
       });
     };
   }, [api, sessionId]);
@@ -149,12 +146,6 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
   }
 
   return { state, prompt, abort };
-}
-
-function reportSessionEventStreamError(cause: unknown, cancelled: boolean) {
-  const error = new SessionEventStreamError({ cause });
-  if (cancelled && errore.isAbortError(error)) return;
-  console.warn("Session event stream failed:", error);
 }
 
 type UseDraftAgentSessionResult = {
