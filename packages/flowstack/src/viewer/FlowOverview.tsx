@@ -6,14 +6,15 @@ import {
   type FlowNode,
   type Service,
 } from "../model/Program.js";
-import { ActorName, actorOf } from "./badges.tsx";
+import { NameText, serviceProcess } from "./badges.tsx";
 import { carrierIcons, carrierLabels } from "./carriers.tsx";
 
 /**
- * The flow at the level of its main services: only the events, each shown as
- * `from → to`, nested as they cause one another. Frames are folded away, so
- * an event that a frame sends sits under the event that frame handled.
- * Clicking an event opens the path to it in the call stack.
+ * The flow at the level of its main services: only the events, nested as
+ * they cause one another, each name coloured by the service that sends it.
+ * Frames are folded away, so an event that a frame sends sits under the
+ * event that frame handled. Clicking an event opens the path to it in the
+ * call stack.
  */
 export function FlowOverview(props: {
   nodes: FlowNode[];
@@ -75,15 +76,10 @@ function Row(props: {
   onReveal: (key: string) => void;
 }) {
   const { node } = props;
-  const from = actorOf(props.services.get(node.from), node.from);
-  const to = actorOf(props.services.get(node.to), node.to);
   const Icon = carrierIcons[node.carrier];
 
   const row = useStyles(styles.row);
   const glyph = useStyles(styles.glyph);
-  const arrow = useStyles(styles.arrow);
-  const actors = useStyles(styles.actors);
-  const name = useStyles(styles.name);
   const carrier = useStyles(styles.carrier);
 
   return (
@@ -97,14 +93,10 @@ function Row(props: {
         <span className={glyph} aria-hidden="true">
           {props.glyph}
         </span>
-        <span className={actors}>
-          <ActorName name={from.name} process={from.process} />
-          <span className={arrow} aria-hidden="true">
-            →
-          </span>
-          <ActorName name={to.name} process={to.process} />
-        </span>
-        <span className={name}>{node.name}</span>
+        <NameText
+          name={node.name}
+          process={serviceProcess(props.services.get(node.from))}
+        />
         <span className={carrier}>
           <Icon size="xs" />
           {carrierLabels[node.carrier]}
@@ -156,21 +148,6 @@ const styles = {
   }),
   glyph: style({
     color: colors.gray[7],
-    flex: "0 0 auto",
-  }),
-  actors: style({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: spacing.value(2),
-    flex: "0 0 auto",
-  }),
-  arrow: style({
-    color: colors.gray[9],
-  }),
-  name: style({
-    marginLeft: spacing.value(4),
-    color: colors.gray[12],
-    fontWeight: 500,
     flex: "0 0 auto",
   }),
   carrier: style({
