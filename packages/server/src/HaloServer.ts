@@ -91,6 +91,17 @@ export class HaloServer {
     host: string;
     port: number;
   }): Promise<HaloHttpConnection | HaloHttpError> {
+    await this.context.workspace.restore();
+    if (this.context.workspace.getWorkspace() !== undefined) {
+      const listed = await this.context.plugins.list();
+      if (listed instanceof Error) {
+        this.context.logger.warn({
+          event: "plugin-startup-load-failed",
+          error: listed,
+        });
+      }
+    }
+
     const listening = await listenHaloHttp({
       context: this.context,
       host: options.host,
