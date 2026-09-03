@@ -22,7 +22,6 @@ const walker = FlowWalker.create({
   extraRoots: ["packages/server/src/router.ts"],
   ignore: ["packages/logger/"],
   keepPackages: ["@earendil-works/"],
-  skipErrorPaths: true,
   rpc: {
     clientPackage: "@orpc/client",
     routerFile: "packages/server/src/router.ts",
@@ -86,7 +85,9 @@ function render(node: FlowNode, indent: string): string {
   const label =
     node.kind === "event"
       ? `${node.name}  [${node.carrier}]`
-      : `${node.entry}  ${node.source === undefined ? "" : `${node.source.path}:${node.source.start}-${node.source.end}`}`;
+      : node.kind === "frame"
+        ? `${node.entry}  ${node.source === undefined ? "" : `${node.source.path}:${node.source.start}-${node.source.end}`}`
+        : node.label;
   const at = node.at === undefined ? "" : `  @${node.at}`;
   return [
     `${indent}${label}${at}`,

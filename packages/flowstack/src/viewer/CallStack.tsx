@@ -22,9 +22,10 @@ export type Expansion = {
  * for depth. Events are always shown, so a closed flow reads as the data flow
  * between its services: each event sits under the event whose handling sent
  * it, with the frames between them folded away. Opening a line shows those
- * frames (and a frame's source); the events then move under the frames that
- * send them. Source lines that lead to a child are marked; clicking one opens
- * that child.
+ * frames (and a frame's source), with the `if`/`else` branches and `return`s
+ * of each body in italics; the events then move under the frames that send
+ * them. Source lines that lead to a child are marked; clicking one opens that
+ * child.
  */
 export function CallStack(props: {
   nodes: FlowNode[];
@@ -89,7 +90,7 @@ function Line(props: {
   const source = node.kind === "frame" ? node.source : undefined;
   const canOpen =
     source !== undefined ||
-    children.some((child) => child.node.kind === "frame");
+    children.some((child) => child.node.kind !== "event");
   const open = canOpen && expansion.isExpanded(key);
   const shown = open ? children : eventChildren(node.children, key);
   const marks: SourceMark[] = children.flatMap((child) =>
@@ -111,6 +112,7 @@ function Line(props: {
   const note = useStyles(styles.note);
   const excerpt = useStyles(styles.excerpt);
   const lineButton = useStyles(styles.lineButton);
+  const control = useStyles(styles.control);
 
   return (
     <div data-flowstack-line={nodeName(node)}>
@@ -128,24 +130,30 @@ function Line(props: {
           <span className={glyph} aria-hidden="true">
             {props.glyph}
           </span>
-          <NameText
-            name={nodeName(node)}
-            process={serviceProcess(
-              props.services.get(
-                node.kind === "event" ? node.from : node.service,
-              ),
-            )}
-          />
-          <span className={location}>
-            {node.kind === "event"
-              ? carrierLabels[node.carrier]
-              : source === undefined
-                ? undefined
-                : `${shortPath(source.path)}:${source.start}-${source.end}`}
-          </span>
-          <span className={note}>
-            {node.kind === "event" ? node.detail : node.summary}
-          </span>
+          {node.kind === "event" || node.kind === "frame" ? (
+            <>
+              <NameText
+                name={nodeName(node)}
+                process={serviceProcess(
+                  props.services.get(
+                    node.kind === "event" ? node.from : node.service,
+                  ),
+                )}
+              />
+              <span className={location}>
+                {node.kind === "event"
+                  ? carrierLabels[node.carrier]
+                  : source === undefined
+                    ? undefined
+                    : `${shortPath(source.path)}:${source.start}-${source.end}`}
+              </span>
+              <span className={note}>
+                {node.kind === "event" ? node.detail : node.summary}
+              </span>
+            </>
+          ) : (
+            <span className={control}>{node.label}</span>
+          )}
         </span>
       </button>
       {open && source !== undefined ? (
@@ -168,7 +176,15 @@ function Line(props: {
 }
 
 function nodeName(node: FlowNode) {
-  return node.kind === "event" ? node.name : node.entry;
+  switch (node.kind) {
+    case "event":
+      return node.name;
+    case "frame":
+      return node.entry;
+    case "branch":
+    case "return":
+      return node.label;
+  }
 }
 
 function shortPath(path: string) {
@@ -237,6 +253,10 @@ const styles = {
     color: colors.gray[10],
     fontSize: "11px",
     flex: "0 0 auto",
+  }),
+  control: style({
+    color: colors.gray[11],
+    fontStyle: "italic",
   }),
   note: style({
     marginLeft: spacing.value(6),

@@ -10,7 +10,7 @@
     "cli": "node --import tsx src/cli.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "generate": "node --import tsx src/walker/generatePrompt.ts",
+    "generate": "node --import tsx src/walker/generatePrompt.ts && oxfmt src/model/generated/prompt.ts",
     "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src vite.config.ts",
     "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src vite.config.ts",
     "typecheck": "tsc --noEmit"

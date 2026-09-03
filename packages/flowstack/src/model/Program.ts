@@ -71,7 +71,26 @@ type FrameNode = {
   children: FlowNode[];
 };
 
-export type FlowNode = EventNode | FrameNode;
+/**
+ * A branch a frame's body takes: `if (...)`, `else if (...)`, `else`.
+ * `children` are what runs inside it. `at` is the line of the keyword.
+ */
+type BranchNode = {
+  kind: "branch";
+  label: string;
+  at?: number;
+  children: FlowNode[];
+};
+
+/** The frame returns here. `children` are the calls in the returned expression. */
+type ReturnNode = {
+  kind: "return";
+  label: string;
+  at?: number;
+  children: FlowNode[];
+};
+
+export type FlowNode = EventNode | FrameNode | BranchNode | ReturnNode;
 
 export type Flow = {
   id: string;
@@ -112,6 +131,22 @@ export function frame(input: FrameInput): FrameNode {
   };
 }
 
+export function branch(input: {
+  label: string;
+  at: number;
+  children: FlowNode[];
+}): BranchNode {
+  return { kind: "branch", ...input };
+}
+
+export function returns(input: {
+  label: string;
+  at: number;
+  children: FlowNode[];
+}): ReturnNode {
+  return { kind: "return", ...input };
+}
+
 /** A node with its position in the tree, `${parentKey}/${index}` per level. */
 export type Keyed = { key: string; node: FlowNode };
 
@@ -120,13 +155,14 @@ export function keyed(nodes: FlowNode[], parentKey: string): Keyed[] {
 }
 
 /**
- * The children with frame nodes removed. Events nested inside a frame move
- * up to where the frame was, in order, and keep their keys.
+ * The children with everything but events removed. Events nested inside a
+ * frame, branch or return move up to where it was, in order, and keep their
+ * keys.
  */
 export function eventChildren(nodes: FlowNode[], parentKey: string): Keyed[] {
   const result: Keyed[] = [];
   for (const { key, node } of keyed(nodes, parentKey)) {
-    if (node.kind === "frame") {
+    if (node.kind !== "event") {
       result.push(...eventChildren(node.children, key));
       continue;
     }

@@ -283,6 +283,14 @@ export const generatedPromptServices: Service[] = [
     composes: [],
   },
   {
+    id: "gen:main:orpcErrors",
+    name: "orpcErrors",
+    process: "main",
+    description: "Generated from source.",
+    state: [],
+    composes: [],
+  },
+  {
     id: "gen:main:AgentSession",
     name: "AgentSession",
     process: "main",
@@ -337,16 +345,45 @@ export const generatedPromptFlow: Flow = {
           kind: "frame",
           children: [
             {
-              kind: "frame",
+              kind: "branch",
+              label:
+                'if (event.key === "Enter" && (event.metaKey || event.ctrlKey))',
+              at: 94,
               children: [
                 {
                   kind: "frame",
                   children: [
                     {
-                      kind: "event",
+                      kind: "branch",
+                      label: "if (!trimmedText)",
+                      at: 120,
                       children: [
                         {
-                          kind: "frame",
+                          kind: "return",
+                          label: "return",
+                          at: 120,
+                          children: [],
+                        },
+                      ],
+                    },
+                    {
+                      kind: "frame",
+                      children: [
+                        {
+                          kind: "branch",
+                          label: "if (readySessionId === undefined)",
+                          at: 90,
+                          children: [
+                            {
+                              kind: "return",
+                              label: "return error",
+                              at: 93,
+                              children: [],
+                            },
+                          ],
+                        },
+                        {
+                          kind: "event",
                           children: [
                             {
                               kind: "frame",
@@ -355,34 +392,34 @@ export const generatedPromptFlow: Flow = {
                                   kind: "frame",
                                   children: [
                                     {
-                                      kind: "frame",
+                                      kind: "branch",
+                                      label: "if (live !== undefined)",
+                                      at: 33,
                                       children: [
                                         {
-                                          kind: "frame",
+                                          kind: "return",
+                                          label: "return live",
+                                          at: 33,
                                           children: [],
-                                          service: "gen:main:WorkspaceService",
-                                          entry: "WorkspaceService.getLayout",
-                                          source: {
-                                            path: "packages/server/src/workspace/WorkspaceService.ts",
-                                            start: 189,
-                                            end: 192,
-                                          },
-                                          at: 101,
                                         },
+                                      ],
+                                    },
+                                    {
+                                      kind: "branch",
+                                      label: "if (pending !== undefined)",
+                                      at: 35,
+                                      children: [
                                         {
-                                          kind: "frame",
+                                          kind: "return",
+                                          label: "return await pending",
+                                          at: 35,
                                           children: [],
-                                          service: "gen:main:SessionManager",
-                                          entry: "SessionManager.list",
-                                          summary:
-                                            "List all sessions for a directory.",
-                                          source: {
-                                            path: "node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.d.ts",
-                                            start: 348,
-                                            end: 348,
-                                          },
-                                          at: 103,
                                         },
+                                      ],
+                                    },
+                                    {
+                                      kind: "frame",
+                                      children: [
                                         {
                                           kind: "frame",
                                           children: [
@@ -390,776 +427,2019 @@ export const generatedPromptFlow: Flow = {
                                               kind: "frame",
                                               children: [
                                                 {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:WorkspaceService",
-                                                  entry:
-                                                    "WorkspaceService.getLayout",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/workspace/WorkspaceService.ts",
-                                                    start: 189,
-                                                    end: 192,
-                                                  },
-                                                  at: 43,
+                                                  kind: "branch",
+                                                  label:
+                                                    'if (this.state.status === "notStarted")',
+                                                  at: 190,
+                                                  children: [
+                                                    {
+                                                      kind: "return",
+                                                      label:
+                                                        "return new WorkspaceNotReadyError()",
+                                                      at: 190,
+                                                      children: [],
+                                                    },
+                                                  ],
                                                 },
+                                                {
+                                                  kind: "return",
+                                                  label:
+                                                    "return this.state.layout",
+                                                  at: 191,
+                                                  children: [],
+                                                },
+                                              ],
+                                              service:
+                                                "gen:main:WorkspaceService",
+                                              entry:
+                                                "WorkspaceService.getLayout",
+                                              source: {
+                                                path: "packages/server/src/workspace/WorkspaceService.ts",
+                                                start: 189,
+                                                end: 192,
+                                              },
+                                              at: 101,
+                                            },
+                                            {
+                                              kind: "branch",
+                                              label:
+                                                "if (layout instanceof Error)",
+                                              at: 102,
+                                              children: [
+                                                {
+                                                  kind: "return",
+                                                  label: "return layout",
+                                                  at: 102,
+                                                  children: [],
+                                                },
+                                              ],
+                                            },
+                                            {
+                                              kind: "frame",
+                                              children: [],
+                                              service:
+                                                "gen:main:SessionManager",
+                                              entry: "SessionManager.list",
+                                              summary:
+                                                "List all sessions for a directory.",
+                                              source: {
+                                                path: "node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.d.ts",
+                                                start: 348,
+                                                end: 348,
+                                              },
+                                              at: 103,
+                                            },
+                                            {
+                                              kind: "branch",
+                                              label:
+                                                "if (sessions instanceof Error)",
+                                              at: 107,
+                                              children: [
+                                                {
+                                                  kind: "return",
+                                                  label: "return sessions",
+                                                  at: 107,
+                                                  children: [],
+                                                },
+                                              ],
+                                            },
+                                            {
+                                              kind: "branch",
+                                              label:
+                                                "if (session === undefined)",
+                                              at: 111,
+                                              children: [
+                                                {
+                                                  kind: "return",
+                                                  label:
+                                                    "return new SessionNotFoundError({ sessionId: options.sessionId })",
+                                                  at: 112,
+                                                  children: [],
+                                                },
+                                              ],
+                                            },
+                                            {
+                                              kind: "branch",
+                                              label:
+                                                "if (manager instanceof Error)",
+                                              at: 122,
+                                              children: [
+                                                {
+                                                  kind: "return",
+                                                  label: "return manager",
+                                                  at: 122,
+                                                  children: [],
+                                                },
+                                              ],
+                                            },
+                                            {
+                                              kind: "return",
+                                              label:
+                                                "return await HaloAgentSession.createFromManager(options, layout, manager)",
+                                              at: 123,
+                                              children: [
                                                 {
                                                   kind: "frame",
                                                   children: [
                                                     {
                                                       kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:preferencePath",
-                                                      entry: "preferencePath",
-                                                      source: {
-                                                        path: "packages/server/src/UserService.ts",
-                                                        start: 59,
-                                                        end: 61,
-                                                      },
-                                                      at: 36,
-                                                    },
-                                                    {
-                                                      kind: "frame",
                                                       children: [
-                                                        {
-                                                          kind: "event",
-                                                          children: [],
-                                                          from: "gen:main:FilesystemService",
-                                                          to: "disk",
-                                                          name: "fs.existsSync",
-                                                          carrier: "filesystem",
-                                                          at: 64,
-                                                        },
-                                                      ],
-                                                      service:
-                                                        "gen:main:FilesystemService",
-                                                      entry:
-                                                        "FilesystemService.exists",
-                                                      source: {
-                                                        path: "packages/server/src/filesystem/FilesystemService.ts",
-                                                        start: 63,
-                                                        end: 65,
-                                                      },
-                                                      at: 37,
-                                                    },
-                                                    {
-                                                      kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:readUserPreference",
-                                                      entry:
-                                                        "readUserPreference",
-                                                      source: {
-                                                        path: "packages/server/src/UserService.ts",
-                                                        start: 63,
-                                                        end: 77,
-                                                      },
-                                                      at: 38,
-                                                    },
-                                                    {
-                                                      kind: "frame",
-                                                      children: [
-                                                        {
-                                                          kind: "frame",
-                                                          children: [
-                                                            {
-                                                              kind: "event",
-                                                              children: [],
-                                                              from: "gen:main:FilesystemService",
-                                                              to: "disk",
-                                                              name: "fsPromises.mkdir",
-                                                              carrier:
-                                                                "filesystem",
-                                                              at: 109,
-                                                            },
-                                                            {
-                                                              kind: "frame",
-                                                              children: [],
-                                                              service:
-                                                                "gen:main:filesystemError",
-                                                              entry:
-                                                                "filesystemError",
-                                                              source: {
-                                                                path: "packages/server/src/filesystem/FilesystemService.ts",
-                                                                start: 250,
-                                                                end: 266,
-                                                              },
-                                                              at: 111,
-                                                            },
-                                                          ],
-                                                          service:
-                                                            "gen:main:FilesystemService",
-                                                          entry:
-                                                            "FilesystemService.makeDirectory",
-                                                          source: {
-                                                            path: "packages/server/src/filesystem/FilesystemService.ts",
-                                                            start: 104,
-                                                            end: 114,
-                                                          },
-                                                          at: 84,
-                                                        },
-                                                        {
-                                                          kind: "frame",
-                                                          children: [
-                                                            {
-                                                              kind: "event",
-                                                              children: [],
-                                                              from: "gen:main:FilesystemService",
-                                                              to: "disk",
-                                                              name: "fsPromises.writeFile",
-                                                              carrier:
-                                                                "filesystem",
-                                                              at: 100,
-                                                            },
-                                                            {
-                                                              kind: "frame",
-                                                              children: [],
-                                                              service:
-                                                                "gen:main:filesystemError",
-                                                              entry:
-                                                                "filesystemError",
-                                                              summary:
-                                                                "Walked above; same calls.",
-                                                              source: {
-                                                                path: "packages/server/src/filesystem/FilesystemService.ts",
-                                                                start: 250,
-                                                                end: 266,
-                                                              },
-                                                              at: 101,
-                                                            },
-                                                          ],
-                                                          service:
-                                                            "gen:main:FilesystemService",
-                                                          entry:
-                                                            "FilesystemService.writeFile",
-                                                          source: {
-                                                            path: "packages/server/src/filesystem/FilesystemService.ts",
-                                                            start: 94,
-                                                            end: 102,
-                                                          },
-                                                          at: 91,
-                                                        },
                                                         {
                                                           kind: "frame",
                                                           children: [],
                                                           service:
-                                                            "gen:main:preferencePath",
+                                                            "gen:main:WorkspaceService",
                                                           entry:
-                                                            "preferencePath",
+                                                            "WorkspaceService.getLayout",
                                                           summary:
                                                             "Walked above; same calls.",
                                                           source: {
-                                                            path: "packages/server/src/UserService.ts",
-                                                            start: 59,
-                                                            end: 61,
+                                                            path: "packages/server/src/workspace/WorkspaceService.ts",
+                                                            start: 189,
+                                                            end: 192,
                                                           },
-                                                          at: 92,
+                                                          at: 43,
+                                                        },
+                                                        {
+                                                          kind: "branch",
+                                                          label:
+                                                            "if (layout instanceof Error)",
+                                                          at: 44,
+                                                          children: [
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return layout",
+                                                              at: 44,
+                                                              children: [],
+                                                            },
+                                                          ],
+                                                        },
+                                                        {
+                                                          kind: "frame",
+                                                          children: [
+                                                            {
+                                                              kind: "branch",
+                                                              label:
+                                                                "if (this.user !== undefined)",
+                                                              at: 34,
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    "return this.user",
+                                                                  at: 34,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    "return join(appDataDir, preferenceFileName)",
+                                                                  at: 60,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:preferencePath",
+                                                              entry:
+                                                                "preferencePath",
+                                                              source: {
+                                                                path: "packages/server/src/UserService.ts",
+                                                                start: 59,
+                                                                end: 61,
+                                                              },
+                                                              at: 36,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    "return fs.existsSync(path)",
+                                                                  at: 64,
+                                                                  children: [
+                                                                    {
+                                                                      kind: "event",
+                                                                      children:
+                                                                        [],
+                                                                      from: "gen:main:FilesystemService",
+                                                                      to: "disk",
+                                                                      name: "fs.existsSync",
+                                                                      carrier:
+                                                                        "filesystem",
+                                                                      at: 64,
+                                                                    },
+                                                                  ],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:FilesystemService",
+                                                              entry:
+                                                                "FilesystemService.exists",
+                                                              source: {
+                                                                path: "packages/server/src/filesystem/FilesystemService.ts",
+                                                                start: 63,
+                                                                end: 65,
+                                                              },
+                                                              at: 37,
+                                                            },
+                                                            {
+                                                              kind: "branch",
+                                                              label:
+                                                                "if (this.options.filesystem.exists(path))",
+                                                              at: 37,
+                                                              children: [
+                                                                {
+                                                                  kind: "frame",
+                                                                  children: [
+                                                                    {
+                                                                      kind: "branch",
+                                                                      label:
+                                                                        "if (raw instanceof Error)",
+                                                                      at: 65,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              "return new UserIoError({ cause: raw })",
+                                                                            at: 65,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                    {
+                                                                      kind: "branch",
+                                                                      label:
+                                                                        "if (parsed instanceof Error)",
+                                                                      at: 74,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              "return parsed",
+                                                                            at: 74,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                    {
+                                                                      kind: "branch",
+                                                                      label:
+                                                                        "if (!Value.Check(userPreferenceSchema, parsed))",
+                                                                      at: 75,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              "return new UserIoError()",
+                                                                            at: 75,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                    {
+                                                                      kind: "return",
+                                                                      label:
+                                                                        "return { id: parsed.id }",
+                                                                      at: 76,
+                                                                      children:
+                                                                        [],
+                                                                    },
+                                                                  ],
+                                                                  service:
+                                                                    "gen:main:readUserPreference",
+                                                                  entry:
+                                                                    "readUserPreference",
+                                                                  source: {
+                                                                    path: "packages/server/src/UserService.ts",
+                                                                    start: 63,
+                                                                    end: 77,
+                                                                  },
+                                                                  at: 38,
+                                                                },
+                                                                {
+                                                                  kind: "branch",
+                                                                  label: "else",
+                                                                  at: 41,
+                                                                  children: [
+                                                                    {
+                                                                      kind: "return",
+                                                                      label:
+                                                                        "return existing",
+                                                                      at: 43,
+                                                                      children:
+                                                                        [],
+                                                                    },
+                                                                  ],
+                                                                },
+                                                              ],
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "frame",
+                                                                  children: [
+                                                                    {
+                                                                      kind: "event",
+                                                                      children:
+                                                                        [],
+                                                                      from: "gen:main:FilesystemService",
+                                                                      to: "disk",
+                                                                      name: "fsPromises.mkdir",
+                                                                      carrier:
+                                                                        "filesystem",
+                                                                      at: 109,
+                                                                    },
+                                                                    {
+                                                                      kind: "frame",
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "branch",
+                                                                            label:
+                                                                              'if (args.cause instanceof Error && "code" in args.cause && args.cause.code …)',
+                                                                            at: 255,
+                                                                            children:
+                                                                              [
+                                                                                {
+                                                                                  kind: "return",
+                                                                                  label:
+                                                                                    "return new FilesystemPathNotFoundError({ path: args.path, cause: args.cause, })",
+                                                                                  at: 260,
+                                                                                  children:
+                                                                                    [],
+                                                                                },
+                                                                              ],
+                                                                          },
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              "return new FilesystemOperationError(args)",
+                                                                            at: 265,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                      service:
+                                                                        "gen:main:filesystemError",
+                                                                      entry:
+                                                                        "filesystemError",
+                                                                      source: {
+                                                                        path: "packages/server/src/filesystem/FilesystemService.ts",
+                                                                        start: 250,
+                                                                        end: 266,
+                                                                      },
+                                                                      at: 111,
+                                                                    },
+                                                                    {
+                                                                      kind: "branch",
+                                                                      label:
+                                                                        "if (created instanceof Error)",
+                                                                      at: 113,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              "return created",
+                                                                            at: 113,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                  ],
+                                                                  service:
+                                                                    "gen:main:FilesystemService",
+                                                                  entry:
+                                                                    "FilesystemService.makeDirectory",
+                                                                  source: {
+                                                                    path: "packages/server/src/filesystem/FilesystemService.ts",
+                                                                    start: 104,
+                                                                    end: 114,
+                                                                  },
+                                                                  at: 84,
+                                                                },
+                                                                {
+                                                                  kind: "branch",
+                                                                  label:
+                                                                    "if (created instanceof Error)",
+                                                                  at: 88,
+                                                                  children: [
+                                                                    {
+                                                                      kind: "return",
+                                                                      label:
+                                                                        "return new UserIoError({ cause: created })",
+                                                                      at: 88,
+                                                                      children:
+                                                                        [],
+                                                                    },
+                                                                  ],
+                                                                },
+                                                                {
+                                                                  kind: "frame",
+                                                                  children: [
+                                                                    {
+                                                                      kind: "return",
+                                                                      label:
+                                                                        "return await fsPromises .writeFile(path, data, options) .catch((cause) => file…",
+                                                                      at: 99,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "event",
+                                                                            children:
+                                                                              [],
+                                                                            from: "gen:main:FilesystemService",
+                                                                            to: "disk",
+                                                                            name: "fsPromises.writeFile",
+                                                                            carrier:
+                                                                              "filesystem",
+                                                                            at: 100,
+                                                                          },
+                                                                          {
+                                                                            kind: "frame",
+                                                                            children:
+                                                                              [],
+                                                                            service:
+                                                                              "gen:main:filesystemError",
+                                                                            entry:
+                                                                              "filesystemError",
+                                                                            summary:
+                                                                              "Walked above; same calls.",
+                                                                            source:
+                                                                              {
+                                                                                path: "packages/server/src/filesystem/FilesystemService.ts",
+                                                                                start: 250,
+                                                                                end: 266,
+                                                                              },
+                                                                            at: 101,
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                  ],
+                                                                  service:
+                                                                    "gen:main:FilesystemService",
+                                                                  entry:
+                                                                    "FilesystemService.writeFile",
+                                                                  source: {
+                                                                    path: "packages/server/src/filesystem/FilesystemService.ts",
+                                                                    start: 94,
+                                                                    end: 102,
+                                                                  },
+                                                                  at: 91,
+                                                                },
+                                                                {
+                                                                  kind: "frame",
+                                                                  children: [],
+                                                                  service:
+                                                                    "gen:main:preferencePath",
+                                                                  entry:
+                                                                    "preferencePath",
+                                                                  summary:
+                                                                    "Walked above; same calls.",
+                                                                  source: {
+                                                                    path: "packages/server/src/UserService.ts",
+                                                                    start: 59,
+                                                                    end: 61,
+                                                                  },
+                                                                  at: 92,
+                                                                },
+                                                                {
+                                                                  kind: "branch",
+                                                                  label:
+                                                                    "if (written instanceof Error)",
+                                                                  at: 96,
+                                                                  children: [
+                                                                    {
+                                                                      kind: "return",
+                                                                      label:
+                                                                        "return new UserIoError({ cause: written })",
+                                                                      at: 96,
+                                                                      children:
+                                                                        [],
+                                                                    },
+                                                                  ],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:writeUserPreference",
+                                                              entry:
+                                                                "writeUserPreference",
+                                                              source: {
+                                                                path: "packages/server/src/UserService.ts",
+                                                                start: 79,
+                                                                end: 97,
+                                                              },
+                                                              at: 48,
+                                                            },
+                                                            {
+                                                              kind: "branch",
+                                                              label:
+                                                                "if (written instanceof Error)",
+                                                              at: 53,
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    "return written",
+                                                                  at: 53,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                            },
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return user",
+                                                              at: 55,
+                                                              children: [],
+                                                            },
+                                                          ],
+                                                          service:
+                                                            "gen:main:UserService",
+                                                          entry:
+                                                            "UserService.getUser",
+                                                          source: {
+                                                            path: "packages/server/src/UserService.ts",
+                                                            start: 33,
+                                                            end: 56,
+                                                          },
+                                                          at: 45,
+                                                        },
+                                                        {
+                                                          kind: "branch",
+                                                          label:
+                                                            "if (user instanceof Error)",
+                                                          at: 46,
+                                                          children: [
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return user",
+                                                              at: 46,
+                                                              children: [],
+                                                            },
+                                                          ],
+                                                        },
+                                                        {
+                                                          kind: "branch",
+                                                          label:
+                                                            "if (this.runtime !== undefined && this.workspaceRoot === layout.root && thi…)",
+                                                          at: 48,
+                                                          children: [
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return this.runtime",
+                                                              at: 53,
+                                                              children: [],
+                                                            },
+                                                          ],
+                                                        },
+                                                        {
+                                                          kind: "frame",
+                                                          children: [
+                                                            {
+                                                              kind: "branch",
+                                                              label:
+                                                                "if (runtime === undefined)",
+                                                              at: 93,
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    "return",
+                                                                  at: 93,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                            },
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return await runtime.close()",
+                                                              at: 94,
+                                                              children: [
+                                                                {
+                                                                  kind: "frame",
+                                                                  children: [
+                                                                    {
+                                                                      kind: "branch",
+                                                                      label:
+                                                                        "if (executorClosed instanceof Error)",
+                                                                      at: 542,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              "return executorClosed",
+                                                                            at: 542,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                    {
+                                                                      kind: "branch",
+                                                                      label:
+                                                                        "if (pluginError instanceof Error)",
+                                                                      at: 544,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              'return new ToolRuntimeError({ operation: "tool shutdown", cause: pluginError, …',
+                                                                            at: 545,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                  ],
+                                                                  service:
+                                                                    "gen:main:ToolRuntime",
+                                                                  entry:
+                                                                    "ToolRuntime.close",
+                                                                  source: {
+                                                                    path: "packages/server/src/agent/runtime/ToolRuntime.ts",
+                                                                    start: 531,
+                                                                    end: 550,
+                                                                  },
+                                                                  at: 94,
+                                                                },
+                                                              ],
+                                                            },
+                                                          ],
+                                                          service:
+                                                            "gen:main:ToolRuntimeService",
+                                                          entry:
+                                                            "ToolRuntimeService.close",
+                                                          source: {
+                                                            path: "packages/server/src/agent/runtime/ToolRuntimeService.ts",
+                                                            start: 80,
+                                                            end: 95,
+                                                          },
+                                                          at: 56,
+                                                        },
+                                                        {
+                                                          kind: "branch",
+                                                          label:
+                                                            "if (closed instanceof Error)",
+                                                          at: 57,
+                                                          children: [
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return closed",
+                                                              at: 57,
+                                                              children: [],
+                                                            },
+                                                          ],
+                                                        },
+                                                        {
+                                                          kind: "frame",
+                                                          children: [
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return createToolRuntime(input)",
+                                                              at: 319,
+                                                              children: [
+                                                                {
+                                                                  kind: "frame",
+                                                                  children: [
+                                                                    {
+                                                                      kind: "branch",
+                                                                      label:
+                                                                        "if (quickJsModule instanceof Error)",
+                                                                      at: 563,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              "return quickJsModule",
+                                                                            at: 563,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                    {
+                                                                      kind: "frame",
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              'return { key: ProviderKey.make("halo"), writable: true, get: (id) => Effect.pr…',
+                                                                            at: 12,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                      service:
+                                                                        "gen:main:createExecutorCredentialProvider",
+                                                                      entry:
+                                                                        "createExecutorCredentialProvider",
+                                                                      source: {
+                                                                        path: "packages/server/src/agent/runtime/ExecutorCredentialProvider.ts",
+                                                                        start: 9,
+                                                                        end: 60,
+                                                                      },
+                                                                      at: 583,
+                                                                    },
+                                                                    {
+                                                                      kind: "branch",
+                                                                      label:
+                                                                        "if (executor instanceof Error)",
+                                                                      at: 610,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              "return executor",
+                                                                            at: 610,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                    {
+                                                                      kind: "frame",
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "branch",
+                                                                            label:
+                                                                              "if (installableGooglePresets.length !== googlePresets.length)",
+                                                                            at: 674,
+                                                                            children:
+                                                                              [
+                                                                                {
+                                                                                  kind: "return",
+                                                                                  label:
+                                                                                    'return new ToolRuntimeError({ operation: "Google integration catalog", cause: …',
+                                                                                  at: 675,
+                                                                                  children:
+                                                                                    [],
+                                                                                },
+                                                                              ],
+                                                                          },
+                                                                          {
+                                                                            kind: "branch",
+                                                                            label:
+                                                                              "if (existing instanceof Error)",
+                                                                            at: 691,
+                                                                            children:
+                                                                              [
+                                                                                {
+                                                                                  kind: "return",
+                                                                                  label:
+                                                                                    "return existing",
+                                                                                  at: 691,
+                                                                                  children:
+                                                                                    [],
+                                                                                },
+                                                                              ],
+                                                                          },
+                                                                          {
+                                                                            kind: "branch",
+                                                                            label:
+                                                                              "if (added instanceof Error)",
+                                                                            at: 715,
+                                                                            children:
+                                                                              [
+                                                                                {
+                                                                                  kind: "return",
+                                                                                  label:
+                                                                                    "return added",
+                                                                                  at: 715,
+                                                                                  children:
+                                                                                    [],
+                                                                                },
+                                                                              ],
+                                                                          },
+                                                                        ],
+                                                                      service:
+                                                                        "gen:main:installGooglePresets",
+                                                                      entry:
+                                                                        "installGooglePresets",
+                                                                      source: {
+                                                                        path: "packages/server/src/agent/runtime/ToolRuntime.ts",
+                                                                        start: 673,
+                                                                        end: 717,
+                                                                      },
+                                                                      at: 612,
+                                                                    },
+                                                                    {
+                                                                      kind: "branch",
+                                                                      label:
+                                                                        "if (installed instanceof Error)",
+                                                                      at: 613,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "return",
+                                                                            label:
+                                                                              "return installed",
+                                                                            at: 620,
+                                                                            children:
+                                                                              [],
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                    {
+                                                                      kind: "return",
+                                                                      label:
+                                                                        "return new ToolRuntime( executor, engine, makeExecutorToolInvoker(executor, { …",
+                                                                      at: 631,
+                                                                      children:
+                                                                        [
+                                                                          {
+                                                                            kind: "frame",
+                                                                            children:
+                                                                              [
+                                                                                {
+                                                                                  kind: "return",
+                                                                                  label:
+                                                                                    "return new Map( presets.flatMap((preset) => preset.authTemplate === undefined …",
+                                                                                  at: 222,
+                                                                                  children:
+                                                                                    [],
+                                                                                },
+                                                                              ],
+                                                                            service:
+                                                                              "gen:main:connectionRequestsForClient",
+                                                                            entry:
+                                                                              "connectionRequestsForClient",
+                                                                            source:
+                                                                              {
+                                                                                path: "packages/server/src/agent/runtime/ToolRuntime.ts",
+                                                                                start: 218,
+                                                                                end: 245,
+                                                                              },
+                                                                            at: 638,
+                                                                          },
+                                                                        ],
+                                                                    },
+                                                                  ],
+                                                                  service:
+                                                                    "gen:main:createToolRuntime",
+                                                                  entry:
+                                                                    "createToolRuntime",
+                                                                  source: {
+                                                                    path: "packages/server/src/agent/runtime/ToolRuntime.ts",
+                                                                    start: 553,
+                                                                    end: 640,
+                                                                  },
+                                                                  at: 319,
+                                                                },
+                                                              ],
+                                                            },
+                                                          ],
+                                                          service:
+                                                            "gen:main:ToolRuntime",
+                                                          entry:
+                                                            "ToolRuntime.create",
+                                                          source: {
+                                                            path: "packages/server/src/agent/runtime/ToolRuntime.ts",
+                                                            start: 318,
+                                                            end: 320,
+                                                          },
+                                                          at: 64,
+                                                        },
+                                                        {
+                                                          kind: "branch",
+                                                          label:
+                                                            "if (runtime instanceof Error)",
+                                                          at: 73,
+                                                          children: [
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return runtime",
+                                                              at: 73,
+                                                              children: [],
+                                                            },
+                                                          ],
+                                                        },
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return runtime",
+                                                          at: 77,
+                                                          children: [],
                                                         },
                                                       ],
                                                       service:
-                                                        "gen:main:writeUserPreference",
+                                                        "gen:main:ToolRuntimeService",
                                                       entry:
-                                                        "writeUserPreference",
+                                                        "ToolRuntimeService.get",
                                                       source: {
-                                                        path: "packages/server/src/UserService.ts",
-                                                        start: 79,
-                                                        end: 97,
+                                                        path: "packages/server/src/agent/runtime/ToolRuntimeService.ts",
+                                                        start: 42,
+                                                        end: 78,
                                                       },
-                                                      at: 48,
+                                                      at: 144,
                                                     },
-                                                  ],
-                                                  service:
-                                                    "gen:main:UserService",
-                                                  entry: "UserService.getUser",
-                                                  source: {
-                                                    path: "packages/server/src/UserService.ts",
-                                                    start: 33,
-                                                    end: 56,
-                                                  },
-                                                  at: 45,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [
                                                     {
-                                                      kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:ToolRuntime",
-                                                      entry:
-                                                        "ToolRuntime.close",
-                                                      source: {
-                                                        path: "packages/server/src/agent/runtime/ToolRuntime.ts",
-                                                        start: 531,
-                                                        end: 550,
-                                                      },
-                                                      at: 94,
+                                                      kind: "branch",
+                                                      label:
+                                                        "if (runtime instanceof Error)",
+                                                      at: 145,
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return runtime",
+                                                          at: 145,
+                                                          children: [],
+                                                        },
+                                                      ],
                                                     },
-                                                  ],
-                                                  service:
-                                                    "gen:main:ToolRuntimeService",
-                                                  entry:
-                                                    "ToolRuntimeService.close",
-                                                  source: {
-                                                    path: "packages/server/src/agent/runtime/ToolRuntimeService.ts",
-                                                    start: 80,
-                                                    end: 95,
-                                                  },
-                                                  at: 56,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [
                                                     {
                                                       kind: "frame",
                                                       children: [
                                                         {
-                                                          kind: "frame",
-                                                          children: [],
-                                                          service:
-                                                            "gen:main:createExecutorCredentialProvider",
-                                                          entry:
-                                                            "createExecutorCredentialProvider",
-                                                          source: {
-                                                            path: "packages/server/src/agent/runtime/ExecutorCredentialProvider.ts",
-                                                            start: 9,
-                                                            end: 60,
-                                                          },
-                                                          at: 583,
+                                                          kind: "branch",
+                                                          label:
+                                                            "if (executorDescription instanceof Error)",
+                                                          at: 347,
+                                                          children: [
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return executorDescription",
+                                                              at: 347,
+                                                              children: [],
+                                                            },
+                                                          ],
                                                         },
                                                         {
-                                                          kind: "frame",
-                                                          children: [],
-                                                          service:
-                                                            "gen:main:installGooglePresets",
-                                                          entry:
-                                                            "installGooglePresets",
-                                                          source: {
-                                                            path: "packages/server/src/agent/runtime/ToolRuntime.ts",
-                                                            start: 673,
-                                                            end: 717,
-                                                          },
-                                                          at: 612,
+                                                          kind: "branch",
+                                                          label:
+                                                            "if (inventoryStart === -1)",
+                                                          at: 356,
+                                                          children: [
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                "return prefix",
+                                                              at: 356,
+                                                              children: [],
+                                                            },
+                                                          ],
                                                         },
                                                         {
-                                                          kind: "frame",
+                                                          kind: "return",
+                                                          label:
+                                                            "return `${prefix}\\n\\n${executorDescription.slice(inventoryStart)}`",
+                                                          at: 357,
                                                           children: [],
-                                                          service:
-                                                            "gen:main:connectionRequestsForClient",
-                                                          entry:
-                                                            "connectionRequestsForClient",
-                                                          source: {
-                                                            path: "packages/server/src/agent/runtime/ToolRuntime.ts",
-                                                            start: 218,
-                                                            end: 245,
-                                                          },
-                                                          at: 638,
                                                         },
                                                       ],
                                                       service:
-                                                        "gen:main:createToolRuntime",
+                                                        "gen:main:ToolRuntime",
                                                       entry:
-                                                        "createToolRuntime",
+                                                        "ToolRuntime.getAgentDescription",
                                                       source: {
                                                         path: "packages/server/src/agent/runtime/ToolRuntime.ts",
-                                                        start: 553,
-                                                        end: 640,
+                                                        start: 340,
+                                                        end: 358,
                                                       },
-                                                      at: 319,
+                                                      at: 146,
                                                     },
-                                                  ],
-                                                  service:
-                                                    "gen:main:ToolRuntime",
-                                                  entry: "ToolRuntime.create",
-                                                  source: {
-                                                    path: "packages/server/src/agent/runtime/ToolRuntime.ts",
-                                                    start: 318,
-                                                    end: 320,
-                                                  },
-                                                  at: 64,
-                                                },
-                                              ],
-                                              service:
-                                                "gen:main:ToolRuntimeService",
-                                              entry: "ToolRuntimeService.get",
-                                              source: {
-                                                path: "packages/server/src/agent/runtime/ToolRuntimeService.ts",
-                                                start: 42,
-                                                end: 78,
-                                              },
-                                              at: 144,
-                                            },
-                                            {
-                                              kind: "frame",
-                                              children: [],
-                                              service: "gen:main:ToolRuntime",
-                                              entry:
-                                                "ToolRuntime.getAgentDescription",
-                                              source: {
-                                                path: "packages/server/src/agent/runtime/ToolRuntime.ts",
-                                                start: 340,
-                                                end: 358,
-                                              },
-                                              at: 146,
-                                            },
-                                            {
-                                              kind: "frame",
-                                              children: [
-                                                {
-                                                  kind: "frame",
-                                                  children: [
                                                     {
-                                                      kind: "event",
+                                                      kind: "branch",
+                                                      label:
+                                                        "if (runtimeDescription instanceof Error)",
+                                                      at: 147,
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return runtimeDescription",
+                                                          at: 147,
+                                                          children: [],
+                                                        },
+                                                      ],
+                                                    },
+                                                    {
+                                                      kind: "frame",
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return new DefaultResourceLoader({ cwd, agentDir, additionalSkillPaths: [mauiS…",
+                                                          at: 61,
+                                                          children: [
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "event",
+                                                                  children: [],
+                                                                  from: "gen:main:mauiSkillsDirectory",
+                                                                  to: "disk",
+                                                                  name: "existsSync",
+                                                                  carrier:
+                                                                    "filesystem",
+                                                                  at: 13,
+                                                                },
+                                                                {
+                                                                  kind: "branch",
+                                                                  label:
+                                                                    "if (existsSync(bundled))",
+                                                                  at: 13,
+                                                                  children: [
+                                                                    {
+                                                                      kind: "return",
+                                                                      label:
+                                                                        "return bundled",
+                                                                      at: 13,
+                                                                      children:
+                                                                        [],
+                                                                    },
+                                                                  ],
+                                                                },
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    'return join(dirname(require.resolve("maui/package.json")), "skills")',
+                                                                  at: 16,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:mauiSkillsDirectory",
+                                                              entry:
+                                                                "mauiSkillsDirectory",
+                                                              source: {
+                                                                path: "packages/server/src/agent/workspacePrompt.ts",
+                                                                start: 8,
+                                                                end: 17,
+                                                              },
+                                                              at: 64,
+                                                            },
+                                                          ],
+                                                        },
+                                                      ],
+                                                      service:
+                                                        "gen:main:createWorkspaceResourceLoader",
+                                                      entry:
+                                                        "createWorkspaceResourceLoader",
+                                                      source: {
+                                                        path: "packages/server/src/agent/workspacePrompt.ts",
+                                                        start: 60,
+                                                        end: 67,
+                                                      },
+                                                      at: 149,
+                                                    },
+                                                    {
+                                                      kind: "frame",
                                                       children: [],
-                                                      from: "gen:main:mauiSkillsDirectory",
-                                                      to: "disk",
-                                                      name: "existsSync",
-                                                      carrier: "filesystem",
-                                                      at: 13,
+                                                      service:
+                                                        "gen:main:DefaultResourceLoader",
+                                                      entry:
+                                                        "DefaultResourceLoader.reload",
+                                                      source: {
+                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.d.ts",
+                                                        start: 195,
+                                                        end: 195,
+                                                      },
+                                                      at: 154,
+                                                    },
+                                                    {
+                                                      kind: "branch",
+                                                      label:
+                                                        "if (reloaded instanceof Error)",
+                                                      at: 156,
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return reloaded",
+                                                          at: 156,
+                                                          children: [],
+                                                        },
+                                                      ],
+                                                    },
+                                                    {
+                                                      kind: "frame",
+                                                      children: [],
+                                                      service:
+                                                        "gen:main:registerBunOAuthFlows",
+                                                      entry:
+                                                        "registerBunOAuthFlows",
+                                                      summary:
+                                                        "Register OAuth flows statically embedded in the standalone Bun binary.",
+                                                      source: {
+                                                        path: "node_modules/@earendil-works/pi-ai/dist/bun-oauth.d.ts",
+                                                        start: 2,
+                                                        end: 2,
+                                                      },
+                                                      at: 157,
+                                                    },
+                                                    {
+                                                      kind: "frame",
+                                                      children: [],
+                                                      service:
+                                                        "gen:main:ModelRuntime",
+                                                      entry:
+                                                        "ModelRuntime.create",
+                                                      source: {
+                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.d.ts",
+                                                        start: 38,
+                                                        end: 38,
+                                                      },
+                                                      at: 158,
+                                                    },
+                                                    {
+                                                      kind: "branch",
+                                                      label:
+                                                        "if (modelRuntime instanceof Error)",
+                                                      at: 161,
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return modelRuntime",
+                                                          at: 161,
+                                                          children: [],
+                                                        },
+                                                      ],
+                                                    },
+                                                    {
+                                                      kind: "frame",
+                                                      children: [],
+                                                      service:
+                                                        "gen:main:ModelRuntime",
+                                                      entry:
+                                                        "ModelRuntime.getModels",
+                                                      source: {
+                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.d.ts",
+                                                        start: 52,
+                                                        end: 52,
+                                                      },
+                                                      at: 163,
+                                                    },
+                                                    {
+                                                      kind: "branch",
+                                                      label:
+                                                        "if (model === undefined)",
+                                                      at: 165,
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            'return new CreateAgentSessionError({ cause: new Error("Pi is missing GPT-5.6 T…',
+                                                          at: 166,
+                                                          children: [],
+                                                        },
+                                                      ],
+                                                    },
+                                                    {
+                                                      kind: "frame",
+                                                      children: [],
+                                                      service:
+                                                        "gen:main:createAgentSession",
+                                                      entry:
+                                                        "createAgentSession",
+                                                      summary:
+                                                        "Create an AgentSession with the specified options.",
+                                                      source: {
+                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.d.ts",
+                                                        start: 105,
+                                                        end: 105,
+                                                      },
+                                                      at: 170,
+                                                    },
+                                                    {
+                                                      kind: "frame",
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return [ withAuthority( createReadTool(input.filesystem, input.cwd), input.aut…",
+                                                          at: 44,
+                                                          children: [
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    "return { ...tool, async execute(id, params, signal, onUpdate) { await authoriz…",
+                                                                  at: 86,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:withAuthority",
+                                                              entry:
+                                                                "withAuthority",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 81,
+                                                                end: 93,
+                                                              },
+                                                              at: 45,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    'return { name: "read", label: "Read", description: "Read a UTF-8 file in the a…',
+                                                                  at: 122,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:createReadTool",
+                                                              entry:
+                                                                "createReadTool",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 118,
+                                                                end: 136,
+                                                              },
+                                                              at: 46,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    "return { pluginId, toolName, requiredCapabilities: [capability] }",
+                                                                  at: 78,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:authorization",
+                                                              entry:
+                                                                "authorization",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 73,
+                                                                end: 79,
+                                                              },
+                                                              at: 48,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:withAuthority",
+                                                              entry:
+                                                                "withAuthority",
+                                                              summary:
+                                                                "Walked above; same calls.",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 81,
+                                                                end: 93,
+                                                              },
+                                                              at: 50,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    'return { name: "edit", label: "Edit", description: "Replace exact text in a wo…',
+                                                                  at: 142,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:createEditTool",
+                                                              entry:
+                                                                "createEditTool",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 138,
+                                                                end: 156,
+                                                              },
+                                                              at: 51,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:authorization",
+                                                              entry:
+                                                                "authorization",
+                                                              summary:
+                                                                "Walked above; same calls.",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 73,
+                                                                end: 79,
+                                                              },
+                                                              at: 53,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:withAuthority",
+                                                              entry:
+                                                                "withAuthority",
+                                                              summary:
+                                                                "Walked above; same calls.",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 81,
+                                                                end: 93,
+                                                              },
+                                                              at: 55,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    'return { name: "write", label: "Write", description: "Write a UTF-8 file in th…',
+                                                                  at: 162,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:createWriteTool",
+                                                              entry:
+                                                                "createWriteTool",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 158,
+                                                                end: 176,
+                                                              },
+                                                              at: 56,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:authorization",
+                                                              entry:
+                                                                "authorization",
+                                                              summary:
+                                                                "Walked above; same calls.",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 73,
+                                                                end: 79,
+                                                              },
+                                                              at: 58,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:withAuthority",
+                                                              entry:
+                                                                "withAuthority",
+                                                              summary:
+                                                                "Walked above; same calls.",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 81,
+                                                                end: 93,
+                                                              },
+                                                              at: 60,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    'return { name: "patch", label: "Patch", description: "Apply an apply_patch pat…',
+                                                                  at: 102,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                              service:
+                                                                "gen:main:createPatchTool",
+                                                              entry:
+                                                                "createPatchTool",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 95,
+                                                                end: 116,
+                                                              },
+                                                              at: 61,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:authorization",
+                                                              entry:
+                                                                "authorization",
+                                                              summary:
+                                                                "Walked above; same calls.",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 73,
+                                                                end: 79,
+                                                              },
+                                                              at: 63,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:withAuthority",
+                                                              entry:
+                                                                "withAuthority",
+                                                              summary:
+                                                                "Walked above; same calls.",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 81,
+                                                                end: 93,
+                                                              },
+                                                              at: 65,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:createBashTool",
+                                                              entry:
+                                                                "createBashTool",
+                                                              source: {
+                                                                path: "node_modules/@earendil-works/pi-coding-agent/dist/core/tools/bash.d.ts",
+                                                                start: 68,
+                                                                end: 68,
+                                                              },
+                                                              at: 66,
+                                                            },
+                                                            {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:authorization",
+                                                              entry:
+                                                                "authorization",
+                                                              summary:
+                                                                "Walked above; same calls.",
+                                                              source: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 73,
+                                                                end: 79,
+                                                              },
+                                                              at: 68,
+                                                            },
+                                                          ],
+                                                        },
+                                                      ],
+                                                      service:
+                                                        "gen:main:createAuthorizedCodingTools",
+                                                      entry:
+                                                        "createAuthorizedCodingTools",
+                                                      source: {
+                                                        path: "packages/server/src/agent/tools/codingTools.ts",
+                                                        start: 39,
+                                                        end: 71,
+                                                      },
+                                                      at: 178,
+                                                    },
+                                                    {
+                                                      kind: "frame",
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            'return { name: "exec", label: "Exec", description: input.runtimeDescription, p…',
+                                                          at: 17,
+                                                          children: [],
+                                                        },
+                                                      ],
+                                                      service:
+                                                        "gen:main:createExecTool",
+                                                      entry: "createExecTool",
+                                                      source: {
+                                                        path: "packages/server/src/agent/tools/execTool.ts",
+                                                        start: 13,
+                                                        end: 54,
+                                                      },
+                                                      at: 183,
+                                                    },
+                                                    {
+                                                      kind: "branch",
+                                                      label:
+                                                        "if (created instanceof Error)",
+                                                      at: 187,
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return created",
+                                                          at: 187,
+                                                          children: [],
+                                                        },
+                                                      ],
+                                                    },
+                                                    {
+                                                      kind: "return",
+                                                      label:
+                                                        "return new HaloAgentSession(created.session)",
+                                                      at: 188,
+                                                      children: [],
                                                     },
                                                   ],
                                                   service:
-                                                    "gen:main:mauiSkillsDirectory",
-                                                  entry: "mauiSkillsDirectory",
+                                                    "gen:main:HaloAgentSession",
+                                                  entry:
+                                                    "HaloAgentSession.createFromManager",
                                                   source: {
-                                                    path: "packages/server/src/agent/workspacePrompt.ts",
-                                                    start: 8,
-                                                    end: 17,
+                                                    path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                    start: 139,
+                                                    end: 189,
                                                   },
-                                                  at: 64,
+                                                  at: 123,
                                                 },
                                               ],
-                                              service:
-                                                "gen:main:createWorkspaceResourceLoader",
-                                              entry:
-                                                "createWorkspaceResourceLoader",
-                                              source: {
-                                                path: "packages/server/src/agent/workspacePrompt.ts",
-                                                start: 60,
-                                                end: 67,
-                                              },
-                                              at: 149,
-                                            },
-                                            {
-                                              kind: "frame",
-                                              children: [],
-                                              service:
-                                                "gen:main:DefaultResourceLoader",
-                                              entry:
-                                                "DefaultResourceLoader.reload",
-                                              source: {
-                                                path: "node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.d.ts",
-                                                start: 195,
-                                                end: 195,
-                                              },
-                                              at: 154,
-                                            },
-                                            {
-                                              kind: "frame",
-                                              children: [],
-                                              service:
-                                                "gen:main:registerBunOAuthFlows",
-                                              entry: "registerBunOAuthFlows",
-                                              summary:
-                                                "Register OAuth flows statically embedded in the standalone Bun binary.",
-                                              source: {
-                                                path: "node_modules/@earendil-works/pi-ai/dist/bun-oauth.d.ts",
-                                                start: 2,
-                                                end: 2,
-                                              },
-                                              at: 157,
-                                            },
-                                            {
-                                              kind: "frame",
-                                              children: [],
-                                              service: "gen:main:ModelRuntime",
-                                              entry: "ModelRuntime.create",
-                                              source: {
-                                                path: "node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.d.ts",
-                                                start: 38,
-                                                end: 38,
-                                              },
-                                              at: 158,
-                                            },
-                                            {
-                                              kind: "frame",
-                                              children: [],
-                                              service: "gen:main:ModelRuntime",
-                                              entry: "ModelRuntime.getModels",
-                                              source: {
-                                                path: "node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.d.ts",
-                                                start: 52,
-                                                end: 52,
-                                              },
-                                              at: 163,
-                                            },
-                                            {
-                                              kind: "frame",
-                                              children: [],
-                                              service:
-                                                "gen:main:createAgentSession",
-                                              entry: "createAgentSession",
-                                              summary:
-                                                "Create an AgentSession with the specified options.",
-                                              source: {
-                                                path: "node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.d.ts",
-                                                start: 105,
-                                                end: 105,
-                                              },
-                                              at: 170,
-                                            },
-                                            {
-                                              kind: "frame",
-                                              children: [
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:withAuthority",
-                                                  entry: "withAuthority",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 81,
-                                                    end: 93,
-                                                  },
-                                                  at: 45,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:createReadTool",
-                                                  entry: "createReadTool",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 118,
-                                                    end: 136,
-                                                  },
-                                                  at: 46,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:authorization",
-                                                  entry: "authorization",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 73,
-                                                    end: 79,
-                                                  },
-                                                  at: 48,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:withAuthority",
-                                                  entry: "withAuthority",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 81,
-                                                    end: 93,
-                                                  },
-                                                  at: 50,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:createEditTool",
-                                                  entry: "createEditTool",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 138,
-                                                    end: 156,
-                                                  },
-                                                  at: 51,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:authorization",
-                                                  entry: "authorization",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 73,
-                                                    end: 79,
-                                                  },
-                                                  at: 53,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:withAuthority",
-                                                  entry: "withAuthority",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 81,
-                                                    end: 93,
-                                                  },
-                                                  at: 55,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:createWriteTool",
-                                                  entry: "createWriteTool",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 158,
-                                                    end: 176,
-                                                  },
-                                                  at: 56,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:authorization",
-                                                  entry: "authorization",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 73,
-                                                    end: 79,
-                                                  },
-                                                  at: 58,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:withAuthority",
-                                                  entry: "withAuthority",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 81,
-                                                    end: 93,
-                                                  },
-                                                  at: 60,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:createPatchTool",
-                                                  entry: "createPatchTool",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 95,
-                                                    end: 116,
-                                                  },
-                                                  at: 61,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:authorization",
-                                                  entry: "authorization",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 73,
-                                                    end: 79,
-                                                  },
-                                                  at: 63,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:withAuthority",
-                                                  entry: "withAuthority",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 81,
-                                                    end: 93,
-                                                  },
-                                                  at: 65,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:createBashTool",
-                                                  entry: "createBashTool",
-                                                  source: {
-                                                    path: "node_modules/@earendil-works/pi-coding-agent/dist/core/tools/bash.d.ts",
-                                                    start: 68,
-                                                    end: 68,
-                                                  },
-                                                  at: 66,
-                                                },
-                                                {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:authorization",
-                                                  entry: "authorization",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/agent/tools/codingTools.ts",
-                                                    start: 73,
-                                                    end: 79,
-                                                  },
-                                                  at: 68,
-                                                },
-                                              ],
-                                              service:
-                                                "gen:main:createAuthorizedCodingTools",
-                                              entry:
-                                                "createAuthorizedCodingTools",
-                                              source: {
-                                                path: "packages/server/src/agent/tools/codingTools.ts",
-                                                start: 39,
-                                                end: 71,
-                                              },
-                                              at: 178,
-                                            },
-                                            {
-                                              kind: "frame",
-                                              children: [],
-                                              service:
-                                                "gen:main:createExecTool",
-                                              entry: "createExecTool",
-                                              source: {
-                                                path: "packages/server/src/agent/tools/execTool.ts",
-                                                start: 13,
-                                                end: 54,
-                                              },
-                                              at: 183,
                                             },
                                           ],
                                           service: "gen:main:HaloAgentSession",
-                                          entry:
-                                            "HaloAgentSession.createFromManager",
+                                          entry: "HaloAgentSession.open",
                                           source: {
                                             path: "packages/server/src/agent/HaloAgentSession.ts",
-                                            start: 139,
-                                            end: 189,
+                                            start: 100,
+                                            end: 124,
                                           },
-                                          at: 123,
+                                          at: 66,
+                                        },
+                                        {
+                                          kind: "branch",
+                                          label:
+                                            "if (session instanceof Error)",
+                                          at: 70,
+                                          children: [
+                                            {
+                                              kind: "return",
+                                              label: "return session",
+                                              at: 70,
+                                              children: [],
+                                            },
+                                          ],
+                                        },
+                                        {
+                                          kind: "frame",
+                                          children: [],
+                                          service: "gen:main:SessionRegistry",
+                                          entry: "SessionRegistry.register",
+                                          source: {
+                                            path: "packages/server/src/sessions/SessionRegistry.ts",
+                                            start: 75,
+                                            end: 77,
+                                          },
+                                          at: 71,
+                                        },
+                                        {
+                                          kind: "return",
+                                          label: "return session",
+                                          at: 72,
+                                          children: [],
                                         },
                                       ],
-                                      service: "gen:main:HaloAgentSession",
-                                      entry: "HaloAgentSession.open",
+                                      service: "gen:main:SessionRegistry",
+                                      entry: "SessionRegistry.openAndRegister",
                                       source: {
-                                        path: "packages/server/src/agent/HaloAgentSession.ts",
-                                        start: 100,
-                                        end: 124,
+                                        path: "packages/server/src/sessions/SessionRegistry.ts",
+                                        start: 65,
+                                        end: 73,
                                       },
-                                      at: 66,
+                                      at: 37,
+                                    },
+                                    {
+                                      kind: "return",
+                                      label: "return session",
+                                      at: 41,
+                                      children: [],
+                                    },
+                                  ],
+                                  service: "gen:main:SessionRegistry",
+                                  entry: "SessionRegistry.open",
+                                  source: {
+                                    path: "packages/server/src/sessions/SessionRegistry.ts",
+                                    start: 31,
+                                    end: 42,
+                                  },
+                                  at: 57,
+                                },
+                                {
+                                  kind: "branch",
+                                  label: "if (session instanceof Error)",
+                                  at: 58,
+                                  children: [
+                                    {
+                                      kind: "return",
+                                      label:
+                                        "return orpcErrors.badRequest(session)",
+                                      at: 58,
+                                      children: [
+                                        {
+                                          kind: "frame",
+                                          children: [
+                                            {
+                                              kind: "return",
+                                              label:
+                                                'return new ORPCError("BAD_REQUEST", { message: error.message, cause: error, })',
+                                              at: 5,
+                                              children: [],
+                                            },
+                                          ],
+                                          service: "gen:main:orpcErrors",
+                                          entry: "orpcErrors.badRequest",
+                                          source: {
+                                            path: "packages/server/src/orpcErrors.ts",
+                                            start: 4,
+                                            end: 9,
+                                          },
+                                          at: 58,
+                                        },
+                                      ],
+                                    },
+                                  ],
+                                },
+                                {
+                                  kind: "frame",
+                                  children: [
+                                    {
+                                      kind: "branch",
+                                      label: "if (text.trim().length === 0)",
+                                      at: 203,
+                                      children: [
+                                        {
+                                          kind: "return",
+                                          label:
+                                            "return new EmptyPromptError()",
+                                          at: 203,
+                                          children: [],
+                                        },
+                                      ],
                                     },
                                     {
                                       kind: "frame",
                                       children: [],
-                                      service: "gen:main:SessionRegistry",
-                                      entry: "SessionRegistry.register",
+                                      service: "gen:main:AgentSession",
+                                      entry: "AgentSession.prompt",
+                                      summary: "Send a prompt to the agent.",
                                       source: {
-                                        path: "packages/server/src/sessions/SessionRegistry.ts",
-                                        start: 75,
-                                        end: 77,
+                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.d.ts",
+                                        start: 364,
+                                        end: 364,
                                       },
-                                      at: 71,
+                                      at: 205,
+                                    },
+                                    {
+                                      kind: "branch",
+                                      label: "if (prompted instanceof Error)",
+                                      at: 213,
+                                      children: [
+                                        {
+                                          kind: "return",
+                                          label: "return prompted",
+                                          at: 213,
+                                          children: [],
+                                        },
+                                      ],
                                     },
                                   ],
-                                  service: "gen:main:SessionRegistry",
-                                  entry: "SessionRegistry.openAndRegister",
+                                  service: "gen:main:HaloAgentSession",
+                                  entry: "HaloAgentSession.prompt",
                                   source: {
-                                    path: "packages/server/src/sessions/SessionRegistry.ts",
-                                    start: 65,
-                                    end: 73,
+                                    path: "packages/server/src/agent/HaloAgentSession.ts",
+                                    start: 202,
+                                    end: 214,
                                   },
-                                  at: 37,
+                                  at: 59,
+                                },
+                                {
+                                  kind: "branch",
+                                  label: "if (prompted instanceof Error)",
+                                  at: 60,
+                                  children: [
+                                    {
+                                      kind: "return",
+                                      label:
+                                        "return orpcErrors.badRequest(prompted)",
+                                      at: 60,
+                                      children: [
+                                        {
+                                          kind: "frame",
+                                          children: [],
+                                          service: "gen:main:orpcErrors",
+                                          entry: "orpcErrors.badRequest",
+                                          summary: "Walked above; same calls.",
+                                          source: {
+                                            path: "packages/server/src/orpcErrors.ts",
+                                            start: 4,
+                                            end: 9,
+                                          },
+                                          at: 60,
+                                        },
+                                      ],
+                                    },
+                                  ],
                                 },
                               ],
-                              service: "gen:main:SessionRegistry",
-                              entry: "SessionRegistry.open",
+                              service: "gen:main:sessionsRouter",
+                              entry: "sessionsRouter.prompt",
                               source: {
-                                path: "packages/server/src/sessions/SessionRegistry.ts",
-                                start: 31,
-                                end: 42,
+                                path: "packages/server/src/sessions/sessionsRouter.ts",
+                                start: 51,
+                                end: 61,
                               },
-                              at: 57,
                             },
+                          ],
+                          from: "gen:renderer:useAgentSession",
+                          to: "gen:main:sessionsRouter",
+                          name: "sessions.prompt",
+                          carrier: "rpc",
+                          at: 97,
+                        },
+                        {
+                          kind: "branch",
+                          label: "if (result instanceof PromptFailedError)",
+                          at: 106,
+                          children: [
+                            {
+                              kind: "return",
+                              label: "return result",
+                              at: 112,
+                              children: [],
+                            },
+                          ],
+                        },
+                        {
+                          kind: "frame",
+                          children: [
                             {
                               kind: "frame",
                               children: [
                                 {
-                                  kind: "frame",
+                                  kind: "return",
+                                  label: "return useContext(ApiContext).api",
+                                  at: 94,
                                   children: [],
-                                  service: "gen:main:AgentSession",
-                                  entry: "AgentSession.prompt",
-                                  summary: "Send a prompt to the agent.",
-                                  source: {
-                                    path: "node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.d.ts",
-                                    start: 364,
-                                    end: 364,
-                                  },
-                                  at: 205,
                                 },
                               ],
-                              service: "gen:main:HaloAgentSession",
-                              entry: "HaloAgentSession.prompt",
+                              service: "gen:renderer:useApi",
+                              entry: "useApi",
                               source: {
-                                path: "packages/server/src/agent/HaloAgentSession.ts",
-                                start: 202,
-                                end: 214,
+                                path: "apps/electron/src/renderer/api/ApiProvider.tsx",
+                                start: 93,
+                                end: 95,
                               },
-                              at: 59,
+                              at: 118,
+                            },
+                            {
+                              kind: "return",
+                              label:
+                                'return useQuery({ queryKey: ["sessions", workspaceRoot], queryFn: () => api.se…',
+                              at: 124,
+                              children: [
+                                {
+                                  kind: "event",
+                                  children: [
+                                    {
+                                      kind: "frame",
+                                      children: [
+                                        {
+                                          kind: "frame",
+                                          children: [
+                                            {
+                                              kind: "return",
+                                              label:
+                                                "return HaloAgentSession.list(this.options)",
+                                              at: 21,
+                                              children: [
+                                                {
+                                                  kind: "frame",
+                                                  children: [
+                                                    {
+                                                      kind: "frame",
+                                                      children: [],
+                                                      service:
+                                                        "gen:main:WorkspaceService",
+                                                      entry:
+                                                        "WorkspaceService.getLayout",
+                                                      summary:
+                                                        "Walked above; same calls.",
+                                                      source: {
+                                                        path: "packages/server/src/workspace/WorkspaceService.ts",
+                                                        start: 189,
+                                                        end: 192,
+                                                      },
+                                                      at: 127,
+                                                    },
+                                                    {
+                                                      kind: "branch",
+                                                      label:
+                                                        "if (layout instanceof Error)",
+                                                      at: 128,
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return layout",
+                                                          at: 128,
+                                                          children: [],
+                                                        },
+                                                      ],
+                                                    },
+                                                    {
+                                                      kind: "frame",
+                                                      children: [],
+                                                      service:
+                                                        "gen:main:SessionManager",
+                                                      entry:
+                                                        "SessionManager.list",
+                                                      summary:
+                                                        "List all sessions for a directory.",
+                                                      source: {
+                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.d.ts",
+                                                        start: 348,
+                                                        end: 348,
+                                                      },
+                                                      at: 129,
+                                                    },
+                                                    {
+                                                      kind: "branch",
+                                                      label:
+                                                        "if (sessions instanceof Error)",
+                                                      at: 133,
+                                                      children: [
+                                                        {
+                                                          kind: "return",
+                                                          label:
+                                                            "return sessions",
+                                                          at: 133,
+                                                          children: [],
+                                                        },
+                                                      ],
+                                                    },
+                                                    {
+                                                      kind: "return",
+                                                      label:
+                                                        "return sessions .map((session) => sessionSummary(session)) .toSorted((left, ri…",
+                                                      at: 134,
+                                                      children: [
+                                                        {
+                                                          kind: "frame",
+                                                          children: [
+                                                            {
+                                                              kind: "return",
+                                                              label:
+                                                                'return { sessionId: session.id, agent: "pi", cwd: session.cwd, title: title.tr…',
+                                                              at: 252,
+                                                              children: [],
+                                                            },
+                                                          ],
+                                                          service:
+                                                            "gen:main:sessionSummary",
+                                                          entry:
+                                                            "sessionSummary",
+                                                          source: {
+                                                            path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                            start: 249,
+                                                            end: 260,
+                                                          },
+                                                          at: 135,
+                                                        },
+                                                      ],
+                                                    },
+                                                  ],
+                                                  service:
+                                                    "gen:main:HaloAgentSession",
+                                                  entry:
+                                                    "HaloAgentSession.list",
+                                                  source: {
+                                                    path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                    start: 126,
+                                                    end: 137,
+                                                  },
+                                                  at: 21,
+                                                },
+                                              ],
+                                            },
+                                          ],
+                                          service: "gen:main:SessionRegistry",
+                                          entry: "SessionRegistry.list",
+                                          source: {
+                                            path: "packages/server/src/sessions/SessionRegistry.ts",
+                                            start: 20,
+                                            end: 22,
+                                          },
+                                          at: 20,
+                                        },
+                                        {
+                                          kind: "branch",
+                                          label:
+                                            "if (sessions instanceof Error)",
+                                          at: 21,
+                                          children: [
+                                            {
+                                              kind: "return",
+                                              label:
+                                                "return orpcErrors.badRequest(sessions)",
+                                              at: 21,
+                                              children: [
+                                                {
+                                                  kind: "frame",
+                                                  children: [],
+                                                  service:
+                                                    "gen:main:orpcErrors",
+                                                  entry:
+                                                    "orpcErrors.badRequest",
+                                                  summary:
+                                                    "Walked above; same calls.",
+                                                  source: {
+                                                    path: "packages/server/src/orpcErrors.ts",
+                                                    start: 4,
+                                                    end: 9,
+                                                  },
+                                                  at: 21,
+                                                },
+                                              ],
+                                            },
+                                          ],
+                                        },
+                                        {
+                                          kind: "return",
+                                          label: "return sessions",
+                                          at: 22,
+                                          children: [],
+                                        },
+                                      ],
+                                      service: "gen:main:sessionsRouter",
+                                      entry: "sessionsRouter.list",
+                                      source: {
+                                        path: "packages/server/src/sessions/sessionsRouter.ts",
+                                        start: 18,
+                                        end: 23,
+                                      },
+                                    },
+                                  ],
+                                  from: "gen:renderer:useSessionsQuery",
+                                  to: "gen:main:sessionsRouter",
+                                  name: "sessions.list",
+                                  carrier: "rpc",
+                                  at: 126,
+                                },
+                              ],
                             },
                           ],
-                          service: "gen:main:sessionsRouter",
-                          entry: "sessionsRouter.prompt",
+                          service: "gen:renderer:useSessionsQuery",
+                          entry: "useSessionsQuery",
                           source: {
-                            path: "packages/server/src/sessions/sessionsRouter.ts",
-                            start: 51,
-                            end: 61,
+                            path: "apps/electron/src/renderer/api/ApiProvider.tsx",
+                            start: 117,
+                            end: 129,
                           },
+                          at: 114,
                         },
                       ],
-                      from: "gen:renderer:useAgentSession",
-                      to: "gen:main:sessionsRouter",
-                      name: "sessions.prompt",
-                      carrier: "rpc",
-                      at: 97,
+                      service: "gen:renderer:useAgentSession",
+                      entry: "useAgentSession.prompt",
+                      source: {
+                        path: "apps/electron/src/renderer/main/agent/useAgentSession.ts",
+                        start: 89,
+                        end: 118,
+                      },
+                      at: 123,
                     },
                     {
                       kind: "frame",
                       children: [
-                        {
-                          kind: "frame",
-                          children: [],
-                          service: "gen:renderer:useApi",
-                          entry: "useApi",
-                          source: {
-                            path: "apps/electron/src/renderer/api/ApiProvider.tsx",
-                            start: 93,
-                            end: 95,
-                          },
-                          at: 118,
-                        },
                         {
                           kind: "event",
                           children: [
@@ -1183,235 +2463,256 @@ export const generatedPromptFlow: Flow = {
                                             start: 189,
                                             end: 192,
                                           },
-                                          at: 127,
+                                          at: 90,
                                         },
                                         {
-                                          kind: "frame",
-                                          children: [],
-                                          service: "gen:main:SessionManager",
-                                          entry: "SessionManager.list",
-                                          summary:
-                                            "List all sessions for a directory.",
-                                          source: {
-                                            path: "node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.d.ts",
-                                            start: 348,
-                                            end: 348,
-                                          },
-                                          at: 129,
+                                          kind: "branch",
+                                          label: "if (layout instanceof Error)",
+                                          at: 91,
+                                          children: [
+                                            {
+                                              kind: "return",
+                                              label: "return layout",
+                                              at: 91,
+                                              children: [],
+                                            },
+                                          ],
                                         },
                                         {
-                                          kind: "frame",
-                                          children: [],
-                                          service: "gen:main:sessionSummary",
-                                          entry: "sessionSummary",
-                                          source: {
-                                            path: "packages/server/src/agent/HaloAgentSession.ts",
-                                            start: 249,
-                                            end: 260,
-                                          },
-                                          at: 135,
+                                          kind: "branch",
+                                          label:
+                                            "if (manager instanceof Error)",
+                                          at: 96,
+                                          children: [
+                                            {
+                                              kind: "return",
+                                              label: "return manager",
+                                              at: 96,
+                                              children: [],
+                                            },
+                                          ],
+                                        },
+                                        {
+                                          kind: "return",
+                                          label:
+                                            "return await HaloAgentSession.createFromManager(options, layout, manager)",
+                                          at: 97,
+                                          children: [
+                                            {
+                                              kind: "frame",
+                                              children: [],
+                                              service:
+                                                "gen:main:HaloAgentSession",
+                                              entry:
+                                                "HaloAgentSession.createFromManager",
+                                              summary:
+                                                "Walked above; same calls.",
+                                              source: {
+                                                path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                start: 139,
+                                                end: 189,
+                                              },
+                                              at: 97,
+                                            },
+                                          ],
                                         },
                                       ],
                                       service: "gen:main:HaloAgentSession",
-                                      entry: "HaloAgentSession.list",
+                                      entry: "HaloAgentSession.create",
                                       source: {
                                         path: "packages/server/src/agent/HaloAgentSession.ts",
-                                        start: 126,
-                                        end: 137,
+                                        start: 89,
+                                        end: 98,
                                       },
-                                      at: 21,
+                                      at: 25,
+                                    },
+                                    {
+                                      kind: "branch",
+                                      label: "if (session instanceof Error)",
+                                      at: 26,
+                                      children: [
+                                        {
+                                          kind: "return",
+                                          label: "return session",
+                                          at: 26,
+                                          children: [],
+                                        },
+                                      ],
+                                    },
+                                    {
+                                      kind: "frame",
+                                      children: [],
+                                      service: "gen:main:SessionRegistry",
+                                      entry: "SessionRegistry.register",
+                                      summary: "Walked above; same calls.",
+                                      source: {
+                                        path: "packages/server/src/sessions/SessionRegistry.ts",
+                                        start: 75,
+                                        end: 77,
+                                      },
+                                      at: 27,
+                                    },
+                                    {
+                                      kind: "return",
+                                      label: "return session",
+                                      at: 28,
+                                      children: [],
                                     },
                                   ],
                                   service: "gen:main:SessionRegistry",
-                                  entry: "SessionRegistry.list",
+                                  entry: "SessionRegistry.create",
                                   source: {
                                     path: "packages/server/src/sessions/SessionRegistry.ts",
-                                    start: 20,
-                                    end: 22,
+                                    start: 24,
+                                    end: 29,
                                   },
-                                  at: 20,
+                                  at: 26,
+                                },
+                                {
+                                  kind: "branch",
+                                  label: "if (session instanceof Error)",
+                                  at: 27,
+                                  children: [
+                                    {
+                                      kind: "return",
+                                      label:
+                                        "return orpcErrors.badRequest(session)",
+                                      at: 27,
+                                      children: [
+                                        {
+                                          kind: "frame",
+                                          children: [],
+                                          service: "gen:main:orpcErrors",
+                                          entry: "orpcErrors.badRequest",
+                                          summary: "Walked above; same calls.",
+                                          source: {
+                                            path: "packages/server/src/orpcErrors.ts",
+                                            start: 4,
+                                            end: 9,
+                                          },
+                                          at: 27,
+                                        },
+                                      ],
+                                    },
+                                  ],
+                                },
+                                {
+                                  kind: "return",
+                                  label:
+                                    "return { sessionId: session.sessionId }",
+                                  at: 28,
+                                  children: [],
                                 },
                               ],
                               service: "gen:main:sessionsRouter",
-                              entry: "sessionsRouter.list",
+                              entry: "sessionsRouter.create",
                               source: {
                                 path: "packages/server/src/sessions/sessionsRouter.ts",
-                                start: 18,
-                                end: 23,
-                              },
-                            },
-                          ],
-                          from: "gen:renderer:useSessionsQuery",
-                          to: "gen:main:sessionsRouter",
-                          name: "sessions.list",
-                          carrier: "rpc",
-                          at: 126,
-                        },
-                      ],
-                      service: "gen:renderer:useSessionsQuery",
-                      entry: "useSessionsQuery",
-                      source: {
-                        path: "apps/electron/src/renderer/api/ApiProvider.tsx",
-                        start: 117,
-                        end: 129,
-                      },
-                      at: 114,
-                    },
-                  ],
-                  service: "gen:renderer:useAgentSession",
-                  entry: "useAgentSession.prompt",
-                  source: {
-                    path: "apps/electron/src/renderer/main/agent/useAgentSession.ts",
-                    start: 89,
-                    end: 118,
-                  },
-                  at: 123,
-                },
-                {
-                  kind: "frame",
-                  children: [
-                    {
-                      kind: "event",
-                      children: [
-                        {
-                          kind: "frame",
-                          children: [
-                            {
-                              kind: "frame",
-                              children: [
-                                {
-                                  kind: "frame",
-                                  children: [
-                                    {
-                                      kind: "frame",
-                                      children: [],
-                                      service: "gen:main:WorkspaceService",
-                                      entry: "WorkspaceService.getLayout",
-                                      summary: "Walked above; same calls.",
-                                      source: {
-                                        path: "packages/server/src/workspace/WorkspaceService.ts",
-                                        start: 189,
-                                        end: 192,
-                                      },
-                                      at: 90,
-                                    },
-                                    {
-                                      kind: "frame",
-                                      children: [],
-                                      service: "gen:main:HaloAgentSession",
-                                      entry:
-                                        "HaloAgentSession.createFromManager",
-                                      summary: "Walked above; same calls.",
-                                      source: {
-                                        path: "packages/server/src/agent/HaloAgentSession.ts",
-                                        start: 139,
-                                        end: 189,
-                                      },
-                                      at: 97,
-                                    },
-                                  ],
-                                  service: "gen:main:HaloAgentSession",
-                                  entry: "HaloAgentSession.create",
-                                  source: {
-                                    path: "packages/server/src/agent/HaloAgentSession.ts",
-                                    start: 89,
-                                    end: 98,
-                                  },
-                                  at: 25,
-                                },
-                                {
-                                  kind: "frame",
-                                  children: [],
-                                  service: "gen:main:SessionRegistry",
-                                  entry: "SessionRegistry.register",
-                                  summary: "Walked above; same calls.",
-                                  source: {
-                                    path: "packages/server/src/sessions/SessionRegistry.ts",
-                                    start: 75,
-                                    end: 77,
-                                  },
-                                  at: 27,
-                                },
-                              ],
-                              service: "gen:main:SessionRegistry",
-                              entry: "SessionRegistry.create",
-                              source: {
-                                path: "packages/server/src/sessions/SessionRegistry.ts",
                                 start: 24,
                                 end: 29,
                               },
-                              at: 26,
                             },
                           ],
-                          service: "gen:main:sessionsRouter",
-                          entry: "sessionsRouter.create",
-                          source: {
-                            path: "packages/server/src/sessions/sessionsRouter.ts",
-                            start: 24,
-                            end: 29,
-                          },
+                          from: "gen:renderer:useDraftAgentSession",
+                          to: "gen:main:sessionsRouter",
+                          name: "sessions.create",
+                          carrier: "rpc",
+                          at: 172,
                         },
-                      ],
-                      from: "gen:renderer:useDraftAgentSession",
-                      to: "gen:main:sessionsRouter",
-                      name: "sessions.create",
-                      carrier: "rpc",
-                      at: 172,
-                    },
-                    {
-                      kind: "event",
-                      children: [
+                        {
+                          kind: "branch",
+                          label: "if (created instanceof Error)",
+                          at: 179,
+                          children: [
+                            {
+                              kind: "return",
+                              label: "return created",
+                              at: 181,
+                              children: [],
+                            },
+                          ],
+                        },
+                        {
+                          kind: "event",
+                          children: [
+                            {
+                              kind: "frame",
+                              children: [],
+                              service: "gen:main:sessionsRouter",
+                              entry: "sessionsRouter.prompt",
+                              summary: "Walked above; same calls.",
+                              source: {
+                                path: "packages/server/src/sessions/sessionsRouter.ts",
+                                start: 51,
+                                end: 61,
+                              },
+                            },
+                          ],
+                          from: "gen:renderer:useDraftAgentSession",
+                          to: "gen:main:sessionsRouter",
+                          name: "sessions.prompt",
+                          carrier: "rpc",
+                          at: 189,
+                        },
+                        {
+                          kind: "branch",
+                          label: "if (result instanceof PromptFailedError)",
+                          at: 198,
+                          children: [
+                            {
+                              kind: "return",
+                              label: "return result",
+                              at: 204,
+                              children: [],
+                            },
+                          ],
+                        },
                         {
                           kind: "frame",
                           children: [],
-                          service: "gen:main:sessionsRouter",
-                          entry: "sessionsRouter.prompt",
+                          service: "gen:renderer:useSessionsQuery",
+                          entry: "useSessionsQuery",
                           summary: "Walked above; same calls.",
                           source: {
-                            path: "packages/server/src/sessions/sessionsRouter.ts",
-                            start: 51,
-                            end: 61,
+                            path: "apps/electron/src/renderer/api/ApiProvider.tsx",
+                            start: 117,
+                            end: 129,
                           },
+                          at: 206,
                         },
                       ],
-                      from: "gen:renderer:useDraftAgentSession",
-                      to: "gen:main:sessionsRouter",
-                      name: "sessions.prompt",
-                      carrier: "rpc",
-                      at: 189,
-                    },
-                    {
-                      kind: "frame",
-                      children: [],
-                      service: "gen:renderer:useSessionsQuery",
-                      entry: "useSessionsQuery",
-                      summary: "Walked above; same calls.",
+                      service: "gen:renderer:useDraftAgentSession",
+                      entry: "useDraftAgentSession.prompt",
                       source: {
-                        path: "apps/electron/src/renderer/api/ApiProvider.tsx",
-                        start: 117,
-                        end: 129,
+                        path: "apps/electron/src/renderer/main/agent/useAgentSession.ts",
+                        start: 171,
+                        end: 210,
                       },
-                      at: 206,
+                      at: 123,
                     },
                   ],
-                  service: "gen:renderer:useDraftAgentSession",
-                  entry: "useDraftAgentSession.prompt",
+                  service: "gen:renderer:Composer",
+                  entry: "Composer.submit",
                   source: {
-                    path: "apps/electron/src/renderer/main/agent/useAgentSession.ts",
-                    start: 171,
-                    end: 210,
+                    path: "apps/electron/src/renderer/main/agent/AgentPane.tsx",
+                    start: 119,
+                    end: 127,
                   },
-                  at: 123,
+                  at: 96,
+                },
+                {
+                  kind: "return",
+                  label: "return true",
+                  at: 97,
+                  children: [],
                 },
               ],
-              service: "gen:renderer:Composer",
-              entry: "Composer.submit",
-              source: {
-                path: "apps/electron/src/renderer/main/agent/AgentPane.tsx",
-                start: 119,
-                end: 127,
-              },
-              at: 96,
+            },
+            {
+              kind: "return",
+              label: "return false",
+              at: 99,
+              children: [],
             },
           ],
           service: "gen:renderer:Editor",

@@ -2,8 +2,10 @@ import path from "node:path";
 import * as errore from "errore";
 import ts from "typescript5";
 import {
+  branch,
   event,
   frame,
+  returns,
   type Carrier,
   type FlowNode,
   type ProcessName,
@@ -29,8 +31,6 @@ type WalkerConfig = {
   ignore: string[];
   /** node_modules package prefixes kept as leaf frames instead of dropped. */
   keepPackages: string[];
-  /** Drop calls inside `if (x instanceof Error) { ... }` branches. */
-  skipErrorPaths: boolean;
   /** Rule: a call whose signature comes from this client package runs a router handler in another process. */
   rpc: {
     clientPackage: string;
@@ -149,7 +149,7 @@ export class FlowWalker {
     this.walked.add(fn);
     const children: FlowNode[] = [];
     if (!stack.includes(fn)) {
-      children.push(...this.callsOf(fn, process, [...stack, fn]));
+      children.push(...this.bodyOf(fn.body, process, [...stack, fn]));
     }
     return frame({
       service: serviceId,
@@ -160,26 +160,98 @@ export class FlowWalker {
     });
   }
 
-  /** The children one function body contributes, `at` set to each call's line. */
-  private callsOf(
-    fn: FunctionNode,
+  /**
+   * The children one body contributes, in source order: the calls it makes,
+   * with `at` set to each call's line, plus a branch node per `if`/`else`
+   * that contains something and a return node per `return`. Nested functions
+   * are deferred work and are skipped unless a sync callback method takes
+   * them.
+   */
+  private bodyOf(
+    body: ts.Node,
     process: ProcessName,
     stack: ts.Node[],
   ): FlowNode[] {
     const children: FlowNode[] = [];
-    for (const call of callsIn(fn)) {
-      if (this.config.skipErrorPaths && onErrorPath(call, fn)) {
-        this.omit(call, "error path");
-        continue;
+    const collect = (node: ts.Node) => {
+      if (node !== body && isFunctionNode(node) && !isSyncCallback(node)) {
+        return;
       }
-      for (const child of this.resolveCall(call, process, stack)) {
-        if (child.at === undefined) {
-          child.at = lineOf(call.expression.getEnd(), call.getSourceFile());
+      if (ts.isIfStatement(node)) {
+        collect(node.expression);
+        children.push(...this.branchesOf(node, "if", process, stack));
+        return;
+      }
+      if (ts.isReturnStatement(node)) {
+        const inner =
+          node.expression === undefined
+            ? []
+            : this.bodyOf(node.expression, process, stack);
+        children.push(
+          returns({
+            label:
+              node.expression === undefined
+                ? "return"
+                : `return ${shortText(node.expression)}`,
+            at: lineOf(node.getStart(), node.getSourceFile()),
+            children: inner,
+          }),
+        );
+        return;
+      }
+      if (ts.isCallExpression(node)) {
+        for (const child of this.resolveCall(node, process, stack)) {
+          if (child.at === undefined) {
+            child.at = lineOf(node.expression.getEnd(), node.getSourceFile());
+          }
+          children.push(child);
         }
-        children.push(child);
       }
-    }
+      ts.forEachChild(node, collect);
+    };
+    collect(body);
     return children;
+  }
+
+  /** `if (...)` and its `else if` / `else` chain, branches with nothing inside dropped. */
+  private branchesOf(
+    node: ts.IfStatement,
+    keyword: "if" | "else if",
+    process: ProcessName,
+    stack: ts.Node[],
+  ): FlowNode[] {
+    const result: FlowNode[] = [];
+    const then = this.bodyOf(node.thenStatement, process, stack);
+    if (then.length > 0) {
+      result.push(
+        branch({
+          label: `${keyword} (${shortText(node.expression)})`,
+          at: lineOf(node.getStart(), node.getSourceFile()),
+          children: then,
+        }),
+      );
+    }
+    if (node.elseStatement === undefined) return result;
+    if (ts.isIfStatement(node.elseStatement)) {
+      result.push(
+        ...this.branchesOf(node.elseStatement, "else if", process, stack),
+      );
+      return result;
+    }
+    const otherwise = this.bodyOf(node.elseStatement, process, stack);
+    if (otherwise.length > 0) {
+      result.push(
+        branch({
+          label: "else",
+          at: lineOf(
+            node.elseStatement.getStart(),
+            node.elseStatement.getSourceFile(),
+          ),
+          children: otherwise,
+        }),
+      );
+    }
+    return result;
   }
 
   private resolveCall(
@@ -409,7 +481,7 @@ export class FlowWalker {
       ) {
         return undefined;
       }
-      return this.callsOf(queryFn.initializer, process, stack);
+      return this.bodyOf(queryFn.initializer.body, process, stack);
     }
     if (
       !ts.isPropertyAccessExpression(call.expression) ||
@@ -682,22 +754,6 @@ function isSyncCallback(node: FunctionNode) {
   );
 }
 
-/** Every call the body makes, in the order its `(` appears. */
-function callsIn(fn: FunctionNode): ts.CallExpression[] {
-  const calls: ts.CallExpression[] = [];
-  function collect(node: ts.Node) {
-    if (node !== fn.body && isFunctionNode(node) && !isSyncCallback(node)) {
-      return;
-    }
-    if (ts.isCallExpression(node)) calls.push(node);
-    ts.forEachChild(node, collect);
-  }
-  collect(fn.body);
-  return calls.toSorted(
-    (a, b) => a.expression.getEnd() - b.expression.getEnd(),
-  );
-}
-
 /**
  * `Container.own`: the function's own name (or the property or variable it is
  * assigned to), under the class or named function it sits in. At module
@@ -760,22 +816,6 @@ function jsDocSummary(fn: ts.SignatureDeclaration) {
   return undefined;
 }
 
-/** Inside the `then` branch of an `if (... instanceof Error)` within `fn`. */
-function onErrorPath(call: ts.CallExpression, fn: FunctionNode) {
-  let current: ts.Node | undefined = call.parent;
-  while (current !== undefined && current !== fn) {
-    if (
-      ts.isIfStatement(current.parent) &&
-      current.parent.thenStatement === current &&
-      current.parent.expression.getText().includes("instanceof Error")
-    ) {
-      return true;
-    }
-    current = current.parent;
-  }
-  return false;
-}
-
 /** The string literal prefix of a `queryKey: [...]` array in an options object. */
 function queryKeyOf(options: ts.Expression | undefined) {
   if (options === undefined || !ts.isObjectLiteralExpression(options)) {
@@ -794,6 +834,12 @@ function queryKeyOf(options: ts.Expression | undefined) {
     key.push(element.text);
   }
   return key;
+}
+
+/** Source text on one line, cut so a label stays readable. */
+function shortText(node: ts.Node) {
+  const text = node.getText().replaceAll(/\s+/g, " ");
+  return text.length > 72 ? `${text.slice(0, 71)}…` : text;
 }
 
 function lineOf(position: number, file: ts.SourceFile) {
