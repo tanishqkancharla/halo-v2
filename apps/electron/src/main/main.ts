@@ -155,7 +155,7 @@ app.whenReady().then(async () => {
   }
   registerLogBridge();
   registerDesktopApi({
-    workspace: workspaceService,
+    selectWorkspace: (directory) => workspaceService.select(directory),
     getWindow: () => mainWindow,
   });
   registerRpcBridge();

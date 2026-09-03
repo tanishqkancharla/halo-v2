@@ -7,6 +7,7 @@ import {
 } from "electron";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
+import type { WorkspaceInfo } from "@get-halo/shared/rpc";
 import {
   DESKTOP_CHANNEL,
   desktopRequestSchema,
@@ -14,7 +15,6 @@ import {
   type OpenExternalRequest,
 } from "../shared/desktop.js";
 import { getAppInfo, installAppUpdate } from "./app/AppUpdate.js";
-import type { WorkspaceService } from "@get-halo/server/workspace";
 
 class DesktopRequestError extends errore.createTaggedError({
   name: "DesktopRequestError",
@@ -27,7 +27,7 @@ class DesktopOperationError extends errore.createTaggedError({
 }) {}
 
 export function registerDesktopApi(args: {
-  workspace: WorkspaceService;
+  selectWorkspace: (directory: string) => Promise<WorkspaceInfo | Error>;
   getWindow: () => BrowserWindow | undefined;
 }): void {
   ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
@@ -37,7 +37,7 @@ export function registerDesktopApi(args: {
     const result = await handleDesktopRequest({
       request: validated,
       window,
-      workspace: args.workspace,
+      selectWorkspace: args.selectWorkspace,
     });
     if (result instanceof Error) throw result;
     return result;
@@ -54,13 +54,13 @@ function validateDesktopRequest(
 async function handleDesktopRequest(args: {
   request: DesktopRequest;
   window: BrowserWindow;
-  workspace: WorkspaceService;
+  selectWorkspace: (directory: string) => Promise<WorkspaceInfo | Error>;
 }) {
   switch (args.request.type) {
     case "chooseWorkspace":
       return chooseWorkspace({
         window: args.window,
-        workspace: args.workspace,
+        selectWorkspace: args.selectWorkspace,
       });
     case "getAppInfo":
       return getAppInfo();
@@ -75,7 +75,7 @@ async function handleDesktopRequest(args: {
 
 async function chooseWorkspace(args: {
   window: BrowserWindow;
-  workspace: WorkspaceService;
+  selectWorkspace: (directory: string) => Promise<WorkspaceInfo | Error>;
 }) {
   const selection = await dialog
     .showOpenDialog(args.window, {
@@ -92,7 +92,7 @@ async function chooseWorkspace(args: {
     );
   if (selection instanceof Error) return selection;
   if (selection.canceled) return undefined;
-  return args.workspace.select(selection.filePaths[0]!);
+  return args.selectWorkspace(selection.filePaths[0]!);
 }
 
 async function openExternal(request: OpenExternalRequest) {
