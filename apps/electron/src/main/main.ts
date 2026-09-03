@@ -168,7 +168,6 @@ app.whenReady().then(async () => {
       toolRuntime,
       logger: rpcLogger,
     },
-    filesystem: filesystemService,
     userDataDir: applicationConfig.dataDir,
   });
   if (listening instanceof Error) {

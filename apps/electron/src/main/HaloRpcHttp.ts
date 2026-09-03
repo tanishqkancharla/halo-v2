@@ -6,13 +6,9 @@ import {
 } from "node:http";
 import type { AddressInfo } from "node:net";
 import { RPCHandler } from "@orpc/server/node";
-import { rpcFilePath, type HaloRpcFile } from "@halo/cli";
 import * as errore from "errore";
-import {
-  FilesystemPathNotFoundError,
-  type FilesystemService,
-} from "@get-halo/server/filesystem";
 import { haloRpcRouter, type HaloContext } from "@get-halo/server/router";
+import { removeHaloRpcFile, writeHaloRpcFile } from "./rpcFile.js";
 
 export type HaloRpcHttp = {
   host: "127.0.0.1";
@@ -29,7 +25,6 @@ export class HaloRpcHttpError extends errore.createTaggedError({
 
 export async function listenHaloRpcHttp(args: {
   context: HaloContext;
-  filesystem: FilesystemService;
   userDataDir: string;
 }): Promise<HaloRpcHttp | HaloRpcHttpError> {
   const token = randomBytes(32).toString("base64url");
@@ -54,23 +49,13 @@ export async function listenHaloRpcHttp(args: {
     return new HaloRpcHttpError({ detail: "server has no TCP address" });
   }
 
-  const file: HaloRpcFile = {
-    version: 1,
-    host: "127.0.0.1",
-    port,
-    token,
-  };
-  const path = rpcFilePath(args.userDataDir);
-  const written = await args.filesystem.writeFile(
-    path,
-    `${JSON.stringify(file)}\n`,
-    {
-      mode: 0o600,
-    },
-  );
-  if (written instanceof Error) {
+  const file = await writeHaloRpcFile({
+    userDataDir: args.userDataDir,
+    connection: { port, token },
+  });
+  if (file instanceof Error) {
     server.close();
-    return new HaloRpcHttpError({ detail: "write rpc.json", cause: written });
+    return new HaloRpcHttpError({ detail: "write rpc.json", cause: file });
   }
 
   let closed = false;
@@ -86,11 +71,10 @@ export async function listenHaloRpcHttp(args: {
       if (closedServer instanceof Error) {
         console.warn("Could not close Halo RPC HTTP:", closedServer.message);
       }
-      const removed = await args.filesystem.unlink(path);
-      if (
-        removed instanceof Error &&
-        !(removed instanceof FilesystemPathNotFoundError)
-      ) {
+      const removed = await removeHaloRpcFile({
+        userDataDir: args.userDataDir,
+      });
+      if (removed instanceof Error) {
         console.warn("Could not unlink rpc.json:", removed.message);
       }
     },

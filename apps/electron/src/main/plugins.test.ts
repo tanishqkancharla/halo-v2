@@ -122,7 +122,6 @@ const pluginTest = test.extend<{
     };
     const rpc = await listenHaloRpcHttp({
       context,
-      filesystem: filesystemService,
       userDataDir,
     });
     if (rpc instanceof Error) throw rpc;
