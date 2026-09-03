@@ -112,6 +112,10 @@ export class HaloServer {
     return listening.connection;
   }
 
+  selectWorkspace(directory: string) {
+    return this.context.workspace.select(directory);
+  }
+
   async close() {
     const httpClosed =
       this.httpServer === undefined
