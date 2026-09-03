@@ -4,7 +4,7 @@ import { FilesystemService } from "./filesystem/FilesystemService.js";
 import {
   closeHaloHttp,
   listenHaloHttp,
-  type HaloHttpAddress,
+  type HaloHttpConnection,
   type HaloHttpError,
 } from "./http.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -90,7 +90,7 @@ export class HaloServer {
   async listen(options: {
     host: string;
     port: number;
-  }): Promise<HaloHttpAddress | HaloHttpError> {
+  }): Promise<HaloHttpConnection | HaloHttpError> {
     const listening = await listenHaloHttp({
       context: this.context,
       host: options.host,
@@ -98,7 +98,7 @@ export class HaloServer {
     });
     if (listening instanceof Error) return listening;
     this.httpServer = listening.server;
-    return listening.address;
+    return listening.connection;
   }
 
   async close() {

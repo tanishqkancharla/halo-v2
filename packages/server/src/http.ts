@@ -1,16 +1,18 @@
+import crypto from "node:crypto";
 import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { RPCHandler } from "@orpc/server/node";
 import * as errore from "errore";
 import { haloRpcRouter, type HaloContext } from "./router.js";
 
-export type HaloHttpAddress = {
+export type HaloHttpConnection = {
   host: string;
   port: number;
+  token: string;
 };
 
 type ListeningHaloHttp = {
-  address: HaloHttpAddress;
+  connection: HaloHttpConnection;
   server: HttpServer;
 };
 
@@ -24,8 +26,14 @@ export async function listenHaloHttp(options: {
   host: string;
   port: number;
 }): Promise<ListeningHaloHttp | HaloHttpError> {
+  const token = crypto.randomBytes(32).toString("base64url");
   const handler = new RPCHandler<HaloContext>(haloRpcRouter);
   const server = createServer(async (request, response) => {
+    if (request.headers.authorization !== `Bearer ${token}`) {
+      response.statusCode = 401;
+      response.end();
+      return;
+    }
     const handled = await handler.handle(request, response, {
       prefix: "/rpc",
       context: options.context,
@@ -45,7 +53,7 @@ export async function listenHaloHttp(options: {
   // SAFETY: listen receives a numeric port and host, so Node returns AddressInfo instead of a pipe name.
   const tcpAddress = address as AddressInfo;
   return {
-    address: { host: options.host, port: tcpAddress.port },
+    connection: { host: options.host, port: tcpAddress.port, token },
     server,
   };
 }
