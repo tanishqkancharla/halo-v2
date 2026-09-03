@@ -3,6 +3,7 @@ import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { RPCHandler } from "@orpc/server/node";
 import * as errore from "errore";
+import { handleOAuthCallback } from "./oauth.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
 
 export type HaloHttpConnection = {
@@ -29,6 +30,19 @@ export async function listenHaloHttp(options: {
   const token = crypto.randomBytes(32).toString("base64url");
   const handler = new RPCHandler<HaloContext>(haloRpcRouter);
   const server = createServer(async (request, response) => {
+    const url = new URL(
+      request.url === undefined ? "/" : request.url,
+      "http://localhost",
+    );
+    if (url.pathname === "/oauth/callback") {
+      await handleOAuthCallback({
+        url,
+        request,
+        response,
+        context: options.context,
+      });
+      return;
+    }
     if (request.headers.authorization !== `Bearer ${token}`) {
       response.statusCode = 401;
       response.end();
@@ -52,6 +66,9 @@ export async function listenHaloHttp(options: {
   }
   // SAFETY: listen receives a numeric port and host, so Node returns AddressInfo instead of a pipe name.
   const tcpAddress = address as AddressInfo;
+  options.context.toolRuntime.setOAuthRedirectUri(
+    `http://${options.host}:${tcpAddress.port}/oauth/callback`,
+  );
   return {
     connection: { host: options.host, port: tcpAddress.port, token },
     server,
