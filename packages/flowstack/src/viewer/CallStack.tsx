@@ -1,6 +1,7 @@
 import { backgroundColor, colors, radius, spacing } from "maui";
 import { style, useStyles } from "purse-styles";
 import {
+  eventChildren,
   keyed,
   type FlowNode,
   type Keyed,
@@ -14,20 +15,16 @@ import { SourceExcerpt, type SourceMark } from "./SourceExcerpt.tsx";
 export type Expansion = {
   isExpanded: (key: string) => boolean;
   toggle: (key: string) => void;
-  open: (keys: string[]) => void;
 };
-
-/** The node keys above `key`, outermost first, the flow id excluded. */
-export function ancestorKeys(key: string) {
-  const parts = key.split("/");
-  return parts.slice(2).map((_, index) => parts.slice(0, index + 2).join("/"));
-}
 
 /**
  * The flow as a call stack in a code block: one line per node, tree glyphs
- * for depth. Opening a line shows the frame's source and, under it, the
- * frames it calls and the events it sends. Source lines that lead to a child
- * are marked; clicking one opens that child.
+ * for depth. Events are always shown, so a closed flow reads as the data flow
+ * between its services: each event sits under the event whose handling sent
+ * it, with the frames between them folded away. Opening a line shows those
+ * frames (and a frame's source); the events then move under the frames that
+ * send them. Source lines that lead to a child are marked; clicking one opens
+ * that child.
  */
 export function CallStack(props: {
   nodes: FlowNode[];
@@ -90,8 +87,11 @@ function Line(props: {
   const { expansion } = props;
   const children = keyed(node.children, key);
   const source = node.kind === "frame" ? node.source : undefined;
-  const canOpen = children.length > 0 || source !== undefined;
+  const canOpen =
+    source !== undefined ||
+    children.some((child) => child.node.kind === "frame");
   const open = canOpen && expansion.isExpanded(key);
+  const shown = open ? children : eventChildren(node.children, key);
   const marks: SourceMark[] = children.flatMap((child) =>
     child.node.at === undefined
       ? []
@@ -113,7 +113,7 @@ function Line(props: {
   const lineButton = useStyles(styles.lineButton);
 
   return (
-    <div data-flowstack-line={nodeName(node)} data-flowstack-key={key}>
+    <div data-flowstack-line={nodeName(node)}>
       <button
         type="button"
         className={line}
@@ -156,15 +156,13 @@ function Line(props: {
           <SourceExcerpt source={source} marks={marks} />
         </div>
       ) : undefined}
-      {open ? (
-        <Lines
-          items={children}
-          prefix={props.childPrefix}
-          root={false}
-          services={props.services}
-          expansion={expansion}
-        />
-      ) : undefined}
+      <Lines
+        items={shown}
+        prefix={props.childPrefix}
+        root={false}
+        services={props.services}
+        expansion={expansion}
+      />
     </div>
   );
 }
