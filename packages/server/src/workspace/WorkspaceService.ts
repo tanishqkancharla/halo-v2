@@ -1,4 +1,12 @@
-import { basename, delimiter, join, relative, resolve, sep } from "node:path";
+import {
+  basename,
+  delimiter,
+  dirname,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
@@ -230,6 +238,14 @@ export class WorkspaceService {
     const relativePath = toPosixRelative(layout.root, absolutePath);
     if (relativePath !== path || isSkippedRelativePath(path)) {
       return new WorkspaceInvalidPathError({ path });
+    }
+
+    const directoryCreated = await this.options.filesystem.makeDirectory(
+      dirname(absolutePath),
+      { recursive: true },
+    );
+    if (directoryCreated instanceof Error) {
+      return new WorkspaceIoError({ cause: directoryCreated });
     }
 
     const written = await this.options.filesystem.writeFile(

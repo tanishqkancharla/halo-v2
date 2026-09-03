@@ -16,9 +16,9 @@
   "scripts": {
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src",
-    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src",
-    "test": "vitest run src",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src test",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src test",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
