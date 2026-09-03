@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { RPCHandler } from "@orpc/server/node";
+import { CORSHandlerPlugin } from "@orpc/server/plugins";
 import * as errore from "errore";
 import { handleOAuthCallback } from "./oauth.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
@@ -26,9 +27,17 @@ export async function listenHaloHttp(options: {
   context: HaloContext;
   host: string;
   port: number;
+  corsOrigins: readonly string[];
 }): Promise<ListeningHaloHttp | HaloHttpError> {
   const token = crypto.randomBytes(32).toString("base64url");
-  const handler = new RPCHandler<HaloContext>(haloRpcRouter);
+  const handler = new RPCHandler<HaloContext>(haloRpcRouter, {
+    plugins: [
+      new CORSHandlerPlugin({
+        origin: options.corsOrigins,
+        allowHeaders: ["authorization", "content-type"],
+      }),
+    ],
+  });
   const server = createServer(async (request, response) => {
     const url = new URL(
       request.url === undefined ? "/" : request.url,
@@ -43,7 +52,10 @@ export async function listenHaloHttp(options: {
       });
       return;
     }
-    if (request.headers.authorization !== `Bearer ${token}`) {
+    if (
+      request.method !== "OPTIONS" &&
+      request.headers.authorization !== `Bearer ${token}`
+    ) {
       response.statusCode = 401;
       response.end();
       return;

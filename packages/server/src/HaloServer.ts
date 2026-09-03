@@ -90,6 +90,7 @@ export class HaloServer {
   async listen(options: {
     host: string;
     port: number;
+    corsOrigins: readonly string[];
   }): Promise<HaloHttpConnection | HaloHttpError> {
     await this.context.workspace.restore();
     if (this.context.workspace.getWorkspace() !== undefined) {
@@ -106,6 +107,7 @@ export class HaloServer {
       context: this.context,
       host: options.host,
       port: options.port,
+      corsOrigins: options.corsOrigins,
     });
     if (listening instanceof Error) return listening;
     this.httpServer = listening.server;
