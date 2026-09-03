@@ -19,7 +19,9 @@ import {
   type LoadedPluginList,
 } from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
+import { ConnectionPage } from "../ConnectionPage.tsx";
 import { desktopApi } from "./electron.js";
+import { IncompatibleServerError } from "./HaloRpcClient.js";
 
 class WorkspaceRestoreError extends errore.createTaggedError({
   name: "WorkspaceRestoreError",
@@ -43,7 +45,7 @@ export function ApiProvider({
   createApi,
   children,
 }: {
-  createApi: () => Promise<HaloClient>;
+  createApi: () => Promise<Error | HaloClient>;
   children: ReactNode;
 }) {
   const [queryClient] = useState(
@@ -72,7 +74,7 @@ function ResolveApi({
   createApi,
   children,
 }: {
-  createApi: () => Promise<HaloClient>;
+  createApi: () => Promise<Error | HaloClient>;
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
@@ -82,7 +84,16 @@ function ResolveApi({
   });
 
   if (apiQuery.isPending) return <LoadingPage />;
-  if (apiQuery.isError) throw apiQuery.error;
+  if (apiQuery.isError) {
+    console.warn("Halo API initialization failed:", apiQuery.error);
+    return <ConnectionPage status="disconnected" />;
+  }
+  if (apiQuery.data instanceof IncompatibleServerError) {
+    return <ConnectionPage status="incompatible" error={apiQuery.data} />;
+  }
+  if (apiQuery.data instanceof Error) {
+    return <ConnectionPage status="disconnected" />;
+  }
 
   return (
     <ApiContext value={{ api: apiQuery.data, queryClient }}>
