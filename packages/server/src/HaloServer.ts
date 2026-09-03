@@ -4,7 +4,7 @@ import { FilesystemService } from "./filesystem/FilesystemService.js";
 import {
   closeHaloHttp,
   listenHaloHttp,
-  type HaloHttpConnection,
+  type HaloHttpConnections,
   type HaloHttpError,
 } from "./http.js";
 import { PluginService } from "./plugins/PluginService.js";
@@ -91,7 +91,7 @@ export class HaloServer {
     host: string;
     port: number;
     corsOrigins: readonly string[];
-  }): Promise<HaloHttpConnection | HaloHttpError> {
+  }): Promise<HaloHttpConnections | HaloHttpError> {
     await this.context.workspace.restore();
     if (this.context.workspace.getWorkspace() !== undefined) {
       const listed = await this.context.plugins.load();
@@ -111,7 +111,7 @@ export class HaloServer {
     });
     if (listening instanceof Error) return listening;
     this.httpServer = listening.server;
-    return listening.connection;
+    return listening.connections;
   }
 
   getWorkspace() {

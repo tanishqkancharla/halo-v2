@@ -121,7 +121,7 @@ app.whenReady().then(async () => {
   }
   const rpcFile = await writeHaloRpcFile({
     userDataDir: applicationConfig.dataDir,
-    connection: listening,
+    connection: listening.cli,
   });
   if (rpcFile instanceof Error) {
     logger.error({ event: "rpc-file-write-failed", error: rpcFile });
@@ -129,8 +129,8 @@ app.whenReady().then(async () => {
     return;
   }
   rpcConnection = {
-    origin: `http://${rpcFile.host}:${rpcFile.port}`,
-    token: rpcFile.token,
+    origin: `http://${listening.renderer.host}:${listening.renderer.port}`,
+    token: listening.renderer.token,
   };
   installMenu();
   await openMainWindow(rpcConnection);

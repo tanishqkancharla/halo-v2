@@ -7,14 +7,19 @@ import * as errore from "errore";
 import { handleOAuthCallback } from "./oauth.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
 
-export type HaloHttpConnection = {
+type HaloHttpConnection = {
   host: string;
   port: number;
   token: string;
 };
 
+export type HaloHttpConnections = {
+  cli: HaloHttpConnection;
+  renderer: HaloHttpConnection;
+};
+
 type ListeningHaloHttp = {
-  connection: HaloHttpConnection;
+  connections: HaloHttpConnections;
   server: HttpServer;
 };
 
@@ -29,7 +34,16 @@ export async function listenHaloHttp(options: {
   port: number;
   corsOrigins: readonly string[];
 }): Promise<ListeningHaloHttp | HaloHttpError> {
-  const token = crypto.randomBytes(32).toString("base64url");
+  const cliToken = crypto.randomBytes(32).toString("base64url");
+  const rendererToken = crypto.randomBytes(32).toString("base64url");
+  const authorizations = new Set([
+    `Bearer ${cliToken}`,
+    `Bearer ${rendererToken}`,
+  ]);
+  const isAuthorized = (authorization: string | undefined) => {
+    if (authorization === undefined) return false;
+    return authorizations.has(authorization);
+  };
   const handler = new RPCHandler<HaloContext>(haloRpcRouter, {
     plugins: [
       new CORSHandlerPlugin({
@@ -54,7 +68,7 @@ export async function listenHaloHttp(options: {
     }
     if (
       request.method !== "OPTIONS" &&
-      request.headers.authorization !== `Bearer ${token}`
+      !isAuthorized(request.headers.authorization)
     ) {
       response.statusCode = 401;
       response.end();
@@ -82,7 +96,14 @@ export async function listenHaloHttp(options: {
     `http://${options.host}:${tcpAddress.port}/oauth/callback`,
   );
   return {
-    connection: { host: options.host, port: tcpAddress.port, token },
+    connections: {
+      cli: { host: options.host, port: tcpAddress.port, token: cliToken },
+      renderer: {
+        host: options.host,
+        port: tcpAddress.port,
+        token: rendererToken,
+      },
+    },
     server,
   };
 }

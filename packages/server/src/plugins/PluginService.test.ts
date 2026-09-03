@@ -5,7 +5,10 @@ import { createHaloRpcClient } from "@halo/cli";
 import type { PluginToolResult } from "@halo/plugin-sdk/server";
 import { Logger } from "@repo/logger";
 import { expect, test } from "vitest";
-import type { HaloClient } from "@get-halo/shared/contract";
+import {
+  haloProtocolVersion,
+  type HaloClient,
+} from "@get-halo/shared/contract";
 import {
   createWorkspaceFilesPlugin,
   type CredentialVault,
@@ -33,6 +36,12 @@ type PluginHandle = {
 
 type PluginDriver = {
   client: HaloClient;
+  credentials: {
+    cli: string;
+    renderer: string;
+  };
+  rendererClient: HaloClient;
+  unauthorizedClient: HaloClient;
   create: (input: {
     id: string;
     capabilities: string[];
@@ -120,12 +129,30 @@ const pluginTest = test.extend<{
     const client = createHaloRpcClient<HaloClient>({
       version: 1,
       host: "127.0.0.1",
-      port: rpc.connection.port,
-      token: rpc.connection.token,
+      port: rpc.connections.cli.port,
+      token: rpc.connections.cli.token,
+    });
+    const rendererClient = createHaloRpcClient<HaloClient>({
+      version: 1,
+      host: "127.0.0.1",
+      port: rpc.connections.renderer.port,
+      token: rpc.connections.renderer.token,
+    });
+    const unauthorizedClient = createHaloRpcClient<HaloClient>({
+      version: 1,
+      host: "127.0.0.1",
+      port: rpc.connections.cli.port,
+      token: "unknown-token",
     });
 
     const driver: PluginDriver = {
       client,
+      credentials: {
+        cli: rpc.connections.cli.token,
+        renderer: rpc.connections.renderer.token,
+      },
+      rendererClient,
+      unauthorizedClient,
       create: async (input) => {
         const created = await client.plugins.create({
           id: input.id,
@@ -198,6 +225,11 @@ class TestCredentialVault implements CredentialVault {
 pluginTest(
   "creates, builds, invokes, and reloads a plugin",
   async ({ plugins }) => {
+    expect(plugins.credentials.renderer).not.toBe(plugins.credentials.cli);
+    expect(await plugins.rendererClient.server.info()).toEqual({
+      protocolVersion: haloProtocolVersion,
+    });
+    await expect(plugins.unauthorizedClient.server.info()).rejects.toThrow();
     const notes = await plugins.create({
       id: "notes",
       capabilities: [],
