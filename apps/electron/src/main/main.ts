@@ -24,6 +24,10 @@ import { HaloServer } from "@get-halo/server";
 import { resolveHaloCliEntry } from "@get-halo/server/cli";
 import { FilesystemService } from "@get-halo/server/filesystem";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
+import {
+  ApplicationLaunchMode,
+  applicationLaunchMode,
+} from "./ApplicationLaunchMode.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { registerDesktopApi } from "./DesktopApi.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
@@ -34,7 +38,8 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const isDevelopment = Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+const isDevelopment =
+  applicationLaunchMode === ApplicationLaunchMode.Development;
 const filesystemService = new FilesystemService();
 
 if (started) app.quit();
@@ -56,7 +61,10 @@ const fileSink = new JsonlLoggerSink({
   filePath: getLogFilePath(applicationConfig),
 });
 const logger = new Logger({
-  sinks: isDevelopment ? [new PrettyConsoleLoggerSink(), fileSink] : [fileSink],
+  sinks:
+    applicationLaunchMode === ApplicationLaunchMode.Production
+      ? [fileSink]
+      : [new PrettyConsoleLoggerSink(), fileSink],
 });
 const rendererLogger = logger.scope("renderer");
 const rpcLogger = logger.scope("rpc");
@@ -135,7 +143,7 @@ app.whenReady().then(async () => {
   installMenu();
   await openMainWindow(rpcConnection);
   startAppUpdates({
-    isDevelopment,
+    mode: applicationLaunchMode,
     getWindow: () => mainWindow,
   });
   logger.info({ event: "app-ready" });
@@ -194,6 +202,7 @@ async function createWindow(
   connection: HaloRpcConnection,
 ): Promise<BrowserWindow> {
   const window = new BrowserWindow({
+    show: shouldShowMainWindow(applicationLaunchMode),
     title: "Halo",
     width: 1100,
     height: 720,
@@ -222,6 +231,12 @@ async function createWindow(
     );
   }
   return window;
+}
+
+function shouldShowMainWindow(mode: ApplicationLaunchMode) {
+  if (mode !== ApplicationLaunchMode.Test) return true;
+  if (process.env.HALO_E2E_HEADFUL === "1") return true;
+  return process.env.PWDEBUG === "1";
 }
 
 function registerLogBridge(): void {

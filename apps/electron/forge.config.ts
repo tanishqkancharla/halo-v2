@@ -5,7 +5,9 @@ import { copyMainProcessExternals } from "./forge/copyMainProcessExternals.js";
 const appleApiKey = process.env.APPLE_API_KEY;
 const appleApiKeyId = process.env.APPLE_API_KEY_ID;
 const appleApiIssuer = process.env.APPLE_API_ISSUER;
+const shouldSign = process.env.npm_lifecycle_event !== "test:e2e:build";
 const shouldNotarize =
+  shouldSign &&
   appleApiKey !== undefined &&
   appleApiKeyId !== undefined &&
   appleApiIssuer !== undefined;
@@ -20,9 +22,11 @@ const packagerConfig: NonNullable<ForgeConfig["packagerConfig"]> = {
   icon: "icons/icon",
   name: "Halo",
   executableName: "Halo",
-  osxSign: {},
   extraResource: [haloCliBundlePath()],
 };
+if (shouldSign) {
+  packagerConfig.osxSign = {};
+}
 if (shouldNotarize) {
   packagerConfig.osxNotarize = {
     appleApiKey,

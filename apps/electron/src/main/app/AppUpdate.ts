@@ -2,6 +2,7 @@ import { app, autoUpdater, dialog, type BrowserWindow } from "electron";
 import * as errore from "errore";
 import { updateElectronApp } from "update-electron-app";
 import type { AppInfo, AppUpdateStatus } from "../../shared/desktop.js";
+import { ApplicationLaunchMode } from "../ApplicationLaunchMode.js";
 
 /** How often packaged macOS/Windows builds poll update.electronjs.org. */
 const UPDATE_POLL_INTERVAL = "10 minutes";
@@ -27,14 +28,17 @@ export function getAppInfo(): AppInfo {
 }
 
 export function startAppUpdates(args: {
-  isDevelopment: boolean;
+  mode: ApplicationLaunchMode;
   getWindow: () => BrowserWindow | undefined;
 }): void {
   getWindow = args.getWindow;
-  if (args.isDevelopment) {
+  if (args.mode !== ApplicationLaunchMode.Production) {
     updateStatus = {
       state: "disabled",
-      reason: "Dev builds do not auto-update",
+      reason:
+        args.mode === ApplicationLaunchMode.Development
+          ? "Dev builds do not auto-update"
+          : "Test builds do not auto-update",
     };
     return;
   }

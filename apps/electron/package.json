@@ -16,12 +16,15 @@
     "dev": "electron-forge start",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "format": "oxfmt src forge index.html package.json tsconfig.json forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "format:check": "oxfmt --check src forge index.html package.json tsconfig.json forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src forge forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src forge forge.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
-    "test": "vitest run src/main src/shared src/renderer/main/agent forge",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json"
+    "format": "oxfmt src forge e2e index.html package.json tsconfig.json forge.config.ts playwright.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "format:check": "oxfmt --check src forge e2e index.html package.json tsconfig.json forge.config.ts playwright.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src forge e2e forge.config.ts playwright.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src forge e2e forge.config.ts playwright.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
+    "test": "pnpm run test:unit && pnpm run test:e2e",
+    "test:unit": "vitest run src/main src/shared src/renderer/main/agent forge",
+    "test:e2e:build": "electron-forge package",
+    "test:e2e": "pnpm run test:e2e:build && playwright test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.83.0",
@@ -84,6 +87,7 @@
     "@electron-forge/plugin-vite": "^7.11.2",
     "@electron-forge/publisher-github": "^7.11.2",
     "@electron-forge/shared-types": "^7.11.2",
+    "@playwright/test": "1.62.1",
     "@repo/typescript-config": "workspace:*",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/hast": "^3.0.5",
@@ -94,6 +98,7 @@
     "agentation": "^3.0.2",
     "agentation-mcp": "^1.2.0",
     "electron": "^44.0.0",
+    "playwright": "1.62.1",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"
   },
