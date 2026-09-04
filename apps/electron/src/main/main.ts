@@ -9,6 +9,7 @@ import {
 } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { registerSessionResourceCleanup } from "@earendil-works/pi-ai";
 import {
   Logger,
   type LogLevel,
@@ -41,6 +42,10 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const isDevelopment =
   applicationLaunchMode === ApplicationLaunchMode.Development;
 const filesystemService = new FilesystemService();
+
+// Rolldown omits pi-ai's session-resources module initializer when it is only
+// reached through pi-coding-agent, leaving packaged session disposal broken.
+registerSessionResourceCleanup(() => {})();
 
 if (started) app.quit();
 

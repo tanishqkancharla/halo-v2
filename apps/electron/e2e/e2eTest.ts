@@ -7,22 +7,26 @@ import {
   type ElectronApplication,
   type Page,
 } from "playwright";
-import {
-  createTestArtifacts,
-  type E2ETestHarness,
-  type TestArtifacts,
-} from "./TestArtifacts.js";
+import { createTestArtifacts, type TestArtifacts } from "./TestArtifacts.js";
 import { resolveUnpackedExecutable } from "./resolveUnpackedExecutable.js";
+import {
+  loadSessionDescription,
+  type SessionDescription,
+} from "./SessionDescription.js";
+
+type E2ETestHarness = TestArtifacts["harness"] & {
+  loadSession(description: SessionDescription): Promise<{ sessionId: string }>;
+};
 
 type E2EFixtures = {
   testArtifacts: TestArtifacts;
   electronApp: ElectronApplication;
   renderer: { page: Page };
+  harness: E2ETestHarness;
   server: {
     host: string;
     port: number;
     rpc: HaloClient;
-    harness: E2ETestHarness;
   };
 };
 
@@ -66,6 +70,24 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
   renderer: async ({ electronApp }, use) => {
     await use({ page: await electronApp.firstWindow() });
   },
+  harness: async ({ renderer, testArtifacts }, use) => {
+    await use({
+      ...testArtifacts.harness,
+      async loadSession(description) {
+        await renderer.page.getByRole("main").waitFor();
+        const loaded = loadSessionDescription({
+          description,
+          workspaceRoot: testArtifacts.paths.workspace,
+        });
+        if (loaded instanceof Error) throw loaded;
+        await renderer.page.reload();
+        await renderer.page
+          .getByRole("main", { name: description.title, exact: true })
+          .waitFor();
+        return loaded;
+      },
+    });
+  },
   server: async ({ electronApp, testArtifacts }, use) => {
     await electronApp.firstWindow();
     const connection = await readHaloRpcFile(
@@ -76,7 +98,6 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
       host: connection.host,
       port: connection.port,
       rpc: createHaloRpcClient<HaloClient>(connection),
-      harness: testArtifacts.harness,
     });
   },
 });

@@ -31,7 +31,7 @@ type TestPaths = {
   haloLog: string;
 };
 
-export type E2ETestHarness = {
+type E2ETestHarness = {
   createClient(serverHost: string, serverPort: number): HaloClient;
   files: TestFiles;
   paths: TestPaths;
