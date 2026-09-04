@@ -12,6 +12,7 @@ import {
   sessionLogEventSchema,
   type HaloConnectionEvent,
   type SessionLogEvent,
+  type ToolIdentity,
 } from "@get-halo/shared/sessionLog";
 import type { SessionSummary } from "@get-halo/shared/rpc";
 import {
@@ -103,10 +104,15 @@ export class HaloAgentSession {
   private constructor(
     private readonly piSession: AgentSession,
     events: DurableStream<SessionLogEvent>,
+    toolIdentities: ReadonlyMap<string, ToolIdentity>,
   ) {
     this.events = events;
     this.unsubscribePiEvents = this.piSession.subscribe((event) => {
-      const adapted = adaptPiEvent({ state: this.adapterState, event });
+      const adapted = adaptPiEvent({
+        state: this.adapterState,
+        event,
+        toolIdentities,
+      });
       this.adapterState = adapted.state;
       this.queueEvents(adapted.events);
     });
@@ -193,6 +199,14 @@ export class HaloAgentSession {
         cause: new Error("Pi is missing GPT-5.6 Terra"),
       });
     }
+    const customTools = [
+      ...createAuthorizedCodingTools({
+        cwd: layout.root,
+        filesystem: options.filesystem,
+        authority: runtime,
+      }),
+      createExecTool({ runtime, runtimeDescription }),
+    ];
     const created = await createAgentSession({
       cwd: layout.root,
       agentDir: layout.agentDir,
@@ -200,14 +214,7 @@ export class HaloAgentSession {
       model,
       modelRuntime,
       noTools: "builtin",
-      customTools: [
-        ...createAuthorizedCodingTools({
-          cwd: layout.root,
-          filesystem: options.filesystem,
-          authority: runtime,
-        }),
-        createExecTool({ runtime, runtimeDescription }),
-      ],
+      customTools,
       resourceLoader,
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;
@@ -225,7 +232,17 @@ export class HaloAgentSession {
         cause: events,
       });
     }
-    const session = new HaloAgentSession(created.session, events);
+    const toolIdentities = new Map(
+      customTools.map((tool) => [
+        tool.name,
+        { path: tool.name, displayName: tool.label },
+      ]),
+    );
+    const session = new HaloAgentSession(
+      created.session,
+      events,
+      toolIdentities,
+    );
     const recovered = await session.recoverInterruptedActivity();
     if (recovered instanceof Error) {
       session.unsubscribePiEvents();

@@ -1,12 +1,17 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { randomUUID } from "node:crypto";
 import type * as Cause from "effect/Cause";
+import * as Exit from "effect/Exit";
 import {
   createExecutionEngine,
   type ExecutionEngine,
   INTEGRATION_INVENTORY_HEADER,
   makeExecutorToolInvoker,
 } from "@executor-js/execution/core";
-import type { SandboxToolInvoker } from "@executor-js/codemode-core";
+import type {
+  CodeExecutor,
+  SandboxToolInvoker,
+} from "@executor-js/codemode-core";
 import {
   openApiPlugin,
   type OpenApiPluginExtension,
@@ -35,6 +40,7 @@ import {
   OAuthClientSlug,
   OAuthState,
   Owner,
+  parseToolAddress,
   type Plugin,
   StorageError,
   Subject,
@@ -42,6 +48,7 @@ import {
   tool,
   ToolAddress,
   type ToolResult,
+  isToolResult,
 } from "@executor-js/sdk/core";
 import quickJsVariant from "@jitl/quickjs-singlefile-cjs-release-sync";
 import { type Static, type TObject, Type } from "@sinclair/typebox";
@@ -52,6 +59,10 @@ import {
 } from "quickjs-emscripten";
 import * as errore from "errore";
 import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
+import type {
+  ExecActivityUpdate,
+  ToolIdentity,
+} from "@get-halo/shared/sessionLog";
 import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 import type {
   HaloTool,
@@ -105,7 +116,10 @@ const showConnectionCardInputSchema = Type.Object({
 type ToolExecutionContext = Pick<
   HaloToolContext,
   "signal" | "modelId" | "runtime"
->;
+> & {
+  parentToolCallId?: string;
+  onToolEvent?: (event: ExecActivityUpdate) => void;
+};
 
 const haloToolsPlugin = definePlugin((options?: HaloToolsPluginOptions) => {
   if (options === undefined) {
@@ -361,10 +375,18 @@ export class ToolRuntime {
     code: string;
     signal?: AbortSignal;
     modelId?: string;
+    parentToolCallId: string;
+    onToolEvent?: (event: ExecActivityUpdate) => void;
   }) {
     const connectionRequests: ConnectionRequest[] = [];
     const execution = await this.executionContext.run(
-      { signal: input.signal, modelId: input.modelId, runtime: this },
+      {
+        signal: input.signal,
+        modelId: input.modelId,
+        runtime: this,
+        parentToolCallId: input.parentToolCallId,
+        onToolEvent: input.onToolEvent,
+      },
       () =>
         Effect.runPromise(
           this.engine.execute(input.code, {
@@ -620,12 +642,41 @@ async function createToolRuntime(
     return installed;
   }
 
+  const integrations = await Effect.runPromise(
+    executor.integrations.list(),
+  ).catch(
+    (cause) =>
+      new ToolRuntimeError({ operation: "integration listing", cause }),
+  );
+  if (integrations instanceof Error) {
+    const closed = await Effect.runPromise(executor.close()).catch(
+      (cause) => new ToolRuntimeError({ operation: "close", cause }),
+    );
+    if (closed instanceof Error) {
+      console.warn(
+        "Failed to close Executor after integration listing:",
+        closed,
+      );
+    }
+    return integrations;
+  }
+  const integrationNames = new Map(
+    integrations.map((integration) => [
+      String(integration.slug),
+      integration.name,
+    ]),
+  );
+
   const engine = createExecutionEngine({
     executor,
-    codeExecutor: makeQuickJsExecutor({
-      timeoutMs: 2_000,
-      memoryLimitBytes: 32 * 1024 * 1024,
-      maxStackSizeBytes: 1024 * 1024,
+    codeExecutor: withToolActivity({
+      codeExecutor: makeQuickJsExecutor({
+        timeoutMs: 2_000,
+        memoryLimitBytes: 32 * 1024 * 1024,
+        maxStackSizeBytes: 1024 * 1024,
+      }),
+      executionContext,
+      integrationNames,
     }),
   });
   return new ToolRuntime(
@@ -637,6 +688,82 @@ async function createToolRuntime(
     input.authority,
     connectionRequestsForClient(googleOAuthClient, installableGooglePresets),
   );
+}
+
+function withToolActivity<E extends Cause.YieldableError>(input: {
+  codeExecutor: CodeExecutor<E>;
+  executionContext: AsyncLocalStorage<ToolExecutionContext>;
+  integrationNames: ReadonlyMap<string, string>;
+}): CodeExecutor<E> {
+  return {
+    timeoutMs: input.codeExecutor.timeoutMs,
+    execute: (code, toolInvoker) => {
+      const context = input.executionContext.getStore();
+      return input.codeExecutor.execute(code, {
+        invoke: (invocation) => {
+          const identity = toolIdentity(
+            invocation.path,
+            input.integrationNames,
+          );
+          if (
+            context?.onToolEvent === undefined ||
+            context.parentToolCallId === undefined ||
+            identity === undefined
+          ) {
+            return toolInvoker.invoke(invocation);
+          }
+
+          const invocationId = randomUUID();
+          context.onToolEvent({
+            type: "tool.started",
+            invocation: {
+              id: invocationId,
+              parentId: context.parentToolCallId,
+              tool: identity,
+              arguments: invocation.args,
+            },
+          });
+          return Effect.gen(function* () {
+            const result = yield* Effect.exit(toolInvoker.invoke(invocation));
+            if (Exit.isSuccess(result)) {
+              context.onToolEvent?.({
+                type: "tool.finished",
+                invocationId,
+                isError: isToolResult(result.value) && !result.value.ok,
+              });
+              return result.value;
+            }
+            context.onToolEvent?.({
+              type: "tool.finished",
+              invocationId,
+              isError: true,
+            });
+            return yield* Effect.failCause(result.cause);
+          });
+        },
+      });
+    },
+  };
+}
+
+function toolIdentity(
+  path: string,
+  integrationNames: ReadonlyMap<string, string>,
+): ToolIdentity | undefined {
+  if (
+    path === "search" ||
+    path === "executor.integrations.list" ||
+    path === "describe.tool"
+  ) {
+    return undefined;
+  }
+  const parsed = parseToolAddress(`tools.${path}`);
+  const integrationId =
+    parsed === null ? path.split(".")[0] : String(parsed.integration);
+  if (integrationId === undefined) return undefined;
+  const displayName = integrationNames.get(integrationId);
+  if (displayName === undefined) return undefined;
+  return { path, displayName, integrationId };
 }
 
 function sandboxPath(address: string) {

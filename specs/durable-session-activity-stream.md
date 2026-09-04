@@ -335,11 +335,11 @@ type ExecActivityUpdate = {
 
 Use a fresh nested invocation ID for every call and the outer Pi `toolCallId` as `parentId`. Preserve actual start/settlement order. Resolve connected-tool display names from Executor integration metadata; resolve static tool names from their registered integration and operation metadata. Filter Executor discovery helpers by their catalog classification rather than renderer path checks. Always emit the finish event with `Effect.onExit`, including tool failures and interruption.
 
-- [ ] Pass the outer tool-call ID and an `onToolEvent` callback from `createExecTool` into `ToolRuntime.executeCode`; call Pi `onUpdate` with typed `ExecActivityUpdate` details.
-- [ ] Wrap the QuickJS `CodeExecutor` invoker in `ToolRuntime.ts` to emit one started and one terminal update per actual invocation, including parallel calls and errors.
-- [ ] Build tool identities from Executor tool/integration catalog records and exclude non-user-facing discovery helpers using metadata owned by the runtime.
-- [ ] Extend `adaptPiEvent` to unpack `ExecActivityUpdate` into normal child `tool.started` and `tool.finished` session events; ignore unrelated partial-result details.
-- [ ] Add focused runtime/session tests for sequential, parallel, repeated-integration, failure, and interruption events; run `pnpm --filter @get-halo/server test` and `pnpm run check-affected`.
+- [x] Pass the outer tool-call ID and an `onToolEvent` callback from `createExecTool` into `ToolRuntime.executeCode`; call Pi `onUpdate` with typed `ExecActivityUpdate` details.
+- [x] Wrap the QuickJS `CodeExecutor` invoker in `ToolRuntime.ts` to emit one started and one terminal update per actual invocation, including parallel calls and errors.
+- [x] Build tool identities from Executor tool/integration catalog records and exclude non-user-facing discovery helpers using metadata owned by the runtime.
+- [x] Extend `adaptPiEvent` to unpack `ExecActivityUpdate` into normal child `tool.started` and `tool.finished` session events; ignore unrelated partial-result details.
+- [x] Verify parallel success/failure lifecycles, parent IDs, catalog labels, discovery exclusion, and session adaptation with a temporary real-runtime test; remove the unit test before commit and retain the end-user E2E regression as requested. Run `pnpm --filter @get-halo/server test` and `pnpm run check-affected`.
 
 ### Phase 5: Client-owned grouping, deduplication, and progressive summaries
 

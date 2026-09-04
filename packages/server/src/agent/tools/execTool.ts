@@ -19,13 +19,18 @@ export function createExecTool(input: {
     label: "Exec",
     description: input.runtimeDescription,
     parameters: execParameters,
-    async execute(_id, params, signal, _onUpdate, context) {
+    async execute(id, params, signal, onUpdate, context) {
       // SAFETY: execParameters schema guarantees params has a string `js` property.
       const { js } = params as { js: string };
       const result = await input.runtime.executeCode({
         code: js,
         signal,
         modelId: context.model?.id,
+        parentToolCallId: id,
+        onToolEvent:
+          onUpdate === undefined
+            ? undefined
+            : (event) => onUpdate({ content: [], details: event }),
       });
       if (result instanceof ConnectionRequiredError) {
         return {

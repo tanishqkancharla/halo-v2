@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { Value } from "@sinclair/typebox/value";
 import {
+  execActivityUpdateSchema,
   projectSession,
   type SessionLogEvent,
+  type ToolIdentity,
 } from "@get-halo/shared/sessionLog";
 
 export type PiEventAdapterState = {
@@ -17,6 +20,7 @@ type AdaptedPiEvent = {
 export function adaptPiEvent(args: {
   state: PiEventAdapterState;
   event: AgentSessionEvent;
+  toolIdentities: ReadonlyMap<string, ToolIdentity>;
 }): AdaptedPiEvent {
   if (args.event.type === "agent_start") {
     const runId = randomUUID();
@@ -60,6 +64,8 @@ export function adaptPiEvent(args: {
   if (args.event.type === "tool_execution_start") {
     const runId = args.state.activeRunId;
     if (runId === undefined) return { state: args.state, events: [] };
+    // SAFETY: Pi only emits execution events for the registered session tools.
+    const tool = args.toolIdentities.get(args.event.toolName) as ToolIdentity;
     return {
       state: args.state,
       events: [
@@ -68,10 +74,7 @@ export function adaptPiEvent(args: {
           invocation: {
             id: args.event.toolCallId,
             runId,
-            tool: {
-              path: args.event.toolName,
-              displayName: displayName(args.event.toolName),
-            },
+            tool,
             arguments: args.event.args,
           },
         },
@@ -80,6 +83,36 @@ export function adaptPiEvent(args: {
   }
 
   if (args.event.type === "tool_execution_update") {
+    const update = args.event.partialResult.details;
+    if (
+      args.event.toolName === "exec" &&
+      Value.Check(execActivityUpdateSchema, update)
+    ) {
+      const runId = args.state.activeRunId;
+      if (runId === undefined) return { state: args.state, events: [] };
+      if (update.type === "tool.started") {
+        return {
+          state: args.state,
+          events: [
+            {
+              type: "tool.started",
+              invocation: { ...update.invocation, runId },
+            },
+          ],
+        };
+      }
+      return {
+        state: args.state,
+        events: [
+          {
+            type: "tool.finished",
+            invocationId: update.invocationId,
+            result: { content: [] },
+            isError: update.isError,
+          },
+        ],
+      };
+    }
     return {
       state: args.state,
       events: [
@@ -131,11 +164,4 @@ export function interruptedSessionEvents(
     ...interruptedTools,
     { type: "run.finished", runId, outcome: "interrupted" },
   ];
-}
-
-function displayName(toolName: string): string {
-  return toolName
-    .split("_")
-    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
-    .join(" ");
 }

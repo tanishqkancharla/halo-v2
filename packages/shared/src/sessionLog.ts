@@ -234,6 +234,25 @@ const toolInvocationSchema = Type.Object({
 
 export type ToolInvocation = Static<typeof toolInvocationSchema>;
 
+export const execActivityUpdateSchema = Type.Union([
+  Type.Object({
+    type: Type.Literal("tool.started"),
+    invocation: Type.Object({
+      id: Type.String(),
+      parentId: Type.String(),
+      tool: toolIdentitySchema,
+      arguments: Type.Unknown(),
+    }),
+  }),
+  Type.Object({
+    type: Type.Literal("tool.finished"),
+    invocationId: Type.String(),
+    isError: Type.Boolean(),
+  }),
+]);
+
+export type ExecActivityUpdate = Static<typeof execActivityUpdateSchema>;
+
 const haloConnectionEventSchema = Type.Object({
   type: Type.Literal("halo.connection"),
   connectionId: Type.String(),
