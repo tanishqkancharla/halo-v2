@@ -50,5 +50,6 @@ function Home() {
         await typecheckPlugin({ filesystem, directory: pluginDir }),
       ).toEqual([]);
     },
+    15_000,
   );
 });

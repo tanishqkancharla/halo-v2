@@ -1,5 +1,9 @@
 import { createHaloRpcClient } from "@halo/cli";
 import { HaloServer, type HaloServerOptions } from "@get-halo/server";
+import {
+  copyPluginWorkspacePackages,
+  installPluginSdkContract,
+} from "@get-halo/server/plugins";
 import type { HaloClient } from "@get-halo/shared/contract";
 import path from "node:path";
 import * as errore from "errore";
@@ -11,7 +15,11 @@ import {
   type TestHarness,
 } from "./TestArtifacts.js";
 
+const testAppVersion = "0.0.0-test";
+
 type TestServer = {
+  host: string;
+  port: number;
   rpc: HaloClient;
   harness: TestHarness;
 };
@@ -47,7 +55,12 @@ export const serverTest = baseTest.extend<{ server: TestServer }>({
       port: connection.cli.port,
       token: connection.cli.token,
     });
-    await use({ rpc, harness: artifacts.harness });
+    await use({
+      host: connection.cli.host,
+      port: connection.cli.port,
+      rpc,
+      harness: artifacts.harness,
+    });
     outcome.passed = task.result?.state === "pass";
   },
 });
@@ -55,9 +68,17 @@ export const serverTest = baseTest.extend<{ server: TestServer }>({
 function createServerOptions(artifacts: TestArtifacts): HaloServerOptions {
   return {
     appDataDir: artifacts.paths.userData,
-    appVersion: "0.0.0-test",
+    appVersion: testAppVersion,
     ownerUserId: Promise.resolve("server-test-user"),
     logger: artifacts.logger,
+    pluginDependencyInstaller: async (directory) => {
+      const contract = await installPluginSdkContract({
+        directory,
+        appVersion: testAppVersion,
+      });
+      if (contract instanceof Error) return contract;
+      return copyPluginWorkspacePackages(directory);
+    },
     createCredentialVault: ({ filesystem, workspaceRoot }) =>
       new TemporaryCredentialVault({
         filesystem,

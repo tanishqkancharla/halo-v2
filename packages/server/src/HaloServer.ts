@@ -28,6 +28,7 @@ export type HaloServerOptions = {
   isDevelopment?: boolean;
   ownerUserId: Promise<string | Error>;
   logger: Logger;
+  pluginDependencyInstaller?: (directory: string) => Promise<Error | void>;
   createCredentialVault: (input: {
     filesystem: FilesystemService;
     workspaceRoot: string;
@@ -50,7 +51,11 @@ export class HaloServer {
       cliElectronRunAsNode: options.cliElectronRunAsNode,
       isDevelopment: options.isDevelopment,
     });
-    const plugins = new PluginService({ filesystem, workspace });
+    const plugins = new PluginService({
+      filesystem,
+      workspace,
+      dependencyInstaller: options.pluginDependencyInstaller,
+    });
     const pluginToolGrants = new PluginToolGrants({ filesystem, workspace });
     const toolRuntime = new ToolRuntimeService({
       filesystem,
