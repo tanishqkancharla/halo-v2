@@ -21,7 +21,14 @@ const walker = FlowWalker.create({
   tsconfig: "apps/electron/tsconfig.json",
   extraRoots: ["packages/server/src/router.ts"],
   ignore: ["packages/logger/"],
-  keepPackages: ["@earendil-works/"],
+  packageServices: [
+    {
+      prefix: "@earendil-works/",
+      service: "pi",
+      name: "Pi",
+      carrier: "memory",
+    },
+  ],
   rpc: {
     clientPackage: "@orpc/client",
     routerFile: "packages/server/src/router.ts",
@@ -31,8 +38,14 @@ const walker = FlowWalker.create({
     to: "main",
   },
   refHelpers: ["useRefCurrent"],
+  callbackSites: [{ component: "Composer", within: "AgentPane" }],
   sinks: [
-    { pathIncludes: "@types/node/fs", service: "disk", carrier: "filesystem" },
+    {
+      pathIncludes: "@types/node/fs",
+      service: "disk",
+      name: "Disk",
+      carrier: "filesystem",
+    },
   ],
 });
 if (walker instanceof Error) {
@@ -64,7 +77,7 @@ export const generatedPromptFlow: Flow = {
   id: "promptGenerated",
   title: "Send a prompt (generated)",
   description:
-    "Walked from Editor.handleKeyDown by src/walker/FlowWalker.ts: plain calls through the type checker, plus rules for React callback props, oRPC client to router, TanStack query invalidation, and node:fs sinks.",
+    "Walked from Editor.handleKeyDown by src/walker/FlowWalker.ts, for a prompt in an open session. Plain calls resolve through the type checker; if/else and returns come along as branches and guards; rules cover React callback props, oRPC client to router with the reply, TanStack query invalidation, node:fs as the disk, and Pi as a service.",
   children: ${JSON.stringify([result.root], undefined, 2)},
 };
 `;
@@ -85,12 +98,16 @@ function render(node: FlowNode, indent: string): string {
   const label =
     node.kind === "event"
       ? `${node.name}  [${node.carrier}]`
-      : node.kind === "frame"
-        ? `${node.entry}  ${node.source === undefined ? "" : `${node.source.path}:${node.source.start}-${node.source.end}`}`
-        : node.label;
+      : node.kind === "reply"
+        ? `↩ ${node.value}  [${node.carrier}]`
+        : node.kind === "frame"
+          ? `${node.entry}  ${node.source === undefined ? "" : `${node.source.path}:${node.source.start}-${node.source.end}`}`
+          : node.label;
   const at = node.at === undefined ? "" : `  @${node.at}`;
+  const guards =
+    node.guards === undefined ? "" : `  {${node.guards.join(" · ")}}`;
   return [
-    `${indent}${label}${at}`,
+    `${indent}${label}${at}${guards}`,
     ...node.children.map((child) => render(child, `${indent}  `)),
   ].join("\n");
 }

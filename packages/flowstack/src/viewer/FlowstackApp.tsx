@@ -78,9 +78,10 @@ export function FlowstackApp() {
         <div>
           <div className={title}>{program.name} — event flows</div>
           <div className={subtitle}>
-            A flow is a call stack across services. Closed, it shows the events
-            between them; open a line to see the frames that carry an event and
-            their source, where marked lines lead to the next level.
+            A flow is a call stack across services. Closed, a line shows the
+            calls under it that cross into another service, and the conditions
+            they pass; open it to see the frames between, with source, where
+            marked lines lead to the next level.
           </div>
         </div>
       </header>

@@ -38,6 +38,21 @@ export function serviceProcess(service: Service | undefined): ProcessName {
   return service === undefined ? "outside" : service.process;
 }
 
+/**
+ * The actor a service stands for in a hop: its process for renderer, preload
+ * and main, the service itself for the outside world (human, disk, Pi).
+ */
+export function actorOf(service: Service | undefined, id: string) {
+  const process = serviceProcess(service);
+  if (process !== "outside") return { name: processLabels[process], process };
+  return { name: service === undefined ? id : service.name, process };
+}
+
+export function ActorName(props: { name: string; process: ProcessName }) {
+  const coloured = useStyles(nameStyle, processText[props.process]);
+  return <span className={coloured}>{props.name}</span>;
+}
+
 const classPattern = /^([A-Za-z_$][\w$]*)(\..*)$/;
 
 /**

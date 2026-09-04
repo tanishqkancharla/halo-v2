@@ -59,9 +59,9 @@ export const generatedPromptServices: Service[] = [
     composes: [],
   },
   {
-    id: "gen:main:SessionManager",
-    name: "SessionManager",
-    process: "main",
+    id: "pi",
+    name: "Pi",
+    process: "outside",
     description: "Generated from source.",
     state: [],
     composes: [],
@@ -94,6 +94,14 @@ export const generatedPromptServices: Service[] = [
     id: "gen:main:FilesystemService",
     name: "FilesystemService",
     process: "main",
+    description: "Generated from source.",
+    state: [],
+    composes: [],
+  },
+  {
+    id: "disk",
+    name: "Disk",
+    process: "outside",
     description: "Generated from source.",
     state: [],
     composes: [],
@@ -179,38 +187,6 @@ export const generatedPromptServices: Service[] = [
     composes: [],
   },
   {
-    id: "gen:main:DefaultResourceLoader",
-    name: "DefaultResourceLoader",
-    process: "main",
-    description: "Generated from source.",
-    state: [],
-    composes: [],
-  },
-  {
-    id: "gen:main:registerBunOAuthFlows",
-    name: "registerBunOAuthFlows",
-    process: "main",
-    description: "Generated from source.",
-    state: [],
-    composes: [],
-  },
-  {
-    id: "gen:main:ModelRuntime",
-    name: "ModelRuntime",
-    process: "main",
-    description: "Generated from source.",
-    state: [],
-    composes: [],
-  },
-  {
-    id: "gen:main:createAgentSession",
-    name: "createAgentSession",
-    process: "main",
-    description: "Generated from source.",
-    state: [],
-    composes: [],
-  },
-  {
     id: "gen:main:createAuthorizedCodingTools",
     name: "createAuthorizedCodingTools",
     process: "main",
@@ -267,14 +243,6 @@ export const generatedPromptServices: Service[] = [
     composes: [],
   },
   {
-    id: "gen:main:createBashTool",
-    name: "createBashTool",
-    process: "main",
-    description: "Generated from source.",
-    state: [],
-    composes: [],
-  },
-  {
     id: "gen:main:createExecTool",
     name: "createExecTool",
     process: "main",
@@ -285,14 +253,6 @@ export const generatedPromptServices: Service[] = [
   {
     id: "gen:main:orpcErrors",
     name: "orpcErrors",
-    process: "main",
-    description: "Generated from source.",
-    state: [],
-    composes: [],
-  },
-  {
-    id: "gen:main:AgentSession",
-    name: "AgentSession",
     process: "main",
     description: "Generated from source.",
     state: [],
@@ -322,21 +282,13 @@ export const generatedPromptServices: Service[] = [
     state: [],
     composes: [],
   },
-  {
-    id: "gen:renderer:useDraftAgentSession",
-    name: "useDraftAgentSession",
-    process: "renderer",
-    description: "Generated from source.",
-    state: [],
-    composes: [],
-  },
 ];
 
 export const generatedPromptFlow: Flow = {
   id: "promptGenerated",
   title: "Send a prompt (generated)",
   description:
-    "Walked from Editor.handleKeyDown by src/walker/FlowWalker.ts: plain calls through the type checker, plus rules for React callback props, oRPC client to router, TanStack query invalidation, and node:fs sinks.",
+    "Walked from Editor.handleKeyDown by src/walker/FlowWalker.ts, for a prompt in an open session. Plain calls resolve through the type checker; if/else and returns come along as branches and guards; rules cover React callback props, oRPC client to router with the reply, TanStack query invalidation, node:fs as the disk, and Pi as a service.",
   children: [
     {
       kind: "event",
@@ -348,6 +300,8 @@ export const generatedPromptFlow: Flow = {
               kind: "branch",
               label:
                 'if (event.key === "Enter" && (event.metaKey || event.ctrlKey))',
+              guard:
+                'if (event.key === "Enter" && (event.metaKey || event.ctrlKey))',
               at: 94,
               children: [
                 {
@@ -356,6 +310,7 @@ export const generatedPromptFlow: Flow = {
                     {
                       kind: "branch",
                       label: "if (!trimmedText)",
+                      guard: "unless (trimmedText)",
                       at: 120,
                       children: [
                         {
@@ -372,6 +327,7 @@ export const generatedPromptFlow: Flow = {
                         {
                           kind: "branch",
                           label: "if (readySessionId === undefined)",
+                          guard: "if (readySessionId === undefined)",
                           at: 90,
                           children: [
                             {
@@ -394,6 +350,7 @@ export const generatedPromptFlow: Flow = {
                                     {
                                       kind: "branch",
                                       label: "if (live !== undefined)",
+                                      guard: "if (live !== undefined)",
                                       at: 33,
                                       children: [
                                         {
@@ -407,6 +364,7 @@ export const generatedPromptFlow: Flow = {
                                     {
                                       kind: "branch",
                                       label: "if (pending !== undefined)",
+                                      guard: "if (pending !== undefined)",
                                       at: 35,
                                       children: [
                                         {
@@ -416,6 +374,7 @@ export const generatedPromptFlow: Flow = {
                                           children: [],
                                         },
                                       ],
+                                      guards: ["unless (live !== undefined)"],
                                     },
                                     {
                                       kind: "frame",
@@ -429,6 +388,8 @@ export const generatedPromptFlow: Flow = {
                                                 {
                                                   kind: "branch",
                                                   label:
+                                                    'if (this.state.status === "notStarted")',
+                                                  guard:
                                                     'if (this.state.status === "notStarted")',
                                                   at: 190,
                                                   children: [
@@ -447,6 +408,9 @@ export const generatedPromptFlow: Flow = {
                                                     "return this.state.layout",
                                                   at: 191,
                                                   children: [],
+                                                  guards: [
+                                                    'unless (this.state.status === "notStarted")',
+                                                  ],
                                                 },
                                               ],
                                               service:
@@ -458,11 +422,14 @@ export const generatedPromptFlow: Flow = {
                                                 start: 189,
                                                 end: 192,
                                               },
+                                              returns: "WorkspaceLayout",
                                               at: 101,
                                             },
                                             {
                                               kind: "branch",
                                               label:
+                                                "if (layout instanceof Error)",
+                                              guard:
                                                 "if (layout instanceof Error)",
                                               at: 102,
                                               children: [
@@ -475,23 +442,39 @@ export const generatedPromptFlow: Flow = {
                                               ],
                                             },
                                             {
-                                              kind: "frame",
-                                              children: [],
-                                              service:
-                                                "gen:main:SessionManager",
-                                              entry: "SessionManager.list",
-                                              summary:
-                                                "List all sessions for a directory.",
-                                              source: {
-                                                path: "node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.d.ts",
-                                                start: 348,
-                                                end: 348,
-                                              },
+                                              kind: "event",
+                                              children: [
+                                                {
+                                                  kind: "frame",
+                                                  children: [],
+                                                  service: "pi",
+                                                  entry: "SessionManager.list",
+                                                  summary:
+                                                    "List all sessions for a directory.",
+                                                  source: {
+                                                    path: "node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.d.ts",
+                                                    start: 348,
+                                                    end: 348,
+                                                  },
+                                                  returns: "SessionInfo[]",
+                                                },
+                                              ],
+                                              from: "gen:main:HaloAgentSession",
+                                              to: "pi",
+                                              name: "SessionManager.list",
+                                              args: "layout.root, layout.sessionDir",
+                                              returns: "SessionInfo[]",
+                                              carrier: "memory",
                                               at: 103,
+                                              guards: [
+                                                "unless (layout instanceof Error)",
+                                              ],
                                             },
                                             {
                                               kind: "branch",
                                               label:
+                                                "if (sessions instanceof Error)",
+                                              guard:
                                                 "if (sessions instanceof Error)",
                                               at: 107,
                                               children: [
@@ -502,10 +485,15 @@ export const generatedPromptFlow: Flow = {
                                                   children: [],
                                                 },
                                               ],
+                                              guards: [
+                                                "unless (layout instanceof Error)",
+                                              ],
                                             },
                                             {
                                               kind: "branch",
                                               label:
+                                                "if (session === undefined)",
+                                              guard:
                                                 "if (session === undefined)",
                                               at: 111,
                                               children: [
@@ -517,10 +505,16 @@ export const generatedPromptFlow: Flow = {
                                                   children: [],
                                                 },
                                               ],
+                                              guards: [
+                                                "unless (layout instanceof Error)",
+                                                "unless (sessions instanceof Error)",
+                                              ],
                                             },
                                             {
                                               kind: "branch",
                                               label:
+                                                "if (manager instanceof Error)",
+                                              guard:
                                                 "if (manager instanceof Error)",
                                               at: 122,
                                               children: [
@@ -530,6 +524,11 @@ export const generatedPromptFlow: Flow = {
                                                   at: 122,
                                                   children: [],
                                                 },
+                                              ],
+                                              guards: [
+                                                "unless (layout instanceof Error)",
+                                                "unless (sessions instanceof Error)",
+                                                "unless (session === undefined)",
                                               ],
                                             },
                                             {
@@ -558,11 +557,15 @@ export const generatedPromptFlow: Flow = {
                                                             start: 189,
                                                             end: 192,
                                                           },
+                                                          returns:
+                                                            "WorkspaceLayout",
                                                           at: 43,
                                                         },
                                                         {
                                                           kind: "branch",
                                                           label:
+                                                            "if (layout instanceof Error)",
+                                                          guard:
                                                             "if (layout instanceof Error)",
                                                           at: 44,
                                                           children: [
@@ -581,6 +584,8 @@ export const generatedPromptFlow: Flow = {
                                                             {
                                                               kind: "branch",
                                                               label:
+                                                                "if (this.user !== undefined)",
+                                                              guard:
                                                                 "if (this.user !== undefined)",
                                                               at: 34,
                                                               children: [
@@ -613,7 +618,11 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 59,
                                                                 end: 61,
                                                               },
+                                                              returns: "string",
                                                               at: 36,
+                                                              guards: [
+                                                                "unless (this.user !== undefined)",
+                                                              ],
                                                             },
                                                             {
                                                               kind: "frame",
@@ -631,6 +640,9 @@ export const generatedPromptFlow: Flow = {
                                                                       from: "gen:main:FilesystemService",
                                                                       to: "disk",
                                                                       name: "fs.existsSync",
+                                                                      args: "path",
+                                                                      returns:
+                                                                        "boolean",
                                                                       carrier:
                                                                         "filesystem",
                                                                       at: 64,
@@ -647,11 +659,18 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 63,
                                                                 end: 65,
                                                               },
+                                                              returns:
+                                                                "boolean",
                                                               at: 37,
+                                                              guards: [
+                                                                "unless (this.user !== undefined)",
+                                                              ],
                                                             },
                                                             {
                                                               kind: "branch",
                                                               label:
+                                                                "if (this.options.filesystem.exists(path))",
+                                                              guard:
                                                                 "if (this.options.filesystem.exists(path))",
                                                               at: 37,
                                                               children: [
@@ -661,6 +680,8 @@ export const generatedPromptFlow: Flow = {
                                                                     {
                                                                       kind: "branch",
                                                                       label:
+                                                                        "if (raw instanceof Error)",
+                                                                      guard:
                                                                         "if (raw instanceof Error)",
                                                                       at: 65,
                                                                       children:
@@ -679,6 +700,8 @@ export const generatedPromptFlow: Flow = {
                                                                       kind: "branch",
                                                                       label:
                                                                         "if (parsed instanceof Error)",
+                                                                      guard:
+                                                                        "if (parsed instanceof Error)",
                                                                       at: 74,
                                                                       children:
                                                                         [
@@ -691,11 +714,16 @@ export const generatedPromptFlow: Flow = {
                                                                               [],
                                                                           },
                                                                         ],
+                                                                      guards: [
+                                                                        "unless (raw instanceof Error)",
+                                                                      ],
                                                                     },
                                                                     {
                                                                       kind: "branch",
                                                                       label:
                                                                         "if (!Value.Check(userPreferenceSchema, parsed))",
+                                                                      guard:
+                                                                        "unless (Value.Check(userPreferenceSchema, parsed))",
                                                                       at: 75,
                                                                       children:
                                                                         [
@@ -708,6 +736,10 @@ export const generatedPromptFlow: Flow = {
                                                                               [],
                                                                           },
                                                                         ],
+                                                                      guards: [
+                                                                        "unless (raw instanceof Error)",
+                                                                        "unless (parsed instanceof Error)",
+                                                                      ],
                                                                     },
                                                                     {
                                                                       kind: "return",
@@ -716,6 +748,11 @@ export const generatedPromptFlow: Flow = {
                                                                       at: 76,
                                                                       children:
                                                                         [],
+                                                                      guards: [
+                                                                        "unless (raw instanceof Error)",
+                                                                        "unless (parsed instanceof Error)",
+                                                                        "if (Value.Check(userPreferenceSchema, parsed))",
+                                                                      ],
                                                                     },
                                                                   ],
                                                                   service:
@@ -727,11 +764,15 @@ export const generatedPromptFlow: Flow = {
                                                                     start: 63,
                                                                     end: 77,
                                                                   },
+                                                                  returns:
+                                                                    "{ id: string; }",
                                                                   at: 38,
                                                                 },
                                                                 {
                                                                   kind: "branch",
                                                                   label: "else",
+                                                                  guard:
+                                                                    "unless (existing instanceof Error)",
                                                                   at: 41,
                                                                   children: [
                                                                     {
@@ -744,6 +785,9 @@ export const generatedPromptFlow: Flow = {
                                                                     },
                                                                   ],
                                                                 },
+                                                              ],
+                                                              guards: [
+                                                                "unless (this.user !== undefined)",
                                                               ],
                                                             },
                                                             {
@@ -759,6 +803,9 @@ export const generatedPromptFlow: Flow = {
                                                                       from: "gen:main:FilesystemService",
                                                                       to: "disk",
                                                                       name: "fsPromises.mkdir",
+                                                                      args: "path, options",
+                                                                      returns:
+                                                                        "string | undefined",
                                                                       carrier:
                                                                         "filesystem",
                                                                       at: 109,
@@ -770,6 +817,8 @@ export const generatedPromptFlow: Flow = {
                                                                           {
                                                                             kind: "branch",
                                                                             label:
+                                                                              'if (args.cause instanceof Error && "code" in args.cause && args.cause.code …)',
+                                                                            guard:
                                                                               'if (args.cause instanceof Error && "code" in args.cause && args.cause.code …)',
                                                                             at: 255,
                                                                             children:
@@ -791,6 +840,10 @@ export const generatedPromptFlow: Flow = {
                                                                             at: 265,
                                                                             children:
                                                                               [],
+                                                                            guards:
+                                                                              [
+                                                                                'unless (args.cause instanceof Error && "code" in args.cause && args.cause.code …)',
+                                                                              ],
                                                                           },
                                                                         ],
                                                                       service:
@@ -802,11 +855,15 @@ export const generatedPromptFlow: Flow = {
                                                                         start: 250,
                                                                         end: 266,
                                                                       },
+                                                                      returns:
+                                                                        "FilesystemOperationError | FilesystemPathNotFoundError",
                                                                       at: 111,
                                                                     },
                                                                     {
                                                                       kind: "branch",
                                                                       label:
+                                                                        "if (created instanceof Error)",
+                                                                      guard:
                                                                         "if (created instanceof Error)",
                                                                       at: 113,
                                                                       children:
@@ -831,11 +888,15 @@ export const generatedPromptFlow: Flow = {
                                                                     start: 104,
                                                                     end: 114,
                                                                   },
+                                                                  returns:
+                                                                    "void",
                                                                   at: 84,
                                                                 },
                                                                 {
                                                                   kind: "branch",
                                                                   label:
+                                                                    "if (created instanceof Error)",
+                                                                  guard:
                                                                     "if (created instanceof Error)",
                                                                   at: 88,
                                                                   children: [
@@ -866,6 +927,9 @@ export const generatedPromptFlow: Flow = {
                                                                             from: "gen:main:FilesystemService",
                                                                             to: "disk",
                                                                             name: "fsPromises.writeFile",
+                                                                            args: "path, data, options",
+                                                                            returns:
+                                                                              "void",
                                                                             carrier:
                                                                               "filesystem",
                                                                             at: 100,
@@ -886,6 +950,8 @@ export const generatedPromptFlow: Flow = {
                                                                                 start: 250,
                                                                                 end: 266,
                                                                               },
+                                                                            returns:
+                                                                              "FilesystemOperationError | FilesystemPathNotFoundError",
                                                                             at: 101,
                                                                           },
                                                                         ],
@@ -900,7 +966,12 @@ export const generatedPromptFlow: Flow = {
                                                                     start: 94,
                                                                     end: 102,
                                                                   },
+                                                                  returns:
+                                                                    "void",
                                                                   at: 91,
+                                                                  guards: [
+                                                                    "unless (created instanceof Error)",
+                                                                  ],
                                                                 },
                                                                 {
                                                                   kind: "frame",
@@ -916,11 +987,18 @@ export const generatedPromptFlow: Flow = {
                                                                     start: 59,
                                                                     end: 61,
                                                                   },
+                                                                  returns:
+                                                                    "string",
                                                                   at: 92,
+                                                                  guards: [
+                                                                    "unless (created instanceof Error)",
+                                                                  ],
                                                                 },
                                                                 {
                                                                   kind: "branch",
                                                                   label:
+                                                                    "if (written instanceof Error)",
+                                                                  guard:
                                                                     "if (written instanceof Error)",
                                                                   at: 96,
                                                                   children: [
@@ -933,6 +1011,9 @@ export const generatedPromptFlow: Flow = {
                                                                         [],
                                                                     },
                                                                   ],
+                                                                  guards: [
+                                                                    "unless (created instanceof Error)",
+                                                                  ],
                                                                 },
                                                               ],
                                                               service:
@@ -944,11 +1025,17 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 79,
                                                                 end: 97,
                                                               },
+                                                              returns: "void",
                                                               at: 48,
+                                                              guards: [
+                                                                "unless (this.user !== undefined)",
+                                                              ],
                                                             },
                                                             {
                                                               kind: "branch",
                                                               label:
+                                                                "if (written instanceof Error)",
+                                                              guard:
                                                                 "if (written instanceof Error)",
                                                               at: 53,
                                                               children: [
@@ -960,6 +1047,9 @@ export const generatedPromptFlow: Flow = {
                                                                   children: [],
                                                                 },
                                                               ],
+                                                              guards: [
+                                                                "unless (this.user !== undefined)",
+                                                              ],
                                                             },
                                                             {
                                                               kind: "return",
@@ -967,6 +1057,10 @@ export const generatedPromptFlow: Flow = {
                                                                 "return user",
                                                               at: 55,
                                                               children: [],
+                                                              guards: [
+                                                                "unless (this.user !== undefined)",
+                                                                "unless (written instanceof Error)",
+                                                              ],
                                                             },
                                                           ],
                                                           service:
@@ -978,11 +1072,17 @@ export const generatedPromptFlow: Flow = {
                                                             start: 33,
                                                             end: 56,
                                                           },
+                                                          returns: "User",
                                                           at: 45,
+                                                          guards: [
+                                                            "unless (layout instanceof Error)",
+                                                          ],
                                                         },
                                                         {
                                                           kind: "branch",
                                                           label:
+                                                            "if (user instanceof Error)",
+                                                          guard:
                                                             "if (user instanceof Error)",
                                                           at: 46,
                                                           children: [
@@ -994,10 +1094,15 @@ export const generatedPromptFlow: Flow = {
                                                               children: [],
                                                             },
                                                           ],
+                                                          guards: [
+                                                            "unless (layout instanceof Error)",
+                                                          ],
                                                         },
                                                         {
                                                           kind: "branch",
                                                           label:
+                                                            "if (this.runtime !== undefined && this.workspaceRoot === layout.root && thi…)",
+                                                          guard:
                                                             "if (this.runtime !== undefined && this.workspaceRoot === layout.root && thi…)",
                                                           at: 48,
                                                           children: [
@@ -1009,6 +1114,10 @@ export const generatedPromptFlow: Flow = {
                                                               children: [],
                                                             },
                                                           ],
+                                                          guards: [
+                                                            "unless (layout instanceof Error)",
+                                                            "unless (user instanceof Error)",
+                                                          ],
                                                         },
                                                         {
                                                           kind: "frame",
@@ -1016,6 +1125,8 @@ export const generatedPromptFlow: Flow = {
                                                             {
                                                               kind: "branch",
                                                               label:
+                                                                "if (runtime === undefined)",
+                                                              guard:
                                                                 "if (runtime === undefined)",
                                                               at: 93,
                                                               children: [
@@ -1041,6 +1152,8 @@ export const generatedPromptFlow: Flow = {
                                                                       kind: "branch",
                                                                       label:
                                                                         "if (executorClosed instanceof Error)",
+                                                                      guard:
+                                                                        "if (executorClosed instanceof Error)",
                                                                       at: 542,
                                                                       children:
                                                                         [
@@ -1058,6 +1171,8 @@ export const generatedPromptFlow: Flow = {
                                                                       kind: "branch",
                                                                       label:
                                                                         "if (pluginError instanceof Error)",
+                                                                      guard:
+                                                                        "if (pluginError instanceof Error)",
                                                                       at: 544,
                                                                       children:
                                                                         [
@@ -1070,6 +1185,9 @@ export const generatedPromptFlow: Flow = {
                                                                               [],
                                                                           },
                                                                         ],
+                                                                      guards: [
+                                                                        "unless (executorClosed instanceof Error)",
+                                                                      ],
                                                                     },
                                                                   ],
                                                                   service:
@@ -1081,8 +1199,13 @@ export const generatedPromptFlow: Flow = {
                                                                     start: 531,
                                                                     end: 550,
                                                                   },
+                                                                  returns:
+                                                                    "void",
                                                                   at: 94,
                                                                 },
+                                                              ],
+                                                              guards: [
+                                                                "unless (runtime === undefined)",
                                                               ],
                                                             },
                                                           ],
@@ -1095,11 +1218,19 @@ export const generatedPromptFlow: Flow = {
                                                             start: 80,
                                                             end: 95,
                                                           },
+                                                          returns: "void",
                                                           at: 56,
+                                                          guards: [
+                                                            "unless (layout instanceof Error)",
+                                                            "unless (user instanceof Error)",
+                                                            "unless (this.runtime !== undefined && this.workspaceRoot === layout.root && thi…)",
+                                                          ],
                                                         },
                                                         {
                                                           kind: "branch",
                                                           label:
+                                                            "if (closed instanceof Error)",
+                                                          guard:
                                                             "if (closed instanceof Error)",
                                                           at: 57,
                                                           children: [
@@ -1110,6 +1241,11 @@ export const generatedPromptFlow: Flow = {
                                                               at: 57,
                                                               children: [],
                                                             },
+                                                          ],
+                                                          guards: [
+                                                            "unless (layout instanceof Error)",
+                                                            "unless (user instanceof Error)",
+                                                            "unless (this.runtime !== undefined && this.workspaceRoot === layout.root && thi…)",
                                                           ],
                                                         },
                                                         {
@@ -1127,6 +1263,8 @@ export const generatedPromptFlow: Flow = {
                                                                     {
                                                                       kind: "branch",
                                                                       label:
+                                                                        "if (quickJsModule instanceof Error)",
+                                                                      guard:
                                                                         "if (quickJsModule instanceof Error)",
                                                                       at: 563,
                                                                       children:
@@ -1163,11 +1301,18 @@ export const generatedPromptFlow: Flow = {
                                                                         start: 9,
                                                                         end: 60,
                                                                       },
+                                                                      returns:
+                                                                        "CredentialProvider",
                                                                       at: 583,
+                                                                      guards: [
+                                                                        "unless (quickJsModule instanceof Error)",
+                                                                      ],
                                                                     },
                                                                     {
                                                                       kind: "branch",
                                                                       label:
+                                                                        "if (executor instanceof Error)",
+                                                                      guard:
                                                                         "if (executor instanceof Error)",
                                                                       at: 610,
                                                                       children:
@@ -1181,6 +1326,9 @@ export const generatedPromptFlow: Flow = {
                                                                               [],
                                                                           },
                                                                         ],
+                                                                      guards: [
+                                                                        "unless (quickJsModule instanceof Error)",
+                                                                      ],
                                                                     },
                                                                     {
                                                                       kind: "frame",
@@ -1189,6 +1337,8 @@ export const generatedPromptFlow: Flow = {
                                                                           {
                                                                             kind: "branch",
                                                                             label:
+                                                                              "if (installableGooglePresets.length !== googlePresets.length)",
+                                                                            guard:
                                                                               "if (installableGooglePresets.length !== googlePresets.length)",
                                                                             at: 674,
                                                                             children:
@@ -1207,6 +1357,8 @@ export const generatedPromptFlow: Flow = {
                                                                             kind: "branch",
                                                                             label:
                                                                               "if (existing instanceof Error)",
+                                                                            guard:
+                                                                              "if (existing instanceof Error)",
                                                                             at: 691,
                                                                             children:
                                                                               [
@@ -1219,10 +1371,16 @@ export const generatedPromptFlow: Flow = {
                                                                                     [],
                                                                                 },
                                                                               ],
+                                                                            guards:
+                                                                              [
+                                                                                "unless (installableGooglePresets.length !== googlePresets.length)",
+                                                                              ],
                                                                           },
                                                                           {
                                                                             kind: "branch",
                                                                             label:
+                                                                              "if (added instanceof Error)",
+                                                                            guard:
                                                                               "if (added instanceof Error)",
                                                                             at: 715,
                                                                             children:
@@ -1236,6 +1394,11 @@ export const generatedPromptFlow: Flow = {
                                                                                     [],
                                                                                 },
                                                                               ],
+                                                                            guards:
+                                                                              [
+                                                                                "unless (installableGooglePresets.length !== googlePresets.length)",
+                                                                                "unless (existing instanceof Error)",
+                                                                              ],
                                                                           },
                                                                         ],
                                                                       service:
@@ -1247,11 +1410,19 @@ export const generatedPromptFlow: Flow = {
                                                                         start: 673,
                                                                         end: 717,
                                                                       },
+                                                                      returns:
+                                                                        "void",
                                                                       at: 612,
+                                                                      guards: [
+                                                                        "unless (quickJsModule instanceof Error)",
+                                                                        "unless (executor instanceof Error)",
+                                                                      ],
                                                                     },
                                                                     {
                                                                       kind: "branch",
                                                                       label:
+                                                                        "if (installed instanceof Error)",
+                                                                      guard:
                                                                         "if (installed instanceof Error)",
                                                                       at: 613,
                                                                       children:
@@ -1265,6 +1436,10 @@ export const generatedPromptFlow: Flow = {
                                                                               [],
                                                                           },
                                                                         ],
+                                                                      guards: [
+                                                                        "unless (quickJsModule instanceof Error)",
+                                                                        "unless (executor instanceof Error)",
+                                                                      ],
                                                                     },
                                                                     {
                                                                       kind: "return",
@@ -1296,9 +1471,16 @@ export const generatedPromptFlow: Flow = {
                                                                                 start: 218,
                                                                                 end: 245,
                                                                               },
+                                                                            returns:
+                                                                              'Map<string, { client: string & Brand<"OAuthClie…',
                                                                             at: 638,
                                                                           },
                                                                         ],
+                                                                      guards: [
+                                                                        "unless (quickJsModule instanceof Error)",
+                                                                        "unless (executor instanceof Error)",
+                                                                        "unless (installed instanceof Error)",
+                                                                      ],
                                                                     },
                                                                   ],
                                                                   service:
@@ -1310,6 +1492,8 @@ export const generatedPromptFlow: Flow = {
                                                                     start: 553,
                                                                     end: 640,
                                                                   },
+                                                                  returns:
+                                                                    "ToolRuntime",
                                                                   at: 319,
                                                                 },
                                                               ],
@@ -1324,11 +1508,21 @@ export const generatedPromptFlow: Flow = {
                                                             start: 318,
                                                             end: 320,
                                                           },
+                                                          returns:
+                                                            "ToolRuntime",
                                                           at: 64,
+                                                          guards: [
+                                                            "unless (layout instanceof Error)",
+                                                            "unless (user instanceof Error)",
+                                                            "unless (this.runtime !== undefined && this.workspaceRoot === layout.root && thi…)",
+                                                            "unless (closed instanceof Error)",
+                                                          ],
                                                         },
                                                         {
                                                           kind: "branch",
                                                           label:
+                                                            "if (runtime instanceof Error)",
+                                                          guard:
                                                             "if (runtime instanceof Error)",
                                                           at: 73,
                                                           children: [
@@ -1340,6 +1534,12 @@ export const generatedPromptFlow: Flow = {
                                                               children: [],
                                                             },
                                                           ],
+                                                          guards: [
+                                                            "unless (layout instanceof Error)",
+                                                            "unless (user instanceof Error)",
+                                                            "unless (this.runtime !== undefined && this.workspaceRoot === layout.root && thi…)",
+                                                            "unless (closed instanceof Error)",
+                                                          ],
                                                         },
                                                         {
                                                           kind: "return",
@@ -1347,6 +1547,13 @@ export const generatedPromptFlow: Flow = {
                                                             "return runtime",
                                                           at: 77,
                                                           children: [],
+                                                          guards: [
+                                                            "unless (layout instanceof Error)",
+                                                            "unless (user instanceof Error)",
+                                                            "unless (this.runtime !== undefined && this.workspaceRoot === layout.root && thi…)",
+                                                            "unless (closed instanceof Error)",
+                                                            "unless (runtime instanceof Error)",
+                                                          ],
                                                         },
                                                       ],
                                                       service:
@@ -1358,11 +1565,14 @@ export const generatedPromptFlow: Flow = {
                                                         start: 42,
                                                         end: 78,
                                                       },
+                                                      returns: "ToolRuntime",
                                                       at: 144,
                                                     },
                                                     {
                                                       kind: "branch",
                                                       label:
+                                                        "if (runtime instanceof Error)",
+                                                      guard:
                                                         "if (runtime instanceof Error)",
                                                       at: 145,
                                                       children: [
@@ -1382,6 +1592,8 @@ export const generatedPromptFlow: Flow = {
                                                           kind: "branch",
                                                           label:
                                                             "if (executorDescription instanceof Error)",
+                                                          guard:
+                                                            "if (executorDescription instanceof Error)",
                                                           at: 347,
                                                           children: [
                                                             {
@@ -1397,6 +1609,8 @@ export const generatedPromptFlow: Flow = {
                                                           kind: "branch",
                                                           label:
                                                             "if (inventoryStart === -1)",
+                                                          guard:
+                                                            "if (inventoryStart === -1)",
                                                           at: 356,
                                                           children: [
                                                             {
@@ -1407,6 +1621,9 @@ export const generatedPromptFlow: Flow = {
                                                               children: [],
                                                             },
                                                           ],
+                                                          guards: [
+                                                            "unless (executorDescription instanceof Error)",
+                                                          ],
                                                         },
                                                         {
                                                           kind: "return",
@@ -1414,6 +1631,10 @@ export const generatedPromptFlow: Flow = {
                                                             "return `${prefix}\\n\\n${executorDescription.slice(inventoryStart)}`",
                                                           at: 357,
                                                           children: [],
+                                                          guards: [
+                                                            "unless (executorDescription instanceof Error)",
+                                                            "unless (inventoryStart === -1)",
+                                                          ],
                                                         },
                                                       ],
                                                       service:
@@ -1425,11 +1646,17 @@ export const generatedPromptFlow: Flow = {
                                                         start: 340,
                                                         end: 358,
                                                       },
+                                                      returns: "string",
                                                       at: 146,
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                      ],
                                                     },
                                                     {
                                                       kind: "branch",
                                                       label:
+                                                        "if (runtimeDescription instanceof Error)",
+                                                      guard:
                                                         "if (runtimeDescription instanceof Error)",
                                                       at: 147,
                                                       children: [
@@ -1440,6 +1667,9 @@ export const generatedPromptFlow: Flow = {
                                                           at: 147,
                                                           children: [],
                                                         },
+                                                      ],
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
                                                       ],
                                                     },
                                                     {
@@ -1460,6 +1690,9 @@ export const generatedPromptFlow: Flow = {
                                                                   from: "gen:main:mauiSkillsDirectory",
                                                                   to: "disk",
                                                                   name: "existsSync",
+                                                                  args: "bundled",
+                                                                  returns:
+                                                                    "boolean",
                                                                   carrier:
                                                                     "filesystem",
                                                                   at: 13,
@@ -1467,6 +1700,8 @@ export const generatedPromptFlow: Flow = {
                                                                 {
                                                                   kind: "branch",
                                                                   label:
+                                                                    "if (existsSync(bundled))",
+                                                                  guard:
                                                                     "if (existsSync(bundled))",
                                                                   at: 13,
                                                                   children: [
@@ -1486,6 +1721,9 @@ export const generatedPromptFlow: Flow = {
                                                                     'return join(dirname(require.resolve("maui/package.json")), "skills")',
                                                                   at: 16,
                                                                   children: [],
+                                                                  guards: [
+                                                                    "unless (existsSync(bundled))",
+                                                                  ],
                                                                 },
                                                               ],
                                                               service:
@@ -1497,6 +1735,7 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 8,
                                                                 end: 17,
                                                               },
+                                                              returns: "string",
                                                               at: 64,
                                                             },
                                                           ],
@@ -1511,25 +1750,47 @@ export const generatedPromptFlow: Flow = {
                                                         start: 60,
                                                         end: 67,
                                                       },
+                                                      returns:
+                                                        "DefaultResourceLoader",
                                                       at: 149,
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                      ],
                                                     },
                                                     {
-                                                      kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:DefaultResourceLoader",
-                                                      entry:
-                                                        "DefaultResourceLoader.reload",
-                                                      source: {
-                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.d.ts",
-                                                        start: 195,
-                                                        end: 195,
-                                                      },
+                                                      kind: "event",
+                                                      children: [
+                                                        {
+                                                          kind: "frame",
+                                                          children: [],
+                                                          service: "pi",
+                                                          entry:
+                                                            "DefaultResourceLoader.reload",
+                                                          source: {
+                                                            path: "node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.d.ts",
+                                                            start: 195,
+                                                            end: 195,
+                                                          },
+                                                          returns: "void",
+                                                        },
+                                                      ],
+                                                      from: "gen:main:HaloAgentSession",
+                                                      to: "pi",
+                                                      name: "DefaultResourceLoader.reload",
+                                                      returns: "void",
+                                                      carrier: "memory",
                                                       at: 154,
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                      ],
                                                     },
                                                     {
                                                       kind: "branch",
                                                       label:
+                                                        "if (reloaded instanceof Error)",
+                                                      guard:
                                                         "if (reloaded instanceof Error)",
                                                       at: 156,
                                                       children: [
@@ -1541,40 +1802,78 @@ export const generatedPromptFlow: Flow = {
                                                           children: [],
                                                         },
                                                       ],
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                      ],
                                                     },
                                                     {
-                                                      kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:registerBunOAuthFlows",
-                                                      entry:
-                                                        "registerBunOAuthFlows",
-                                                      summary:
-                                                        "Register OAuth flows statically embedded in the standalone Bun binary.",
-                                                      source: {
-                                                        path: "node_modules/@earendil-works/pi-ai/dist/bun-oauth.d.ts",
-                                                        start: 2,
-                                                        end: 2,
-                                                      },
+                                                      kind: "event",
+                                                      children: [
+                                                        {
+                                                          kind: "frame",
+                                                          children: [],
+                                                          service: "pi",
+                                                          entry:
+                                                            "registerBunOAuthFlows",
+                                                          summary:
+                                                            "Register OAuth flows statically embedded in the standalone Bun binary.",
+                                                          source: {
+                                                            path: "node_modules/@earendil-works/pi-ai/dist/bun-oauth.d.ts",
+                                                            start: 2,
+                                                            end: 2,
+                                                          },
+                                                          returns: "void",
+                                                        },
+                                                      ],
+                                                      from: "gen:main:HaloAgentSession",
+                                                      to: "pi",
+                                                      name: "registerBunOAuthFlows",
+                                                      returns: "void",
+                                                      carrier: "memory",
                                                       at: 157,
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                      ],
                                                     },
                                                     {
-                                                      kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:ModelRuntime",
-                                                      entry:
-                                                        "ModelRuntime.create",
-                                                      source: {
-                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.d.ts",
-                                                        start: 38,
-                                                        end: 38,
-                                                      },
+                                                      kind: "event",
+                                                      children: [
+                                                        {
+                                                          kind: "frame",
+                                                          children: [],
+                                                          service: "pi",
+                                                          entry:
+                                                            "ModelRuntime.create",
+                                                          source: {
+                                                            path: "node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.d.ts",
+                                                            start: 38,
+                                                            end: 38,
+                                                          },
+                                                          returns:
+                                                            "ModelRuntime",
+                                                        },
+                                                      ],
+                                                      from: "gen:main:HaloAgentSession",
+                                                      to: "pi",
+                                                      name: "ModelRuntime.create",
+                                                      args: '{ modelsPath: join(layout.agentDir, "mo…',
+                                                      returns: "ModelRuntime",
+                                                      carrier: "memory",
                                                       at: 158,
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                      ],
                                                     },
                                                     {
                                                       kind: "branch",
                                                       label:
+                                                        "if (modelRuntime instanceof Error)",
+                                                      guard:
                                                         "if (modelRuntime instanceof Error)",
                                                       at: 161,
                                                       children: [
@@ -1586,24 +1885,50 @@ export const generatedPromptFlow: Flow = {
                                                           children: [],
                                                         },
                                                       ],
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                      ],
                                                     },
                                                     {
-                                                      kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:ModelRuntime",
-                                                      entry:
-                                                        "ModelRuntime.getModels",
-                                                      source: {
-                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.d.ts",
-                                                        start: 52,
-                                                        end: 52,
-                                                      },
+                                                      kind: "event",
+                                                      children: [
+                                                        {
+                                                          kind: "frame",
+                                                          children: [],
+                                                          service: "pi",
+                                                          entry:
+                                                            "ModelRuntime.getModels",
+                                                          source: {
+                                                            path: "node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.d.ts",
+                                                            start: 52,
+                                                            end: 52,
+                                                          },
+                                                          returns:
+                                                            "readonly Model<Api>[]",
+                                                        },
+                                                      ],
+                                                      from: "gen:main:HaloAgentSession",
+                                                      to: "pi",
+                                                      name: "ModelRuntime.getModels",
+                                                      args: '"openai-codex"',
+                                                      returns:
+                                                        "readonly Model<Api>[]",
+                                                      carrier: "memory",
                                                       at: 163,
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                        "unless (modelRuntime instanceof Error)",
+                                                      ],
                                                     },
                                                     {
                                                       kind: "branch",
                                                       label:
+                                                        "if (model === undefined)",
+                                                      guard:
                                                         "if (model === undefined)",
                                                       at: 165,
                                                       children: [
@@ -1615,22 +1940,48 @@ export const generatedPromptFlow: Flow = {
                                                           children: [],
                                                         },
                                                       ],
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                        "unless (modelRuntime instanceof Error)",
+                                                      ],
                                                     },
                                                     {
-                                                      kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:createAgentSession",
-                                                      entry:
-                                                        "createAgentSession",
-                                                      summary:
-                                                        "Create an AgentSession with the specified options.",
-                                                      source: {
-                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.d.ts",
-                                                        start: 105,
-                                                        end: 105,
-                                                      },
+                                                      kind: "event",
+                                                      children: [
+                                                        {
+                                                          kind: "frame",
+                                                          children: [],
+                                                          service: "pi",
+                                                          entry:
+                                                            "createAgentSession",
+                                                          summary:
+                                                            "Create an AgentSession with the specified options.",
+                                                          source: {
+                                                            path: "node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.d.ts",
+                                                            start: 105,
+                                                            end: 105,
+                                                          },
+                                                          returns:
+                                                            "CreateAgentSessionResult",
+                                                        },
+                                                      ],
+                                                      from: "gen:main:HaloAgentSession",
+                                                      to: "pi",
+                                                      name: "createAgentSession",
+                                                      args: "{ cwd: layout.root, agentDir: layout.ag…",
+                                                      returns:
+                                                        "CreateAgentSessionResult",
+                                                      carrier: "memory",
                                                       at: 170,
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                        "unless (modelRuntime instanceof Error)",
+                                                        "unless (model === undefined)",
+                                                      ],
                                                     },
                                                     {
                                                       kind: "frame",
@@ -1661,6 +2012,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 81,
                                                                 end: 93,
                                                               },
+                                                              returns:
+                                                                "AgentTool<TParameters, TDetails>",
                                                               at: 45,
                                                             },
                                                             {
@@ -1683,6 +2036,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 118,
                                                                 end: 136,
                                                               },
+                                                              returns:
+                                                                "AgentTool<TObject<{ path: TString; offset: TOpt…",
                                                               at: 46,
                                                             },
                                                             {
@@ -1705,6 +2060,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 73,
                                                                 end: 79,
                                                               },
+                                                              returns:
+                                                                "Authorization",
                                                               at: 48,
                                                             },
                                                             {
@@ -1721,6 +2078,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 81,
                                                                 end: 93,
                                                               },
+                                                              returns:
+                                                                "AgentTool<TParameters, TDetails>",
                                                               at: 50,
                                                             },
                                                             {
@@ -1743,6 +2102,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 138,
                                                                 end: 156,
                                                               },
+                                                              returns:
+                                                                "AgentTool<TObject<{ path: TString; oldText: TSt…",
                                                               at: 51,
                                                             },
                                                             {
@@ -1759,6 +2120,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 73,
                                                                 end: 79,
                                                               },
+                                                              returns:
+                                                                "Authorization",
                                                               at: 53,
                                                             },
                                                             {
@@ -1775,6 +2138,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 81,
                                                                 end: 93,
                                                               },
+                                                              returns:
+                                                                "AgentTool<TParameters, TDetails>",
                                                               at: 55,
                                                             },
                                                             {
@@ -1797,6 +2162,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 158,
                                                                 end: 176,
                                                               },
+                                                              returns:
+                                                                "AgentTool<TObject<{ path: TString; content: TSt…",
                                                               at: 56,
                                                             },
                                                             {
@@ -1813,6 +2180,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 73,
                                                                 end: 79,
                                                               },
+                                                              returns:
+                                                                "Authorization",
                                                               at: 58,
                                                             },
                                                             {
@@ -1829,6 +2198,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 81,
                                                                 end: 93,
                                                               },
+                                                              returns:
+                                                                "AgentTool<TParameters, TDetails>",
                                                               at: 60,
                                                             },
                                                             {
@@ -1851,6 +2222,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 95,
                                                                 end: 116,
                                                               },
+                                                              returns:
+                                                                "AgentTool<TObject<{ patchText: TString; }>, { a…",
                                                               at: 61,
                                                             },
                                                             {
@@ -1867,6 +2240,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 73,
                                                                 end: 79,
                                                               },
+                                                              returns:
+                                                                "Authorization",
                                                               at: 63,
                                                             },
                                                             {
@@ -1883,20 +2258,35 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 81,
                                                                 end: 93,
                                                               },
+                                                              returns:
+                                                                "AgentTool<TParameters, TDetails>",
                                                               at: 65,
                                                             },
                                                             {
-                                                              kind: "frame",
-                                                              children: [],
-                                                              service:
-                                                                "gen:main:createBashTool",
-                                                              entry:
-                                                                "createBashTool",
-                                                              source: {
-                                                                path: "node_modules/@earendil-works/pi-coding-agent/dist/core/tools/bash.d.ts",
-                                                                start: 68,
-                                                                end: 68,
-                                                              },
+                                                              kind: "event",
+                                                              children: [
+                                                                {
+                                                                  kind: "frame",
+                                                                  children: [],
+                                                                  service: "pi",
+                                                                  entry:
+                                                                    "createBashTool",
+                                                                  source: {
+                                                                    path: "node_modules/@earendil-works/pi-coding-agent/dist/core/tools/bash.d.ts",
+                                                                    start: 68,
+                                                                    end: 68,
+                                                                  },
+                                                                  returns:
+                                                                    "AgentTool<TObject<{ command: TString; timeout: …",
+                                                                },
+                                                              ],
+                                                              from: "gen:main:createAuthorizedCodingTools",
+                                                              to: "pi",
+                                                              name: "createBashTool",
+                                                              args: "input.cwd",
+                                                              returns:
+                                                                "AgentTool<TObject<{ command: TString; timeout: …",
+                                                              carrier: "memory",
                                                               at: 66,
                                                             },
                                                             {
@@ -1913,6 +2303,8 @@ export const generatedPromptFlow: Flow = {
                                                                 start: 73,
                                                                 end: 79,
                                                               },
+                                                              returns:
+                                                                "Authorization",
                                                               at: 68,
                                                             },
                                                           ],
@@ -1927,7 +2319,16 @@ export const generatedPromptFlow: Flow = {
                                                         start: 39,
                                                         end: 71,
                                                       },
+                                                      returns:
+                                                        "readonly [AgentTool<TObject<{ path: TString; of…",
                                                       at: 178,
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                        "unless (modelRuntime instanceof Error)",
+                                                        "unless (model === undefined)",
+                                                      ],
                                                     },
                                                     {
                                                       kind: "frame",
@@ -1948,11 +2349,22 @@ export const generatedPromptFlow: Flow = {
                                                         start: 13,
                                                         end: 54,
                                                       },
+                                                      returns:
+                                                        "ToolDefinition<TSchema, unknown, any>",
                                                       at: 183,
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                        "unless (modelRuntime instanceof Error)",
+                                                        "unless (model === undefined)",
+                                                      ],
                                                     },
                                                     {
                                                       kind: "branch",
                                                       label:
+                                                        "if (created instanceof Error)",
+                                                      guard:
                                                         "if (created instanceof Error)",
                                                       at: 187,
                                                       children: [
@@ -1964,6 +2376,13 @@ export const generatedPromptFlow: Flow = {
                                                           children: [],
                                                         },
                                                       ],
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                        "unless (modelRuntime instanceof Error)",
+                                                        "unless (model === undefined)",
+                                                      ],
                                                     },
                                                     {
                                                       kind: "return",
@@ -1971,6 +2390,14 @@ export const generatedPromptFlow: Flow = {
                                                         "return new HaloAgentSession(created.session)",
                                                       at: 188,
                                                       children: [],
+                                                      guards: [
+                                                        "unless (runtime instanceof Error)",
+                                                        "unless (runtimeDescription instanceof Error)",
+                                                        "unless (reloaded instanceof Error)",
+                                                        "unless (modelRuntime instanceof Error)",
+                                                        "unless (model === undefined)",
+                                                        "unless (created instanceof Error)",
+                                                      ],
                                                     },
                                                   ],
                                                   service:
@@ -1982,8 +2409,15 @@ export const generatedPromptFlow: Flow = {
                                                     start: 139,
                                                     end: 189,
                                                   },
+                                                  returns: "HaloAgentSession",
                                                   at: 123,
                                                 },
+                                              ],
+                                              guards: [
+                                                "unless (layout instanceof Error)",
+                                                "unless (sessions instanceof Error)",
+                                                "unless (session === undefined)",
+                                                "unless (manager instanceof Error)",
                                               ],
                                             },
                                           ],
@@ -1994,11 +2428,14 @@ export const generatedPromptFlow: Flow = {
                                             start: 100,
                                             end: 124,
                                           },
+                                          returns: "HaloAgentSession",
                                           at: 66,
                                         },
                                         {
                                           kind: "branch",
                                           label:
+                                            "if (session instanceof Error)",
+                                          guard:
                                             "if (session instanceof Error)",
                                           at: 70,
                                           children: [
@@ -2020,13 +2457,20 @@ export const generatedPromptFlow: Flow = {
                                             start: 75,
                                             end: 77,
                                           },
+                                          returns: "void",
                                           at: 71,
+                                          guards: [
+                                            "unless (session instanceof Error)",
+                                          ],
                                         },
                                         {
                                           kind: "return",
                                           label: "return session",
                                           at: 72,
                                           children: [],
+                                          guards: [
+                                            "unless (session instanceof Error)",
+                                          ],
                                         },
                                       ],
                                       service: "gen:main:SessionRegistry",
@@ -2036,13 +2480,22 @@ export const generatedPromptFlow: Flow = {
                                         start: 65,
                                         end: 73,
                                       },
+                                      returns: "HaloAgentSession",
                                       at: 37,
+                                      guards: [
+                                        "unless (live !== undefined)",
+                                        "unless (pending !== undefined)",
+                                      ],
                                     },
                                     {
                                       kind: "return",
                                       label: "return session",
                                       at: 41,
                                       children: [],
+                                      guards: [
+                                        "unless (live !== undefined)",
+                                        "unless (pending !== undefined)",
+                                      ],
                                     },
                                   ],
                                   service: "gen:main:SessionRegistry",
@@ -2052,11 +2505,13 @@ export const generatedPromptFlow: Flow = {
                                     start: 31,
                                     end: 42,
                                   },
+                                  returns: "HaloAgentSession",
                                   at: 57,
                                 },
                                 {
                                   kind: "branch",
                                   label: "if (session instanceof Error)",
+                                  guard: "if (session instanceof Error)",
                                   at: 58,
                                   children: [
                                     {
@@ -2083,6 +2538,8 @@ export const generatedPromptFlow: Flow = {
                                             start: 4,
                                             end: 9,
                                           },
+                                          returns:
+                                            'ORPCError<"BAD_REQUEST", unknown>',
                                           at: 58,
                                         },
                                       ],
@@ -2095,6 +2552,7 @@ export const generatedPromptFlow: Flow = {
                                     {
                                       kind: "branch",
                                       label: "if (text.trim().length === 0)",
+                                      guard: "if (text.trim().length === 0)",
                                       at: 203,
                                       children: [
                                         {
@@ -2107,21 +2565,38 @@ export const generatedPromptFlow: Flow = {
                                       ],
                                     },
                                     {
-                                      kind: "frame",
-                                      children: [],
-                                      service: "gen:main:AgentSession",
-                                      entry: "AgentSession.prompt",
-                                      summary: "Send a prompt to the agent.",
-                                      source: {
-                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.d.ts",
-                                        start: 364,
-                                        end: 364,
-                                      },
+                                      kind: "event",
+                                      children: [
+                                        {
+                                          kind: "frame",
+                                          children: [],
+                                          service: "pi",
+                                          entry: "AgentSession.prompt",
+                                          summary:
+                                            "Send a prompt to the agent.",
+                                          source: {
+                                            path: "node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.d.ts",
+                                            start: 364,
+                                            end: 364,
+                                          },
+                                          returns: "void",
+                                        },
+                                      ],
+                                      from: "gen:main:HaloAgentSession",
+                                      to: "pi",
+                                      name: "AgentSession.prompt",
+                                      args: 'text, { streamingBehavior: "steer" }',
+                                      returns: "void",
+                                      carrier: "memory",
                                       at: 205,
+                                      guards: [
+                                        "unless (text.trim().length === 0)",
+                                      ],
                                     },
                                     {
                                       kind: "branch",
                                       label: "if (prompted instanceof Error)",
+                                      guard: "if (prompted instanceof Error)",
                                       at: 213,
                                       children: [
                                         {
@@ -2130,6 +2605,9 @@ export const generatedPromptFlow: Flow = {
                                           at: 213,
                                           children: [],
                                         },
+                                      ],
+                                      guards: [
+                                        "unless (text.trim().length === 0)",
                                       ],
                                     },
                                   ],
@@ -2140,11 +2618,14 @@ export const generatedPromptFlow: Flow = {
                                     start: 202,
                                     end: 214,
                                   },
+                                  returns: "void",
                                   at: 59,
+                                  guards: ["unless (session instanceof Error)"],
                                 },
                                 {
                                   kind: "branch",
                                   label: "if (prompted instanceof Error)",
+                                  guard: "if (prompted instanceof Error)",
                                   at: 60,
                                   children: [
                                     {
@@ -2164,11 +2645,14 @@ export const generatedPromptFlow: Flow = {
                                             start: 4,
                                             end: 9,
                                           },
+                                          returns:
+                                            'ORPCError<"BAD_REQUEST", unknown>',
                                           at: 60,
                                         },
                                       ],
                                     },
                                   ],
+                                  guards: ["unless (session instanceof Error)"],
                                 },
                               ],
                               service: "gen:main:sessionsRouter",
@@ -2178,254 +2662,332 @@ export const generatedPromptFlow: Flow = {
                                 start: 51,
                                 end: 61,
                               },
+                              returns: "void",
                             },
-                          ],
-                          from: "gen:renderer:useAgentSession",
-                          to: "gen:main:sessionsRouter",
-                          name: "sessions.prompt",
-                          carrier: "rpc",
-                          at: 97,
-                        },
-                        {
-                          kind: "branch",
-                          label: "if (result instanceof PromptFailedError)",
-                          at: 106,
-                          children: [
                             {
-                              kind: "return",
-                              label: "return result",
-                              at: 112,
-                              children: [],
-                            },
-                          ],
-                        },
-                        {
-                          kind: "frame",
-                          children: [
-                            {
-                              kind: "frame",
+                              kind: "reply",
+                              from: "gen:main:sessionsRouter",
+                              to: "gen:renderer:useAgentSession",
+                              carrier: "rpc",
+                              value: "void",
+                              at: 97,
                               children: [
                                 {
-                                  kind: "return",
-                                  label: "return useContext(ApiContext).api",
-                                  at: 94,
-                                  children: [],
+                                  kind: "branch",
+                                  label:
+                                    "if (result instanceof PromptFailedError)",
+                                  guard:
+                                    "if (result instanceof PromptFailedError)",
+                                  at: 106,
+                                  children: [
+                                    {
+                                      kind: "return",
+                                      label: "return result",
+                                      at: 112,
+                                      children: [],
+                                    },
+                                  ],
+                                  guards: [
+                                    "unless (readySessionId === undefined)",
+                                  ],
                                 },
-                              ],
-                              service: "gen:renderer:useApi",
-                              entry: "useApi",
-                              source: {
-                                path: "apps/electron/src/renderer/api/ApiProvider.tsx",
-                                start: 93,
-                                end: 95,
-                              },
-                              at: 118,
-                            },
-                            {
-                              kind: "return",
-                              label:
-                                'return useQuery({ queryKey: ["sessions", workspaceRoot], queryFn: () => api.se…',
-                              at: 124,
-                              children: [
                                 {
-                                  kind: "event",
+                                  kind: "frame",
                                   children: [
                                     {
                                       kind: "frame",
                                       children: [
                                         {
-                                          kind: "frame",
+                                          kind: "return",
+                                          label:
+                                            "return useContext(ApiContext).api",
+                                          at: 94,
+                                          children: [],
+                                        },
+                                      ],
+                                      service: "gen:renderer:useApi",
+                                      entry: "useApi",
+                                      source: {
+                                        path: "apps/electron/src/renderer/api/ApiProvider.tsx",
+                                        start: 93,
+                                        end: 95,
+                                      },
+                                      returns:
+                                        "{ getAppInfo: ProcedureContractClient<object, I…",
+                                      at: 118,
+                                    },
+                                    {
+                                      kind: "return",
+                                      label:
+                                        'return useQuery({ queryKey: ["sessions", workspaceRoot], queryFn: () => api.se…',
+                                      at: 124,
+                                      children: [
+                                        {
+                                          kind: "event",
                                           children: [
                                             {
-                                              kind: "return",
-                                              label:
-                                                "return HaloAgentSession.list(this.options)",
-                                              at: 21,
+                                              kind: "frame",
                                               children: [
                                                 {
                                                   kind: "frame",
                                                   children: [
                                                     {
-                                                      kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:WorkspaceService",
-                                                      entry:
-                                                        "WorkspaceService.getLayout",
-                                                      summary:
-                                                        "Walked above; same calls.",
-                                                      source: {
-                                                        path: "packages/server/src/workspace/WorkspaceService.ts",
-                                                        start: 189,
-                                                        end: 192,
-                                                      },
-                                                      at: 127,
-                                                    },
-                                                    {
-                                                      kind: "branch",
-                                                      label:
-                                                        "if (layout instanceof Error)",
-                                                      at: 128,
-                                                      children: [
-                                                        {
-                                                          kind: "return",
-                                                          label:
-                                                            "return layout",
-                                                          at: 128,
-                                                          children: [],
-                                                        },
-                                                      ],
-                                                    },
-                                                    {
-                                                      kind: "frame",
-                                                      children: [],
-                                                      service:
-                                                        "gen:main:SessionManager",
-                                                      entry:
-                                                        "SessionManager.list",
-                                                      summary:
-                                                        "List all sessions for a directory.",
-                                                      source: {
-                                                        path: "node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.d.ts",
-                                                        start: 348,
-                                                        end: 348,
-                                                      },
-                                                      at: 129,
-                                                    },
-                                                    {
-                                                      kind: "branch",
-                                                      label:
-                                                        "if (sessions instanceof Error)",
-                                                      at: 133,
-                                                      children: [
-                                                        {
-                                                          kind: "return",
-                                                          label:
-                                                            "return sessions",
-                                                          at: 133,
-                                                          children: [],
-                                                        },
-                                                      ],
-                                                    },
-                                                    {
                                                       kind: "return",
                                                       label:
-                                                        "return sessions .map((session) => sessionSummary(session)) .toSorted((left, ri…",
-                                                      at: 134,
+                                                        "return HaloAgentSession.list(this.options)",
+                                                      at: 21,
                                                       children: [
                                                         {
                                                           kind: "frame",
                                                           children: [
                                                             {
+                                                              kind: "frame",
+                                                              children: [],
+                                                              service:
+                                                                "gen:main:WorkspaceService",
+                                                              entry:
+                                                                "WorkspaceService.getLayout",
+                                                              summary:
+                                                                "Walked above; same calls.",
+                                                              source: {
+                                                                path: "packages/server/src/workspace/WorkspaceService.ts",
+                                                                start: 189,
+                                                                end: 192,
+                                                              },
+                                                              returns:
+                                                                "WorkspaceLayout",
+                                                              at: 127,
+                                                            },
+                                                            {
+                                                              kind: "branch",
+                                                              label:
+                                                                "if (layout instanceof Error)",
+                                                              guard:
+                                                                "if (layout instanceof Error)",
+                                                              at: 128,
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    "return layout",
+                                                                  at: 128,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                            },
+                                                            {
+                                                              kind: "event",
+                                                              children: [
+                                                                {
+                                                                  kind: "frame",
+                                                                  children: [],
+                                                                  service: "pi",
+                                                                  entry:
+                                                                    "SessionManager.list",
+                                                                  summary:
+                                                                    "List all sessions for a directory.",
+                                                                  source: {
+                                                                    path: "node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.d.ts",
+                                                                    start: 348,
+                                                                    end: 348,
+                                                                  },
+                                                                  returns:
+                                                                    "SessionInfo[]",
+                                                                },
+                                                              ],
+                                                              from: "gen:main:HaloAgentSession",
+                                                              to: "pi",
+                                                              name: "SessionManager.list",
+                                                              args: "layout.root, layout.sessionDir",
+                                                              returns:
+                                                                "SessionInfo[]",
+                                                              carrier: "memory",
+                                                              at: 129,
+                                                              guards: [
+                                                                "unless (layout instanceof Error)",
+                                                              ],
+                                                            },
+                                                            {
+                                                              kind: "branch",
+                                                              label:
+                                                                "if (sessions instanceof Error)",
+                                                              guard:
+                                                                "if (sessions instanceof Error)",
+                                                              at: 133,
+                                                              children: [
+                                                                {
+                                                                  kind: "return",
+                                                                  label:
+                                                                    "return sessions",
+                                                                  at: 133,
+                                                                  children: [],
+                                                                },
+                                                              ],
+                                                              guards: [
+                                                                "unless (layout instanceof Error)",
+                                                              ],
+                                                            },
+                                                            {
                                                               kind: "return",
                                                               label:
-                                                                'return { sessionId: session.id, agent: "pi", cwd: session.cwd, title: title.tr…',
-                                                              at: 252,
-                                                              children: [],
+                                                                "return sessions .map((session) => sessionSummary(session)) .toSorted((left, ri…",
+                                                              at: 134,
+                                                              children: [
+                                                                {
+                                                                  kind: "frame",
+                                                                  children: [
+                                                                    {
+                                                                      kind: "return",
+                                                                      label:
+                                                                        'return { sessionId: session.id, agent: "pi", cwd: session.cwd, title: title.tr…',
+                                                                      at: 252,
+                                                                      children:
+                                                                        [],
+                                                                    },
+                                                                  ],
+                                                                  service:
+                                                                    "gen:main:sessionSummary",
+                                                                  entry:
+                                                                    "sessionSummary",
+                                                                  source: {
+                                                                    path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                                    start: 249,
+                                                                    end: 260,
+                                                                  },
+                                                                  returns:
+                                                                    "SessionSummary",
+                                                                  at: 135,
+                                                                },
+                                                              ],
+                                                              guards: [
+                                                                "unless (layout instanceof Error)",
+                                                                "unless (sessions instanceof Error)",
+                                                              ],
                                                             },
                                                           ],
                                                           service:
-                                                            "gen:main:sessionSummary",
+                                                            "gen:main:HaloAgentSession",
                                                           entry:
-                                                            "sessionSummary",
+                                                            "HaloAgentSession.list",
                                                           source: {
                                                             path: "packages/server/src/agent/HaloAgentSession.ts",
-                                                            start: 249,
-                                                            end: 260,
+                                                            start: 126,
+                                                            end: 137,
                                                           },
-                                                          at: 135,
+                                                          at: 21,
                                                         },
                                                       ],
                                                     },
                                                   ],
                                                   service:
-                                                    "gen:main:HaloAgentSession",
-                                                  entry:
-                                                    "HaloAgentSession.list",
+                                                    "gen:main:SessionRegistry",
+                                                  entry: "SessionRegistry.list",
                                                   source: {
-                                                    path: "packages/server/src/agent/HaloAgentSession.ts",
-                                                    start: 126,
-                                                    end: 137,
+                                                    path: "packages/server/src/sessions/SessionRegistry.ts",
+                                                    start: 20,
+                                                    end: 22,
                                                   },
-                                                  at: 21,
+                                                  at: 20,
                                                 },
-                                              ],
-                                            },
-                                          ],
-                                          service: "gen:main:SessionRegistry",
-                                          entry: "SessionRegistry.list",
-                                          source: {
-                                            path: "packages/server/src/sessions/SessionRegistry.ts",
-                                            start: 20,
-                                            end: 22,
-                                          },
-                                          at: 20,
-                                        },
-                                        {
-                                          kind: "branch",
-                                          label:
-                                            "if (sessions instanceof Error)",
-                                          at: 21,
-                                          children: [
-                                            {
-                                              kind: "return",
-                                              label:
-                                                "return orpcErrors.badRequest(sessions)",
-                                              at: 21,
-                                              children: [
                                                 {
-                                                  kind: "frame",
-                                                  children: [],
-                                                  service:
-                                                    "gen:main:orpcErrors",
-                                                  entry:
-                                                    "orpcErrors.badRequest",
-                                                  summary:
-                                                    "Walked above; same calls.",
-                                                  source: {
-                                                    path: "packages/server/src/orpcErrors.ts",
-                                                    start: 4,
-                                                    end: 9,
-                                                  },
+                                                  kind: "branch",
+                                                  label:
+                                                    "if (sessions instanceof Error)",
+                                                  guard:
+                                                    "if (sessions instanceof Error)",
                                                   at: 21,
+                                                  children: [
+                                                    {
+                                                      kind: "return",
+                                                      label:
+                                                        "return orpcErrors.badRequest(sessions)",
+                                                      at: 21,
+                                                      children: [
+                                                        {
+                                                          kind: "frame",
+                                                          children: [],
+                                                          service:
+                                                            "gen:main:orpcErrors",
+                                                          entry:
+                                                            "orpcErrors.badRequest",
+                                                          summary:
+                                                            "Walked above; same calls.",
+                                                          source: {
+                                                            path: "packages/server/src/orpcErrors.ts",
+                                                            start: 4,
+                                                            end: 9,
+                                                          },
+                                                          returns:
+                                                            'ORPCError<"BAD_REQUEST", unknown>',
+                                                          at: 21,
+                                                        },
+                                                      ],
+                                                    },
+                                                  ],
+                                                },
+                                                {
+                                                  kind: "return",
+                                                  label: "return sessions",
+                                                  at: 22,
+                                                  children: [],
+                                                  guards: [
+                                                    "unless (sessions instanceof Error)",
+                                                  ],
                                                 },
                                               ],
+                                              service:
+                                                "gen:main:sessionsRouter",
+                                              entry: "sessionsRouter.list",
+                                              source: {
+                                                path: "packages/server/src/sessions/sessionsRouter.ts",
+                                                start: 18,
+                                                end: 23,
+                                              },
+                                            },
+                                            {
+                                              kind: "reply",
+                                              from: "gen:main:sessionsRouter",
+                                              to: "gen:renderer:useSessionsQuery",
+                                              carrier: "rpc",
+                                              value: "SessionSummary[]",
+                                              at: 126,
+                                              children: [],
                                             },
                                           ],
-                                        },
-                                        {
-                                          kind: "return",
-                                          label: "return sessions",
-                                          at: 22,
-                                          children: [],
+                                          from: "gen:renderer:useSessionsQuery",
+                                          to: "gen:main:sessionsRouter",
+                                          name: "sessions.list",
+                                          carrier: "rpc",
+                                          at: 126,
                                         },
                                       ],
-                                      service: "gen:main:sessionsRouter",
-                                      entry: "sessionsRouter.list",
-                                      source: {
-                                        path: "packages/server/src/sessions/sessionsRouter.ts",
-                                        start: 18,
-                                        end: 23,
-                                      },
                                     },
                                   ],
-                                  from: "gen:renderer:useSessionsQuery",
-                                  to: "gen:main:sessionsRouter",
-                                  name: "sessions.list",
-                                  carrier: "rpc",
-                                  at: 126,
+                                  service: "gen:renderer:useSessionsQuery",
+                                  entry: "useSessionsQuery",
+                                  source: {
+                                    path: "apps/electron/src/renderer/api/ApiProvider.tsx",
+                                    start: 117,
+                                    end: 129,
+                                  },
+                                  returns:
+                                    "UseQueryResult<NoInfer<SessionSummary[]>, Error>",
+                                  at: 114,
+                                  guards: [
+                                    "unless (readySessionId === undefined)",
+                                    "unless (result instanceof PromptFailedError)",
+                                  ],
                                 },
                               ],
                             },
                           ],
-                          service: "gen:renderer:useSessionsQuery",
-                          entry: "useSessionsQuery",
-                          source: {
-                            path: "apps/electron/src/renderer/api/ApiProvider.tsx",
-                            start: 117,
-                            end: 129,
-                          },
-                          at: 114,
+                          from: "gen:renderer:useAgentSession",
+                          to: "gen:main:sessionsRouter",
+                          name: "sessions.prompt",
+                          args: "{ sessionId: readySessionId, text }",
+                          carrier: "rpc",
+                          at: 97,
+                          guards: ["unless (readySessionId === undefined)"],
                         },
                       ],
                       service: "gen:renderer:useAgentSession",
@@ -2435,260 +2997,9 @@ export const generatedPromptFlow: Flow = {
                         start: 89,
                         end: 118,
                       },
+                      returns: "void",
                       at: 123,
-                    },
-                    {
-                      kind: "frame",
-                      children: [
-                        {
-                          kind: "event",
-                          children: [
-                            {
-                              kind: "frame",
-                              children: [
-                                {
-                                  kind: "frame",
-                                  children: [
-                                    {
-                                      kind: "frame",
-                                      children: [
-                                        {
-                                          kind: "frame",
-                                          children: [],
-                                          service: "gen:main:WorkspaceService",
-                                          entry: "WorkspaceService.getLayout",
-                                          summary: "Walked above; same calls.",
-                                          source: {
-                                            path: "packages/server/src/workspace/WorkspaceService.ts",
-                                            start: 189,
-                                            end: 192,
-                                          },
-                                          at: 90,
-                                        },
-                                        {
-                                          kind: "branch",
-                                          label: "if (layout instanceof Error)",
-                                          at: 91,
-                                          children: [
-                                            {
-                                              kind: "return",
-                                              label: "return layout",
-                                              at: 91,
-                                              children: [],
-                                            },
-                                          ],
-                                        },
-                                        {
-                                          kind: "branch",
-                                          label:
-                                            "if (manager instanceof Error)",
-                                          at: 96,
-                                          children: [
-                                            {
-                                              kind: "return",
-                                              label: "return manager",
-                                              at: 96,
-                                              children: [],
-                                            },
-                                          ],
-                                        },
-                                        {
-                                          kind: "return",
-                                          label:
-                                            "return await HaloAgentSession.createFromManager(options, layout, manager)",
-                                          at: 97,
-                                          children: [
-                                            {
-                                              kind: "frame",
-                                              children: [],
-                                              service:
-                                                "gen:main:HaloAgentSession",
-                                              entry:
-                                                "HaloAgentSession.createFromManager",
-                                              summary:
-                                                "Walked above; same calls.",
-                                              source: {
-                                                path: "packages/server/src/agent/HaloAgentSession.ts",
-                                                start: 139,
-                                                end: 189,
-                                              },
-                                              at: 97,
-                                            },
-                                          ],
-                                        },
-                                      ],
-                                      service: "gen:main:HaloAgentSession",
-                                      entry: "HaloAgentSession.create",
-                                      source: {
-                                        path: "packages/server/src/agent/HaloAgentSession.ts",
-                                        start: 89,
-                                        end: 98,
-                                      },
-                                      at: 25,
-                                    },
-                                    {
-                                      kind: "branch",
-                                      label: "if (session instanceof Error)",
-                                      at: 26,
-                                      children: [
-                                        {
-                                          kind: "return",
-                                          label: "return session",
-                                          at: 26,
-                                          children: [],
-                                        },
-                                      ],
-                                    },
-                                    {
-                                      kind: "frame",
-                                      children: [],
-                                      service: "gen:main:SessionRegistry",
-                                      entry: "SessionRegistry.register",
-                                      summary: "Walked above; same calls.",
-                                      source: {
-                                        path: "packages/server/src/sessions/SessionRegistry.ts",
-                                        start: 75,
-                                        end: 77,
-                                      },
-                                      at: 27,
-                                    },
-                                    {
-                                      kind: "return",
-                                      label: "return session",
-                                      at: 28,
-                                      children: [],
-                                    },
-                                  ],
-                                  service: "gen:main:SessionRegistry",
-                                  entry: "SessionRegistry.create",
-                                  source: {
-                                    path: "packages/server/src/sessions/SessionRegistry.ts",
-                                    start: 24,
-                                    end: 29,
-                                  },
-                                  at: 26,
-                                },
-                                {
-                                  kind: "branch",
-                                  label: "if (session instanceof Error)",
-                                  at: 27,
-                                  children: [
-                                    {
-                                      kind: "return",
-                                      label:
-                                        "return orpcErrors.badRequest(session)",
-                                      at: 27,
-                                      children: [
-                                        {
-                                          kind: "frame",
-                                          children: [],
-                                          service: "gen:main:orpcErrors",
-                                          entry: "orpcErrors.badRequest",
-                                          summary: "Walked above; same calls.",
-                                          source: {
-                                            path: "packages/server/src/orpcErrors.ts",
-                                            start: 4,
-                                            end: 9,
-                                          },
-                                          at: 27,
-                                        },
-                                      ],
-                                    },
-                                  ],
-                                },
-                                {
-                                  kind: "return",
-                                  label:
-                                    "return { sessionId: session.sessionId }",
-                                  at: 28,
-                                  children: [],
-                                },
-                              ],
-                              service: "gen:main:sessionsRouter",
-                              entry: "sessionsRouter.create",
-                              source: {
-                                path: "packages/server/src/sessions/sessionsRouter.ts",
-                                start: 24,
-                                end: 29,
-                              },
-                            },
-                          ],
-                          from: "gen:renderer:useDraftAgentSession",
-                          to: "gen:main:sessionsRouter",
-                          name: "sessions.create",
-                          carrier: "rpc",
-                          at: 172,
-                        },
-                        {
-                          kind: "branch",
-                          label: "if (created instanceof Error)",
-                          at: 179,
-                          children: [
-                            {
-                              kind: "return",
-                              label: "return created",
-                              at: 181,
-                              children: [],
-                            },
-                          ],
-                        },
-                        {
-                          kind: "event",
-                          children: [
-                            {
-                              kind: "frame",
-                              children: [],
-                              service: "gen:main:sessionsRouter",
-                              entry: "sessionsRouter.prompt",
-                              summary: "Walked above; same calls.",
-                              source: {
-                                path: "packages/server/src/sessions/sessionsRouter.ts",
-                                start: 51,
-                                end: 61,
-                              },
-                            },
-                          ],
-                          from: "gen:renderer:useDraftAgentSession",
-                          to: "gen:main:sessionsRouter",
-                          name: "sessions.prompt",
-                          carrier: "rpc",
-                          at: 189,
-                        },
-                        {
-                          kind: "branch",
-                          label: "if (result instanceof PromptFailedError)",
-                          at: 198,
-                          children: [
-                            {
-                              kind: "return",
-                              label: "return result",
-                              at: 204,
-                              children: [],
-                            },
-                          ],
-                        },
-                        {
-                          kind: "frame",
-                          children: [],
-                          service: "gen:renderer:useSessionsQuery",
-                          entry: "useSessionsQuery",
-                          summary: "Walked above; same calls.",
-                          source: {
-                            path: "apps/electron/src/renderer/api/ApiProvider.tsx",
-                            start: 117,
-                            end: 129,
-                          },
-                          at: 206,
-                        },
-                      ],
-                      service: "gen:renderer:useDraftAgentSession",
-                      entry: "useDraftAgentSession.prompt",
-                      source: {
-                        path: "apps/electron/src/renderer/main/agent/useAgentSession.ts",
-                        start: 171,
-                        end: 210,
-                      },
-                      at: 123,
+                      guards: ["if (trimmedText)"],
                     },
                   ],
                   service: "gen:renderer:Composer",
@@ -2698,6 +3009,7 @@ export const generatedPromptFlow: Flow = {
                     start: 119,
                     end: 127,
                   },
+                  returns: "void",
                   at: 96,
                 },
                 {
@@ -2713,6 +3025,9 @@ export const generatedPromptFlow: Flow = {
               label: "return false",
               at: 99,
               children: [],
+              guards: [
+                'unless (event.key === "Enter" && (event.metaKey || event.ctrlKey))',
+              ],
             },
           ],
           service: "gen:renderer:Editor",
@@ -2722,6 +3037,7 @@ export const generatedPromptFlow: Flow = {
             start: 93,
             end: 100,
           },
+          returns: "boolean",
         },
       ],
       from: "human",

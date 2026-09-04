@@ -5,8 +5,10 @@ import {
   branch,
   event,
   frame,
+  reply,
   returns,
   type Carrier,
+  type EventNode,
   type FlowNode,
   type ProcessName,
   type Service,
@@ -29,8 +31,16 @@ type WalkerConfig = {
   extraRoots: string[];
   /** Repo-relative path prefixes whose calls are dropped (loggers, ui kits). */
   ignore: string[];
-  /** node_modules package prefixes kept as leaf frames instead of dropped. */
-  keepPackages: string[];
+  /**
+   * Rule: a node_modules package that is a service of its own. A call into it
+   * is an event to that service, with the `.d.ts` declaration as the frame.
+   */
+  packageServices: {
+    prefix: string;
+    service: string;
+    name: string;
+    carrier: Carrier;
+  }[];
   /** Rule: a call whose signature comes from this client package runs a router handler in another process. */
   rpc: {
     clientPackage: string;
@@ -42,8 +52,18 @@ type WalkerConfig = {
   };
   /** Rule: `helper(x).current` reads back `x` (a ref that mirrors a prop). */
   refHelpers: string[];
+  /**
+   * Rule: when a component's callback prop is set at more than one JSX site,
+   * follow only the site inside the named function. One flow, one user path.
+   */
+  callbackSites: { component: string; within: string }[];
   /** Rule: file paths that mean the disk; calls into them are events. */
-  sinks: { pathIncludes: string; service: string; carrier: Carrier }[];
+  sinks: {
+    pathIncludes: string;
+    service: string;
+    name: string;
+    carrier: Carrier;
+  }[];
 };
 
 type Omitted = { callee: string; where: string; reason: string };
@@ -144,6 +164,8 @@ export class FlowWalker {
         entry: name,
         summary: "Walked above; same calls.",
         source: this.sourceOf(fn),
+        returns: this.returnTypeOf(fn),
+        children: [],
       });
     }
     this.walked.add(fn);
@@ -156,61 +178,82 @@ export class FlowWalker {
       entry: name,
       summary: jsDocSummary(fn),
       source: this.sourceOf(fn),
+      returns: this.returnTypeOf(fn),
       children,
     });
   }
 
   /**
    * The children one body contributes, in source order: the calls it makes,
-   * with `at` set to each call's line, plus a branch node per `if`/`else`
-   * that contains something and a return node per `return`. Nested functions
-   * are deferred work and are skipped unless a sync callback method takes
-   * them.
+   * with `at` set to each call's line, a branch node per `if`/`else` that
+   * contains something, and a return node per `return`. Two shapes of control
+   * flow are folded into the tree: after `if (x) return`, everything later in
+   * the body carries the guard `unless (x)`; after an awaited event with a
+   * reply, everything later in the body becomes the reply's children, since
+   * the reply is what lets it run. Nested functions are deferred work and are
+   * skipped unless a sync callback method takes them.
    */
   private bodyOf(
     body: ts.Node,
     process: ProcessName,
     stack: ts.Node[],
   ): FlowNode[] {
-    const children: FlowNode[] = [];
+    const out: FlowNode[] = [];
+    let sink = out;
+    const guards: string[] = [];
+    const emit = (node: FlowNode) => {
+      if (guards.length > 0) node.guards = [...guards];
+      sink.push(node);
+    };
     const collect = (node: ts.Node) => {
       if (node !== body && isFunctionNode(node) && !isSyncCallback(node)) {
         return;
       }
       if (ts.isIfStatement(node)) {
         collect(node.expression);
-        children.push(...this.branchesOf(node, "if", process, stack));
+        for (const arm of this.branchesOf(node, "if", process, stack)) {
+          emit(arm);
+        }
+        if (alwaysExits(node.thenStatement)) {
+          guards.push(guardLabel(node.expression, false));
+        }
         return;
       }
       if (ts.isReturnStatement(node)) {
-        const inner =
-          node.expression === undefined
-            ? []
-            : this.bodyOf(node.expression, process, stack);
-        children.push(
+        emit(
           returns({
             label:
               node.expression === undefined
                 ? "return"
                 : `return ${shortText(node.expression)}`,
             at: lineOf(node.getStart(), node.getSourceFile()),
-            children: inner,
+            children:
+              node.expression === undefined
+                ? []
+                : this.bodyOf(node.expression, process, stack),
           }),
         );
         return;
       }
       if (ts.isCallExpression(node)) {
-        for (const child of this.resolveCall(node, process, stack)) {
+        const resolved = this.resolveCall(node, process, stack);
+        for (const child of resolved) {
           if (child.at === undefined) {
             child.at = lineOf(node.expression.getEnd(), node.getSourceFile());
           }
-          children.push(child);
+          emit(child);
+        }
+        const awaited = isAwaited(node);
+        for (const child of resolved) {
+          if (!awaited || child.kind !== "event") continue;
+          const last = child.children.at(-1);
+          if (last !== undefined && last.kind === "reply") sink = last.children;
         }
       }
       ts.forEachChild(node, collect);
     };
     collect(body);
-    return children;
+    return out;
   }
 
   /** `if (...)` and its `else if` / `else` chain, branches with nothing inside dropped. */
@@ -226,6 +269,7 @@ export class FlowWalker {
       result.push(
         branch({
           label: `${keyword} (${shortText(node.expression)})`,
+          guard: guardLabel(node.expression, true),
           at: lineOf(node.getStart(), node.getSourceFile()),
           children: then,
         }),
@@ -243,6 +287,7 @@ export class FlowWalker {
       result.push(
         branch({
           label: "else",
+          guard: guardLabel(node.expression, false),
           at: lineOf(
             node.elseStatement.getStart(),
             node.elseStatement.getSourceFile(),
@@ -299,8 +344,9 @@ export class FlowWalker {
 
   /**
    * A declaration outside the repo: a sink becomes an event to that actor, a
-   * kept package becomes a leaf frame at its `.d.ts`, the rest is dropped.
-   * Returns undefined for declarations inside the repo.
+   * package service becomes an event with the `.d.ts` declaration as its
+   * frame, the rest is dropped. Returns undefined for declarations inside the
+   * repo.
    */
   private externalRule(
     call: ts.CallExpression,
@@ -319,19 +365,23 @@ export class FlowWalker {
       file.includes(entry.pathIncludes),
     );
     if (sink !== undefined) {
+      this.outsideService(sink.service, sink.name);
       return [
         event({
           from: this.serviceFor(frameName(enclosingFunction(call)), process),
           to: sink.service,
           name: call.expression.getText().replaceAll(/\s+/g, ""),
+          args: argsText(call),
+          returns: this.returnTypeOfCall(call),
           carrier: sink.carrier,
+          children: [],
         }),
       ];
     }
-    const kept = this.config.keepPackages.some((prefix) =>
-      relative.startsWith(`node_modules/${prefix}`),
+    const pkg = this.config.packageServices.find((entry) =>
+      relative.startsWith(`node_modules/${entry.prefix}`),
     );
-    if (!kept) {
+    if (pkg === undefined) {
       this.omit(call, `outside the repo (${relative})`);
       return [];
     }
@@ -339,13 +389,26 @@ export class FlowWalker {
       this.omit(call, `not a function declaration (${relative})`);
       return [];
     }
+    this.outsideService(pkg.service, pkg.name);
     const name = frameName(declaration);
     return [
-      frame({
-        service: this.serviceFor(name, process),
-        entry: name,
-        summary: jsDocSummary(declaration),
-        source: this.sourceOf(declaration),
+      event({
+        from: this.serviceFor(frameName(enclosingFunction(call)), process),
+        to: pkg.service,
+        name,
+        args: argsText(call),
+        returns: this.returnTypeOfCall(call),
+        carrier: pkg.carrier,
+        children: [
+          frame({
+            service: pkg.service,
+            entry: name,
+            summary: jsDocSummary(declaration),
+            source: this.sourceOf(declaration),
+            returns: this.returnTypeOfCall(call),
+            children: [],
+          }),
+        ],
       }),
     ];
   }
@@ -391,13 +454,26 @@ export class FlowWalker {
       return undefined;
     }
     const target = this.walk(handler, this.config.rpc.to, stack);
-    return event({
-      from: this.serviceFor(frameName(enclosingFunction(call)), process),
+    const caller = this.serviceFor(frameName(enclosingFunction(call)), process);
+    const node: EventNode = event({
+      from: caller,
       to: target.service,
       name: segments.join("."),
+      args: argsText(call),
       carrier: this.config.rpc.carrier,
-      children: [target],
+      children: [
+        target,
+        reply({
+          from: target.service,
+          to: caller,
+          carrier: this.config.rpc.carrier,
+          value: this.replyValue(call, handler),
+          at: lineOf(call.expression.getEnd(), call.getSourceFile()),
+          children: [],
+        }),
+      ],
     });
+    return node;
   }
 
   private routerHandler(segments: string[]): FunctionNode | undefined {
@@ -570,17 +646,29 @@ export class FlowWalker {
     return [];
   }
 
-  /** What each `<Component prop={...}>` in the repo passes for `prop`. */
+  /**
+   * What each `<Component prop={...}>` in the repo passes for `prop`, or only
+   * the site inside the function a `callbackSites` entry names.
+   */
   private propTargets(
     component: FunctionNode,
     propName: string,
   ): FunctionNode[] {
     const targets: FunctionNode[] = [];
+    const site = this.config.callbackSites.find(
+      (entry) => entry.component === frameName(component),
+    );
     for (const file of this.program.getSourceFiles()) {
       if (file.isDeclarationFile) continue;
       visit(file, (node) => {
         if (!ts.isJsxOpeningLikeElement(node)) return;
         if (this.declarationOf(node.tagName) !== component) return;
+        if (
+          site !== undefined &&
+          frameName(enclosingFunction(node)) !== site.within
+        ) {
+          return;
+        }
         for (const attribute of node.attributes.properties) {
           if (!ts.isJsxAttribute(attribute)) continue;
           if (attribute.name.getText() !== propName) continue;
@@ -666,6 +754,65 @@ export class FlowWalker {
       });
     }
     return id;
+  }
+
+  private outsideService(id: string, name: string) {
+    if (this.services.has(id)) return;
+    this.services.set(id, {
+      id,
+      name,
+      process: "outside",
+      description: "Generated from source.",
+      state: [],
+      composes: [],
+    });
+  }
+
+  /**
+   * The wire type of a reply: the client call's type from the contract, or
+   * the handler's own return type when the contract leaves it open.
+   */
+  private replyValue(call: ts.CallExpression, handler: FunctionNode) {
+    const contract = this.returnTypeOfCall(call);
+    if (
+      contract !== undefined &&
+      contract !== "unknown" &&
+      contract !== "any"
+    ) {
+      return contract;
+    }
+    return this.returnTypeOf(handler);
+  }
+
+  /** The function's return type as text, `Promise<>` unwrapped, error members dropped. */
+  private returnTypeOf(fn: ts.SignatureDeclaration) {
+    const signature = this.checker.getSignatureFromDeclaration(fn);
+    if (signature === undefined) return undefined;
+    return this.typeText(this.checker.getReturnTypeOfSignature(signature));
+  }
+
+  private returnTypeOfCall(call: ts.CallExpression) {
+    const signature = this.checker.getResolvedSignature(call);
+    if (signature === undefined) return undefined;
+    return this.typeText(this.checker.getReturnTypeOfSignature(signature));
+  }
+
+  private typeText(type: ts.Type) {
+    let text = this.checker.typeToString(type);
+    // oRPC clients return `PromiseWithError<T, E>`; the value is `T`.
+    const promised = /^(?:Promise|PromiseWithError)<(.*)>$/.exec(text);
+    if (promised?.[1] !== undefined) {
+      const inner = promised[1];
+      const comma = topLevelIndex(inner, ", ");
+      text = comma === -1 ? inner : inner.slice(0, comma);
+    }
+    const members = splitUnion(text).filter(
+      (member) => !/Error\b/.test(member),
+    );
+    if (members.length === 0) return text;
+    const joined = members.join(" | ").replace(/^undefined$/, "void");
+    if (joined === "any" || joined === "unknown") return undefined;
+    return joined.length > 48 ? `${joined.slice(0, 47)}…` : joined;
   }
 
   private sourceOf(node: ts.Node) {
@@ -840,6 +987,85 @@ function queryKeyOf(options: ts.Expression | undefined) {
 function shortText(node: ts.Node) {
   const text = node.getText().replaceAll(/\s+/g, " ");
   return text.length > 72 ? `${text.slice(0, 71)}…` : text;
+}
+
+function argsText(call: ts.CallExpression) {
+  if (call.arguments.length === 0) return undefined;
+  const text = call.arguments.map((argument) => shortText(argument)).join(", ");
+  return text.length > 40 ? `${text.slice(0, 39)}…` : text;
+}
+
+/**
+ * The condition a folded branch adds: `if (x)` for the arm that runs when
+ * `x` holds, `unless (x)` for the arm that runs when it does not. A negated
+ * condition flips so the label stays positive.
+ */
+function guardLabel(condition: ts.Expression, holds: boolean) {
+  let expression = condition;
+  let positive = holds;
+  while (ts.isParenthesizedExpression(expression)) {
+    expression = expression.expression;
+  }
+  if (
+    ts.isPrefixUnaryExpression(expression) &&
+    expression.operator === ts.SyntaxKind.ExclamationToken
+  ) {
+    expression = expression.operand;
+    positive = !positive;
+  }
+  return `${positive ? "if" : "unless"} (${shortText(expression)})`;
+}
+
+/** A statement after which the rest of the body cannot run. */
+function alwaysExits(statement: ts.Statement): boolean {
+  if (ts.isReturnStatement(statement) || ts.isThrowStatement(statement)) {
+    return true;
+  }
+  if (ts.isBlock(statement)) {
+    const last = statement.statements.at(-1);
+    return last !== undefined && alwaysExits(last);
+  }
+  return false;
+}
+
+/** Whether the call's value is awaited, through `.then` / `.catch` chains. */
+function isAwaited(call: ts.CallExpression) {
+  let current: ts.Node = call;
+  while (
+    ts.isPropertyAccessExpression(current.parent) ||
+    ts.isCallExpression(current.parent)
+  ) {
+    current = current.parent;
+  }
+  return ts.isAwaitExpression(current.parent);
+}
+
+/** Top-level members of a union type's text. */
+function splitUnion(text: string) {
+  const members: string[] = [];
+  let rest = text;
+  for (;;) {
+    const index = topLevelIndex(rest, " | ");
+    if (index === -1) break;
+    members.push(rest.slice(0, index));
+    rest = rest.slice(index + 3);
+  }
+  members.push(rest);
+  return members;
+}
+
+/** First index of `separator` outside any brackets, or -1. */
+function topLevelIndex(text: string, separator: string) {
+  let depth = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "<" || char === "(" || char === "[" || char === "{")
+      depth += 1;
+    if (char === ">" || char === ")" || char === "]" || char === "}")
+      depth -= 1;
+    if (depth === 0 && text.startsWith(separator, index)) return index;
+  }
+  return -1;
 }
 
 function lineOf(position: number, file: ts.SourceFile) {

@@ -43,54 +43,79 @@ export type Service = {
 };
 
 /**
- * `from` sends, `to` receives. `children` is what `to` runs to handle it.
- * Nesting is causal: a callee sits under its caller, an event sits under the
- * frame that sends it, and a response sits beside its request. `at` is the
- * line in the parent frame's source where this node starts: the call for a
- * frame, the send or the receipt for an event.
+ * Shared by every node. `at` is the line in the parent frame's source where
+ * the node starts. `guards` are the conditions, from earlier in the same
+ * body, under which the node runs at all: `if (x) return` before it adds
+ * `unless (x)`.
  */
-type EventNode = {
+type NodeBase = {
+  at?: number;
+  guards?: string[];
+  children: FlowNode[];
+};
+
+/**
+ * A call that crosses a service boundary. `from` sends, `to` receives.
+ * `children` is what `to` runs to handle it, usually one frame, then the
+ * reply when the sender waits for one. Nesting is causal: an event sits under
+ * the frame that sends it.
+ */
+export type EventNode = NodeBase & {
   kind: "event";
   from: string;
   to: string;
   name: string;
   carrier: Carrier;
+  args?: string;
+  returns?: string;
   detail?: string;
-  at?: number;
-  children: FlowNode[];
+};
+
+/**
+ * The value an event's receiver sends back. `children` is what the sender
+ * runs once it has the reply.
+ */
+type ReplyNode = NodeBase & {
+  kind: "reply";
+  from: string;
+  to: string;
+  carrier: Carrier;
+  value?: string;
 };
 
 /** A function in a service. `children` are the frames it calls and the events it sends. */
-type FrameNode = {
+type FrameNode = NodeBase & {
   kind: "frame";
   service: string;
   entry: string;
   summary?: string;
   source?: Source;
-  at?: number;
-  children: FlowNode[];
+  returns?: string;
 };
 
 /**
  * A branch a frame's body takes: `if (...)`, `else if (...)`, `else`.
- * `children` are what runs inside it. `at` is the line of the keyword.
+ * `children` are what runs inside it. `guard` is what the branch adds to the
+ * conditions of everything inside it when it is folded away.
  */
-type BranchNode = {
+type BranchNode = NodeBase & {
   kind: "branch";
   label: string;
-  at?: number;
-  children: FlowNode[];
+  guard: string;
 };
 
 /** The frame returns here. `children` are the calls in the returned expression. */
-type ReturnNode = {
+type ReturnNode = NodeBase & {
   kind: "return";
   label: string;
-  at?: number;
-  children: FlowNode[];
 };
 
-export type FlowNode = EventNode | FrameNode | BranchNode | ReturnNode;
+export type FlowNode =
+  | EventNode
+  | ReplyNode
+  | FrameNode
+  | BranchNode
+  | ReturnNode;
 
 export type Flow = {
   id: string;
@@ -131,19 +156,15 @@ export function frame(input: FrameInput): FrameNode {
   };
 }
 
-export function branch(input: {
-  label: string;
-  at: number;
-  children: FlowNode[];
-}): BranchNode {
+export function reply(input: Omit<ReplyNode, "kind">): ReplyNode {
+  return { kind: "reply", ...input };
+}
+
+export function branch(input: Omit<BranchNode, "kind">): BranchNode {
   return { kind: "branch", ...input };
 }
 
-export function returns(input: {
-  label: string;
-  at: number;
-  children: FlowNode[];
-}): ReturnNode {
+export function returns(input: Omit<ReturnNode, "kind">): ReturnNode {
   return { kind: "return", ...input };
 }
 
@@ -152,23 +173,6 @@ export type Keyed = { key: string; node: FlowNode };
 
 export function keyed(nodes: FlowNode[], parentKey: string): Keyed[] {
   return nodes.map((node, index) => ({ key: `${parentKey}/${index}`, node }));
-}
-
-/**
- * The children with everything but events removed. Events nested inside a
- * frame, branch or return move up to where it was, in order, and keep their
- * keys.
- */
-export function eventChildren(nodes: FlowNode[], parentKey: string): Keyed[] {
-  const result: Keyed[] = [];
-  for (const { key, node } of keyed(nodes, parentKey)) {
-    if (node.kind !== "event") {
-      result.push(...eventChildren(node.children, key));
-      continue;
-    }
-    result.push({ key, node });
-  }
-  return result;
 }
 
 /** Every node below `nodes`, pre-order. */

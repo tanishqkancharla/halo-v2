@@ -1,14 +1,15 @@
 import { backgroundColor, colors, radius, spacing } from "maui";
 import { style, useStyles } from "purse-styles";
 import {
-  eventChildren,
   keyed,
+  type Carrier,
   type FlowNode,
   type Keyed,
   type Service,
+  type Source,
 } from "../model/Program.js";
-import { NameText, serviceProcess } from "./badges.tsx";
-import { carrierLabels } from "./carriers.tsx";
+import { ActorName, actorOf, NameText, serviceProcess } from "./badges.tsx";
+import { carrierIcons, carrierLabels } from "./carriers.tsx";
 import { SourceExcerpt, type SourceMark } from "./SourceExcerpt.tsx";
 
 /** Which node keys are open. Keys are `${parentKey}/${index}` per level. */
@@ -19,13 +20,16 @@ export type Expansion = {
 
 /**
  * The flow as a call stack in a code block: one line per node, tree glyphs
- * for depth. Events are always shown, so a closed flow reads as the data flow
- * between its services: each event sits under the event whose handling sent
- * it, with the frames between them folded away. Opening a line shows those
- * frames (and a frame's source), with the `if`/`else` branches and `return`s
- * of each body in italics; the events then move under the frames that send
- * them. Source lines that lead to a child are marked; clicking one opens that
- * child.
+ * for depth.
+ *
+ * A line is a frame. A call that crosses a service boundary shows as the
+ * frame that receives it, with the hop (`renderer → main`, the carrier) on
+ * the right; a reply shows as `↩ value` with the hop back. Closed, a line
+ * shows only the crossings under it, hoisted through the frames, branches
+ * and returns between, and grouped under the conditions those had to pass.
+ * Open, it shows its source and its direct children in order: calls, `if`
+ * branches, returns, crossings. Source lines that lead to a child are marked;
+ * clicking one opens that child.
  */
 export function CallStack(props: {
   nodes: FlowNode[];
@@ -37,7 +41,7 @@ export function CallStack(props: {
   return (
     <div className={block} data-flowstack-callstack>
       <Lines
-        items={keyed(props.nodes, props.parentKey)}
+        entries={keyed(props.nodes, props.parentKey).map(asRow)}
         prefix=""
         root
         services={props.services}
@@ -47,8 +51,75 @@ export function CallStack(props: {
   );
 }
 
+type Entry =
+  | { kind: "row"; item: Keyed; guards: string[] }
+  | { kind: "guard"; label: string; entries: Entry[] };
+
+function asRow(item: Keyed): Entry {
+  return { kind: "row", item, guards: [] };
+}
+
+/**
+ * The crossings below `items` with everything else folded away, each with
+ * the conditions it passed on the way. Error guards (`unless (x instanceof
+ * Error)`) are the normal path and are dropped from the label.
+ */
+function hoist(items: Keyed[], guards: string[]): Entry[] {
+  const result: Entry[] = [];
+  for (const item of items) {
+    const node = item.node;
+    const own = [...guards, ...ownGuards(node)];
+    if (node.kind === "event" || node.kind === "reply") {
+      result.push({ kind: "row", item, guards: own });
+      continue;
+    }
+    const through = node.kind === "branch" ? [...own, node.guard] : own;
+    result.push(...hoist(keyed(node.children, item.key), through));
+  }
+  return result;
+}
+
+function ownGuards(node: FlowNode) {
+  if (node.guards === undefined) return [];
+  return node.guards.filter((guard) => !/instanceof \w*Error\b/.test(guard));
+}
+
+/**
+ * Crossings nested under the conditions they passed: adjacent entries that
+ * share a first condition go under one guard line, and the rest of their
+ * conditions group again inside it. A guard with a single guard inside folds
+ * into one line, `a · b`.
+ */
+function grouped(entries: Entry[]): Entry[] {
+  const result: Entry[] = [];
+  for (const entry of entries) {
+    if (entry.kind === "guard" || entry.guards.length === 0) {
+      result.push(entry);
+      continue;
+    }
+    const [label, ...rest] = entry.guards;
+    if (label === undefined) continue;
+    const inner: Entry = { ...entry, guards: rest };
+    const last = result.at(-1);
+    if (last !== undefined && last.kind === "guard" && last.label === label) {
+      last.entries.push(inner);
+      continue;
+    }
+    result.push({ kind: "guard", label, entries: [inner] });
+  }
+  return result.map((entry) => {
+    if (entry.kind !== "guard") return entry;
+    const inner = grouped(entry.entries);
+    const only = inner[0];
+    if (inner.length === 1 && only !== undefined && only.kind === "guard") {
+      return { ...only, label: `${entry.label} · ${only.label}` };
+    }
+    return { ...entry, entries: inner };
+  });
+}
+
 function Lines(props: {
-  items: Keyed[];
+  entries: Entry[];
   prefix: string;
   root: boolean;
   services: Map<string, Service>;
@@ -56,16 +127,28 @@ function Lines(props: {
 }) {
   return (
     <>
-      {props.items.map((item, index) => {
-        const last = index === props.items.length - 1;
+      {props.entries.map((entry, index) => {
+        const last = index === props.entries.length - 1;
         const glyph = props.root ? "" : last ? "└── " : "├── ";
         const childPrefix = props.root
           ? ""
           : `${props.prefix}${last ? "    " : "│   "}`;
-        return (
+        const key =
+          entry.kind === "row" ? entry.item.key : `guard:${entry.label}`;
+        return entry.kind === "row" ? (
           <Line
-            key={item.key}
-            item={item}
+            key={key}
+            item={entry.item}
+            glyph={`${props.prefix}${glyph}`}
+            childPrefix={childPrefix}
+            services={props.services}
+            expansion={props.expansion}
+          />
+        ) : (
+          <GuardLine
+            key={key}
+            label={entry.label}
+            entries={entry.entries}
             glyph={`${props.prefix}${glyph}`}
             childPrefix={childPrefix}
             services={props.services}
@@ -77,6 +160,99 @@ function Lines(props: {
   );
 }
 
+type Hop = { from: string; to: string; carrier: Carrier; name?: string };
+
+/** What one line shows. A crossing merges the event with the frame that receives it. */
+type Row = {
+  kind: FlowNode["kind"];
+  name: string;
+  service?: string;
+  args?: string;
+  hop?: Hop;
+  source?: Source;
+  returns?: string;
+  note?: string;
+  children: Keyed[];
+};
+
+function rowOf(item: Keyed): Row {
+  const { node, key } = item;
+  const children = keyed(node.children, key);
+  switch (node.kind) {
+    case "event": {
+      const first = children[0];
+      const hop: Hop = {
+        from: node.from,
+        to: node.to,
+        carrier: node.carrier,
+      };
+      if (first === undefined || first.node.kind !== "frame") {
+        return {
+          kind: "event",
+          name: node.name,
+          service: node.to,
+          args: node.args,
+          hop,
+          returns: node.returns,
+          note: node.detail,
+          children,
+        };
+      }
+      const frame = first.node;
+      return {
+        kind: "event",
+        name: frame.entry,
+        service: frame.service,
+        args: node.args,
+        hop: node.name === frame.entry ? hop : { ...hop, name: node.name },
+        source: frame.source,
+        returns: frame.returns === undefined ? node.returns : frame.returns,
+        note: frame.summary === undefined ? node.detail : frame.summary,
+        children: [...keyed(frame.children, first.key), ...children.slice(1)],
+      };
+    }
+    case "reply":
+      return {
+        kind: "reply",
+        name: node.value === undefined ? "↩" : `↩ ${node.value}`,
+        service: node.from,
+        hop: { from: node.from, to: node.to, carrier: node.carrier },
+        children,
+      };
+    case "frame":
+      return {
+        kind: "frame",
+        name: node.entry,
+        service: node.service,
+        source: node.source,
+        returns: node.returns,
+        note: node.summary,
+        children,
+      };
+    case "branch": {
+      const only = children[0];
+      if (
+        children.length === 1 &&
+        only !== undefined &&
+        only.node.kind === "return"
+      ) {
+        return {
+          kind: "branch",
+          name: `${node.label}  ${returnLabel(only.node.label)}`,
+          children: [],
+        };
+      }
+      return { kind: "branch", name: node.label, children };
+    }
+    case "return":
+      return { kind: "return", name: returnLabel(node.label), children };
+  }
+}
+
+function returnLabel(label: string) {
+  return label === "return" ? "↩" : `↩ ${label.slice("return ".length)}`;
+}
+
 function Line(props: {
   item: Keyed;
   glyph: string;
@@ -84,20 +260,24 @@ function Line(props: {
   services: Map<string, Service>;
   expansion: Expansion;
 }) {
-  const { node, key } = props.item;
-  const { expansion } = props;
-  const children = keyed(node.children, key);
-  const source = node.kind === "frame" ? node.source : undefined;
+  const { key } = props.item;
+  const { expansion, services } = props;
+  const row = rowOf(props.item);
   const canOpen =
-    source !== undefined ||
-    children.some((child) => child.node.kind !== "event");
+    row.source !== undefined ||
+    row.children.some(
+      (child) => child.node.kind !== "event" && child.node.kind !== "reply",
+    );
   const open = canOpen && expansion.isExpanded(key);
-  const shown = open ? children : eventChildren(node.children, key);
-  const marks: SourceMark[] = children.flatMap((child) =>
+  const shown = open
+    ? row.children.map(asRow)
+    : grouped(hoist(row.children, []));
+  const marks: SourceMark[] = row.children.flatMap((child) =>
     child.node.at === undefined
       ? []
       : [{ line: child.node.at, onClick: () => expansion.toggle(child.key) }],
   );
+  const control = row.kind === "branch" || row.kind === "return";
 
   const line = useStyles(
     styles.line,
@@ -108,14 +288,16 @@ function Line(props: {
     canOpen ? styles.gutterOpenable : undefined,
   );
   const glyph = useStyles(styles.glyph);
+  const args = useStyles(styles.args);
   const location = useStyles(styles.location);
+  const returns = useStyles(styles.returns);
   const note = useStyles(styles.note);
+  const controlText = useStyles(styles.control);
   const excerpt = useStyles(styles.excerpt);
   const lineButton = useStyles(styles.lineButton);
-  const control = useStyles(styles.control);
 
   return (
-    <div data-flowstack-line={nodeName(node)}>
+    <div data-flowstack-line={row.name} data-flowstack-key={key}>
       <button
         type="button"
         className={line}
@@ -130,61 +312,127 @@ function Line(props: {
           <span className={glyph} aria-hidden="true">
             {props.glyph}
           </span>
-          {node.kind === "event" || node.kind === "frame" ? (
-            <>
-              <NameText
-                name={nodeName(node)}
-                process={serviceProcess(
-                  props.services.get(
-                    node.kind === "event" ? node.from : node.service,
-                  ),
-                )}
-              />
-              <span className={location}>
-                {node.kind === "event"
-                  ? carrierLabels[node.carrier]
-                  : source === undefined
-                    ? undefined
-                    : `${shortPath(source.path)}:${source.start}-${source.end}`}
-              </span>
-              <span className={note}>
-                {node.kind === "event" ? node.detail : node.summary}
-              </span>
-            </>
+          {control ? (
+            <span className={controlText}>{row.name}</span>
+          ) : row.kind === "reply" ? (
+            <ActorName
+              name={row.name}
+              process={serviceProcess(
+                row.service === undefined
+                  ? undefined
+                  : services.get(row.service),
+              )}
+            />
           ) : (
-            <span className={control}>{node.label}</span>
+            <NameText
+              name={row.name}
+              process={serviceProcess(
+                row.service === undefined
+                  ? undefined
+                  : services.get(row.service),
+              )}
+            />
+          )}
+          {row.args === undefined ? undefined : (
+            <span className={args}>({row.args})</span>
+          )}
+          {row.hop === undefined ? undefined : (
+            <HopText hop={row.hop} services={services} />
+          )}
+          {row.source === undefined ? undefined : (
+            <span className={location}>
+              {`${shortPath(row.source.path)}:${row.source.start}-${row.source.end}`}
+            </span>
+          )}
+          {row.returns === undefined ||
+          row.returns === "void" ||
+          row.kind === "reply" ? undefined : (
+            <span className={returns}>↩ {row.returns}</span>
+          )}
+          {row.note === undefined ? undefined : (
+            <span className={note}>{row.note}</span>
           )}
         </span>
       </button>
-      {open && source !== undefined ? (
+      {open && row.source !== undefined ? (
         <div
           className={excerpt}
           style={{ marginLeft: `calc(${props.childPrefix.length + 2}ch)` }}
         >
-          <SourceExcerpt source={source} marks={marks} />
+          <SourceExcerpt source={row.source} marks={marks} />
         </div>
       ) : undefined}
       <Lines
-        items={shown}
+        entries={shown}
         prefix={props.childPrefix}
         root={false}
-        services={props.services}
+        services={services}
         expansion={expansion}
       />
     </div>
   );
 }
 
-function nodeName(node: FlowNode) {
-  switch (node.kind) {
-    case "event":
-      return node.name;
-    case "frame":
-      return node.entry;
-    case "branch":
-    case "return":
-      return node.label;
-  }
+function GuardLine(props: {
+  label: string;
+  entries: Entry[];
+  glyph: string;
+  childPrefix: string;
+  services: Map<string, Service>;
+  expansion: Expansion;
+}) {
+  const line = useStyles(styles.line);
+  const gutter = useStyles(styles.gutter);
+  const glyph = useStyles(styles.glyph);
+  const control = useStyles(styles.control);
+  const lineButton = useStyles(styles.lineButton);
+  return (
+    <div data-flowstack-guard={props.label}>
+      <div className={line}>
+        <span className={lineButton}>
+          <span className={gutter} aria-hidden="true">
+            {" "}
+          </span>
+          <span className={glyph} aria-hidden="true">
+            {props.glyph}
+          </span>
+          <span className={control}>{props.label}</span>
+        </span>
+      </div>
+      <Lines
+        entries={props.entries}
+        prefix={props.childPrefix}
+        root={false}
+        services={props.services}
+        expansion={props.expansion}
+      />
+    </div>
+  );
+}
+
+/** `renderer → main · RPC sessions.prompt`: the hop that reached a line. */
+function HopText(props: { hop: Hop; services: Map<string, Service> }) {
+  const { hop, services } = props;
+  const from = actorOf(services.get(hop.from), hop.from);
+  const to = actorOf(services.get(hop.to), hop.to);
+  const Icon = carrierIcons[hop.carrier];
+  const hopStyle = useStyles(styles.hop);
+  const arrow = useStyles(styles.hopArrow);
+  const carrier = useStyles(styles.hopCarrier);
+  return (
+    <span className={hopStyle}>
+      <ActorName name={from.name} process={from.process} />
+      <span className={arrow} aria-hidden="true">
+        →
+      </span>
+      <ActorName name={to.name} process={to.process} />
+      <span className={carrier}>
+        <Icon size="xs" />
+        {carrierLabels[hop.carrier]}
+        {hop.name === undefined ? undefined : ` ${hop.name}`}
+      </span>
+    </span>
+  );
 }
 
 function shortPath(path: string) {
@@ -248,7 +496,35 @@ const styles = {
     color: colors.gray[7],
     flex: "0 0 auto",
   }),
+  args: style({
+    color: colors.gray[9],
+    flex: "0 0 auto",
+  }),
+  hop: style({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: spacing.value(1),
+    marginLeft: spacing.value(4),
+    fontSize: "11px",
+    flex: "0 0 auto",
+  }),
+  hopArrow: style({
+    color: colors.gray[9],
+  }),
+  hopCarrier: style({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: spacing.value(1),
+    marginLeft: spacing.value(2),
+    color: colors.gray[10],
+  }),
   location: style({
+    marginLeft: spacing.value(4),
+    color: colors.gray[10],
+    fontSize: "11px",
+    flex: "0 0 auto",
+  }),
+  returns: style({
     marginLeft: spacing.value(4),
     color: colors.gray[10],
     fontSize: "11px",
