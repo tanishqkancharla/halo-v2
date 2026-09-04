@@ -2,14 +2,12 @@ import { backgroundColor, colors, radius, spacing } from "maui";
 import { style, useStyles } from "purse-styles";
 import {
   keyed,
-  type Carrier,
   type FlowNode,
   type Keyed,
   type Service,
   type Source,
 } from "../model/Program.js";
-import { ActorName, actorOf, NameText, serviceProcess } from "./badges.tsx";
-import { carrierIcons, carrierLabels } from "./carriers.tsx";
+import { ActorName, NameText, serviceProcess } from "./badges.tsx";
 import { SourceExcerpt, type SourceMark } from "./SourceExcerpt.tsx";
 
 /** Which node keys are open. Keys are `${parentKey}/${index}` per level. */
@@ -22,14 +20,14 @@ export type Expansion = {
  * The flow as a call stack in a code block: one line per node, tree glyphs
  * for depth.
  *
- * A line is a frame. A call that crosses a service boundary shows as the
- * frame that receives it, with the hop (`renderer → main`, the carrier) on
- * the right; a reply shows as `↩ value` with the hop back. Closed, a line
- * shows only the crossings under it, hoisted through the frames, branches
- * and returns between, and grouped under the conditions those had to pass.
- * Open, it shows its source and its direct children in order: calls, `if`
- * branches, returns, crossings. Source lines that lead to a child are marked;
- * clicking one opens that child.
+ * A line is a frame, coloured by the service that runs it. A call that
+ * crosses a service boundary shows as the frame that receives it; a reply
+ * shows as `↩ value`. Closed, a line shows only the crossings under it,
+ * hoisted through the frames, branches and returns between, and grouped
+ * under the conditions those had to pass. Open, it shows where it was called
+ * (for a crossing), its own source, and its direct children in order: calls,
+ * `if` branches, returns, crossings. Source lines that lead to a child are
+ * marked; clicking one opens that child.
  */
 export function CallStack(props: {
   nodes: FlowNode[];
@@ -127,12 +125,9 @@ function Lines(props: {
 }) {
   return (
     <>
-      {props.entries.map((entry, index) => {
-        const last = index === props.entries.length - 1;
-        const glyph = props.root ? "" : last ? "└── " : "├── ";
-        const childPrefix = props.root
-          ? ""
-          : `${props.prefix}${last ? "    " : "│   "}`;
+      {props.entries.map((entry) => {
+        const glyph = props.root ? "" : indent;
+        const childPrefix = props.root ? "" : `${props.prefix}${indent}`;
         const key =
           entry.kind === "row" ? entry.item.key : `guard:${entry.label}`;
         return entry.kind === "row" ? (
@@ -160,7 +155,7 @@ function Lines(props: {
   );
 }
 
-type Hop = { from: string; to: string; carrier: Carrier; name?: string };
+const indent = "    ";
 
 /** What one line shows. A crossing merges the event with the frame that receives it. */
 type Row = {
@@ -168,7 +163,7 @@ type Row = {
   name: string;
   service?: string;
   args?: string;
-  hop?: Hop;
+  callSite?: Source;
   source?: Source;
   returns?: string;
   note?: string;
@@ -181,18 +176,13 @@ function rowOf(item: Keyed): Row {
   switch (node.kind) {
     case "event": {
       const first = children[0];
-      const hop: Hop = {
-        from: node.from,
-        to: node.to,
-        carrier: node.carrier,
-      };
       if (first === undefined || first.node.kind !== "frame") {
         return {
           kind: "event",
           name: node.name,
           service: node.to,
           args: node.args,
-          hop,
+          callSite: node.callSite,
           returns: node.returns,
           note: node.detail,
           children,
@@ -204,7 +194,7 @@ function rowOf(item: Keyed): Row {
         name: frame.entry,
         service: frame.service,
         args: node.args,
-        hop: node.name === frame.entry ? hop : { ...hop, name: node.name },
+        callSite: node.callSite,
         source: frame.source,
         returns: frame.returns === undefined ? node.returns : frame.returns,
         note: frame.summary === undefined ? node.detail : frame.summary,
@@ -216,7 +206,6 @@ function rowOf(item: Keyed): Row {
         kind: "reply",
         name: node.value === undefined ? "↩" : `↩ ${node.value}`,
         service: node.from,
-        hop: { from: node.from, to: node.to, carrier: node.carrier },
         children,
       };
     case "frame":
@@ -265,6 +254,7 @@ function Line(props: {
   const row = rowOf(props.item);
   const canOpen =
     row.source !== undefined ||
+    row.callSite !== undefined ||
     row.children.some(
       (child) => child.node.kind !== "event" && child.node.kind !== "reply",
     );
@@ -336,9 +326,6 @@ function Line(props: {
           {row.args === undefined ? undefined : (
             <span className={args}>({row.args})</span>
           )}
-          {row.hop === undefined ? undefined : (
-            <HopText hop={row.hop} services={services} />
-          )}
           {row.source === undefined ? undefined : (
             <span className={location}>
               {`${shortPath(row.source.path)}:${row.source.start}-${row.source.end}`}
@@ -354,6 +341,21 @@ function Line(props: {
           )}
         </span>
       </button>
+      {open && row.callSite !== undefined ? (
+        <div
+          className={excerpt}
+          style={{ marginLeft: `calc(${props.childPrefix.length + 2}ch)` }}
+        >
+          <SourceExcerpt
+            source={row.callSite}
+            marks={
+              props.item.node.at === undefined
+                ? []
+                : [{ line: props.item.node.at }]
+            }
+          />
+        </div>
+      ) : undefined}
       {open && row.source !== undefined ? (
         <div
           className={excerpt}
@@ -407,31 +409,6 @@ function GuardLine(props: {
         expansion={props.expansion}
       />
     </div>
-  );
-}
-
-/** `renderer → main · RPC sessions.prompt`: the hop that reached a line. */
-function HopText(props: { hop: Hop; services: Map<string, Service> }) {
-  const { hop, services } = props;
-  const from = actorOf(services.get(hop.from), hop.from);
-  const to = actorOf(services.get(hop.to), hop.to);
-  const Icon = carrierIcons[hop.carrier];
-  const hopStyle = useStyles(styles.hop);
-  const arrow = useStyles(styles.hopArrow);
-  const carrier = useStyles(styles.hopCarrier);
-  return (
-    <span className={hopStyle}>
-      <ActorName name={from.name} process={from.process} />
-      <span className={arrow} aria-hidden="true">
-        →
-      </span>
-      <ActorName name={to.name} process={to.process} />
-      <span className={carrier}>
-        <Icon size="xs" />
-        {carrierLabels[hop.carrier]}
-        {hop.name === undefined ? undefined : ` ${hop.name}`}
-      </span>
-    </span>
   );
 }
 
@@ -500,24 +477,6 @@ const styles = {
     color: colors.gray[9],
     flex: "0 0 auto",
   }),
-  hop: style({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: spacing.value(1),
-    marginLeft: spacing.value(4),
-    fontSize: "11px",
-    flex: "0 0 auto",
-  }),
-  hopArrow: style({
-    color: colors.gray[9],
-  }),
-  hopCarrier: style({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: spacing.value(1),
-    marginLeft: spacing.value(2),
-    color: colors.gray[10],
-  }),
   location: style({
     marginLeft: spacing.value(4),
     color: colors.gray[10],
@@ -532,7 +491,6 @@ const styles = {
   }),
   control: style({
     color: colors.gray[11],
-    fontStyle: "italic",
   }),
   note: style({
     marginLeft: spacing.value(6),

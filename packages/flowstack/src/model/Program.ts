@@ -69,6 +69,8 @@ export type EventNode = NodeBase & {
   args?: string;
   returns?: string;
   detail?: string;
+  /** The sender's function, so the call can be shown where it sits. */
+  callSite?: Source;
 };
 
 /**

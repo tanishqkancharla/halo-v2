@@ -23,17 +23,6 @@ export const carrierIcons = {
   memory: Lightning,
 } satisfies Record<Carrier, ComponentType<IconProps>>;
 
-export const carrierLabels = {
-  ui: "UI",
-  ipc: "IPC",
-  rpc: "RPC",
-  http: "HTTP",
-  filesystem: "FS",
-  process: "process",
-  network: "network",
-  memory: "in-memory",
-} satisfies Record<Carrier, string>;
-
 export const processLabels = {
   renderer: "renderer",
   preload: "preload",

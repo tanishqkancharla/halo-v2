@@ -27,7 +27,7 @@ import {
   type Service,
 } from "../model/Program.js";
 import { ProcessBadge, StateChip } from "./badges.tsx";
-import { carrierIcons, carrierLabels } from "./carriers.tsx";
+import { carrierIcons } from "./carriers.tsx";
 import { MermaidBlock } from "./MermaidBlock.tsx";
 import { CallStack, type Expansion } from "./CallStack.tsx";
 
@@ -218,19 +218,6 @@ function Legend() {
         {processOrder.map((process) => (
           <ProcessBadge key={process} process={process} />
         ))}
-      </div>
-      <div className={group}>
-        <span className={muted}>Event carrier</span>
-        {Object.entries(carrierLabels).map(([carrier, label]) => {
-          // SAFETY: carrierLabels is a Record keyed by Carrier, so its entry keys are Carrier values.
-          const Icon = carrierIcons[carrier as keyof typeof carrierIcons];
-          return (
-            <span key={carrier} className={group}>
-              <Icon size="xs" />
-              <span className={muted}>{label}</span>
-            </span>
-          );
-        })}
       </div>
     </div>
   );

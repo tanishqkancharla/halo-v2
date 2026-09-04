@@ -12,10 +12,10 @@ type FileExcerptPayload = {
   contents: string;
 };
 
-/** A line in the excerpt that opens the next level of the stack. */
+/** A line in the excerpt to point at; with `onClick`, it opens the next level. */
 export type SourceMark = {
   line: number;
-  onClick: () => void;
+  onClick?: () => void;
 };
 
 export function SourceExcerpt(props: { source: Source; marks: SourceMark[] }) {
@@ -35,7 +35,7 @@ export function SourceExcerpt(props: { source: Source; marks: SourceMark[] }) {
       const line = markedLine(target);
       if (line === undefined) continue;
       const mark = props.marks.find((entry) => entry.line === line);
-      if (mark !== undefined) mark.onClick();
+      if (mark?.onClick !== undefined) mark.onClick();
       return;
     }
   }

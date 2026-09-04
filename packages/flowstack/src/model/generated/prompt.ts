@@ -465,6 +465,11 @@ export const generatedPromptFlow: Flow = {
                                               args: "layout.root, layout.sessionDir",
                                               returns: "SessionInfo[]",
                                               carrier: "memory",
+                                              callSite: {
+                                                path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                start: 100,
+                                                end: 124,
+                                              },
                                               at: 103,
                                               guards: [
                                                 "unless (layout instanceof Error)",
@@ -645,6 +650,12 @@ export const generatedPromptFlow: Flow = {
                                                                         "boolean",
                                                                       carrier:
                                                                         "filesystem",
+                                                                      callSite:
+                                                                        {
+                                                                          path: "packages/server/src/filesystem/FilesystemService.ts",
+                                                                          start: 63,
+                                                                          end: 65,
+                                                                        },
                                                                       at: 64,
                                                                     },
                                                                   ],
@@ -808,6 +819,12 @@ export const generatedPromptFlow: Flow = {
                                                                         "string | undefined",
                                                                       carrier:
                                                                         "filesystem",
+                                                                      callSite:
+                                                                        {
+                                                                          path: "packages/server/src/filesystem/FilesystemService.ts",
+                                                                          start: 104,
+                                                                          end: 114,
+                                                                        },
                                                                       at: 109,
                                                                     },
                                                                     {
@@ -932,6 +949,12 @@ export const generatedPromptFlow: Flow = {
                                                                               "void",
                                                                             carrier:
                                                                               "filesystem",
+                                                                            callSite:
+                                                                              {
+                                                                                path: "packages/server/src/filesystem/FilesystemService.ts",
+                                                                                start: 94,
+                                                                                end: 102,
+                                                                              },
                                                                             at: 100,
                                                                           },
                                                                           {
@@ -1695,6 +1718,11 @@ export const generatedPromptFlow: Flow = {
                                                                     "boolean",
                                                                   carrier:
                                                                     "filesystem",
+                                                                  callSite: {
+                                                                    path: "packages/server/src/agent/workspacePrompt.ts",
+                                                                    start: 8,
+                                                                    end: 17,
+                                                                  },
                                                                   at: 13,
                                                                 },
                                                                 {
@@ -1780,6 +1808,11 @@ export const generatedPromptFlow: Flow = {
                                                       name: "DefaultResourceLoader.reload",
                                                       returns: "void",
                                                       carrier: "memory",
+                                                      callSite: {
+                                                        path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                        start: 139,
+                                                        end: 189,
+                                                      },
                                                       at: 154,
                                                       guards: [
                                                         "unless (runtime instanceof Error)",
@@ -1831,6 +1864,11 @@ export const generatedPromptFlow: Flow = {
                                                       name: "registerBunOAuthFlows",
                                                       returns: "void",
                                                       carrier: "memory",
+                                                      callSite: {
+                                                        path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                        start: 139,
+                                                        end: 189,
+                                                      },
                                                       at: 157,
                                                       guards: [
                                                         "unless (runtime instanceof Error)",
@@ -1862,6 +1900,11 @@ export const generatedPromptFlow: Flow = {
                                                       args: '{ modelsPath: join(layout.agentDir, "mo…',
                                                       returns: "ModelRuntime",
                                                       carrier: "memory",
+                                                      callSite: {
+                                                        path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                        start: 139,
+                                                        end: 189,
+                                                      },
                                                       at: 158,
                                                       guards: [
                                                         "unless (runtime instanceof Error)",
@@ -1916,6 +1959,11 @@ export const generatedPromptFlow: Flow = {
                                                       returns:
                                                         "readonly Model<Api>[]",
                                                       carrier: "memory",
+                                                      callSite: {
+                                                        path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                        start: 139,
+                                                        end: 189,
+                                                      },
                                                       at: 163,
                                                       guards: [
                                                         "unless (runtime instanceof Error)",
@@ -1974,6 +2022,11 @@ export const generatedPromptFlow: Flow = {
                                                       returns:
                                                         "CreateAgentSessionResult",
                                                       carrier: "memory",
+                                                      callSite: {
+                                                        path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                        start: 139,
+                                                        end: 189,
+                                                      },
                                                       at: 170,
                                                       guards: [
                                                         "unless (runtime instanceof Error)",
@@ -2287,6 +2340,11 @@ export const generatedPromptFlow: Flow = {
                                                               returns:
                                                                 "AgentTool<TObject<{ command: TString; timeout: …",
                                                               carrier: "memory",
+                                                              callSite: {
+                                                                path: "packages/server/src/agent/tools/codingTools.ts",
+                                                                start: 39,
+                                                                end: 71,
+                                                              },
                                                               at: 66,
                                                             },
                                                             {
@@ -2588,6 +2646,11 @@ export const generatedPromptFlow: Flow = {
                                       args: 'text, { streamingBehavior: "steer" }',
                                       returns: "void",
                                       carrier: "memory",
+                                      callSite: {
+                                        path: "packages/server/src/agent/HaloAgentSession.ts",
+                                        start: 202,
+                                        end: 214,
+                                      },
                                       at: 205,
                                       guards: [
                                         "unless (text.trim().length === 0)",
@@ -2802,6 +2865,11 @@ export const generatedPromptFlow: Flow = {
                                                               returns:
                                                                 "SessionInfo[]",
                                                               carrier: "memory",
+                                                              callSite: {
+                                                                path: "packages/server/src/agent/HaloAgentSession.ts",
+                                                                start: 126,
+                                                                end: 137,
+                                                              },
                                                               at: 129,
                                                               guards: [
                                                                 "unless (layout instanceof Error)",
@@ -2958,6 +3026,11 @@ export const generatedPromptFlow: Flow = {
                                           to: "gen:main:sessionsRouter",
                                           name: "sessions.list",
                                           carrier: "rpc",
+                                          callSite: {
+                                            path: "apps/electron/src/renderer/api/ApiProvider.tsx",
+                                            start: 126,
+                                            end: 126,
+                                          },
                                           at: 126,
                                         },
                                       ],
@@ -2986,6 +3059,11 @@ export const generatedPromptFlow: Flow = {
                           name: "sessions.prompt",
                           args: "{ sessionId: readySessionId, text }",
                           carrier: "rpc",
+                          callSite: {
+                            path: "apps/electron/src/renderer/main/agent/useAgentSession.ts",
+                            start: 89,
+                            end: 118,
+                          },
                           at: 97,
                           guards: ["unless (readySessionId === undefined)"],
                         },

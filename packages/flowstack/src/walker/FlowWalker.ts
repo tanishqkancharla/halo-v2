@@ -374,6 +374,7 @@ export class FlowWalker {
           args: argsText(call),
           returns: this.returnTypeOfCall(call),
           carrier: sink.carrier,
+          callSite: this.sourceOf(enclosingFunction(call)),
           children: [],
         }),
       ];
@@ -399,6 +400,7 @@ export class FlowWalker {
         args: argsText(call),
         returns: this.returnTypeOfCall(call),
         carrier: pkg.carrier,
+        callSite: this.sourceOf(enclosingFunction(call)),
         children: [
           frame({
             service: pkg.service,
@@ -461,6 +463,7 @@ export class FlowWalker {
       name: segments.join("."),
       args: argsText(call),
       carrier: this.config.rpc.carrier,
+      callSite: this.sourceOf(enclosingFunction(call)),
       children: [
         target,
         reply({
