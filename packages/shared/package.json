@@ -11,7 +11,8 @@
     "./mauiSkills": "./src/mauiSkills.ts",
     "./plugin": "./src/plugin.ts",
     "./pluginManifest": "./src/pluginManifest.ts",
-    "./rpc": "./src/rpc.ts"
+    "./rpc": "./src/rpc.ts",
+    "./sessionLog": "./src/sessionLog.ts"
   },
   "scripts": {
     "format": "oxfmt .",

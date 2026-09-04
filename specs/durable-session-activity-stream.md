@@ -166,20 +166,18 @@ Define durable records and storage separately from their filesystem encoding:
 
 ```ts
 type DurableStreamRecord<T> = {
-  sequence: number
-  value: T
-}
+  sequence: number;
+  value: T;
+};
 
 type DurableStreamConsumeOptions = StreamConsumeOptions & {
-  afterSequence?: number
-}
+  afterSequence?: number;
+};
 
 type DurableStreamStorage<T> = {
-  load(): Promise<readonly DurableStreamRecord<T>[] | Error>
-  append(
-    records: readonly DurableStreamRecord<T>[],
-  ): Promise<void | Error>
-}
+  load(): Promise<readonly DurableStreamRecord<T>[] | Error>;
+  append(records: readonly DurableStreamRecord<T>[]): Promise<void | Error>;
+};
 ```
 
 `DurableStream.append` is asynchronous and returns the assigned record or a tagged persistence error. It serializes concurrent appends, batches records already waiting on the same filesystem write, and publishes them to its internal `Stream` only after storage succeeds. `consume` subscribes to the live stream before selecting replay records, then suppresses replay/live overlap by sequence. This makes snapshot-followed-by-consume gap-free.
@@ -210,17 +208,17 @@ Define stable facts rather than presentation sentences:
 
 ```ts
 type ToolIdentity = {
-  path: string
-  displayName: string
-  integrationId?: string
-}
+  path: string;
+  displayName: string;
+  integrationId?: string;
+};
 
 type ToolInvocation = {
-  id: string
-  parentId?: string
-  tool: ToolIdentity
-  arguments: unknown
-}
+  id: string;
+  parentId?: string;
+  tool: ToolIdentity;
+  arguments: unknown;
+};
 
 type SessionLogEvent =
   | { type: "run.started"; runId: string }
@@ -230,21 +228,21 @@ type SessionLogEvent =
   | { type: "tool.started"; invocation: ToolInvocation }
   | { type: "tool.updated"; invocationId: string; update: unknown }
   | {
-      type: "tool.finished"
-      invocationId: string
-      result: AgentToolResult<unknown>
-      isError: boolean
+      type: "tool.finished";
+      invocationId: string;
+      result: AgentToolResult<unknown>;
+      isError: boolean;
     }
-  | HaloConnectionEvent
+  | HaloConnectionEvent;
 ```
 
 `assistant.updated` stores Pi’s delta/update object, not the repeatedly growing assistant-message snapshot. `message.committed` is the durable final message. The pure projector folds event prefixes into the current transcript, active invocations, working state, and error; none of those derived fields remain canonical state.
 
-- [ ] Define `SessionLogEvent`, `ToolIdentity`, and `ToolInvocation` in `packages/shared/src/sessionLog.ts`, including helpers for stable run and invocation relationships.
-- [ ] Replace reducer-centric tests in `packages/shared/src/AgentSessionState.test.ts` with `projectSession` prefix tests for messages, streaming deltas, errors, aborts, direct tool lifecycles, and interrupted runs.
-- [ ] Add `legacyStateToSessionLog` temporarily and route `AgentPane.tsx` plus `sessionView.ts` through `projectSession` without changing visible output.
-- [ ] Keep summaries behaviorally identical in this phase; move only state reconstruction into the projector.
-- [ ] Run `pnpm --filter @get-halo/shared test` and `pnpm --filter @halo/desktop typecheck`, then `pnpm run check-affected`.
+- [x] Define `SessionLogEvent`, `ToolIdentity`, and `ToolInvocation` in `packages/shared/src/sessionLog.ts`, with explicit run and parent invocation relationships.
+- [x] Replace reducer-centric tests with `projectSession` prefix tests for messages, streaming deltas, errors, aborts, direct tool lifecycles, and interrupted runs.
+- [x] Add `legacyStateToSessionLog` temporarily and route `AgentPane.tsx` plus `sessionView.ts` through `projectSession` without changing visible output.
+- [x] Keep summaries behaviorally identical in this phase; move only state reconstruction into the projector.
+- [x] Run the shared tests, desktop typecheck, and `pnpm run check-affected`. All Phase 2 checks pass; the affected suite stops only at the intentionally failing tool-label E2E.
 
 ### Phase 3: Make DurableStream the session transport and filesystem source
 
@@ -323,16 +321,16 @@ The partial-result detail is a transport envelope only:
 
 ```ts
 type ExecActivityUpdate = {
-  type: "halo.exec.tool"
+  type: "halo.exec.tool";
   event:
     | { type: "started"; invocation: ToolInvocation }
     | {
-        type: "finished"
-        invocationId: string
-        result: unknown
-        isError: boolean
-      }
-}
+        type: "finished";
+        invocationId: string;
+        result: unknown;
+        isError: boolean;
+      };
+};
 ```
 
 Use a fresh nested invocation ID for every call and the outer Pi `toolCallId` as `parentId`. Preserve actual start/settlement order. Resolve connected-tool display names from Executor integration metadata; resolve static tool names from their registered integration and operation metadata. Filter Executor discovery helpers by their catalog classification rather than renderer path checks. Always emit the finish event with `Effect.onExit`, including tool failures and interruption.
@@ -367,11 +365,11 @@ Keep presenters simple and local:
 
 ```ts
 type ToolActivityPresenter = {
-  activeLabel(activity: ReducedToolInvocation): string
+  activeLabel(activity: ReducedToolInvocation): string;
   completedSummary(
     activities: readonly ReducedToolInvocation[],
-  ): string | undefined
-}
+  ): string | undefined;
+};
 ```
 
 The read presenter normalizes workspace paths and creates its own `Set` inside `completedSummary`; there is no shared `dedupeKey`. Integration summaries deduplicate by stable integration/tool identity while retaining first-use order. The outer `exec` is hidden when it has visible children and falls back to `Using Exec` or `Used Exec` only when it ran no user-facing nested tool.
@@ -380,9 +378,9 @@ The read presenter normalizes workspace paths and creates its own `Set` inside `
 
 ```ts
 type ToolActivitySummary = {
-  completed: string[]
-  active: string[]
-}
+  completed: string[];
+  active: string[];
+};
 ```
 
 Render the joined completed sentence on the primary row and each active sentence on an indented row with its own `Thinking` indicator. This supports the required transitions without encoding whitespace in summary strings.

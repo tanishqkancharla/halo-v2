@@ -1,7 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import type { AgentMessage } from "@get-halo/shared/rpc";
-import type { AgentSessionState } from "@get-halo/shared/AgentSessionState";
+import type { ProjectedSession } from "@get-halo/shared/sessionLog";
 import {
   connectionRequestLabel,
   connectionRequestSchema,
@@ -95,12 +95,12 @@ const bashArgsSchema = Type.Object({
 });
 
 /**
- * Project AgentSessionState into view rows: one user bubble per user message,
+ * Project a session into view rows: one user bubble per user message,
  * one assistant column per stretch of assistant activity (Pi TUI shape).
  * Tool calls on one assistant message are one parallel group. Assistant text
  * splits groups; adjacent tool-only groups stay one activity.
  */
-export function sessionViewItems(state: AgentSessionState): SessionViewItem[] {
+export function sessionViewItems(state: ProjectedSession): SessionViewItem[] {
   const items: SessionViewItem[] = [];
   const toolResults = toolResultsByCallId(state);
   const emittedTools = new Set<string>();
@@ -460,7 +460,7 @@ function toPosixPath(value: string): string {
   return value.replaceAll("\\", "/");
 }
 
-function toolResultsByCallId(state: AgentSessionState) {
+function toolResultsByCallId(state: ProjectedSession) {
   const map = new Map<
     string,
     { text: string; connectionRequests: ConnectionRequest[] }
