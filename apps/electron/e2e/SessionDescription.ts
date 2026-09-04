@@ -6,6 +6,11 @@ import * as errore from "errore";
 
 type ToolArguments = { [key in string]: string };
 
+type ToolResultDetails = {
+  connectionRequests?: ConnectionRequest[];
+  toolLabels?: string[];
+};
+
 export type SessionDescription = {
   title: string;
   messages: SessionDescriptionItem[];
@@ -19,6 +24,7 @@ type SessionDescriptionItem =
       name: string;
       arguments: ToolArguments;
       result: string;
+      details?: ToolResultDetails;
     }
   | { type: "connectionRequest"; request: ConnectionRequest };
 
@@ -76,6 +82,15 @@ export const m = {
       name: "bash",
       arguments: { command: input.command },
       result: input.result,
+    };
+  },
+  exec(input: { js: string; result: string; toolLabels: string[] }) {
+    return {
+      type: "tool" as const,
+      name: "exec",
+      arguments: { js: input.js },
+      result: input.result,
+      details: { toolLabels: input.toolLabels },
     };
   },
   connectionRequest(request: ConnectionRequest) {
@@ -159,7 +174,7 @@ function appendDescriptionItem(args: {
       name: args.item.name,
       arguments: args.item.arguments,
       result: args.item.result,
-      details: undefined,
+      details: "details" in args.item ? args.item.details : undefined,
       timestamp: args.timestamp,
     });
     return;
@@ -180,7 +195,7 @@ function appendTool(args: {
   name: string;
   arguments: ToolArguments;
   result: string;
-  details: { connectionRequests: ConnectionRequest[] } | undefined;
+  details: ToolResultDetails | undefined;
   timestamp: number;
 }): void {
   const toolCallId = `tool-${args.timestamp}`;

@@ -71,3 +71,24 @@ e2eTest("shows a connection request", async ({ harness, renderer }) => {
   await expect(card).toBeVisible();
   await expect(card.getByRole("button", { name: "Connect" })).toBeVisible();
 });
+
+e2eTest("shows tools used inside exec", async ({ harness, renderer }) => {
+  await harness.loadSession({
+    title: "Cross-tool lookup",
+    messages: [
+      m.user("Check my calendar and search the web"),
+      m.exec({
+        js: "await Promise.all([tools.google_calendar.events.list({}), tools.web.search({ query: 'Halo' })])",
+        result: "Done",
+        toolLabels: ["Google Calendar", "Web Search"],
+      }),
+    ],
+  });
+
+  await expect(
+    renderer.page.getByRole("button", {
+      name: "Used Google Calendar, Web Search",
+      exact: true,
+    }),
+  ).toBeVisible();
+});
