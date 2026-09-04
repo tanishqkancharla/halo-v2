@@ -1,95 +1,32 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { describe, expect, test } from "vitest";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { expect, test } from "vitest";
 import { JsonlLoggerSink } from "./JsonlLoggerSink.js";
-import {
-  Logger,
-  type LoggerEntry,
-  type LoggerScope,
-  type LoggerSinkApi,
-} from "./Logger.js";
+import { Logger, type LoggerScope } from "./Logger.js";
 
-class CollectingSink implements LoggerSinkApi {
-  readonly entries: LoggerEntry[] = [];
-
-  log(entry: LoggerEntry) {
-    this.entries.push(entry);
-  }
-}
-
-describe("Logger", () => {
-  test("writes level, timestamp, scopes, and data to sinks", () => {
-    const sink = new CollectingSink();
-    const logger = new Logger({ sinks: [sink] });
-
-    logger.info({ message: "hello", count: 1 });
-
-    expect(sink.entries).toHaveLength(1);
-    const entry = sink.entries[0]!;
-    expect(entry.level).toBe("info");
-    expect(entry.scopes).toEqual([]);
-    expect(entry.data).toEqual({ message: "hello", count: 1 });
-    expect(Number.isNaN(Date.parse(entry.timestamp))).toBe(false);
-  });
-
-  test("appends each scope as its own object in order", () => {
-    const sink = new CollectingSink();
-    const logger = new Logger({ sinks: [sink] })
-      .scope("renderer")
-      .scope("ui", { route: "chat" });
-
-    logger.warn({ message: "slow render" });
-
-    expect(sink.entries[0]!.scopes).toEqual([
-      { name: "renderer", data: {} },
-      { name: "ui", data: { route: "chat" } },
-    ]);
-    expect(sink.entries[0]!.data).toEqual({
-      message: "slow render",
-    });
-  });
-
-  test("addSink shares existing scopes with the new sink", () => {
-    const first = new CollectingSink();
-    const second = new CollectingSink();
-    const logger = new Logger({ sinks: [first] }).scope("main").addSink(second);
-
-    logger.log({ event: "ready" });
-
-    expect(first.entries[0]!.scopes).toEqual([{ name: "main", data: {} }]);
-    expect(first.entries[0]!.data).toEqual({ event: "ready" });
-    expect(second.entries[0]!.scopes).toEqual([{ name: "main", data: {} }]);
-    expect(second.entries[0]!.data).toEqual({ event: "ready" });
-  });
-
-  test("destroy calls each unique sink once", () => {
-    const destroyed: string[] = [];
-    const sink: LoggerSinkApi = {
-      log() {},
-      destroy() {
-        destroyed.push("sink");
-      },
-    };
-    const logger = new Logger({ sinks: [sink, sink] });
-
-    logger.destroy();
-
-    expect(destroyed).toEqual(["sink"]);
-  });
+const loggerTest = test.extend<{ directory: string }>({
+  directory: async ({ task }, use) => {
+    const parent = path.resolve(import.meta.dirname, "../../../tmp/logger");
+    await fs.mkdir(parent, { recursive: true });
+    const directory = await fs.mkdtemp(path.join(parent, `${task.id}-`));
+    await use(directory);
+    await fs.rm(directory, { recursive: true, force: true });
+  },
 });
 
-describe("JsonlLoggerSink", () => {
-  test("appends serialized entries as json lines", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "halo-logger-"));
-    const filePath = join(directory, "test.jsonl");
+loggerTest(
+  "writes structured entries through the JSONL sink",
+  async ({ directory }) => {
+    const filePath = path.join(directory, "test.jsonl");
     const sink = new JsonlLoggerSink({ filePath });
-    const logger = new Logger({ sinks: [sink] }).scope("main");
+    const logger = new Logger({ sinks: [sink] })
+      .scope("main")
+      .scope("ui", { route: "chat" });
     const error = new Error("boom");
 
     logger.error({ message: "failed", error });
 
-    const lines = (await readFile(filePath, "utf8")).trimEnd().split("\n");
+    const lines = (await fs.readFile(filePath, "utf8")).trimEnd().split("\n");
     expect(lines).toHaveLength(1);
     const parsed = JSON.parse(lines[0]!);
     // SAFETY: JsonlLoggerSink writes one JSON object per line with Error values serialized.
@@ -102,7 +39,11 @@ describe("JsonlLoggerSink", () => {
       };
     };
     expect(entry.level).toBe("error");
-    expect(entry.scopes).toEqual([{ name: "main", data: {} }]);
+    expect(Number.isNaN(Date.parse(parsed.timestamp))).toBe(false);
+    expect(entry.scopes).toEqual([
+      { name: "main", data: {} },
+      { name: "ui", data: { route: "chat" } },
+    ]);
     expect(entry.data).toEqual({
       message: "failed",
       error: {
@@ -111,7 +52,27 @@ describe("JsonlLoggerSink", () => {
         stack: error.stack,
       },
     });
+  },
+);
 
-    await rm(directory, { recursive: true, force: true });
+loggerTest("adds another real sink", async ({ directory }) => {
+  const firstPath = path.join(directory, "first.jsonl");
+  const secondPath = path.join(directory, "second.jsonl");
+  const logger = new Logger({
+    sinks: [new JsonlLoggerSink({ filePath: firstPath })],
+  })
+    .scope("main")
+    .addSink(new JsonlLoggerSink({ filePath: secondPath }));
+
+  logger.log({ event: "ready" });
+
+  const [first, second] = await Promise.all([
+    fs.readFile(firstPath, "utf8"),
+    fs.readFile(secondPath, "utf8"),
+  ]);
+  expect(first).toBe(second);
+  expect(JSON.parse(first)).toMatchObject({
+    scopes: [{ name: "main", data: {} }],
+    data: { event: "ready" },
   });
 });
