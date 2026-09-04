@@ -31,7 +31,8 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
   testArtifacts: async ({}, use, testInfo) => {
     const artifacts = await createTestArtifacts(testInfo);
     await use(artifacts);
-    await artifacts.finish(testInfo.status === testInfo.expectedStatus);
+    const finished = await artifacts.finish();
+    if (finished instanceof Error) throw finished;
   },
   electronApp: async ({ testArtifacts }, use) => {
     await using cleanup = new errore.AsyncDisposableStack();
@@ -40,13 +41,26 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
     const app = await electron.launch({
       executablePath,
       args: [`--user-data-dir=${testArtifacts.paths.userData}`],
-      artifactsDir: pathForPlaywrightArtifacts(testArtifacts),
+      artifactsDir: testArtifacts.paths.playwright,
       env: {
         ...processEnvironment(),
         HALO_E2E: "1",
       },
     });
     cleanup.defer(() => app.close());
+    const captured = testArtifacts.captureProcess(app.process());
+    if (captured instanceof Error) throw captured;
+    await app.context().tracing.start({ screenshots: true, snapshots: true });
+    cleanup.defer(() =>
+      app.context().tracing.stop({ path: testArtifacts.paths.trace }),
+    );
+    const page = await app.firstWindow();
+    const rendererCaptured = await testArtifacts.captureRenderer(page);
+    if (rendererCaptured instanceof Error) throw rendererCaptured;
+    cleanup.defer(async () => {
+      const screenshot = await testArtifacts.captureScreenshot(page);
+      if (screenshot instanceof Error) throw screenshot;
+    });
     await use(app);
   },
   renderer: async ({ electronApp }, use) => {
@@ -75,8 +89,4 @@ function processEnvironment() {
         entry[0] !== "ELECTRON_RUN_AS_NODE" && entry[1] !== undefined,
     ),
   );
-}
-
-function pathForPlaywrightArtifacts(artifacts: TestArtifacts) {
-  return `${artifacts.paths.root}/playwright`;
 }
