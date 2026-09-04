@@ -38,9 +38,11 @@ export const sessionsRouter = os.router({
     });
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
+    const snapshot = session.getSnapshot();
     return {
       sessionId: session.sessionId,
-      state: session.getState(),
+      records: snapshot.records,
+      cursor: snapshot.cursor,
     };
   }),
   events: os.events.handler(async ({ input, context, signal }) => {
@@ -50,7 +52,10 @@ export const sessionsRouter = os.router({
     });
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    return session.events.consume({ abortSignal: signal });
+    return session.events.consume({
+      abortSignal: signal,
+      afterSequence: input.afterSequence,
+    });
   }),
   prompt: os.prompt.handler(async ({ input, context }) => {
     context.logger.info({
@@ -75,7 +80,8 @@ export const sessionsRouter = os.router({
       sessionId: input.sessionId,
       request: input.request,
       onEvent: async (event) => {
-        session.appendConnectionEvent(event);
+        const appended = await session.appendConnectionEvent(event);
+        if (appended instanceof Error) return appended;
         if (event.status !== "connected") return;
         const notified = await notifyConnectedSession({
           session,

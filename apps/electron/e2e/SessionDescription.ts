@@ -1,10 +1,16 @@
+import fs from "node:fs";
 import path from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type { AgentMessage } from "@get-halo/shared/rpc";
+import type {
+  SessionLogEvent,
+  SessionLogRecord,
+} from "@get-halo/shared/sessionLog";
 import * as errore from "errore";
 
 type ToolArguments = { [key in string]: string };
+type StoredAgentMessage = Parameters<SessionManager["appendMessage"]>[0];
 
 type ToolResultDetails = {
   connectionRequests?: ConnectionRequest[];
@@ -14,6 +20,7 @@ type ToolResultDetails = {
 export type SessionDescription = {
   title: string;
   messages: SessionDescriptionItem[];
+  initialEvents?: SessionLogEvent[];
 };
 
 type SessionDescriptionItem =
@@ -129,15 +136,35 @@ export function loadSessionDescription(args: {
         path.join(args.workspaceRoot, ".pi", "agent", "sessions"),
       );
       manager.appendSessionInfo(args.description.title);
+      const events: SessionLogEvent[] = [];
       const startTime = Date.now();
       for (const [index, item] of args.description.messages.entries()) {
         appendDescriptionItem({
           manager,
+          events,
           item,
           timestamp: startTime + index * 2,
         });
       }
-      return { sessionId: manager.getSessionId() };
+      if (args.description.initialEvents !== undefined) {
+        events.push(...args.description.initialEvents);
+      }
+      const sessionId = manager.getSessionId();
+      const records: SessionLogRecord[] = events.map((value, index) => ({
+        sequence: index + 1,
+        value,
+      }));
+      fs.writeFileSync(
+        path.join(
+          args.workspaceRoot,
+          ".pi",
+          "agent",
+          "sessions",
+          `${sessionId}.halo-events.jsonl`,
+        ),
+        `${records.map((record) => JSON.stringify(record)).join("\n")}\n`,
+      );
+      return { sessionId };
     },
     catch: (cause) => new LoadSessionError({ cause }),
   });
@@ -145,32 +172,40 @@ export function loadSessionDescription(args: {
 
 function appendDescriptionItem(args: {
   manager: SessionManager;
+  events: SessionLogEvent[];
   item: SessionDescriptionItem;
   timestamp: number;
 }): void {
   if (args.item.type === "user") {
-    args.manager.appendMessage({
-      role: "user",
-      content: args.item.text,
-      timestamp: args.timestamp,
+    appendSessionMessage({
+      manager: args.manager,
+      events: args.events,
+      message: {
+        role: "user",
+        content: args.item.text,
+        timestamp: args.timestamp,
+      },
     });
     return;
   }
 
   if (args.item.type === "assistant") {
-    args.manager.appendMessage(
-      assistantMessage({
+    appendSessionMessage({
+      manager: args.manager,
+      events: args.events,
+      message: assistantMessage({
         content: [{ type: "text", text: args.item.text }],
         stopReason: "stop",
         timestamp: args.timestamp,
       }),
-    );
+    });
     return;
   }
 
   if (args.item.type === "tool") {
     appendTool({
       manager: args.manager,
+      events: args.events,
       name: args.item.name,
       arguments: args.item.arguments,
       result: args.item.result,
@@ -182,6 +217,7 @@ function appendDescriptionItem(args: {
 
   appendTool({
     manager: args.manager,
+    events: args.events,
     name: "exec",
     arguments: { js: "" },
     result: "Connection required",
@@ -192,6 +228,7 @@ function appendDescriptionItem(args: {
 
 function appendTool(args: {
   manager: SessionManager;
+  events: SessionLogEvent[];
   name: string;
   arguments: ToolArguments;
   result: string;
@@ -199,8 +236,10 @@ function appendTool(args: {
   timestamp: number;
 }): void {
   const toolCallId = `tool-${args.timestamp}`;
-  args.manager.appendMessage(
-    assistantMessage({
+  appendSessionMessage({
+    manager: args.manager,
+    events: args.events,
+    message: assistantMessage({
       content: [
         {
           type: "toolCall",
@@ -212,16 +251,29 @@ function appendTool(args: {
       stopReason: "toolUse",
       timestamp: args.timestamp,
     }),
-  );
-  args.manager.appendMessage({
-    role: "toolResult",
-    toolCallId,
-    toolName: args.name,
-    content: [{ type: "text", text: args.result }],
-    details: args.details,
-    isError: false,
-    timestamp: args.timestamp + 1,
   });
+  appendSessionMessage({
+    manager: args.manager,
+    events: args.events,
+    message: {
+      role: "toolResult",
+      toolCallId,
+      toolName: args.name,
+      content: [{ type: "text", text: args.result }],
+      details: args.details,
+      isError: false,
+      timestamp: args.timestamp + 1,
+    },
+  });
+}
+
+function appendSessionMessage(args: {
+  manager: SessionManager;
+  events: SessionLogEvent[];
+  message: StoredAgentMessage;
+}): void {
+  args.manager.appendMessage(args.message);
+  args.events.push({ type: "message.committed", message: args.message });
 }
 
 function assistantMessage(args: {

@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 import type { AgentMessage } from "./rpc.js";
 import {
   lastAssistantTurnWasAborted,
-  legacyStateToSessionLog,
   projectSession,
   type SessionLogEvent,
   type ToolIdentity,
@@ -181,26 +180,10 @@ describe("projectSession", () => {
     expect(restarted.isWorking).toBe(true);
     expect(restarted.activeInvocations).toEqual([]);
     expect(
-      projectSession([...interrupted, { type: "run.finished", runId: "run-2" }])
-        .isWorking,
+      projectSession([
+        ...interrupted,
+        { type: "run.finished", runId: "run-2", outcome: "completed" },
+      ]).isWorking,
     ).toBe(false);
   });
-});
-
-test("legacyStateToSessionLog preserves the current renderer state", () => {
-  const committed = userMessage("hello", 1);
-  const streaming = assistantMessage({
-    stopReason: "stop",
-    content: [{ type: "text", text: "partial" }],
-    timestamp: 2,
-  });
-  const legacy = {
-    messages: [committed],
-    streamingMessage: streaming,
-    error: "local prompt failure",
-    isWorking: true,
-  };
-
-  const projected = projectSession(legacyStateToSessionLog(legacy));
-  expect(projected).toMatchObject(legacy);
 });

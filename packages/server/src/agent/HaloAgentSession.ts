@@ -9,15 +9,17 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import * as errore from "errore";
 import {
-  agentSessionStateFromSession,
-  type AgentSessionState,
-} from "@get-halo/shared/AgentSessionState";
-import type {
-  HaloConnectionEvent,
-  HaloSessionEvent,
-} from "@get-halo/shared/contract";
+  sessionLogEventSchema,
+  type HaloConnectionEvent,
+  type SessionLogEvent,
+} from "@get-halo/shared/sessionLog";
 import type { SessionSummary } from "@get-halo/shared/rpc";
-import { type ReadonlyStream, Stream } from "../Stream.js";
+import {
+  createDurableStream,
+  type DurableStream,
+  type DurableStreamRecord,
+} from "../DurableStream.js";
+import { JsonlDurableStreamStorage } from "../JsonlDurableStreamStorage.js";
 import type {
   WorkspaceLayout,
   WorkspaceService,
@@ -27,6 +29,11 @@ import type { ToolRuntimeService } from "./runtime/ToolRuntimeService.js";
 import { createAuthorizedCodingTools } from "./tools/codingTools.js";
 import { createExecTool } from "./tools/execTool.js";
 import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
+import {
+  adaptPiEvent,
+  interruptedSessionEvents,
+  type PiEventAdapterState,
+} from "./SessionLogAdapter.js";
 
 export class EmptyPromptError extends errore.createTaggedError({
   name: "EmptyPromptError",
@@ -68,6 +75,11 @@ export class NotifyIntegrationEventError extends errore.createTaggedError({
   message: "Failed to notify the agent after an integration change",
 }) {}
 
+export class SessionEventPersistenceError extends errore.createTaggedError({
+  name: "SessionEventPersistenceError",
+  message: "Could not persist events for session '$sessionId'",
+}) {}
+
 type SessionNotification = {
   customType: "halo.integration.connected";
   content: string;
@@ -80,13 +92,23 @@ export type HaloAgentSessionOptions = {
 };
 
 export class HaloAgentSession {
-  private readonly eventStream = new Stream<HaloSessionEvent>();
-  readonly events: ReadonlyStream<HaloSessionEvent> = this.eventStream;
+  readonly events: DurableStream<SessionLogEvent>;
   private readonly unsubscribePiEvents: () => void;
+  private adapterState: PiEventAdapterState = { activeRunId: undefined };
+  private readonly pendingEventWrites: Promise<
+    DurableStreamRecord<SessionLogEvent> | Error
+  >[] = [];
+  private eventWriteError: SessionEventPersistenceError | undefined;
 
-  private constructor(private readonly piSession: AgentSession) {
+  private constructor(
+    private readonly piSession: AgentSession,
+    events: DurableStream<SessionLogEvent>,
+  ) {
+    this.events = events;
     this.unsubscribePiEvents = this.piSession.subscribe((event) => {
-      this.eventStream.append(event);
+      const adapted = adaptPiEvent({ state: this.adapterState, event });
+      this.adapterState = adapted.state;
+      this.queueEvents(adapted.events);
     });
   }
 
@@ -189,22 +211,46 @@ export class HaloAgentSession {
       resourceLoader,
     }).catch((e) => new CreateAgentSessionError({ cause: e }));
     if (created instanceof Error) return created;
-    return new HaloAgentSession(created.session);
+    const events = await createDurableStream({
+      storage: new JsonlDurableStreamStorage({
+        filesystem: options.filesystem,
+        path: layout.sessionLogPath(manager.getSessionId()),
+        valueSchema: sessionLogEventSchema,
+      }),
+    });
+    if (events instanceof Error) {
+      created.session.dispose();
+      return new SessionEventPersistenceError({
+        sessionId: manager.getSessionId(),
+        cause: events,
+      });
+    }
+    const session = new HaloAgentSession(created.session, events);
+    const recovered = await session.recoverInterruptedActivity();
+    if (recovered instanceof Error) {
+      session.unsubscribePiEvents();
+      created.session.dispose();
+      return recovered;
+    }
+    return session;
   }
 
   get sessionId() {
     return this.piSession.sessionId;
   }
 
-  getState(): AgentSessionState {
-    return agentSessionStateFromSession({
-      messages: this.piSession.messages,
-      isStreaming: this.piSession.isStreaming,
-    });
+  getSnapshot() {
+    const records = [...this.events.snapshot()];
+    const last = records.at(-1);
+    return {
+      records,
+      cursor: last === undefined ? 0 : last.sequence,
+    };
   }
 
-  appendConnectionEvent(event: HaloConnectionEvent): void {
-    this.eventStream.append(event);
+  async appendConnectionEvent(event: HaloConnectionEvent) {
+    this.queueEvents([event]);
+    return await this.drainEventWrites();
   }
 
   async prompt(text: string) {
@@ -218,6 +264,8 @@ export class HaloAgentSession {
             cause: e,
           }),
       );
+    const persisted = await this.drainEventWrites();
+    if (persisted instanceof Error) return persisted;
     if (prompted instanceof Error) return prompted;
   }
 
@@ -229,6 +277,8 @@ export class HaloAgentSession {
           cause: e,
         }),
     );
+    const persisted = await this.drainEventWrites();
+    if (persisted instanceof Error) return persisted;
     if (aborted instanceof Error) return aborted;
   }
 
@@ -243,6 +293,8 @@ export class HaloAgentSession {
         { triggerTurn: true, deliverAs: "steer" },
       )
       .catch((e) => new NotifyIntegrationEventError({ cause: e }));
+    const persisted = await this.drainEventWrites();
+    if (persisted instanceof Error) return persisted;
     if (sent instanceof Error) return sent;
   }
 
@@ -250,7 +302,37 @@ export class HaloAgentSession {
     const aborted = await this.abort();
     this.unsubscribePiEvents();
     this.piSession.dispose();
+    const persisted = await this.drainEventWrites();
+    if (persisted instanceof Error) return persisted;
     if (aborted instanceof Error) return aborted;
+  }
+
+  private queueEvents(events: readonly SessionLogEvent[]): void {
+    for (const event of events) {
+      this.pendingEventWrites.push(this.events.append(event));
+    }
+  }
+
+  private async drainEventWrites() {
+    while (this.pendingEventWrites.length > 0) {
+      const results = await Promise.all(this.pendingEventWrites.splice(0));
+      const error = results.find((result) => result instanceof Error);
+      if (error instanceof Error) {
+        this.eventWriteError = new SessionEventPersistenceError({
+          sessionId: this.sessionId,
+          cause: error,
+        });
+      }
+    }
+    return this.eventWriteError;
+  }
+
+  private async recoverInterruptedActivity() {
+    const recoveryEvents = interruptedSessionEvents(
+      this.events.snapshot().map((record) => record.value),
+    );
+    this.queueEvents(recoveryEvents);
+    return await this.drainEventWrites();
   }
 }
 

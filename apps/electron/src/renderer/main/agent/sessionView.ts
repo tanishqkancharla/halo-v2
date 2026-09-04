@@ -44,6 +44,7 @@ type ToolArgValue =
   | string
   | number
   | boolean
+  | null
   | ToolArgValue[]
   | { [K in string]: ToolArgValue };
 type ToolArgs = { [K in string]: ToolArgValue };

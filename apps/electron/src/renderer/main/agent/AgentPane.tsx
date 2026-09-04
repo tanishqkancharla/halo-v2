@@ -16,9 +16,7 @@ import { style, useStyles } from "purse-styles";
 import { useAgentSession, useDraftAgentSession } from "./useAgentSession.ts";
 import { sessionViewItems, type SessionViewItem } from "./sessionView.ts";
 import {
-  legacyStateToSessionLog,
   lastAssistantTurnWasAborted,
-  projectSession,
   type ProjectedSession,
 } from "@get-halo/shared/sessionLog";
 import { AssistantMessage } from "./AssistantMessage.tsx";
@@ -38,8 +36,7 @@ export function AgentPane({
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body);
   const column = useStyles(styles.column);
-  const { state: legacyState, prompt, abort } = useAgentSession(sessionId);
-  const state = projectSession(legacyStateToSessionLog(legacyState));
+  const { state, prompt, abort } = useAgentSession(sessionId);
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
   );
@@ -67,15 +64,11 @@ export function AgentPane({
 
 export function DraftAgentPane({ draftId }: { draftId: string }) {
   const [, navigate] = useLocation();
-  const {
-    state: legacyState,
-    sessionId,
-    prompt,
-    abort,
-  } = useDraftAgentSession((createdSessionId) => {
-    navigate(`/sessions/${createdSessionId}`);
-  });
-  const state = projectSession(legacyStateToSessionLog(legacyState));
+  const { state, sessionId, prompt, abort } = useDraftAgentSession(
+    (createdSessionId) => {
+      navigate(`/sessions/${createdSessionId}`);
+    },
+  );
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body, styles.bodyTop);
   const column = useStyles(styles.column);

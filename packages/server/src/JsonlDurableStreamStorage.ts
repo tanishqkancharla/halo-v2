@@ -28,20 +28,13 @@ export class JsonlDurableStreamAppendError extends errore.createTaggedError({
 export class JsonlDurableStreamStorage<
   TValueSchema extends TSchema,
 > implements DurableStreamStorage<Static<TValueSchema>> {
-  private readonly recordSchema: TSchema;
-
   constructor(
     private readonly args: {
       filesystem: FilesystemService;
       path: string;
       valueSchema: TValueSchema;
     },
-  ) {
-    this.recordSchema = Type.Object({
-      sequence: Type.Integer({ minimum: 1 }),
-      value: args.valueSchema,
-    });
-  }
+  ) {}
 
   async load(): Promise<
     readonly DurableStreamRecord<Static<TValueSchema>>[] | Error
@@ -60,13 +53,30 @@ export class JsonlDurableStreamStorage<
 
     const lines = contents.split("\n");
     if (lines.at(-1) === "") lines.pop();
+    const serializedRecordSchema = Type.Object({
+      sequence: Type.Integer({ minimum: 1 }),
+      value: Type.Unknown(),
+    });
     const records: DurableStreamRecord<Static<TValueSchema>>[] = [];
     for (const [index, line] of lines.entries()) {
       const lineNumber = index + 1;
-      const parsed = errore.try({
+      const record = errore.try({
         try: () => {
-          // SAFETY: JSON.parse is untyped; recordSchema is the storage contract.
-          return JSON.parse(line) as unknown;
+          // SAFETY: JSON.parse is untyped; the envelope and value schemas validate its output below.
+          const parsed = Value.Parse(
+            serializedRecordSchema,
+            JSON.parse(line) as unknown,
+          );
+          const value: unknown = parsed.value;
+          if (!Value.Check(this.args.valueSchema, value)) {
+            throw new Error("Durable stream value does not match its schema");
+          }
+          // SAFETY: Value.Check validated value against the generic TValueSchema.
+          const checkedValue = value as Static<TValueSchema>;
+          return {
+            sequence: parsed.sequence,
+            value: checkedValue,
+          };
         },
         catch: (cause) =>
           new JsonlDurableStreamRecordError({
@@ -75,15 +85,8 @@ export class JsonlDurableStreamStorage<
             cause,
           }),
       });
-      if (parsed instanceof Error) return parsed;
-      if (!Value.Check(this.recordSchema, parsed)) {
-        return new JsonlDurableStreamRecordError({
-          path: this.args.path,
-          line: lineNumber,
-        });
-      }
-      // SAFETY: recordSchema validates the sequence and TValueSchema value.
-      records.push(parsed as DurableStreamRecord<Static<TValueSchema>>);
+      if (record instanceof Error) return record;
+      records.push(record);
     }
     return records;
   }
@@ -91,8 +94,12 @@ export class JsonlDurableStreamStorage<
   async append(
     records: readonly DurableStreamRecord<Static<TValueSchema>>[],
   ): Promise<void | Error> {
+    const recordSchema = Type.Object({
+      sequence: Type.Integer({ minimum: 1 }),
+      value: this.args.valueSchema,
+    });
     for (const record of records) {
-      if (Value.Check(this.recordSchema, record)) continue;
+      if (Value.Check(recordSchema, record)) continue;
       return new JsonlDurableStreamAppendError({ path: this.args.path });
     }
     const contents = errore.try({

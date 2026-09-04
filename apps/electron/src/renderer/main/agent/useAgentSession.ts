@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import * as errore from "errore";
 import { useQueryClient } from "@tanstack/react-query";
-import type { AgentSessionState } from "@get-halo/shared/AgentSessionState";
 import {
-  applyAgentSessionEvent,
-  emptyAgentSessionState,
-} from "@get-halo/shared/AgentSessionState";
+  projectSession,
+  type ProjectedSession,
+  type SessionLogRecord,
+} from "@get-halo/shared/sessionLog";
 import { useApi } from "../../api/ApiProvider.tsx";
 import type { HaloClient } from "@get-halo/shared/contract";
 import {
@@ -25,13 +25,13 @@ class AbortFailedError extends errore.createTaggedError({
 }) {}
 
 type UseAgentSessionResult = {
-  state: AgentSessionState;
+  state: ProjectedSession;
   prompt: (text: string) => Promise<void | PromptFailedError>;
   abort: () => Promise<void | AbortFailedError>;
 };
 
 /**
- * Opens a saved Pi session and folds AgentSessionEvents into AgentSessionState.
+ * Opens a saved session and projects its durable event records.
  */
 export function useAgentSession(sessionId: string): UseAgentSessionResult {
   const api = useApi();
@@ -40,13 +40,15 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
   const [readySessionId, setReadySessionId] = useState<string | undefined>(
     undefined,
   );
-  const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
+  const [records, setRecords] = useState<SessionLogRecord[]>([]);
+  const [localError, setLocalError] = useState<string | undefined>(undefined);
   const [openedFor, setOpenedFor] = useState(sessionId);
 
   if (openedFor !== sessionId) {
     setOpenedFor(sessionId);
     setReadySessionId(undefined);
-    setState(emptyAgentSessionState);
+    setRecords([]);
+    setLocalError(undefined);
   }
 
   useEffect(() => {
@@ -68,18 +70,21 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
         return;
       }
       if (cancelled) return;
-      setState(opened.state);
+      setRecords(opened.records);
       setReadySessionId(opened.sessionId);
-      iterator = await api.sessions.events({ sessionId: opened.sessionId });
-      for await (const event of iterator) {
+      iterator = await api.sessions.events({
+        sessionId: opened.sessionId,
+        afterSequence: opened.cursor,
+      });
+      for await (const record of iterator) {
+        setRecords((current) => [...current, record]);
+        const event = record.value;
         if (event.type === "halo.connection") {
           queryClientRef.current.setQueryData<ConnectionState>(
             connectionStateQueryKey(event.request),
             (current) => applyConnectionEvent(current, event),
           );
-          continue;
         }
-        setState((current) => applyAgentSessionEvent(current, event));
       }
     })().catch((cause) => {
       if (cancelled && errore.isAbortError(cause)) return;
@@ -99,10 +104,10 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
   async function prompt(text: string) {
     if (readySessionId === undefined) {
       const error = new PromptFailedError({ reason: "Session is not ready." });
-      setState((current) => ({ ...current, error: error.message }));
+      setLocalError(error.message);
       return error;
     }
-    setState((current) => ({ ...current, error: undefined }));
+    setLocalError(undefined);
     const result = await api.sessions
       .prompt({ sessionId: readySessionId, text })
       .then(() => undefined)
@@ -114,11 +119,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
           }),
       );
     if (result instanceof PromptFailedError) {
-      setState((current) => ({
-        ...current,
-        isWorking: false,
-        error: result.message,
-      }));
+      setLocalError(result.message);
       return result;
     }
     await queryClient.invalidateQueries({
@@ -145,11 +146,11 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
     }
   }
 
-  return { state, prompt, abort };
+  return { state: projectRecords(records, localError), prompt, abort };
 }
 
 type UseDraftAgentSessionResult = {
-  state: AgentSessionState;
+  state: ProjectedSession;
   sessionId: string | undefined;
   prompt: (text: string) => Promise<void | PromptFailedError>;
   abort: () => Promise<void | AbortFailedError>;
@@ -163,7 +164,7 @@ export function useDraftAgentSession(
 ): UseDraftAgentSessionResult {
   const api = useApi();
   const queryClient = useQueryClient();
-  const [state, setState] = useState<AgentSessionState>(emptyAgentSessionState);
+  const [localError, setLocalError] = useState<string | undefined>(undefined);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const sessionIdRef = useRef<string | undefined>(undefined);
   const onCreatedRef = useRef(onCreated);
@@ -181,14 +182,14 @@ export function useDraftAgentSession(
         }),
     );
     if (created instanceof Error) {
-      setState((current) => ({ ...current, error: created.message }));
+      setLocalError(created.message);
       return created;
     }
     sessionIdRef.current = created.sessionId;
     setSessionId(created.sessionId);
     onCreatedRef.current(created.sessionId);
 
-    setState((current) => ({ ...current, error: undefined }));
+    setLocalError(undefined);
     const result = await api.sessions
       .prompt({ sessionId: created.sessionId, text })
       .then(() => undefined)
@@ -200,11 +201,7 @@ export function useDraftAgentSession(
           }),
       );
     if (result instanceof PromptFailedError) {
-      setState((current) => ({
-        ...current,
-        isWorking: false,
-        error: result.message,
-      }));
+      setLocalError(result.message);
       return result;
     }
     await queryClient.invalidateQueries({
@@ -232,5 +229,19 @@ export function useDraftAgentSession(
     }
   }
 
-  return { state, sessionId, prompt, abort };
+  return {
+    state: projectRecords([], localError),
+    sessionId,
+    prompt,
+    abort,
+  };
+}
+
+function projectRecords(
+  records: readonly SessionLogRecord[],
+  localError: string | undefined,
+): ProjectedSession {
+  const projected = projectSession(records.map((record) => record.value));
+  if (localError === undefined) return projected;
+  return { ...projected, error: localError, isWorking: false };
 }

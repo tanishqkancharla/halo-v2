@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./AgentSessionState": "./src/AgentSessionState.ts",
     "./connectionRequests": "./src/connectionRequests.ts",
     "./contract": "./src/contract.ts",
     "./isCallable": "./src/isCallable.ts",

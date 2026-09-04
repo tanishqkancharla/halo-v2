@@ -72,6 +72,55 @@ e2eTest("shows a connection request", async ({ harness, renderer }) => {
   await expect(card.getByRole("button", { name: "Connect" })).toBeVisible();
 });
 
+e2eTest(
+  "recovers interrupted activity from the durable session log",
+  async ({ harness, renderer, server }) => {
+    const loaded = await harness.loadSession({
+      title: "Interrupted session",
+      messages: [
+        m.user("Read the project notes"),
+        m.assistant("I’ll read the notes."),
+      ],
+      initialEvents: [
+        { type: "run.started", runId: "run-1" },
+        {
+          type: "tool.started",
+          invocation: {
+            id: "tool-1",
+            runId: "run-1",
+            tool: { path: "read", displayName: "Read" },
+            arguments: { path: "notes.md" },
+          },
+        },
+      ],
+    });
+
+    const pane = renderer.page.getByRole("main", {
+      name: "Interrupted session",
+    });
+    await expect(pane.getByText("Read the project notes")).toBeVisible();
+    await expect(pane.getByText("Working", { exact: true })).not.toBeVisible();
+
+    const opened = await server.rpc.sessions.open({
+      sessionId: loaded.sessionId,
+    });
+    expect(
+      opened.records.slice(-2).map((record) => record.value),
+    ).toMatchObject([
+      {
+        type: "tool.finished",
+        invocationId: "tool-1",
+        isError: true,
+      },
+      {
+        type: "run.finished",
+        runId: "run-1",
+        outcome: "interrupted",
+      },
+    ]);
+  },
+);
+
 e2eTest("shows tools used inside exec", async ({ harness, renderer }) => {
   await harness.loadSession({
     title: "Cross-tool lookup",

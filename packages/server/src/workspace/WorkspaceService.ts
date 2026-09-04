@@ -24,6 +24,7 @@ export type WorkspaceLayout = {
   root: string;
   agentDir: string;
   sessionDir: string;
+  sessionLogPath(sessionId: string): string;
 };
 
 type WorkspaceInfo = {
@@ -416,10 +417,13 @@ async function walkDirectory(
 
 function workspaceLayout(root: string): WorkspaceLayout {
   const agentDir = join(root, ".pi", "agent");
+  const sessionDir = join(agentDir, "sessions");
   return {
     root,
     agentDir,
-    sessionDir: join(agentDir, "sessions"),
+    sessionDir,
+    sessionLogPath: (sessionId) =>
+      join(sessionDir, `${sessionId}.halo-events.jsonl`),
   };
 }
 

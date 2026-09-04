@@ -1,4 +1,3 @@
-import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import {
   asyncIteratorObject,
   error,
@@ -6,8 +5,8 @@ import {
   type,
   type RouterContractClient,
 } from "@orpc/contract";
-import type { AgentSessionState } from "./AgentSessionState.js";
 import type { ConnectionRequest } from "./connectionRequests.js";
+import type { SessionLogRecord } from "./sessionLog.js";
 import type {
   PluginList,
   PluginLoadError,
@@ -16,7 +15,7 @@ import type {
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const haloProtocolVersion = 2 as const;
+export const haloProtocolVersion = 3 as const;
 
 export const RequestRejectedError = error("BAD_REQUEST", {
   message: "Halo could not complete the request.",
@@ -66,15 +65,6 @@ export type ConnectionStarted =
       expiresInMs: number;
     };
 
-export type HaloConnectionEvent = {
-  type: "halo.connection";
-  connectionId: string;
-  request: ConnectionRequest;
-  status: "connected" | "cancelled" | "expired";
-};
-
-export type HaloSessionEvent = AgentSessionEvent | HaloConnectionEvent;
-
 export const contract = publicProcedure.router({
   server: {
     info: oc.output(type<{ protocolVersion: typeof haloProtocolVersion }>()),
@@ -91,12 +81,16 @@ export const contract = publicProcedure.router({
   sessions: {
     list: oc.output(type<SessionSummary[]>()),
     create: oc.output(type<{ sessionId: string }>()),
-    open: oc
-      .input(type<{ sessionId: string }>())
-      .output(type<{ sessionId: string; state: AgentSessionState }>()),
+    open: oc.input(type<{ sessionId: string }>()).output(
+      type<{
+        sessionId: string;
+        records: SessionLogRecord[];
+        cursor: number;
+      }>(),
+    ),
     events: oc
-      .input(type<{ sessionId: string }>())
-      .output(asyncIteratorObject(type<HaloSessionEvent>())),
+      .input(type<{ sessionId: string; afterSequence?: number }>())
+      .output(asyncIteratorObject(type<SessionLogRecord>())),
     prompt: oc.input(type<{ sessionId: string; text: string }>()),
     startConnection: oc
       .input(type<{ sessionId: string; request: ConnectionRequest }>())

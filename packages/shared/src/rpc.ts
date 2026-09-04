@@ -1,13 +1,8 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
 export type { AgentSessionEvent };
+export type { AgentMessage } from "./sessionLog.js";
 export type { PluginList, PluginLoadError } from "./plugin.js";
-
-/** Pi agent message carried on session events and durable sessions. */
-export type AgentMessage = Extract<
-  AgentSessionEvent,
-  { type: "message_end" }
->["message"];
 
 export type WorkspaceInfo = {
   name: string;

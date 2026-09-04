@@ -292,11 +292,11 @@ The Pi subscription adapter appends semantic events in received order. Append fa
 
 Update the E2E harness to seed the Halo event log instead of writing only Pi messages. Because Halo is unreleased, do not add a fallback that rebuilds missing logs from legacy sessions.
 
-- [ ] Add the session log path to `WorkspaceLayout` and open/close a `DurableStream<SessionLogEvent>` in `HaloAgentSession.ts`.
-- [ ] Add `adaptPiEvent` for run, message, assistant-delta, direct-tool, and connection events; queue and propagate durable append errors.
-- [ ] Replace `sessions.open` and `sessions.events` contracts and handlers with records plus sequence cursors.
-- [ ] Change `useAgentSession.ts` to retain only `DurableStreamRecord<SessionLogEvent>[]`, subscribe after the returned cursor, and project the event values; remove `AgentSessionState.ts` and the temporary legacy adapter.
-- [ ] Update `SessionDescription.ts` to seed durable events, run focused server/shared/desktop tests, then run `pnpm run check-affected`.
+- [x] Add the session log path to `WorkspaceLayout` and open/close a `DurableStream<SessionLogEvent>` in `HaloAgentSession.ts`.
+- [x] Add `adaptPiEvent` for run, message, assistant-delta, direct-tool, and connection events; queue and propagate durable append errors.
+- [x] Replace `sessions.open` and `sessions.events` contracts and handlers with records plus sequence cursors.
+- [x] Change `useAgentSession.ts` to retain only `DurableStreamRecord<SessionLogEvent>[]`, subscribe after the returned cursor, and project the event values; remove `AgentSessionState.ts` and the temporary legacy adapter.
+- [x] Update `SessionDescription.ts` to seed durable events and run focused server/shared/desktop tests. Typechecking, linting, formatting, unit tests, and four existing Electron flows pass; `pnpm run check-affected` stops only at the intentionally failing Phase 5 tool-label regression.
 
 ### Phase 4: Publish nested Executor tools as ordinary child invocations
 

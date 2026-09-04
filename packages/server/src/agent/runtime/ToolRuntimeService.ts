@@ -2,10 +2,8 @@ import { randomUUID } from "node:crypto";
 import { OAUTH2_SESSION_TTL_MS } from "@executor-js/sdk/core";
 import * as errore from "errore";
 import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
-import type {
-  ConnectionStarted,
-  HaloConnectionEvent,
-} from "@get-halo/shared/contract";
+import type { ConnectionStarted } from "@get-halo/shared/contract";
+import type { HaloConnectionEvent } from "@get-halo/shared/sessionLog";
 import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 import type { WorkspaceService } from "../../workspace/WorkspaceService.js";
 import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
