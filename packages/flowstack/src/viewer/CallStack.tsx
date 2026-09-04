@@ -204,8 +204,9 @@ function rowOf(item: Keyed): Row {
     case "reply":
       return {
         kind: "reply",
-        name: node.value === undefined ? "↩" : `↩ ${node.value}`,
+        name: node.name,
         service: node.from,
+        returns: node.value,
         children,
       };
     case "frame":
@@ -281,6 +282,7 @@ function Line(props: {
   const args = useStyles(styles.args);
   const location = useStyles(styles.location);
   const returns = useStyles(styles.returns);
+  const replyFrom = useStyles(styles.replyFrom);
   const note = useStyles(styles.note);
   const controlText = useStyles(styles.control);
   const excerpt = useStyles(styles.excerpt);
@@ -305,14 +307,20 @@ function Line(props: {
           {control ? (
             <span className={controlText}>{row.name}</span>
           ) : row.kind === "reply" ? (
-            <ActorName
-              name={row.name}
-              process={serviceProcess(
-                row.service === undefined
-                  ? undefined
-                  : services.get(row.service),
+            <>
+              <ActorName
+                name="↩"
+                process={serviceProcess(
+                  row.service === undefined
+                    ? undefined
+                    : services.get(row.service),
+                )}
+              />
+              <span className={replyFrom}>{row.name} return</span>
+              {row.returns === undefined ? undefined : (
+                <span className={args}>({row.returns})</span>
               )}
-            />
+            </>
           ) : (
             <NameText
               name={row.name}
@@ -485,6 +493,12 @@ const styles = {
   }),
   returns: style({
     marginLeft: spacing.value(4),
+    color: colors.gray[10],
+    fontSize: "11px",
+    flex: "0 0 auto",
+  }),
+  replyFrom: style({
+    margin: `0 ${spacing.value(1)}`,
     color: colors.gray[10],
     fontSize: "11px",
     flex: "0 0 auto",

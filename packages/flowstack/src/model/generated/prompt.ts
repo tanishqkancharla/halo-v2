@@ -2729,6 +2729,7 @@ export const generatedPromptFlow: Flow = {
                             },
                             {
                               kind: "reply",
+                              name: "sessionsRouter.prompt",
                               from: "gen:main:sessionsRouter",
                               to: "gen:renderer:useAgentSession",
                               carrier: "rpc",
@@ -3014,6 +3015,7 @@ export const generatedPromptFlow: Flow = {
                                             },
                                             {
                                               kind: "reply",
+                                              name: "sessionsRouter.list",
                                               from: "gen:main:sessionsRouter",
                                               to: "gen:renderer:useSessionsQuery",
                                               carrier: "rpc",

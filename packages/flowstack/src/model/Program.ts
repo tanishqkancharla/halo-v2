@@ -79,6 +79,8 @@ export type EventNode = NodeBase & {
  */
 type ReplyNode = NodeBase & {
   kind: "reply";
+  /** The frame that returns. */
+  name: string;
   from: string;
   to: string;
   carrier: Carrier;

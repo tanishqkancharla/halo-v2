@@ -467,6 +467,7 @@ export class FlowWalker {
       children: [
         target,
         reply({
+          name: target.entry,
           from: target.service,
           to: caller,
           carrier: this.config.rpc.carrier,
