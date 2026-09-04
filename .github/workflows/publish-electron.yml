@@ -33,18 +33,85 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+  test:
+    name: Test ${{ matrix.platform }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-latest
+          - platform: macos
+            os: macos-latest
+          - platform: windows
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+        with:
+          runtime: node@22
+          cache: true
+          install: false
+
+      - name: Install Linux display server
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
+      - name: Allow private Maui git dependency
+        env:
+          MAUI_READ_TOKEN: ${{ secrets.MAUI_READ_TOKEN }}
+        shell: bash
+        run: |
+          git config --global url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --global --add url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "git@github.com:"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run packaged Electron tests
+        if: matrix.platform != 'linux'
+        run: pnpm --filter @halo/desktop test:e2e
+
+      - name: Run packaged Electron tests on Linux
+        if: matrix.platform == 'linux'
+        env:
+          HALO_USE_SWIFTSHADER: "1"
+        run: xvfb-run --auto-servernum pnpm --filter @halo/desktop test:e2e
+
+      - name: Upload failed test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-e2e-${{ matrix.platform }}
+          path: tmp/e2e
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    name: Create GitHub Release
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    steps:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.version.outputs.version }}" \
-            --title "${{ steps.version.outputs.version }}" \
+          gh release create "${{ needs.prepare.outputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ needs.prepare.outputs.version }}" \
             --generate-notes \
             --latest
 
   publish:
     name: Publish ${{ matrix.platform }}
-    needs: prepare
+    needs: [prepare, release]
     environment: Release
     strategy:
       fail-fast: false
@@ -116,7 +183,7 @@ jobs:
 
   publish-plugin-sdk:
     name: Publish @get-halo/plugin-sdk
-    needs: prepare
+    needs: [prepare, release]
     environment: Release
     runs-on: ubuntu-latest
     permissions:
