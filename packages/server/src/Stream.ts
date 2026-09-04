@@ -1,8 +1,14 @@
+import * as errore from "errore";
+
 type StreamSubscriber<T> = (value: T) => void;
+
+export type StreamConsumeOptions = {
+  abortSignal?: AbortSignal;
+};
 
 export type ReadonlyStream<T> = {
   subscribe(subscriber: StreamSubscriber<T>): () => void;
-  consume(signal?: AbortSignal): AsyncGenerator<T, void, void>;
+  consume(options?: StreamConsumeOptions): AsyncGenerator<T, void, void>;
   map<U>(transform: (value: T) => U): ReadonlyStream<U>;
   filter<S extends T>(predicate: (value: T) => value is S): ReadonlyStream<S>;
   filter(predicate: (value: T) => boolean): ReadonlyStream<T>;
@@ -22,8 +28,8 @@ export class Stream<T> implements ReadonlyStream<T> {
     return () => this.subscribers.delete(subscriber);
   }
 
-  consume(signal?: AbortSignal): AsyncGenerator<T, void, void> {
-    return consumeStream(this, signal);
+  consume(options?: StreamConsumeOptions): AsyncGenerator<T, void, void> {
+    return consumeStream(this, options);
   }
 
   map<U>(transform: (value: T) => U): ReadonlyStream<U> {
@@ -47,8 +53,8 @@ class MappedStream<T, U> implements ReadonlyStream<U> {
     return this.source.subscribe((value) => subscriber(this.transform(value)));
   }
 
-  consume(signal?: AbortSignal): AsyncGenerator<U, void, void> {
-    return consumeStream(this, signal);
+  consume(options?: StreamConsumeOptions): AsyncGenerator<U, void, void> {
+    return consumeStream(this, options);
   }
 
   map<V>(transform: (value: U) => V): ReadonlyStream<V> {
@@ -76,8 +82,8 @@ class FilteredStream<T, U extends T = T> implements ReadonlyStream<U> {
     });
   }
 
-  consume(signal?: AbortSignal): AsyncGenerator<U, void, void> {
-    return consumeStream(this, signal);
+  consume(options?: StreamConsumeOptions): AsyncGenerator<U, void, void> {
+    return consumeStream(this, options);
   }
 
   map<V>(transform: (value: U) => V): ReadonlyStream<V> {
@@ -93,8 +99,9 @@ class FilteredStream<T, U extends T = T> implements ReadonlyStream<U> {
 
 async function* consumeStream<T>(
   stream: ReadonlyStream<T>,
-  signal?: AbortSignal,
+  options?: StreamConsumeOptions,
 ): AsyncGenerator<T, void, void> {
+  const signal = options?.abortSignal;
   const values: T[] = [];
   let wake: (() => void) | undefined;
   let aborted = signal?.aborted === true;
@@ -107,28 +114,26 @@ async function* consumeStream<T>(
     values.push(value);
     wakeConsumer();
   });
+  using cleanup = new errore.DisposableStack();
+  cleanup.defer(unsubscribe);
   const abort = () => {
     aborted = true;
     wakeConsumer();
   };
   signal?.addEventListener("abort", abort, { once: true });
+  cleanup.defer(() => signal?.removeEventListener("abort", abort));
 
-  try {
-    while (true) {
-      if (aborted) return;
-      if (values.length === 0) {
-        await new Promise<void>((resolve) => {
-          wake = resolve;
-        });
-      }
-      const ready = values.splice(0);
-      for (const value of ready) {
-        if (aborted) return;
-        yield value;
-      }
+  while (true) {
+    if (aborted) return;
+    if (values.length === 0) {
+      await new Promise<void>((resolve) => {
+        wake = resolve;
+      });
     }
-  } finally {
-    signal?.removeEventListener("abort", abort);
-    unsubscribe();
+    const ready = values.splice(0);
+    for (const value of ready) {
+      if (aborted) return;
+      yield value;
+    }
   }
 }

@@ -39,6 +39,6 @@ export const workspaceRouter = os.router({
   }),
   events: os.events.handler(({ context, signal }) => {
     context.logger.info({ event: "subscribeWorkspaceTree" });
-    return context.workspace.treeEvents.consume(signal);
+    return context.workspace.treeEvents.consume({ abortSignal: signal });
   }),
 });

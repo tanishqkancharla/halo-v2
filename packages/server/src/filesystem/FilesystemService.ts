@@ -101,6 +101,16 @@ export class FilesystemService {
       .catch((cause) => filesystemError({ operation: "write", path, cause }));
   }
 
+  async appendFile(
+    path: string,
+    data: string | Uint8Array,
+    options?: BufferEncoding | { mode?: number },
+  ) {
+    return await fsPromises
+      .appendFile(path, data, options)
+      .catch((cause) => filesystemError({ operation: "append", path, cause }));
+  }
+
   async makeDirectory(
     path: string,
     options?: { recursive?: boolean; mode?: number },

@@ -186,11 +186,11 @@ type DurableStreamStorage<T> = {
 
 Add `FilesystemService.appendFile` and a JSONL storage adapter. Parsing malformed records fails `createDurableStream` with a tagged error rather than silently skipping history.
 
-- [ ] Change `ReadonlyStream.consume`, `Stream`, `MappedStream`, `FilteredStream`, and `consumeStream` in `packages/server/src/Stream.ts` to accept `consume({ abortSignal }?)`; update `sessionsRouter.ts` and `workspaceRouter.ts` call sites.
-- [ ] Add `packages/server/src/DurableStream.ts` with sequenced records, serialized durable append, `snapshot()`, and cursor-safe `consume({ abortSignal, afterSequence }?)` built on `Stream`.
-- [ ] Add `FilesystemService.appendFile` and `packages/server/src/JsonlDurableStreamStorage.ts`, following the repository’s `errore` boundary conventions.
-- [ ] Add focused tests covering optional consumption options, abort cleanup, persistence-before-publish, concurrent append order, replay/live overlap, restart reload, and malformed JSONL.
-- [ ] Run `pnpm --filter @get-halo/server test -- Stream DurableStream` and `pnpm run check-affected`.
+- [x] Change `ReadonlyStream.consume`, `Stream`, `MappedStream`, `FilteredStream`, and `consumeStream` in `packages/server/src/Stream.ts` to accept `consume({ abortSignal }?)`; update `sessionsRouter.ts` and `workspaceRouter.ts` call sites.
+- [x] Add `packages/server/src/DurableStream.ts` with sequenced records, serialized durable append, `snapshot()`, and cursor-safe `consume({ abortSignal, afterSequence }?)` built on `Stream`.
+- [x] Add `FilesystemService.appendFile` and `packages/server/src/JsonlDurableStreamStorage.ts`, following the repository’s `errore` boundary conventions.
+- [x] Add focused tests covering optional consumption options, abort cleanup, persistence-before-publish, concurrent append order, replay/live overlap, restart reload, and malformed JSONL.
+- [x] Run the focused stream tests and `pnpm run check-affected`. The server suite passes; the affected check stops at the intentionally failing tool-label E2E committed before Phase 1.
 
 ### Phase 2: Shared append-only session log and pure client projector
 

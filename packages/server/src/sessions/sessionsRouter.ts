@@ -50,7 +50,7 @@ export const sessionsRouter = os.router({
     });
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    return session.events.consume(signal);
+    return session.events.consume({ abortSignal: signal });
   }),
   prompt: os.prompt.handler(async ({ input, context }) => {
     context.logger.info({
