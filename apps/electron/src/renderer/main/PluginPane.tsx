@@ -40,6 +40,7 @@ export function MissingPluginPane({ pluginId }: { pluginId: string }) {
 
   return (
     <main className={pane} aria-label={pluginId}>
+      <PaneHeader />
       <div className={body}>
         <div className={column}>Plugin '{pluginId}' has no Routes</div>
       </div>

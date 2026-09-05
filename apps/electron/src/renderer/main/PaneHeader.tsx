@@ -1,4 +1,4 @@
-import { border, flexItem, spacing, text } from "maui";
+import { border, flex, flexItem, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 
 export function PaneHeader({
@@ -10,8 +10,12 @@ export function PaneHeader({
 }) {
   const header = useStyles(headerClass);
   const titleClassName = useStyles(titleClass);
-  if (title === undefined) return undefined;
-  const label = section === undefined ? title : `${section} / ${title}`;
+  const label = paneLabel(section, title);
+
+  if (label === undefined) {
+    return <header className={header} aria-hidden="true" />;
+  }
+
   return (
     <header className={header} aria-label={label}>
       <div className={titleClassName}>{label}</div>
@@ -19,12 +23,21 @@ export function PaneHeader({
   );
 }
 
+function paneLabel(section: string | undefined, title: string | undefined) {
+  if (title === undefined) return section;
+  if (section === undefined) return title;
+  return `${section} / ${title}`;
+}
+
 const headerClass = style(
+  flex({ align: "center" }),
   flexItem({ size: "hug" }),
   border(["bottom"], "border"),
   spacing.padding({ x: 12, y: 6 }),
   {
     minWidth: 0,
+    minHeight: "36px",
+    flexShrink: 0,
     alignSelf: "stretch",
     WebkitAppRegion: "drag",
   },
