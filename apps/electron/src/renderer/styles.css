@@ -38,3 +38,9 @@ select,
 textarea {
   font: inherit;
 }
+
+/* Shiki's highlighted <pre> is tabindex=0; Chromium then paints outline:auto. */
+.maui-code-block :focus,
+.maui-code-block :focus-visible {
+  outline: none;
+}
