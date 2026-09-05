@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   CodeBlock,
   colors,
@@ -20,23 +20,21 @@ export function ToolCall({ part }: { part: ToolPart }) {
       : undefined;
   const label = toolPartLabel(part, workspaceRoot);
   const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
   const rootClassName = useStyles(
     styles.root,
     expanded ? styles.rootExpanded : undefined,
   );
-  const labelClassName = useStyles(styles.label);
   const summaryClassName = useStyles(styles.summary);
   const shellClassName = useStyles(styles.shell);
   const bodyClassName = useStyles(styles.body);
-  const js = label.kind === "exec" ? execJsSource(part.args) : undefined;
-  const expandable = label.kind === "exec" && js !== undefined;
+  const { details } = part;
+  const js = details.toolPath === "exec" ? execJsSource(details) : undefined;
+  const input =
+    js === undefined ? JSON.stringify(details.args, undefined, 2) : js;
 
   const summary =
-    label.kind === "read" ? (
-      <>Read {label.text}</>
-    ) : label.kind === "wrote" ? (
-      <>Wrote {label.text}</>
-    ) : label.kind === "shell" ? (
+    label.kind === "shell" ? (
       <>
         {"$ "}
         <span className={shellClassName}>{label.text}</span>
@@ -45,26 +43,32 @@ export function ToolCall({ part }: { part: ToolPart }) {
       <>{label.text}</>
     );
 
-  if (!expandable) {
-    return <div className={labelClassName}>{summary}</div>;
-  }
-
   return (
     <div className={rootClassName}>
       <button
         type="button"
         className={summaryClassName}
         aria-expanded={expanded}
-        aria-label={label.text}
+        aria-controls={detailsId}
+        aria-label={`${label.text} (${part.tool.path})`}
         onClick={() => setExpanded(!expanded)}
       >
         {summary}
       </button>
       {expanded ? (
-        <div className={bodyClassName}>
-          <CodeBlock lang="javascript">{js}</CodeBlock>
-          {part.resultText !== undefined ? (
-            <CodeBlock lang="text">{part.resultText}</CodeBlock>
+        <div
+          id={detailsId}
+          className={bodyClassName}
+          role="region"
+          aria-label={part.tool.path}
+        >
+          {input !== undefined ? (
+            <CodeBlock lang={js === undefined ? "json" : "javascript"}>
+              {input}
+            </CodeBlock>
+          ) : undefined}
+          {details.resultText !== undefined ? (
+            <CodeBlock lang="text">{details.resultText}</CodeBlock>
           ) : undefined}
         </div>
       ) : undefined}
@@ -87,7 +91,6 @@ const styles = {
   rootExpanded: style(spacing.padding({ x: 3, y: 2 }), {
     backgroundColor: colors.gray[3],
   }),
-  label: labelStyle,
   summary: style(labelStyle, {
     textAlign: "left",
     border: "none",
@@ -101,5 +104,9 @@ const styles = {
   shell: style(monospace, { fontFeatureSettings: '"calt" 1' }),
   body: style(flex({ direction: "column", gap: 3 }), {
     minWidth: 0,
+    "& pre, & code": {
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere",
+    },
   }),
 };

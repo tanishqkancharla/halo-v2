@@ -123,7 +123,7 @@ async function callParallelTool(args: {
 
 export const parallelSearchPlugin: HaloToolPlugin = {
   id: "web",
-  name: "Web",
+  name: "Web Search",
   tools: [
     defineHaloTool({
       name: "search",

@@ -26,6 +26,7 @@ export type HaloServerOptions = {
   cliNodeExecutable?: string;
   cliElectronRunAsNode?: boolean;
   isDevelopment?: boolean;
+  testingApiEnabled?: boolean;
   ownerUserId: Promise<string | Error>;
   logger: Logger;
   pluginDependencyInstaller?: (directory: string) => Promise<Error | void>;
@@ -89,6 +90,7 @@ export class HaloServer {
       sessions,
       toolRuntime,
       logger: options.logger,
+      testingApiEnabled: options.testingApiEnabled === true,
     };
   }
 

@@ -103,6 +103,7 @@ const haloServer = new HaloServer({
   cliNodeExecutable: isDevelopment ? "node" : process.execPath,
   cliElectronRunAsNode: !isDevelopment,
   isDevelopment,
+  testingApiEnabled: applicationLaunchMode === ApplicationLaunchMode.Test,
   ownerUserId,
   logger: rpcLogger,
   createCredentialVault: ({ filesystem, workspaceRoot }) =>

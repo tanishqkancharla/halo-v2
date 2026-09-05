@@ -6,7 +6,11 @@ import {
   type RouterContractClient,
 } from "@orpc/contract";
 import type { ConnectionRequest } from "./connectionRequests.js";
-import type { SessionLogRecord } from "./sessionLog.js";
+import type {
+  SessionLogEvent,
+  SessionLogRecord,
+  ToolIdentity,
+} from "./sessionLog.js";
 import type {
   PluginList,
   PluginLoadError,
@@ -99,6 +103,13 @@ export const contract = publicProcedure.router({
       oc.input(type<{ sessionId: string; connectionId: string }>()),
     abort: oc.input(type<{ sessionId: string }>()),
     close: oc.input(type<{ sessionId: string }>()),
+  },
+  testHarness: {
+    appendSessionEvents:
+      oc.input(type<{ sessionId: string; events: SessionLogEvent[] }>()),
+    getToolIdentity: oc
+      .input(type<{ path: string }>())
+      .output(type<ToolIdentity>()),
   },
   plugins: {
     list: oc.output(type<PluginList>()),

@@ -12,10 +12,15 @@ import {
   workspaceRouter,
   type WorkspaceRouterContext,
 } from "./workspace/workspaceRouter.js";
+import {
+  testingRouter,
+  type TestingRouterContext,
+} from "./testing/testingRouter.js";
 
 export type HaloContext = WorkspaceRouterContext &
   SessionsRouterContext &
-  PluginsRouterContext;
+  PluginsRouterContext &
+  TestingRouterContext;
 
 const server = implement(contract.server);
 
@@ -28,4 +33,5 @@ export const haloRpcRouter = {
   workspace: workspaceRouter,
   sessions: sessionsRouter,
   plugins: pluginsRouter,
+  testHarness: testingRouter,
 };

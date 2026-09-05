@@ -11,11 +11,20 @@ import { createTestArtifacts, type TestArtifacts } from "./TestArtifacts.js";
 import { resolveUnpackedExecutable } from "./resolveUnpackedExecutable.js";
 import {
   loadSessionDescription,
+  sessionDescriptionEvents,
   type SessionDescription,
+  type SessionDescriptionItem,
 } from "./SessionDescription.js";
 
+type E2ESession = {
+  sessionId: string;
+  append(
+    items: SessionDescriptionItem | SessionDescriptionItem[],
+  ): Promise<void>;
+};
+
 type E2ETestHarness = TestArtifacts["harness"] & {
-  loadSession(description: SessionDescription): Promise<{ sessionId: string }>;
+  loadSession(description: SessionDescription): Promise<E2ESession>;
 };
 
 type E2EFixtures = {
@@ -70,21 +79,26 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
   renderer: async ({ electronApp }, use) => {
     await use({ page: await electronApp.firstWindow() });
   },
-  harness: async ({ renderer, testArtifacts }, use) => {
+  harness: async ({ renderer, server, testArtifacts }, use) => {
     await use({
       ...testArtifacts.harness,
       async loadSession(description) {
         await renderer.page.getByRole("main").waitFor();
-        const loaded = loadSessionDescription({
+        const loaded = await loadSessionDescription({
           description,
           workspaceRoot: testArtifacts.paths.workspace,
+          getToolIdentity: (path) =>
+            server.rpc.testHarness.getToolIdentity({ path }),
         });
         if (loaded instanceof Error) throw loaded;
         await renderer.page.reload();
         await renderer.page
           .getByRole("main", { name: description.title, exact: true })
           .waitFor();
-        return loaded;
+        return createE2ESession({
+          sessionId: loaded.sessionId,
+          server: server.rpc,
+        });
       },
     });
   },
@@ -101,6 +115,31 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
     });
   },
 });
+
+function createE2ESession(args: {
+  sessionId: string;
+  server: HaloClient;
+}): E2ESession {
+  return {
+    sessionId: args.sessionId,
+    async append(items) {
+      const opened = await args.server.sessions.open({
+        sessionId: args.sessionId,
+      });
+      const events = await sessionDescriptionEvents({
+        items: Array.isArray(items) ? items : [items],
+        history: opened.records.map((record) => record.value),
+        getToolIdentity: (path) =>
+          args.server.testHarness.getToolIdentity({ path }),
+      });
+      if (events instanceof Error) throw events;
+      await args.server.testHarness.appendSessionEvents({
+        sessionId: args.sessionId,
+        events,
+      });
+    },
+  };
+}
 
 function processEnvironment() {
   // Electron treats the packaged app as a Node process when this inherited variable is present.

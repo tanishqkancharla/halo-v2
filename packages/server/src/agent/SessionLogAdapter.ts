@@ -149,8 +149,12 @@ export function interruptedSessionEvents(
   const runId = projected.activeRunId;
   if (runId === undefined) return [];
 
-  const interruptedTools: SessionLogEvent[] = projected.activeInvocations.map(
-    ({ invocation }) => ({
+  const interruptedTools: SessionLogEvent[] = projected.toolInvocations
+    .filter(
+      ({ invocation, completion }) =>
+        invocation.runId === runId && completion === undefined,
+    )
+    .map(({ invocation }) => ({
       type: "tool.finished",
       invocationId: invocation.id,
       result: {
@@ -158,8 +162,7 @@ export function interruptedSessionEvents(
         details: { interrupted: true },
       },
       isError: true,
-    }),
-  );
+    }));
   return [
     ...interruptedTools,
     { type: "run.finished", runId, outcome: "interrupted" },

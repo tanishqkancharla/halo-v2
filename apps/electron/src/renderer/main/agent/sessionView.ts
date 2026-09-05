@@ -1,9 +1,12 @@
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import type { AgentMessage } from "@get-halo/shared/rpc";
-import type { ProjectedSession } from "@get-halo/shared/sessionLog";
+import type {
+  ProjectedSession,
+  ProjectedToolInvocation,
+  ToolIdentity,
+} from "@get-halo/shared/sessionLog";
 import {
-  connectionRequestLabel,
   connectionRequestSchema,
   type ConnectionRequest,
 } from "@get-halo/shared/connectionRequests";
@@ -18,9 +21,14 @@ export type SessionViewItem =
 
 export type ToolPart = {
   id: string;
-  toolName: string;
-  args: ToolArgs;
-  resultText?: string;
+  tool: ToolIdentity;
+  args: unknown;
+  status: "active" | "completed";
+  details: {
+    toolPath: string;
+    args: unknown;
+    resultText?: string;
+  };
 };
 
 export type SessionViewPart =
@@ -28,10 +36,8 @@ export type SessionViewPart =
   | {
       kind: "toolActivity";
       id: string;
-      summary: string;
-      active: boolean;
-      activeCalls: ToolPart[];
-      completedCalls: ToolPart[];
+      live: boolean;
+      calls: ToolPart[];
     }
   | {
       kind: "executorConnection";
@@ -39,15 +45,20 @@ export type SessionViewPart =
       request: ConnectionRequest;
     };
 
-/** Tool call arguments as parsed from JSON — values may be any JSON-representable scalar or composite. */
-type ToolArgValue =
-  | string
-  | number
-  | boolean
-  | null
-  | ToolArgValue[]
-  | { [K in string]: ToolArgValue };
-type ToolArgs = { [K in string]: ToolArgValue };
+type ToolActivitySummary = {
+  completed: string[];
+  current: string | undefined;
+};
+
+type ReducedToolInvocation = ProjectedToolInvocation & {
+  active: boolean;
+};
+
+type ToolActivityPresenter = {
+  matches(call: ToolPart): boolean;
+  activeLabel(call: ToolPart): string;
+  completedSummary(calls: readonly ToolPart[]): string | undefined;
+};
 
 type ToolPartLabel = {
   kind: "read" | "wrote" | "shell" | "exec" | "other";
@@ -57,9 +68,6 @@ type ToolPartLabel = {
 type CollectedTool = {
   id: string;
   groupId: string;
-  toolName: string;
-  args: ToolArgs;
-  resultText?: string;
   connectionRequests: ConnectionRequest[];
 };
 
@@ -104,12 +112,17 @@ const bashArgsSchema = Type.Object({
 export function sessionViewItems(state: ProjectedSession): SessionViewItem[] {
   const items: SessionViewItem[] = [];
   const toolResults = toolResultsByCallId(state);
+  const invocations = reduceToolInvocations(state);
   const emittedTools = new Set<string>();
   let pending: PendingTurn | undefined;
 
   function flush(live: boolean) {
     if (pending === undefined) return;
-    const parts = projectTurn(pending, live);
+    const parts = projectTurn({
+      turn: pending,
+      live,
+      invocations,
+    });
     if (parts.length > 0) {
       items.push({
         kind: "assistantTurn",
@@ -153,14 +166,9 @@ export function sessionViewItems(state: ProjectedSession): SessionViewItem[] {
       const collected: CollectedTool = {
         id: part.id,
         groupId,
-        toolName: part.name,
-        args: part.arguments,
         connectionRequests:
           toolResult === undefined ? [] : toolResult.connectionRequests,
       };
-      if (toolResult !== undefined) {
-        collected.resultText = toolResult.text;
-      }
       const last = turn.segments.at(-1);
       if (
         last !== undefined &&
@@ -209,10 +217,8 @@ export function sessionViewItems(state: ProjectedSession): SessionViewItem[] {
         {
           kind: "toolActivity",
           id: "assistant-working-activity",
-          summary: "Thinking",
-          active: true,
-          activeCalls: [],
-          completedCalls: [],
+          live: true,
+          calls: [],
         },
       ],
     });
@@ -223,54 +229,82 @@ export function sessionViewItems(state: ProjectedSession): SessionViewItem[] {
 
 /** Maui AiChat labels for Pi coding tools. */
 export function toolPartLabel(
-  part: {
-    toolName: string;
-    args: unknown;
-  },
+  part: ToolPart,
   workspaceRoot: string | undefined,
 ): ToolPartLabel {
-  if (part.toolName === "exec") {
-    return { kind: "exec", text: "Exec" };
+  const path = part.tool.path;
+  const active = part.status === "active";
+  if (path === "exec") {
+    return { kind: "exec", text: active ? "Using tools" : "Used tools" };
   }
 
-  if (part.toolName === "read") {
+  const operation = path.split(".").at(-1);
+  const fileIntegration = part.tool.integrationId === "files";
+  if (isToolSearch(part)) {
+    return {
+      kind: "other",
+      text: active ? "Searching tools" : "Searched tools",
+    };
+  }
+  if (path === "read" || (fileIntegration && operation === "read")) {
     if (!Value.Check(pathArgsSchema, part.args)) {
-      return { kind: "other", text: part.toolName };
+      return { kind: "other", text: active ? "Reading file" : "Read file" };
     }
     return {
       kind: "read",
-      text: stripWorkspaceRootPrefix(part.args.path, workspaceRoot),
+      text: `${active ? "Reading" : "Read"} ${stripWorkspaceRootPrefix(part.args.path, workspaceRoot)}`,
     };
   }
 
-  if (part.toolName === "write" || part.toolName === "edit") {
+  if (
+    path === "write" ||
+    path === "edit" ||
+    path === "patch" ||
+    (fileIntegration &&
+      operation !== undefined &&
+      new Set(["write", "edit", "patch"]).has(operation))
+  ) {
     if (!Value.Check(pathArgsSchema, part.args)) {
-      return { kind: "other", text: part.toolName };
+      return {
+        kind: "other",
+        text: active ? "Writing file" : "Wrote file",
+      };
     }
     return {
       kind: "wrote",
-      text: stripWorkspaceRootPrefix(part.args.path, workspaceRoot),
+      text: `${active ? "Writing" : "Wrote"} ${stripWorkspaceRootPrefix(part.args.path, workspaceRoot)}`,
     };
   }
 
-  if (part.toolName === "bash") {
+  if (path === "bash" || part.tool.integrationId === "bash") {
     if (!Value.Check(bashArgsSchema, part.args)) {
-      return { kind: "other", text: part.toolName };
+      return {
+        kind: "other",
+        text: active ? "Running command" : "Ran command",
+      };
     }
     return { kind: "shell", text: part.args.command };
   }
 
-  return { kind: "other", text: part.toolName };
+  return {
+    kind: "other",
+    text: `${active ? "Using" : "Used"} ${part.tool.displayName}`,
+  };
 }
 
 const execArgsSchema = Type.Object({ js: Type.String() });
 
-export function execJsSource(args: ToolArgs): string | undefined {
-  if (!Value.Check(execArgsSchema, args)) return undefined;
-  return args.js;
+export function execJsSource(details: ToolPart["details"]): string | undefined {
+  if (!Value.Check(execArgsSchema, details.args)) return undefined;
+  return details.args.js;
 }
 
-function projectTurn(turn: PendingTurn, live: boolean): SessionViewPart[] {
+function projectTurn(args: {
+  turn: PendingTurn;
+  live: boolean;
+  invocations: readonly ReducedToolInvocation[];
+}): SessionViewPart[] {
+  const { turn, live, invocations } = args;
   const hasTools = turn.segments.some((segment) => segment.kind === "group");
   const hasText = turn.segments.some((segment) => segment.kind === "text");
   if (!hasTools) {
@@ -279,10 +313,8 @@ function projectTurn(turn: PendingTurn, live: boolean): SessionViewPart[] {
         {
           kind: "toolActivity",
           id: `${turn.id}-activity`,
-          summary: "Thinking",
-          active: true,
-          activeCalls: [],
-          completedCalls: [],
+          live: true,
+          calls: [],
         },
       ];
     }
@@ -307,7 +339,12 @@ function projectTurn(turn: PendingTurn, live: boolean): SessionViewPart[] {
     const tools = pendingGroups.flatMap((group) => group.tools);
     const lastGroupId = pendingGroups.at(-1)?.groupId;
     if (lastGroupId === undefined) return;
-    const activity = groupActivity(tools, lastGroupId, active);
+    const activity = groupActivity({
+      tools,
+      lastGroupId,
+      live: active,
+      invocations,
+    });
     if (activity !== undefined) parts.push(activity);
     for (const tool of tools) {
       for (const [index, request] of tool.connectionRequests.entries()) {
@@ -338,107 +375,283 @@ function projectTurn(turn: PendingTurn, live: boolean): SessionViewPart[] {
   return parts;
 }
 
-function groupActivity(
-  tools: CollectedTool[],
-  lastGroupId: string,
-  active: boolean,
-): SessionViewPart | undefined {
+function groupActivity(args: {
+  tools: CollectedTool[];
+  lastGroupId: string;
+  live: boolean;
+  invocations: readonly ReducedToolInvocation[];
+}): SessionViewPart | undefined {
+  const { tools, lastGroupId, live, invocations } = args;
   if (tools.length === 0) return undefined;
 
   const visible = tools.filter((call) => call.connectionRequests.length === 0);
+  const activities = activitiesForRoots(
+    invocations,
+    new Set(visible.map((call) => call.id)),
+  );
+  const calls = visibleToolParts(activities);
 
   return {
     kind: "toolActivity",
     id: `assistant-${lastGroupId}-activity`,
-    summary: activitySummary(tools),
-    active,
-    activeCalls: active
-      ? visible.filter((call) => call.groupId === lastGroupId).map(toToolPart)
-      : [],
-    completedCalls: visible.map(toToolPart),
+    live,
+    calls,
   };
 }
 
-function activitySummary(calls: CollectedTool[]): string {
-  const finished = calls.filter((call) => call.resultText !== undefined);
-  if (finished.length === 0) return "Working";
+function reduceToolInvocations(
+  state: ProjectedSession,
+): ReducedToolInvocation[] {
+  return state.toolInvocations.flatMap((tool) => {
+    const active =
+      tool.completion === undefined &&
+      tool.invocation.runId === state.activeRunId;
+    if (!active && tool.completion === undefined) return [];
+    return [{ ...tool, active }];
+  });
+}
 
-  let commands = 0;
-  let reads = 0;
-  let writes = 0;
-  const integrations: string[] = [];
-  const seenIntegrations = new Set<string>();
-
-  for (const call of finished) {
-    if (call.toolName === "bash") {
-      commands += 1;
-      continue;
-    }
-    if (call.toolName === "read") {
-      reads += 1;
-      continue;
-    }
-    if (
-      call.toolName === "write" ||
-      call.toolName === "edit" ||
-      call.toolName === "patch"
-    ) {
-      writes += 1;
-      continue;
-    }
-    const label = integrationLabel(call);
-    if (seenIntegrations.has(label)) continue;
-    seenIntegrations.add(label);
-    integrations.push(label);
+export function summarizeToolActivities(args: {
+  calls: readonly ToolPart[];
+  workspaceRoot: string | undefined;
+  live: boolean;
+}): ToolActivitySummary {
+  const { calls, workspaceRoot, live } = args;
+  const concreteCalls = calls.filter((call) => call.tool.path !== "exec");
+  const summarizedCalls = concreteCalls.length === 0 ? calls : concreteCalls;
+  const presenters = activityPresenters(workspaceRoot);
+  const completed = presenters.flatMap((presenter) => {
+    const summary = presenter.completedSummary(summarizedCalls);
+    return summary === undefined ? [] : [summary];
+  });
+  let latestActive: ToolPart | undefined;
+  for (let index = summarizedCalls.length - 1; index >= 0; index -= 1) {
+    const call = summarizedCalls[index];
+    if (call?.status !== "active") continue;
+    latestActive = call;
+    break;
   }
+  const latestActivity = latestActive ?? summarizedCalls.at(-1);
+  const presenter =
+    latestActivity === undefined
+      ? undefined
+      : presenters.find((candidate) => candidate.matches(latestActivity));
+  const current =
+    live && latestActivity !== undefined && presenter !== undefined
+      ? presenter.activeLabel(latestActivity)
+      : undefined;
+  return { completed, current };
+}
 
-  const chunks: string[] = [];
-  if (commands === 1) chunks.push("ran 1 command");
-  if (commands > 1) chunks.push(`ran ${commands} commands`);
-  if (reads === 1) chunks.push("read 1 file");
-  if (reads > 1) chunks.push(`read ${reads} files`);
-  for (const label of integrations) {
-    chunks.push(`used ${label}`);
+function visibleToolParts(
+  activities: readonly ReducedToolInvocation[],
+): ToolPart[] {
+  const concreteAncestorIds = new Set<string>();
+  const byId = new Map(
+    activities.map((activity) => [activity.invocation.id, activity]),
+  );
+  const parts: ToolPart[] = [];
+  for (const activity of activities) {
+    let detailSource = activity;
+    let parentId = activity.invocation.parentId;
+    while (parentId !== undefined) {
+      if (activity.invocation.tool.path !== "exec") {
+        concreteAncestorIds.add(parentId);
+      }
+      const parent = byId.get(parentId);
+      if (parent?.invocation.tool.path === "exec") detailSource = parent;
+      parentId = parent?.invocation.parentId;
+    }
+    parts.push(toToolPart({ activity, detailSource }));
   }
-  if (writes === 1) chunks.push("wrote 1 file");
-  if (writes > 1) chunks.push(`wrote ${writes} files`);
-
-  return joinSummary(chunks);
+  return parts.filter(
+    (part) => part.tool.path !== "exec" || !concreteAncestorIds.has(part.id),
+  );
 }
 
-function integrationLabel(call: CollectedTool): string {
-  const request = call.connectionRequests[0];
-  if (request !== undefined) return connectionRequestLabel(request);
-  if (call.toolName === "exec") return "Exec";
-  return titleCaseToolName(call.toolName);
+function activitiesForRoots(
+  activities: readonly ReducedToolInvocation[],
+  rootIds: ReadonlySet<string>,
+): ReducedToolInvocation[] {
+  const byId = new Map(
+    activities.map((activity) => [activity.invocation.id, activity]),
+  );
+  return activities.filter((activity) => {
+    let current: ReducedToolInvocation | undefined = activity;
+    while (current !== undefined) {
+      if (rootIds.has(current.invocation.id)) return true;
+      const parentId: string | undefined = current.invocation.parentId;
+      current = parentId === undefined ? undefined : byId.get(parentId);
+    }
+    return false;
+  });
 }
 
-function titleCaseToolName(name: string): string {
-  return name
-    .split("_")
-    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
-    .join(" ");
+function activityPresenters(
+  workspaceRoot: string | undefined,
+): ToolActivityPresenter[] {
+  return [
+    shellPresenter,
+    toolSearchPresenter,
+    filePresenter("read", workspaceRoot),
+    integrationPresenter,
+    filePresenter("write", workspaceRoot),
+  ];
 }
 
-function joinSummary(chunks: string[]): string {
-  const first = chunks[0];
-  if (first === undefined) return "Working";
-  const capitalized = `${first.charAt(0).toUpperCase()}${first.slice(1)}`;
-  const rest = chunks.slice(1);
-  const last = rest.at(-1);
-  if (last === undefined) return capitalized;
-  if (rest.length === 1) return `${capitalized} and ${last}`;
-  return `${capitalized}, ${rest.slice(0, -1).join(", ")}, and ${last}`;
+const shellPresenter: ToolActivityPresenter = {
+  matches: ({ tool }) => tool.path === "bash" || tool.integrationId === "bash",
+  activeLabel: () => "Running command",
+  completedSummary: (activities) => {
+    const count = completedMatching(activities, shellPresenter).length;
+    if (count === 0) return undefined;
+    return count === 1 ? "ran 1 command" : `ran ${count} commands`;
+  },
+};
+
+const toolSearchPresenter: ToolActivityPresenter = {
+  matches: isToolSearch,
+  activeLabel: () => "Searching tools",
+  completedSummary: (calls) =>
+    completedMatching(calls, toolSearchPresenter).length === 0
+      ? undefined
+      : "searched tools",
+};
+
+function filePresenter(
+  mode: "read" | "write",
+  workspaceRoot: string | undefined,
+): ToolActivityPresenter {
+  const operations =
+    mode === "read" ? new Set(["read"]) : new Set(["write", "edit", "patch"]);
+  const presenter: ToolActivityPresenter = {
+    matches: ({ tool }) => {
+      if (operations.has(tool.path)) return true;
+      if (tool.integrationId !== "files") return false;
+      const operation = tool.path.split(".").at(-1);
+      return operation !== undefined && operations.has(operation);
+    },
+    activeLabel: (call) => {
+      const path = callPath(call);
+      if (path === undefined)
+        return mode === "read" ? "Reading file" : "Writing file";
+      const visiblePath = stripWorkspaceRootPrefix(path, workspaceRoot);
+      return mode === "read"
+        ? `Reading ${visiblePath}`
+        : `Writing ${visiblePath}`;
+    },
+    completedSummary: (activities) => {
+      const uniquePaths = new Set<string>();
+      let pathless = 0;
+      for (const call of completedMatching(activities, presenter)) {
+        const path = callPath(call);
+        if (path === undefined) {
+          pathless += 1;
+          continue;
+        }
+        uniquePaths.add(normalizedPath(path, workspaceRoot));
+      }
+      const count = uniquePaths.size + pathless;
+      if (count === 0) return undefined;
+      const verb = mode === "read" ? "read" : "wrote";
+      return count === 1 ? `${verb} 1 file` : `${verb} ${count} files`;
+    },
+  };
+  return presenter;
 }
 
-function toToolPart(call: CollectedTool): ToolPart {
+const integrationPresenter: ToolActivityPresenter = {
+  matches: (call) =>
+    call.tool.path === "exec" ||
+    (!shellPresenter.matches(call) &&
+      !toolSearchPresenter.matches(call) &&
+      !isFileActivity(call)),
+  activeLabel: ({ tool }) =>
+    tool.path === "exec" ? "Using tools" : `Using ${tool.displayName}`,
+  completedSummary: (activities) => {
+    const labels: string[] = [];
+    const seen = new Set<string>();
+    for (const call of completedMatching(activities, integrationPresenter)) {
+      const identity = stableToolIdentity(call.tool);
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+      labels.push(call.tool.path === "exec" ? "tools" : call.tool.displayName);
+    }
+    if (labels.length === 0) return undefined;
+    return `used ${labels.join(", ")}`;
+  },
+};
+
+function isToolSearch(call: ToolPart): boolean {
+  return (
+    call.tool.path === "search" ||
+    call.tool.path === "describe.tool" ||
+    call.tool.path === "executor.integrations.list"
+  );
+}
+
+function completedMatching(
+  calls: readonly ToolPart[],
+  presenter: ToolActivityPresenter,
+): ToolPart[] {
+  return calls.filter(
+    (call) => call.status === "completed" && presenter.matches(call),
+  );
+}
+
+function isFileActivity(call: ToolPart): boolean {
+  const tool = call.tool;
+  const path = tool.path;
+  return (
+    tool.integrationId === "files" ||
+    path === "read" ||
+    path === "write" ||
+    path === "edit" ||
+    path === "patch"
+  );
+}
+
+function callPath(call: ToolPart): string | undefined {
+  if (!Value.Check(pathArgsSchema, call.args)) {
+    return undefined;
+  }
+  return call.args.path;
+}
+
+function normalizedPath(
+  filePath: string,
+  workspaceRoot: string | undefined,
+): string {
+  return toPosixPath(stripWorkspaceRootPrefix(filePath, workspaceRoot)).replace(
+    /^\.\//,
+    "",
+  );
+}
+
+function stableToolIdentity(tool: ToolIdentity): string {
+  if (tool.integrationId !== undefined) return tool.integrationId;
+  return tool.path;
+}
+
+function toToolPart(args: {
+  activity: ReducedToolInvocation;
+  detailSource: ReducedToolInvocation;
+}): ToolPart {
+  const { activity, detailSource } = args;
   const part: ToolPart = {
-    id: call.id,
-    toolName: call.toolName,
-    args: call.args,
+    id: activity.invocation.id,
+    tool: activity.invocation.tool,
+    args: activity.invocation.arguments,
+    status: activity.active ? "active" : "completed",
+    details: {
+      toolPath: detailSource.invocation.tool.path,
+      args: detailSource.invocation.arguments,
+    },
   };
-  if (call.resultText !== undefined) {
-    part.resultText = call.resultText;
+  if (detailSource.completion !== undefined) {
+    part.details.resultText = detailSource.completion.result.content
+      .flatMap((content) => (content.type === "text" ? [content.text] : []))
+      .join("");
   }
   return part;
 }
@@ -462,10 +675,7 @@ function toPosixPath(value: string): string {
 }
 
 function toolResultsByCallId(state: ProjectedSession) {
-  const map = new Map<
-    string,
-    { text: string; connectionRequests: ConnectionRequest[] }
-  >();
+  const map = new Map<string, { connectionRequests: ConnectionRequest[] }>();
   for (const message of state.messages) {
     if (message.role !== "toolResult") continue;
     const connectionRequests = Value.Check(
@@ -475,21 +685,10 @@ function toolResultsByCallId(state: ProjectedSession) {
       ? message.details.connectionRequests
       : [];
     map.set(message.toolCallId, {
-      text: toolResultText(message),
       connectionRequests,
     });
   }
   return map;
-}
-
-function toolResultText(message: AgentMessage): string {
-  if (message.role !== "toolResult") return "";
-  return message.content
-    .flatMap((part) => {
-      if (part.type !== "text") return [];
-      return [part.text];
-    })
-    .join("");
 }
 
 function userText(message: AgentMessage): string {

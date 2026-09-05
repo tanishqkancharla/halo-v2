@@ -333,15 +333,38 @@ export class ToolRuntime {
     return createToolRuntime(input);
   }
 
-  constructor(
-    private readonly executor: Executor<HaloRuntimePlugins>,
-    private readonly engine: ExecutionEngine<Cause.YieldableError>,
-    private readonly toolInvoker: SandboxToolInvoker,
-    private readonly executionContext: AsyncLocalStorage<ToolExecutionContext>,
-    private readonly toolPlugins: readonly HaloToolPlugin[],
-    private readonly authority: AgentAuthority,
-    private readonly connectionRequests: ReadonlyMap<string, ConnectionRequest>,
-  ) {}
+  private readonly executor: Executor<HaloRuntimePlugins>;
+  private readonly engine: ExecutionEngine<Cause.YieldableError>;
+  private readonly toolInvoker: SandboxToolInvoker;
+  private readonly executionContext: AsyncLocalStorage<ToolExecutionContext>;
+  private readonly toolPlugins: readonly HaloToolPlugin[];
+  private readonly authority: AgentAuthority;
+  private readonly connectionRequests: ReadonlyMap<string, ConnectionRequest>;
+  private readonly integrationNames: ReadonlyMap<string, string>;
+
+  constructor(input: {
+    executor: Executor<HaloRuntimePlugins>;
+    engine: ExecutionEngine<Cause.YieldableError>;
+    toolInvoker: SandboxToolInvoker;
+    executionContext: AsyncLocalStorage<ToolExecutionContext>;
+    toolPlugins: readonly HaloToolPlugin[];
+    authority: AgentAuthority;
+    connectionRequests: ReadonlyMap<string, ConnectionRequest>;
+    integrationNames: ReadonlyMap<string, string>;
+  }) {
+    this.executor = input.executor;
+    this.engine = input.engine;
+    this.toolInvoker = input.toolInvoker;
+    this.executionContext = input.executionContext;
+    this.toolPlugins = input.toolPlugins;
+    this.authority = input.authority;
+    this.connectionRequests = input.connectionRequests;
+    this.integrationNames = input.integrationNames;
+  }
+
+  getToolIdentity(path: string) {
+    return toolIdentity(path, this.integrationNames);
+  }
 
   authorize(input: {
     pluginId: string;
@@ -679,15 +702,19 @@ async function createToolRuntime(
       integrationNames,
     }),
   });
-  return new ToolRuntime(
+  return new ToolRuntime({
     executor,
     engine,
-    makeExecutorToolInvoker(executor, { invokeOptions: {} }),
+    toolInvoker: makeExecutorToolInvoker(executor, { invokeOptions: {} }),
     executionContext,
-    input.toolPlugins,
-    input.authority,
-    connectionRequestsForClient(googleOAuthClient, installableGooglePresets),
-  );
+    toolPlugins: input.toolPlugins,
+    authority: input.authority,
+    connectionRequests: connectionRequestsForClient(
+      googleOAuthClient,
+      installableGooglePresets,
+    ),
+    integrationNames,
+  });
 }
 
 function withToolActivity<E extends Cause.YieldableError>(input: {
@@ -755,7 +782,7 @@ function toolIdentity(
     path === "executor.integrations.list" ||
     path === "describe.tool"
   ) {
-    return undefined;
+    return { path, displayName: "Tools", integrationId: "executor" };
   }
   const parsed = parseToolAddress(`tools.${path}`);
   const integrationId =

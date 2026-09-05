@@ -80,7 +80,7 @@ export const sessionsRouter = os.router({
       sessionId: input.sessionId,
       request: input.request,
       onEvent: async (event) => {
-        const appended = await session.appendConnectionEvent(event);
+        const appended = await session.appendEvents([event]);
         if (appended instanceof Error) return appended;
         if (event.status !== "connected") return;
         const notified = await notifyConnectedSession({

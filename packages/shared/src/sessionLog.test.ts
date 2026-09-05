@@ -154,13 +154,25 @@ describe("projectSession", () => {
       },
     ];
 
-    expect(projectSession(events.slice(0, 2)).activeInvocations).toEqual([
+    expect(projectSession(events.slice(0, 2)).toolInvocations).toEqual([
       { invocation },
     ]);
-    expect(projectSession(events.slice(0, 3)).activeInvocations).toEqual([
+    expect(projectSession(events.slice(0, 3)).toolInvocations).toEqual([
       { invocation, update: { bytesRead: 10 } },
     ]);
-    expect(projectSession(events).activeInvocations).toEqual([]);
+    expect(projectSession(events).toolInvocations).toEqual([
+      {
+        invocation,
+        update: { bytesRead: 10 },
+        completion: {
+          result: {
+            content: [{ type: "text", text: "contents" }],
+            details: {},
+          },
+          isError: false,
+        },
+      },
+    ]);
   });
 
   test("a new run supersedes interrupted work", () => {
@@ -178,7 +190,7 @@ describe("projectSession", () => {
 
     const restarted = projectSession(interrupted);
     expect(restarted.isWorking).toBe(true);
-    expect(restarted.activeInvocations).toEqual([]);
+    expect(restarted.toolInvocations).toEqual([{ invocation }]);
     expect(
       projectSession([
         ...interrupted,

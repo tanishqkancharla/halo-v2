@@ -274,6 +274,8 @@ const agentToolResultSchema = Type.Object({
   terminate: Type.Optional(Type.Boolean()),
 });
 
+export type AgentToolResult = Static<typeof agentToolResultSchema>;
+
 export const sessionLogEventSchema = Type.Union([
   Type.Object({ type: Type.Literal("run.started"), runId: Type.String() }),
   Type.Object({
@@ -320,15 +322,19 @@ export const sessionLogRecordSchema = Type.Object({
 
 export type SessionLogRecord = Static<typeof sessionLogRecordSchema>;
 
-export type ActiveToolInvocation = {
+export type ProjectedToolInvocation = {
   invocation: ToolInvocation;
   update?: unknown;
+  completion?: {
+    result: AgentToolResult;
+    isError: boolean;
+  };
 };
 
 export type ProjectedSession = {
   messages: AgentMessage[];
   streamingMessage: AgentMessage | undefined;
-  activeInvocations: ActiveToolInvocation[];
+  toolInvocations: ProjectedToolInvocation[];
   connectionEvents: HaloConnectionEvent[];
   activeRunId: string | undefined;
   error: string | undefined;
@@ -339,7 +345,7 @@ export function projectSession(
   events: readonly SessionLogEvent[],
 ): ProjectedSession {
   const messages: AgentMessage[] = [];
-  const activeInvocations = new Map<string, ActiveToolInvocation>();
+  const toolInvocations = new Map<string, ProjectedToolInvocation>();
   const connectionEvents: HaloConnectionEvent[] = [];
   let streamingMessage: AgentMessage | undefined;
   let error: string | undefined;
@@ -348,22 +354,10 @@ export function projectSession(
   for (const event of events) {
     switch (event.type) {
       case "run.started":
-        if (activeRunId !== undefined && activeRunId !== event.runId) {
-          for (const [id, active] of activeInvocations) {
-            if (active.invocation.runId === activeRunId) {
-              activeInvocations.delete(id);
-            }
-          }
-        }
         activeRunId = event.runId;
         break;
       case "run.finished":
         if (event.runId === activeRunId) activeRunId = undefined;
-        for (const [id, active] of activeInvocations) {
-          if (active.invocation.runId === event.runId) {
-            activeInvocations.delete(id);
-          }
-        }
         break;
       case "message.committed": {
         messages.push(event.message);
@@ -379,22 +373,31 @@ export function projectSession(
         error = undefined;
         break;
       case "tool.started":
-        activeInvocations.set(event.invocation.id, {
+        toolInvocations.set(event.invocation.id, {
           invocation: event.invocation,
         });
         break;
       case "tool.updated": {
-        const active = activeInvocations.get(event.invocationId);
-        if (active === undefined) break;
-        activeInvocations.set(event.invocationId, {
-          invocation: active.invocation,
+        const tool = toolInvocations.get(event.invocationId);
+        if (tool === undefined) break;
+        toolInvocations.set(event.invocationId, {
+          ...tool,
           update: event.update,
         });
         break;
       }
-      case "tool.finished":
-        activeInvocations.delete(event.invocationId);
+      case "tool.finished": {
+        const tool = toolInvocations.get(event.invocationId);
+        if (tool === undefined) break;
+        toolInvocations.set(event.invocationId, {
+          ...tool,
+          completion: {
+            result: event.result,
+            isError: event.isError,
+          },
+        });
         break;
+      }
       case "halo.connection":
         connectionEvents.push(event);
         break;
@@ -404,7 +407,7 @@ export function projectSession(
   return {
     messages,
     streamingMessage,
-    activeInvocations: [...activeInvocations.values()],
+    toolInvocations: [...toolInvocations.values()],
     connectionEvents,
     activeRunId,
     error,

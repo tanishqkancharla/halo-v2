@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import {
-  Icons,
+  ChevronRightLarge,
   Thinking,
   colors,
   flex,
@@ -10,8 +10,13 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import type { SessionViewPart, ToolPart } from "./sessionView.ts";
+import {
+  summarizeToolActivities,
+  type SessionViewPart,
+  type ToolPart,
+} from "./sessionView.ts";
 import { ToolCall } from "./ToolCall.tsx";
+import { useWorkspaceQuery } from "../../api/ApiProvider.tsx";
 
 type ToolActivityPart = Extract<SessionViewPart, { kind: "toolActivity" }>;
 
@@ -22,12 +27,29 @@ const transitionRemovalDelayMs = motionDurationMs + 16;
 
 export function ToolActivity({ part }: { part: ToolActivityPart }) {
   const [expanded, setExpanded] = useState(false);
+  const calls = part.calls;
+  const workspace = useWorkspaceQuery().data;
+  const workspaceRoot =
+    workspace?.status === "ready"
+      ? workspace.workspace.workspaceRoot
+      : undefined;
+  const summary = summarizeToolActivities({
+    calls,
+    workspaceRoot,
+    live: part.live,
+  });
   const activityClassName = useStyles(styles.activity);
   const summaryClassName = useStyles(styles.summary);
   const thinkingClassName = useStyles(styles.thinking);
-  const interactive =
-    part.activeCalls.length > 0 || part.completedCalls.length > 0;
-  const visibleCalls = expanded ? part.completedCalls : part.activeCalls;
+  const markClassName = useStyles(styles.mark);
+  const interactive = calls.length > 0;
+  const visibleCalls = expanded ? calls : [];
+  const completedLabel = joinSummary(summary.completed);
+  const primaryLabel = part.live
+    ? (summary.current ?? "Working")
+    : completedLabel;
+
+  if (primaryLabel === undefined) return undefined;
 
   return (
     <div className={activityClassName} aria-label="Tool activity">
@@ -35,33 +57,53 @@ export function ToolActivity({ part }: { part: ToolActivityPart }) {
         <button
           type="button"
           className={summaryClassName}
+          aria-label={primaryLabel}
           aria-expanded={expanded}
-          data-active={part.active ? "" : undefined}
+          data-active={part.live ? "" : undefined}
           onClick={() => setExpanded(!expanded)}
         >
-          {part.active ? (
-            <span data-activity-thinking="">
-              <Thinking size={thinkingSize} variant="muted" />
+          <span className={markClassName}>
+            {part.live ? (
+              <Thinking
+                size={thinkingSize}
+                variant="muted"
+                aria-label="Working"
+              />
+            ) : undefined}
+            <span role="img" aria-label="Expand tool activity">
+              <ChevronRightLarge width={chevronSize} height={chevronSize} />
             </span>
-          ) : undefined}
-          <span data-activity-chevron="">
-            <Icons.ChevronRightLarge width={chevronSize} height={chevronSize} />
           </span>
-          {part.summary}
+          {primaryLabel}
         </button>
       ) : (
         <div className={thinkingClassName}>
-          {part.active ? (
-            <span data-activity-thinking="">
-              <Thinking size={thinkingSize} variant="muted" />
+          {part.live ? (
+            <span className={markClassName}>
+              <Thinking
+                size={thinkingSize}
+                variant="muted"
+                aria-label="Working"
+              />
             </span>
           ) : undefined}
-          {part.summary}
+          {primaryLabel}
         </div>
       )}
       <AnimatedToolCalls calls={visibleCalls} />
     </div>
   );
+}
+
+function joinSummary(chunks: readonly string[]): string | undefined {
+  const first = chunks[0];
+  if (first === undefined) return undefined;
+  const capitalized = `${first.charAt(0).toUpperCase()}${first.slice(1)}`;
+  const rest = chunks.slice(1);
+  const last = rest.at(-1);
+  if (last === undefined) return capitalized;
+  if (rest.length === 1) return `${capitalized} and ${last}`;
+  return `${capitalized}, ${rest.slice(0, -1).join(", ")}, and ${last}`;
 }
 
 function AnimatedToolCalls({ calls }: { calls: ToolPart[] }) {
@@ -137,14 +179,6 @@ const summaryRow = style(
   {
     overflow: "visible",
     color: colors.gray[11],
-    "& [data-activity-thinking], & [data-activity-chevron]": {
-      display: "inline-flex",
-      width: markSlot,
-      height: markSlot,
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
-    },
   },
 );
 
@@ -153,6 +187,14 @@ const styles = {
     minWidth: 0,
   }),
   thinking: summaryRow,
+  mark: style({
+    display: "inline-flex",
+    width: markSlot,
+    height: markSlot,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  }),
   summary: style(summaryRow, {
     width: "fit-content",
     maxWidth: "100%",
@@ -165,9 +207,8 @@ const styles = {
     justifyContent: "flex-start",
     textAlign: "left",
     cursor: "pointer",
-    "& > span": { flexShrink: 0 },
-    "& [data-activity-chevron]": { display: "none" },
-    "& [data-activity-chevron] svg": {
+    "& [aria-label='Expand tool activity']": { display: "none" },
+    "& [aria-label='Expand tool activity'] svg": {
       transition: `transform ${String(motionDurationMs)}ms ${motionEasing}`,
       transformOrigin: "center",
     },
@@ -175,28 +216,21 @@ const styles = {
       color: colors.gray[12],
       background: "transparent",
     },
-    "&:hover [data-activity-thinking], &:focus-visible [data-activity-thinking]":
-      {
-        display: "none",
-      },
-    "&:hover [data-activity-chevron], &:focus-visible [data-activity-chevron]":
+    "&:hover [aria-label='Working'], &:focus-visible [aria-label='Working']": {
+      display: "none",
+    },
+    "&:hover [aria-label='Expand tool activity'], &:focus-visible [aria-label='Expand tool activity']":
       {
         display: "inline-flex",
       },
-    "&:not([data-active]) [data-activity-chevron]": {
+    "&:not([data-active]) [aria-label='Expand tool activity']": {
       display: "inline-flex",
     },
     "&[aria-expanded='true']": {
       color: colors.gray[12],
       background: "transparent",
     },
-    "&[aria-expanded='true']:not([data-active]) [data-activity-thinking]": {
-      display: "none",
-    },
-    "&[aria-expanded='true']:not([data-active]) [data-activity-chevron]": {
-      display: "inline-flex",
-    },
-    "&[aria-expanded='true'] [data-activity-chevron] svg": {
+    "&[aria-expanded='true'] [aria-label='Expand tool activity'] svg": {
       transform: "rotate(90deg)",
     },
     "&:focus": {

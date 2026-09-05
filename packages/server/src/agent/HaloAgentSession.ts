@@ -10,7 +10,6 @@ import {
 import * as errore from "errore";
 import {
   sessionLogEventSchema,
-  type HaloConnectionEvent,
   type SessionLogEvent,
   type ToolIdentity,
 } from "@get-halo/shared/sessionLog";
@@ -265,8 +264,8 @@ export class HaloAgentSession {
     };
   }
 
-  async appendConnectionEvent(event: HaloConnectionEvent) {
-    this.queueEvents([event]);
+  async appendEvents(events: readonly SessionLogEvent[]) {
+    this.queueEvents(events);
     return await this.drainEventWrites();
   }
 

@@ -385,11 +385,12 @@ type ToolActivitySummary = {
 
 Render the joined completed sentence on the primary row and each active sentence on an indented row with its own `Thinking` indicator. This supports the required transitions without encoding whitespace in summary strings.
 
-- [ ] Extract `reduceToolInvocations` and presenter-based `summarizeToolActivities` from `sessionView.ts`; deduplicate reads/writes by normalized path and integrations by stable identity inside each presenter.
-- [ ] Change `SessionViewPart` and `ToolActivity.tsx` to render structured completed and active rows, including the empty `Working` state and outer-`exec` fallback.
-- [ ] Add projector/presenter tests for repeated paths, distinct paths, repeated integrations, mixed direct/nested activity, parallel calls, and every required intermediate prefix.
-- [ ] Update the E2E fixture to express structured invocation facts, make `shows tools used inside exec` pass, and add a live-progress E2E covering `Using` to `Used` transitions through the user-visible renderer.
-- [ ] Run `pnpm --filter @halo/desktop exec playwright test --grep "tools used inside exec|streams tool activity"` and `pnpm run check-affected`.
+- [x] Extract `reduceToolInvocations` and presenter-based `summarizeToolActivities` from `sessionView.ts`; deduplicate reads/writes by normalized path and integrations by stable identity inside each presenter.
+- [x] Change `SessionViewPart` and `ToolActivity.tsx` to render structured completed and active rows, including the empty `Working` state and outer-`exec` fallback.
+- [x] Verify repeated paths, distinct paths, repeated integrations, mixed direct/nested activity, parallel calls, and every required intermediate prefix with temporary presenter tests, then remove them as requested.
+- [x] Update the E2E fixture to express structured invocation facts, make `shows tools used inside exec` pass, and cover normalized-path deduplication through the user-visible renderer.
+- [x] Add a live-progress E2E covering `Using` to `Used` transitions through the user-visible renderer using the E2E-only session event API.
+- [x] Run the focused activity E2Es and `pnpm run check-affected`.
 
 ## Final verification
 
