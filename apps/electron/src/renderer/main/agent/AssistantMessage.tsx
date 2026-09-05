@@ -13,6 +13,7 @@ import {
 import { code } from "@streamdown/code";
 import {
   Code,
+  CodeBlock,
   backgroundColor,
   motionEasing,
   motionStreamDurationMs,
@@ -24,7 +25,6 @@ import {
   type ProseSize,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import { CodeBlock } from "../CodeBlock.tsx";
 import {
   inlineCodeAnimateTag,
   rehypeInlineCodeAnimate,
@@ -81,7 +81,7 @@ function MauiFencedCode({
   // updating without remounting a highlighter on every chunk.
   if (isIncomplete || !isSupportedCodeLang(language)) {
     return (
-      <pre className={pendingClassName} tabIndex={-1}>
+      <pre className={pendingClassName}>
         <code className={className} {...props}>
           {text}
         </code>
@@ -215,9 +215,6 @@ const pendingCodeShellClass = style(radius.md, shadow.subtle, {
   margin: 0,
   overflowX: "auto",
   padding: "12px",
-  "&:focus, &:focus-visible": {
-    outline: "none",
-  },
 });
 
 function joinClassNames(...classNames: Array<string | undefined>) {
