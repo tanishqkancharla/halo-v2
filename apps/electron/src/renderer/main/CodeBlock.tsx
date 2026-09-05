@@ -7,11 +7,10 @@ export function CodeBlock(props: { children: string; lang: string }) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    const root = rootRef.current;
-    if (root === null) return;
-
     function disarm() {
-      for (const node of root.querySelectorAll("pre, .maui-code-block")) {
+      const host = rootRef.current;
+      if (host === null) return;
+      for (const node of host.querySelectorAll("pre, .maui-code-block")) {
         if (
           node instanceof HTMLElement &&
           node.getAttribute("tabindex") !== "-1"
@@ -21,9 +20,11 @@ export function CodeBlock(props: { children: string; lang: string }) {
       }
     }
 
+    const host = rootRef.current;
+    if (host === null) return;
     disarm();
     const observer = new MutationObserver(disarm);
-    observer.observe(root, {
+    observer.observe(host, {
       childList: true,
       subtree: true,
       attributes: true,
