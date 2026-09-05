@@ -40,7 +40,7 @@ export function AgentPane({
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
   );
-  const title = sessionMeta?.title ? sessionMeta.title : sessionId;
+  const title = sessionMeta?.title ? sessionMeta.title : "New session";
 
   return (
     <main className={pane} aria-label={title}>

@@ -187,6 +187,10 @@ export function useDraftAgentSession(
     }
     sessionIdRef.current = created.sessionId;
     setSessionId(created.sessionId);
+    await queryClient.invalidateQueries({
+      queryKey: ["sessions"],
+      refetchType: "all",
+    });
     onCreatedRef.current(created.sessionId);
 
     setLocalError(undefined);

@@ -16,6 +16,12 @@ e2eTest("starts a new session", async ({ harness, renderer }) => {
   const newSession = renderer.page.getByRole("main", { name: "New session" });
   await expect(newSession).toBeVisible();
   await expect(newSession.getByLabel("Message")).toBeFocused();
+  await expect(
+    renderer.page.getByRole("link", { name: "New session" }),
+  ).toBeVisible();
+  await expect(
+    renderer.page.getByRole("link", { name: "Existing conversation" }),
+  ).toBeVisible();
 });
 
 e2eTest("shows a connection request", async ({ harness, renderer }) => {
