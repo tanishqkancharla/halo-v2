@@ -1,5 +1,10 @@
 import { test as baseTest } from "@playwright/test";
 import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
+import {
+  copyPluginWorkspacePackages,
+  installPluginSdkContract,
+} from "@get-halo/server/plugins";
+import nodePath from "node:path";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import {
@@ -24,6 +29,7 @@ type E2ESession = {
 };
 
 type E2ETestHarness = TestArtifacts["harness"] & {
+  openWindow(): Promise<Page>;
   loadSession(description: SessionDescription): Promise<E2ESession>;
 };
 
@@ -79,9 +85,19 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
   renderer: async ({ electronApp }, use) => {
     await use({ page: await electronApp.firstWindow() });
   },
-  harness: async ({ renderer, server, testArtifacts }, use) => {
+  harness: async ({ electronApp, renderer, server, testArtifacts }, use) => {
     await use({
       ...testArtifacts.harness,
+      async openWindow() {
+        const opened = electronApp.waitForEvent("window");
+        await electronApp.evaluate(({ app }) =>
+          app.emit("halo:e2e:open-window"),
+        );
+        const page = await opened;
+        const captured = await testArtifacts.captureRenderer(page);
+        if (captured instanceof Error) throw captured;
+        return page;
+      },
       async loadSession(description) {
         await renderer.page.getByRole("main").waitFor();
         const loaded = await loadSessionDescription({
@@ -104,6 +120,16 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
   },
   server: async ({ electronApp, testArtifacts }, use) => {
     await electronApp.firstWindow();
+    const directory = nodePath.join(
+      testArtifacts.paths.userData,
+      "plugin-dependencies",
+    );
+    const appVersion = await electronApp.evaluate(({ app }) =>
+      app.getVersion(),
+    );
+    const installed = await installPluginSdkContract({ directory, appVersion });
+    if (installed instanceof Error) throw installed;
+    await copyPluginWorkspacePackages(directory);
     const connection = await readHaloRpcFile(
       rpcFilePath(testArtifacts.paths.userData),
     );

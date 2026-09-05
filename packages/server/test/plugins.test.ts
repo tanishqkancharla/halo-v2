@@ -43,7 +43,7 @@ serverTest(
 );
 
 serverTest(
-  "reloads a plugin after its server changes",
+  "reloads plugin code on build, not when a client lists plugins",
   async ({ server }) => {
     const plugin = await server.rpc.plugins.create({ id: "notes" });
     await server.harness.files.write({
@@ -68,6 +68,16 @@ serverTest(
         };
       `,
     });
+    const listed = await server.rpc.plugins.list();
+    expect(listed.plugins.map((manifest) => manifest.id)).toEqual(["notes"]);
+    expect(
+      await server.rpc.plugins.invoke({
+        pluginId: plugin.id,
+        path: ["ping"],
+        input: undefined,
+      }),
+    ).toEqual({ pluginId: "notes" });
+
     await server.rpc.plugins.build();
 
     expect(

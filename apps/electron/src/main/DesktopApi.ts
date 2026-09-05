@@ -28,10 +28,10 @@ class DesktopOperationError extends errore.createTaggedError({
 
 export function registerDesktopApi(args: {
   selectWorkspace: (directory: string) => Promise<WorkspaceInfo | Error>;
-  getWindow: () => BrowserWindow | undefined;
+  ownsWindow: (window: BrowserWindow) => boolean;
 }): void {
   ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
-    const window = assertTrustedSender({ event, getWindow: args.getWindow });
+    const window = assertTrustedSender({ event, ownsWindow: args.ownsWindow });
     const validated = validateDesktopRequest(request);
     if (validated instanceof Error) throw validated;
     const result = await handleDesktopRequest({
@@ -119,11 +119,10 @@ async function openExternal(request: OpenExternalRequest) {
 
 function assertTrustedSender(args: {
   event: IpcMainInvokeEvent;
-  getWindow: () => BrowserWindow | undefined;
+  ownsWindow: (window: BrowserWindow) => boolean;
 }): BrowserWindow {
-  const window = args.getWindow();
   const senderWindow = BrowserWindow.fromWebContents(args.event.sender);
-  if (senderWindow === null || senderWindow !== window) {
+  if (senderWindow === null || !args.ownsWindow(senderWindow)) {
     throw new Error("Halo rejected IPC from an unknown renderer.");
   }
   return senderWindow;

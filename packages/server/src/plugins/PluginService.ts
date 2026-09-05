@@ -51,6 +51,7 @@ type PluginDirectory = {
 
 export class PluginService {
   private routers = new Map<string, AnyRouter>();
+  private loaded: PluginList = { plugins: [], compiledViews: [], errors: [] };
 
   private readonly filesystem: FilesystemService;
   private readonly workspace: WorkspaceService;
@@ -132,7 +133,7 @@ export class PluginService {
       built.push(plugin.id);
     }
 
-    const remounted = await this.load();
+    const remounted = await this.reload();
     if (remounted instanceof Error) return remounted;
     return { built, errors };
   }
@@ -180,7 +181,13 @@ export class PluginService {
     return { written, diagnostics };
   }
 
-  async load() {
+  list() {
+    const layout = this.workspace.getLayout();
+    if (layout instanceof Error) return layout;
+    return this.loaded;
+  }
+
+  async reload() {
     const listed = await this.listPluginDirectories();
     if (listed instanceof Error) return listed;
 
@@ -234,7 +241,8 @@ export class PluginService {
       if (compiled !== undefined) compiledViews.push(compiled);
     }
     this.routers = routers;
-    return { plugins, compiledViews, errors };
+    this.loaded = { plugins, compiledViews, errors };
+    return this.loaded;
   }
 
   async listManifests() {

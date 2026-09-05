@@ -30,17 +30,18 @@ export function syncRoutes<Schema extends AnySchema>(
   tables: RuntimeSchemaDefinition<Schema>,
 ) {
   const collections = Object.keys(tables.collections);
-  let remote: RemoteServer | undefined;
+  let remote: Promise<PluginStorageStoreError | RemoteServer> | undefined;
 
-  async function pluginRemote(context: PluginServerContext) {
+  function pluginRemote(context: PluginServerContext) {
     if (remote !== undefined) return remote;
-    const store = await FileRemoteStore.open({
+    remote = FileRemoteStore.open({
       pluginId: context.pluginId,
       workspaceRoot: context.workspaceRoot,
       collections,
+    }).then((store) => {
+      if (store instanceof Error) return store;
+      return new RemoteServer({ store });
     });
-    if (store instanceof Error) return store;
-    remote = new RemoteServer({ store });
     return remote;
   }
 
