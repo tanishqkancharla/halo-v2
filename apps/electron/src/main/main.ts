@@ -8,6 +8,7 @@ import {
   type IpcMainEvent,
 } from "electron";
 import { dirname, join } from "node:path";
+import { cp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { registerSessionResourceCleanup } from "@earendil-works/pi-ai";
 import {
@@ -24,6 +25,7 @@ import type { HaloRpcConnection } from "../shared/rpc.js";
 import { HaloServer } from "@get-halo/server";
 import { resolveHaloCliEntry } from "@get-halo/server/cli";
 import { FilesystemService } from "@get-halo/server/filesystem";
+import { PluginDependencyInstallError } from "@get-halo/server/plugins";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import {
   ApplicationLaunchMode,
@@ -104,6 +106,19 @@ const haloServer = new HaloServer({
   cliElectronRunAsNode: !isDevelopment,
   isDevelopment,
   testingApiEnabled: applicationLaunchMode === ApplicationLaunchMode.Test,
+  pluginDependencyInstaller:
+    applicationLaunchMode === ApplicationLaunchMode.Test
+      ? (directory) =>
+          cp(
+            join(
+              applicationConfig.dataDir,
+              "plugin-dependencies",
+              "node_modules",
+            ),
+            join(directory, "node_modules"),
+            { recursive: true },
+          ).catch((cause) => new PluginDependencyInstallError({ cause }))
+      : undefined,
   ownerUserId,
   logger: rpcLogger,
   createCredentialVault: ({ filesystem, workspaceRoot }) =>
@@ -113,6 +128,7 @@ const haloServer = new HaloServer({
     }),
 });
 let mainWindow: BrowserWindow | undefined;
+const windows = new Set<BrowserWindow>();
 let rpcConnection: HaloRpcConnection | undefined;
 let shutdownStarted = false;
 
@@ -121,7 +137,7 @@ app.whenReady().then(async () => {
   registerLogBridge();
   registerDesktopApi({
     selectWorkspace: (directory) => haloServer.selectWorkspace(directory),
-    getWindow: () => mainWindow,
+    ownsWindow: (window) => windows.has(window),
   });
   const listening = await haloServer.listen({
     host: "127.0.0.1",
@@ -148,6 +164,14 @@ app.whenReady().then(async () => {
   };
   installMenu();
   await openMainWindow(rpcConnection);
+  if (applicationLaunchMode === ApplicationLaunchMode.Test) {
+    const testEvents: NodeJS.EventEmitter = app;
+    const testConnection = rpcConnection;
+    testEvents.on("halo:e2e:open-window", () => {
+      // oxlint-disable-next-line typescript/no-floating-promises -- The harness waits for Electron's window event.
+      void createWindow(testConnection);
+    });
+  }
   startAppUpdates({
     mode: applicationLaunchMode,
     getWindow: () => mainWindow,
@@ -228,6 +252,8 @@ async function createWindow(
       ],
     },
   });
+  windows.add(window);
+  window.once("closed", () => windows.delete(window));
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     await window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -264,7 +290,7 @@ function registerLogBridge(): void {
 
 function assertTrustedSender(event: IpcMainEvent): BrowserWindow {
   const senderWindow = BrowserWindow.fromWebContents(event.sender);
-  if (senderWindow === null || senderWindow !== mainWindow) {
+  if (senderWindow === null || !windows.has(senderWindow)) {
     throw new Error("Halo rejected IPC from an unknown renderer.");
   }
   return senderWindow;

@@ -23,9 +23,9 @@ export type PluginsRouterContext = {
 const os = implement(contract.plugins).$context<PluginsRouterContext>();
 
 export const pluginsRouter = os.router({
-  list: os.list.handler(async ({ context }) => {
+  list: os.list.handler(({ context }) => {
     context.logger.info({ event: "listPlugins" });
-    const listed = await context.plugins.load();
+    const listed = context.plugins.list();
     if (listed instanceof Error) return orpcErrors.badRequest(listed);
     context.logger.info({
       event: "listPluginsResult",

@@ -101,7 +101,7 @@ export class HaloServer {
   }): Promise<HaloHttpConnections | HaloHttpError> {
     await this.context.workspace.restore();
     if (this.context.workspace.getWorkspace() !== undefined) {
-      const listed = await this.context.plugins.load();
+      const listed = await this.context.plugins.reload();
       if (listed instanceof Error) {
         this.context.logger.warn({
           event: "plugin-startup-load-failed",
@@ -141,7 +141,7 @@ export class HaloServer {
     const runtimeClosed = await this.context.toolRuntime.close();
     if (runtimeClosed instanceof Error) return runtimeClosed;
 
-    const pluginsLoaded = await this.context.plugins.load();
+    const pluginsLoaded = await this.context.plugins.reload();
     if (pluginsLoaded instanceof Error) {
       this.context.logger.warn({
         event: "plugin-workspace-load-failed",

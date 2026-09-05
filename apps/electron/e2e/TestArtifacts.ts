@@ -68,6 +68,18 @@ export async function createTestArtifacts(testInfo: TestInfo) {
   const outputPrefix = `[e2e:${testInfo.title}:main]`;
   const captureFinalizers: Array<() => Promise<void>> = [];
 
+  const rendererLogInitialized = fsPromises
+    .writeFile(paths.rendererLog, "")
+    .catch(
+      (cause) =>
+        new TestArtifactError({ operation: "initialize renderer log", cause }),
+    );
+  const rendererLog = createRendererLog({
+    path: paths.rendererLog,
+    prefix: `[e2e:${testInfo.title}:renderer]`,
+  });
+  let rendererIndex = 0;
+
   const resolveFilePath = (filePath: string) => {
     const resolved = path.resolve(root, filePath);
     const relative = path.relative(root, resolved);
@@ -125,35 +137,24 @@ export async function createTestArtifacts(testInfo: TestInfo) {
       );
     },
     async captureRenderer(page: Page) {
-      const initialized = await fsPromises
-        .writeFile(paths.rendererLog, "")
-        .catch(
-          (cause) =>
-            new TestArtifactError({
-              operation: "initialize renderer log",
-              cause,
-            }),
-        );
+      const initialized = await rendererLogInitialized;
       if (initialized instanceof Error) return initialized;
-
-      const prefix = `[e2e:${testInfo.title}:renderer]`;
-      const rendererLog = createRendererLog({
-        path: paths.rendererLog,
-        prefix,
-      });
+      const windowLabel = `[window:${rendererIndex++}]`;
       const onConsole = (message: ConsoleMessage) => {
-        rendererLog.write(`[console:${message.type()}] ${message.text()}`);
+        rendererLog.write(
+          `${windowLabel}[console:${message.type()}] ${message.text()}`,
+        );
       };
       const onPageError = (error: Error) => {
         rendererLog.write(
-          `[pageerror] ${error.stack === undefined ? error.message : error.stack}`,
+          `${windowLabel}[pageerror] ${error.stack === undefined ? error.message : error.stack}`,
         );
       };
       const onRequestFailed = (request: Request) => {
         const failure = request.failure();
         const detail = failure === null ? "unknown failure" : failure.errorText;
         rendererLog.write(
-          `[requestfailed] ${request.method()} ${request.url()}: ${detail}`,
+          `${windowLabel}[requestfailed] ${request.method()} ${request.url()}: ${detail}`,
         );
       };
       page.on("console", onConsole);
@@ -189,7 +190,10 @@ export async function createTestArtifacts(testInfo: TestInfo) {
         return finalized;
       }
 
-      if (testInfo.status !== testInfo.expectedStatus) {
+      if (
+        testInfo.status !== testInfo.expectedStatus ||
+        testInfo.status === "failed"
+      ) {
         const attached = await attachArtifacts({ testInfo, paths });
         retainArtifacts(paths.root);
         return attached;
