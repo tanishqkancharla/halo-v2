@@ -86,7 +86,7 @@ const styles = {
     overflow: "auto",
     overscrollBehavior: "contain",
   }),
-  codeBody: style(spacing.padding({ all: 12 }), {
+  codeBody: style({
     flex: "1 1 auto",
     minWidth: 0,
     minHeight: 0,
@@ -103,8 +103,6 @@ const styles = {
   markdownEditor: style({ minHeight: "100%" }),
   codeContent: style({
     width: "100%",
-    maxWidth: proseMaxWidth,
-    marginInline: "auto",
     flex: "1 1 auto",
     minWidth: 0,
     minHeight: 0,
