@@ -1,4 +1,5 @@
 import {
+  CodeBlock,
   Editor,
   backgroundColor,
   flex,
@@ -7,7 +8,6 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import { CodeBlock } from "./CodeBlock.tsx";
 import { useWorkspaceFileQuery } from "../api/ApiProvider.tsx";
 import { CodeViewFileEditor } from "./CodeViewFileEditor.tsx";
 import { fileKind, fileLanguage } from "./fileKind.ts";

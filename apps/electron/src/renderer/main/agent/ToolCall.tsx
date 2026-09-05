@@ -1,7 +1,14 @@
 import { useId, useState } from "react";
-import { colors, flex, monospace, prose, radius, spacing } from "maui";
+import {
+  CodeBlock,
+  colors,
+  flex,
+  monospace,
+  prose,
+  radius,
+  spacing,
+} from "maui";
 import { style, useStyles } from "purse-styles";
-import { CodeBlock } from "../CodeBlock.tsx";
 import { execJsSource, toolPartLabel, type ToolPart } from "./sessionView.ts";
 import { useWorkspaceQuery } from "../../api/ApiProvider.tsx";
 
