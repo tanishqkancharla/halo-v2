@@ -17,6 +17,11 @@ class ParallelMcpError extends errore.createTaggedError({
   message: "Parallel MCP request failed",
 }) {}
 
+class ParallelMcpToolError extends errore.createTaggedError({
+  name: "ParallelMcpToolError",
+  message: 'Parallel MCP tool "$tool" failed: $details',
+}) {}
+
 const parallelSearchMcpUrl = "https://search.parallel.ai/mcp";
 
 const webSearchParameters = Type.Object({
@@ -114,11 +119,26 @@ async function callParallelTool(args: {
 
   // SAFETY: callTool was invoked with CallToolResultSchema, so the payload is CallToolResult.
   const callResult = result as CallToolResult;
-  return {
-    value: callResult.content
-      .flatMap((part) => (part.type === "text" ? [part.text] : []))
-      .join("\n"),
-  };
+  const text = callResult.content
+    .flatMap((part) => (part.type === "text" ? [part.text] : []))
+    .join("\n");
+  if (callResult.isError === true) {
+    return new ParallelMcpToolError({ tool: args.name, details: text });
+  }
+  if (callResult.structuredContent !== undefined) {
+    return { value: callResult.structuredContent };
+  }
+
+  // Parallel serializes Search and Fetch results into MCP text content.
+  const parsed = errore.try({
+    try: () => {
+      const value: unknown = JSON.parse(text);
+      return { value };
+    },
+    catch: (cause) => new ParallelMcpError({ cause }),
+  });
+  if (parsed instanceof Error) return parsed;
+  return parsed;
 }
 
 export const parallelSearchPlugin: HaloToolPlugin = {
