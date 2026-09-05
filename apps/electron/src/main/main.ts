@@ -367,7 +367,7 @@ async function switchWorkspace(): Promise<void> {
   const selection = await dialog.showOpenDialog(mainWindow, {
     title: "Switch workspace",
     buttonLabel: "Switch workspace",
-    properties: ["openDirectory"],
+    properties: ["openDirectory", "createDirectory"],
   });
   if (selection.canceled) return;
   const directory = selection.filePaths[0];

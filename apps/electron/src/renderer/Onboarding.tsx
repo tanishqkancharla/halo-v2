@@ -29,7 +29,7 @@ export function Onboarding(props: OnboardingProps) {
         <Flex column gap={8}>
           <div>
             <H1>Choose a workspace</H1>
-            <P>Pick the folder where Halo and Pi should work.</P>
+            <P>Pick or create the folder where Halo and Pi should work.</P>
           </div>
           {props.message && (
             <div className={error} role="alert">

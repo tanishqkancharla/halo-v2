@@ -81,7 +81,7 @@ async function chooseWorkspace(args: {
     .showOpenDialog(args.window, {
       title: "Choose a Halo workspace",
       buttonLabel: "Choose workspace",
-      properties: ["openDirectory"],
+      properties: ["openDirectory", "createDirectory"],
     })
     .catch(
       (e) =>
