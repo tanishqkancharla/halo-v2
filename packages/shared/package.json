@@ -8,6 +8,7 @@
     "./contract": "./src/contract.ts",
     "./isCallable": "./src/isCallable.ts",
     "./mauiSkills": "./src/mauiSkills.ts",
+    "./pathEvents": "./src/pathEvents.ts",
     "./plugin": "./src/plugin.ts",
     "./pluginManifest": "./src/pluginManifest.ts",
     "./rpc": "./src/rpc.ts",

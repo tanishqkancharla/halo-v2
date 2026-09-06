@@ -2,6 +2,7 @@ import { SidebarItem, SidebarSection } from "@halo/plugin-sdk/view";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { File, Folder } from "maui/icons";
+import { applyPathEvents } from "@get-halo/shared/pathEvents";
 import type { HaloClient } from "@get-halo/shared/contract";
 import type { WorkspaceTreeEvent } from "@get-halo/shared/rpc";
 import {
@@ -134,17 +135,4 @@ async function listenWorkspaceTree(
 ) {
   const events = await api.workspace.events(undefined, { signal });
   for await (const event of events) onEvents(event);
-}
-
-function applyPathEvents(paths: string[], events: WorkspaceTreeEvent[]) {
-  return events.reduce((next, event) => {
-    if (event.type === "create") {
-      if (next.includes(event.path)) return next;
-      return [...next, event.path];
-    }
-    return next.filter((path) => {
-      if (path === event.path) return false;
-      return !path.startsWith(`${event.path}/`);
-    });
-  }, paths);
 }
