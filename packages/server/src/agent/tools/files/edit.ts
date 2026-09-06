@@ -29,6 +29,16 @@ function restoreLineEndings(text: string, ending: "\r\n" | "\n") {
   return ending === "\r\n" ? text.replace(/\n/g, "\r\n") : text;
 }
 
+function replaceFirst(
+  content: string,
+  oldText: string,
+  newText: string,
+): string {
+  const idx = content.indexOf(oldText);
+  if (idx === -1) return content;
+  return content.slice(0, idx) + newText + content.slice(idx + oldText.length);
+}
+
 export async function editFile(args: {
   filesystem: FilesystemService;
   cwd: string;
@@ -86,7 +96,7 @@ export async function editFile(args: {
 
   const newContent = replaceAll
     ? normalizedContent.split(normalizedOldText).join(normalizedNewText)
-    : normalizedContent.replace(normalizedOldText, normalizedNewText);
+    : replaceFirst(normalizedContent, normalizedOldText, normalizedNewText);
   const finalContent = bom + restoreLineEndings(newContent, lineEnding);
 
   const written = await args.filesystem.writeFile(
