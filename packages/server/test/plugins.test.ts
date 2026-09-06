@@ -234,3 +234,32 @@ serverTest(
   },
   30_000,
 );
+
+serverTest(
+  "build surfaces a server mount failure",
+  async ({ server }) => {
+    const plugin = await server.rpc.plugins.create({ id: "broken" });
+    await server.harness.files.write({
+      path: path.join(plugin.directory, "server.ts"),
+      content: outdent`
+        import { pluginOs } from "@get-halo/plugin-sdk/server";
+        throw new Error("server module failed to initialize");
+        export default { ping: pluginOs.handler(() => ({ ok: true })) };
+      `,
+    });
+    const result = await server.rpc.plugins.build();
+    expect(result.built).toContain("broken");
+    expect(result.errors.length).toBeGreaterThan(0);
+    const buildError = result.errors.find((e) => e.id === "broken");
+    expect(buildError).toBeDefined();
+    expect(buildError?.message).toContain("server module failed to initialize");
+    await expect(
+      server.rpc.plugins.invoke({
+        pluginId: plugin.id,
+        path: ["ping"],
+        input: undefined,
+      }),
+    ).rejects.toThrow("Plugin 'broken' is not mounted");
+  },
+  30_000,
+);

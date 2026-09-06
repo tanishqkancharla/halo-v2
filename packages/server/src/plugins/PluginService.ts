@@ -134,7 +134,11 @@ export class PluginService {
 
     const remounted = await this.load();
     if (remounted instanceof Error) return remounted;
-    return { built, errors };
+    const alreadyErrored = new Set(errors.map((e) => e.id));
+    const remountErrors = remounted.errors.filter(
+      (e) => !alreadyErrored.has(e.id),
+    );
+    return { built, errors: [...errors, ...remountErrors] };
   }
 
   async types() {
