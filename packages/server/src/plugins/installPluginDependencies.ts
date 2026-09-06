@@ -10,8 +10,9 @@ export class PluginDependencyInstallError extends errore.createTaggedError({
 }) {}
 
 export async function installPluginDependencies(directory: string) {
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
   const installed = await execFileAsync(
-    "npm",
+    npm,
     [
       "install",
       "--ignore-scripts",
@@ -19,7 +20,10 @@ export async function installPluginDependencies(directory: string) {
       "--no-fund",
       "--package-lock=false",
     ],
-    { cwd: directory },
+    {
+      cwd: directory,
+      shell: process.platform === "win32",
+    },
   ).catch((e) => new PluginDependencyInstallError({ cause: e }));
   if (installed instanceof Error) return installed;
 }
