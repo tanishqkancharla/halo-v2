@@ -122,7 +122,7 @@ function Composer({
     setDraft("");
     const result = await onSubmit(trimmedText);
     if (result instanceof Error) {
-      setDraft(trimmedText);
+      setDraft((current) => (current === "" ? trimmedText : current));
     }
   }
 
