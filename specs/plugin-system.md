@@ -1,5 +1,7 @@
 # Plugin system
 
+> Historical design, not instructions to implement. [Workspace plugin panes](./workspace-plugin-panes.md) supersedes this plan for frontend loading, dependency ownership, and contributions. The original content remains below for reference.
+
 ## System flow
 
 ```mermaid
