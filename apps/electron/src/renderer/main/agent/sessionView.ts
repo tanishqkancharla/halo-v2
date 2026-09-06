@@ -601,13 +601,13 @@ function completedMatching(
 
 function isFileActivity(call: ToolPart): boolean {
   const tool = call.tool;
-  const path = tool.path;
+  const fileOperations = new Set(["read", "write", "edit", "patch"]);
+  const operation = tool.path.split(".").at(-1);
   return (
-    tool.integrationId === "files" ||
-    path === "read" ||
-    path === "write" ||
-    path === "edit" ||
-    path === "patch"
+    fileOperations.has(tool.path) ||
+    (tool.integrationId === "files" &&
+      operation !== undefined &&
+      fileOperations.has(operation))
   );
 }
 

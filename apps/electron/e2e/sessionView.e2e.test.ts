@@ -594,6 +594,60 @@ e2eTest(
   },
 );
 
+e2eTest(
+  "shows a files.delete activity instead of hiding the row",
+  async ({ harness, renderer }, testInfo) => {
+    const session = await harness.loadSession({ title: "Delete a file" });
+    const pane = renderer.page.getByRole("main", { name: "Delete a file" });
+    const js = "return await tools.files.delete({ path: 'notes.md' })";
+
+    await session.append(m.run.start());
+    await session.append(m.exec.start({ js }));
+    await session.append(
+      m.exec.tool.start("files.delete", { arguments: { path: "notes.md" } }),
+    );
+    const activeSummary = pane.getByRole("button", {
+      name: "Using Workspace files",
+      exact: true,
+    });
+    await expect(activeSummary).toBeVisible();
+    await expectThinkingVisible(
+      activeSummary.getByRole("status", { name: "Working" }),
+    );
+
+    await session.append([
+      m.exec.tool.end(),
+      m.exec.end({ result: "Deleted" }),
+      m.run.end(),
+    ]);
+    const completedSummary = pane.getByRole("button", {
+      name: "Used Workspace files",
+      exact: true,
+    });
+    await expect(completedSummary).toBeVisible();
+    await expect(
+      completedSummary.getByRole("status", { name: "Working" }),
+    ).toHaveCount(0);
+    await completedSummary.click();
+    const completedCall = pane.getByRole("button", {
+      name: "Used Workspace files (files.delete)",
+      exact: true,
+    });
+    await expect(completedCall).toBeVisible();
+    await completedCall.click();
+    const details = pane.getByRole("region", {
+      name: "files.delete",
+      exact: true,
+    });
+    await expect(details).toBeVisible();
+    await expect(details.getByRole("code")).toHaveText([js, "Deleted"]);
+    await testInfo.attach("files.delete activity", {
+      body: await pane.screenshot(),
+      contentType: "image/png",
+    });
+  },
+);
+
 async function expectThinkingVisible(indicator: Locator) {
   await expect(indicator).toBeVisible();
   // The status container can be visible even when its animated dots have no painted area.
