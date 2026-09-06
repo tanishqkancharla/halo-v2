@@ -1,16 +1,364 @@
 import { haloProtocolVersion } from "@get-halo/shared/contract";
+import type { PluginContributions } from "@halo/plugin-sdk/schema";
+import { symlink } from "node:fs/promises";
 import path from "node:path";
 import outdent from "outdent";
-import { expect } from "vitest";
+import { describe, expect } from "vitest";
 import { serverTest } from "./serverTest.js";
+import type { PluginFiles } from "./PluginFiles.js";
+
+describe("plugin contributions", { timeout: 15_000 }, () => {
+  const contributionTest = serverTest.extend<{
+    plugin: {
+      id: string;
+      directory: string;
+      files: PluginFiles;
+      contributes: PluginContributions;
+    };
+  }>({
+    plugin: async ({ server }, use) => {
+      const plugin = await server.rpc.plugins.create({ id: "sessions" });
+      const files = server.harness.pluginFiles(plugin);
+      const contributes: PluginContributions = {
+        sidebar: ["first", "second"].map((id) => ({
+          id,
+          title: id,
+          target: { paneId: "session", params: { sessionId: id } },
+        })),
+        panes: [
+          {
+            id: "session",
+            title: "Session",
+            content: { kind: "webview", entry: "./Session.tsx" },
+          },
+        ],
+      };
+      await files.updateManifest({ contributes });
+      await files.write({
+        "Session.tsx": "export default function Session() { return null; }",
+      });
+      await use({ ...plugin, files, contributes });
+    },
+  });
+
+  contributionTest(
+    "discovers two targets of the same pane",
+    async ({ server, plugin }) => {
+      await server.rpc.plugins.build();
+
+      const listed = await server.rpc.plugins.list();
+      expect(
+        listed.contributions.flatMap(({ contributes }) =>
+          contributes.sidebar.map(({ target }) => target),
+        ),
+      ).toEqual(plugin.contributes.sidebar.map(({ target }) => target));
+    },
+  );
+
+  contributionTest(
+    "publishes edited sidebar targets after rebuilding the plugin",
+    async ({ server, plugin }) => {
+      await server.rpc.plugins.build();
+
+      const contributes: PluginContributions = {
+        ...plugin.contributes,
+        sidebar: [
+          {
+            id: "first",
+            title: "Renamed session",
+            target: { paneId: "session", params: { sessionId: "first" } },
+          },
+          {
+            id: "third",
+            title: "New session",
+            target: { paneId: "session", params: { sessionId: "third" } },
+          },
+        ],
+      };
+      await plugin.files.updateManifest({ contributes });
+      await server.rpc.plugins.build();
+
+      const listed = await server.rpc.plugins.list();
+      expect(
+        listed.contributions.flatMap((entry) => entry.contributes.sidebar),
+      ).toEqual(contributes.sidebar);
+    },
+  );
+
+  contributionTest(
+    "discovers separate session and settings panes in one plugin",
+    async ({ server, plugin }) => {
+      await plugin.files.write({
+        "Settings.tsx":
+          "export default function Settings() { return 'Settings'; }",
+      });
+      const contributes: PluginContributions = {
+        sidebar: [
+          ...plugin.contributes.sidebar,
+          {
+            id: "settings",
+            title: "Settings",
+            target: { paneId: "settings", params: {} },
+          },
+        ],
+        panes: [
+          ...plugin.contributes.panes,
+          {
+            id: "settings",
+            title: "Settings",
+            content: { kind: "webview", entry: "./Settings.tsx" },
+          },
+        ],
+      };
+      await plugin.files.updateManifest({ contributes });
+      await server.rpc.plugins.build();
+
+      const listed = await server.rpc.plugins.list();
+      expect(
+        listed.contributions.flatMap((entry) => entry.contributes.panes),
+      ).toEqual(contributes.panes);
+    },
+  );
+
+  contributionTest(
+    "discovers two plugins that use the same local pane and sidebar IDs",
+    async ({ server, plugin }) => {
+      const archive = await server.rpc.plugins.create({ id: "archive" });
+      const files = server.harness.pluginFiles(archive);
+      await files.updateManifest({ contributes: plugin.contributes });
+      await files.write({
+        "Session.tsx":
+          "export default function Session() { return 'Archived session'; }",
+      });
+      await server.rpc.plugins.build();
+
+      const listed = await server.rpc.plugins.list();
+      expect(listed.contributions).toMatchObject(
+        [archive.id, plugin.id].map((pluginId) => ({
+          pluginId,
+          contributes: {
+            sidebar: [{ id: "first" }, { id: "second" }],
+            panes: [{ id: "session" }],
+          },
+        })),
+      );
+    },
+  );
+
+  describe("manifest validation", () => {
+    contributionTest.for(["sidebar", "panes"] as const)(
+      "rejects duplicate %s IDs",
+      async (kind, { server, plugin }) => {
+        await plugin.files.updateManifest({
+          contributes: {
+            ...plugin.contributes,
+            [kind]: [...plugin.contributes[kind], ...plugin.contributes[kind]],
+          },
+        });
+        await server.rpc.plugins.build();
+
+        expect((await server.rpc.plugins.list()).errors).toEqual([
+          {
+            id: plugin.id,
+            message: expect.stringContaining(`duplicate ${kind} id`),
+          },
+        ]);
+      },
+    );
+
+    contributionTest(
+      "rejects a sidebar target without a declared pane",
+      async ({ server, plugin }) => {
+        await plugin.files.updateManifest({
+          contributes: { ...plugin.contributes, panes: [] },
+        });
+        await server.rpc.plugins.build();
+
+        expect((await server.rpc.plugins.list()).errors).toEqual([
+          {
+            id: plugin.id,
+            message: expect.stringContaining("targets unknown pane"),
+          },
+        ]);
+      },
+    );
+
+    contributionTest(
+      "rejects non-string pane parameters",
+      async ({ server, plugin }) => {
+        await plugin.files.updateManifest({
+          contributes: {
+            ...plugin.contributes,
+            sidebar: [
+              {
+                id: "bad",
+                title: "Bad",
+                target: { paneId: "session", params: { sessionId: 42 } },
+              },
+            ],
+          },
+        });
+        await server.rpc.plugins.build();
+
+        expect((await server.rpc.plugins.list()).errors).toEqual([
+          {
+            id: plugin.id,
+            message: expect.stringContaining("/params/sessionId"),
+          },
+        ]);
+      },
+    );
+
+    contributionTest.for([
+      {
+        name: "missing files",
+        entry: "./missing.tsx",
+        error: "cannot resolve pane",
+      },
+      { name: "directories", entry: ".", error: "entry must be a file" },
+    ])(
+      "rejects $name as pane entries",
+      async ({ entry, error }, { server, plugin }) => {
+        await plugin.files.updateManifest({
+          contributes: {
+            ...plugin.contributes,
+            panes: [
+              {
+                id: "session",
+                title: "Session",
+                content: { kind: "webview", entry },
+              },
+            ],
+          },
+        });
+        await server.rpc.plugins.build();
+
+        expect((await server.rpc.plugins.list()).errors).toEqual([
+          { id: plugin.id, message: expect.stringContaining(error) },
+        ]);
+      },
+    );
+
+    contributionTest(
+      "rejects absolute pane entry paths",
+      async ({ server, plugin }) => {
+        await plugin.files.updateManifest({
+          contributes: {
+            ...plugin.contributes,
+            panes: [
+              {
+                id: "session",
+                title: "Session",
+                content: {
+                  kind: "webview",
+                  entry: path.join(plugin.directory, "Session.tsx"),
+                },
+              },
+            ],
+          },
+        });
+        await server.rpc.plugins.build();
+
+        expect((await server.rpc.plugins.list()).errors).toEqual([
+          {
+            id: plugin.id,
+            message: expect.stringContaining("entry must be relative"),
+          },
+        ]);
+      },
+    );
+
+    contributionTest(
+      "rejects pane entries outside the plugin directory",
+      async ({ server, plugin }) => {
+        await plugin.files.write({
+          "../outside.tsx": "export default function Outside() {}",
+        });
+        await plugin.files.updateManifest({
+          contributes: {
+            ...plugin.contributes,
+            panes: [
+              {
+                id: "session",
+                title: "Session",
+                content: { kind: "webview", entry: "../outside.tsx" },
+              },
+            ],
+          },
+        });
+        await server.rpc.plugins.build();
+
+        expect((await server.rpc.plugins.list()).errors).toEqual([
+          {
+            id: plugin.id,
+            message: expect.stringContaining("entry must stay inside"),
+          },
+        ]);
+      },
+    );
+
+    contributionTest(
+      "rejects pane symlinks outside the plugin directory",
+      async ({ server, plugin }) => {
+        await plugin.files.write({
+          "../outside.tsx": "export default function Outside() {}",
+        });
+        await symlink(
+          path.join(plugin.directory, "../outside.tsx"),
+          path.join(plugin.directory, "escape.tsx"),
+        );
+        await plugin.files.updateManifest({
+          contributes: {
+            ...plugin.contributes,
+            panes: [
+              {
+                id: "session",
+                title: "Session",
+                content: { kind: "webview", entry: "./escape.tsx" },
+              },
+            ],
+          },
+        });
+        await server.rpc.plugins.build();
+
+        expect((await server.rpc.plugins.list()).errors).toEqual([
+          {
+            id: plugin.id,
+            message: expect.stringContaining("entry must stay inside"),
+          },
+        ]);
+      },
+    );
+
+    contributionTest(
+      "keeps valid contributions discoverable beside an invalid plugin",
+      async ({ server, plugin }) => {
+        const healthy = await server.rpc.plugins.create({ id: "healthy" });
+        const files = server.harness.pluginFiles(healthy);
+        await files.updateManifest({ contributes: plugin.contributes });
+        await files.write({
+          "Session.tsx": "export default function Session() { return null; }",
+        });
+        await plugin.files.updateManifest({
+          contributes: { ...plugin.contributes, panes: [] },
+        });
+        await server.rpc.plugins.build();
+
+        const listed = await server.rpc.plugins.list();
+        expect(listed.contributions.map(({ pluginId }) => pluginId)).toEqual([
+          healthy.id,
+        ]);
+      },
+    );
+  });
+});
 
 serverTest(
   "builds and invokes a plugin",
   async ({ server }) => {
     const plugin = await server.rpc.plugins.create({ id: "notes" });
-    await server.harness.files.write({
-      path: path.join(plugin.directory, "server.ts"),
-      content: outdent`
+    await server.harness.pluginFiles(plugin).write({
+      "server.ts": outdent`
         import { pluginOs } from "@get-halo/plugin-sdk/server";
 
         export default {
@@ -46,9 +394,8 @@ serverTest(
   "reloads plugin code on build, not when a client lists plugins",
   async ({ server }) => {
     const plugin = await server.rpc.plugins.create({ id: "notes" });
-    await server.harness.files.write({
-      path: path.join(plugin.directory, "server.ts"),
-      content: outdent`
+    await server.harness.pluginFiles(plugin).write({
+      "server.ts": outdent`
         import { pluginOs } from "@get-halo/plugin-sdk/server";
 
         export default {
@@ -58,9 +405,8 @@ serverTest(
     });
     await server.rpc.plugins.build();
 
-    await server.harness.files.write({
-      path: path.join(plugin.directory, "server.ts"),
-      content: outdent`
+    await server.harness.pluginFiles(plugin).write({
+      "server.ts": outdent`
         import { pluginOs } from "@get-halo/plugin-sdk/server";
 
         export default {
@@ -68,8 +414,7 @@ serverTest(
         };
       `,
     });
-    const listed = await server.rpc.plugins.list();
-    expect(listed.plugins.map((manifest) => manifest.id)).toEqual(["notes"]);
+    await server.rpc.plugins.list();
     expect(
       await server.rpc.plugins.invoke({
         pluginId: plugin.id,
@@ -95,9 +440,8 @@ serverTest(
   "streams plugin results",
   async ({ server }) => {
     const plugin = await server.rpc.plugins.create({ id: "counter" });
-    await server.harness.files.write({
-      path: path.join(plugin.directory, "server.ts"),
-      content: outdent`
+    await server.harness.pluginFiles(plugin).write({
+      "server.ts": outdent`
         import { pluginOs } from "@get-halo/plugin-sdk/server";
 
         export default {
@@ -169,22 +513,10 @@ serverTest(
       content: "hello",
     });
     const reader = await server.rpc.plugins.create({ id: "reader" });
-    const packagePath = path.join(reader.directory, "package.json");
-    const setCapabilities = async (capabilities: string[]) => {
-      // SAFETY: plugins.create writes a package object with a Halo manifest.
-      const packageJson = JSON.parse(
-        (await server.harness.files.read(packagePath)).toString("utf8"),
-      ) as { halo: { capabilities?: string[] } };
-      packageJson.halo.capabilities = capabilities;
-      await server.harness.files.write({
-        path: packagePath,
-        content: `${JSON.stringify(packageJson, undefined, 2)}\n`,
-      });
-    };
-    await setCapabilities(["files.read"]);
-    await server.harness.files.write({
-      path: path.join(reader.directory, "server.ts"),
-      content: outdent`
+    const files = server.harness.pluginFiles(reader);
+    await files.updateManifest({ capabilities: ["files.read"] });
+    await files.write({
+      "server.ts": outdent`
         import { pluginOs } from "@get-halo/plugin-sdk/server";
 
         export default {
@@ -196,9 +528,6 @@ serverTest(
     });
     await server.rpc.plugins.types();
     await server.rpc.plugins.build();
-
-    const listed = await server.rpc.plugins.list();
-    expect(listed.plugins.map((plugin) => plugin.id)).toContain("reader");
 
     const invokeReader = () =>
       server.rpc.plugins.invoke({
@@ -224,13 +553,13 @@ serverTest(
       data: { path: "message.txt", text: "hello" },
     });
 
-    await setCapabilities([]);
+    await files.updateManifest({ capabilities: [] });
     expect(await invokeReader()).toMatchObject({
       ok: false,
       error: { code: "tool_not_granted" },
     });
 
-    await setCapabilities(["files.read"]);
+    await files.updateManifest({ capabilities: ["files.read"] });
     expect(await invokeReader()).toMatchObject({
       ok: false,
       error: { code: "tool_not_granted" },

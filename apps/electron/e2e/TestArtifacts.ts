@@ -5,6 +5,7 @@ import path from "node:path";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { HaloClient } from "@get-halo/shared/contract";
+import { PluginFiles } from "@get-halo/server/testing";
 import type { ConsoleMessage, Page, Request, TestInfo } from "@playwright/test";
 import * as errore from "errore";
 
@@ -32,6 +33,7 @@ type TestPaths = {
 };
 
 type E2ETestHarness = {
+  pluginFiles(plugin: { directory: string }): PluginFiles;
   createClient(serverHost: string, serverPort: number): HaloClient;
   files: TestFiles;
   paths: TestPaths;
@@ -103,6 +105,9 @@ export async function createTestArtifacts(testInfo: TestInfo) {
     },
   };
   const harness: E2ETestHarness = {
+    pluginFiles(plugin) {
+      return new PluginFiles({ directory: plugin.directory, files });
+    },
     createClient(serverHost, serverPort) {
       const link = new RPCLink({
         origin: `http://${serverHost}:${serverPort}`,
