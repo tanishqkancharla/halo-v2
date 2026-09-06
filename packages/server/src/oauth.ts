@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { SessionEventPersistenceError } from "./agent/HaloAgentSession.js";
 import type { HaloContext } from "./router.js";
 
 export async function handleOAuthCallback(options: {
@@ -20,7 +21,10 @@ export async function handleOAuthCallback(options: {
       const cancelled = await options.context.toolRuntime.cancelOAuth(state);
       if (cancelled instanceof Error) {
         options.context.logger.warn({
-          event: "oauth-cancel-failed",
+          event:
+            cancelled instanceof SessionEventPersistenceError
+              ? "oauth-cancel-persist-failed"
+              : "oauth-cancel-failed",
           error: cancelled,
         });
       }
@@ -42,6 +46,23 @@ export async function handleOAuthCallback(options: {
     state,
     code,
   });
+  if (completed instanceof SessionEventPersistenceError) {
+    // The executor persisted the credential and connection row before the
+    // session-log append ran, so this error means authorization succeeded but
+    // recording the "connected" event failed. The session's event log is sticky
+    // for its lifetime, so guide the user to restart the session to recover.
+    options.context.logger.warn({
+      event: "oauth-callback-persist-failed",
+      error: completed,
+    });
+    options.response.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+    });
+    options.response.end(
+      '<!doctype html><html><head><meta charset="utf-8"><title>Halo</title></head><body>Your connection was authorized, but the session could not be updated. Please restart your session and try again.</body></html>',
+    );
+    return;
+  }
   if (completed instanceof Error) {
     options.context.logger.warn({
       event: "oauth-callback-failed",
