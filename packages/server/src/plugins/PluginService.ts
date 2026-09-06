@@ -237,6 +237,10 @@ export class PluginService {
     return { plugins, compiledViews, errors };
   }
 
+  invalidate() {
+    this.routers = new Map();
+  }
+
   async listManifests() {
     const listed = await this.listPluginDirectories();
     if (listed instanceof Error) return listed;

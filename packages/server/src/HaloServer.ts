@@ -136,6 +136,8 @@ export class HaloServer {
       return selected;
     }
 
+    this.context.plugins.invalidate();
+
     const sessionsClosed = await this.context.sessions.shutdown();
     if (sessionsClosed instanceof Error) return sessionsClosed;
     const runtimeClosed = await this.context.toolRuntime.close();
