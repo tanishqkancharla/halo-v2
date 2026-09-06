@@ -46,6 +46,7 @@ type ExecDescription = {
   tools?: ToolDescription[];
   result?: string;
   isError?: boolean;
+  details?: ToolResultDetails;
 };
 
 type ToolSelector = {
@@ -468,7 +469,13 @@ async function resolveDescriptionItem(args: {
             m.exec.tool.end({ result: tool.result, isError: tool.isError }),
           );
         }
-        items.push(m.exec.end({ result: item.result, isError: item.isError }));
+        items.push(
+          m.exec.end({
+            result: item.result,
+            isError: item.isError,
+            details: item.details,
+          }),
+        );
       } else {
         items.push(
           m.tool.start(item.name, { arguments: item.arguments }),

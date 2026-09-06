@@ -42,6 +42,54 @@ e2eTest("shows a connection request", async ({ harness, renderer }) => {
 });
 
 e2eTest(
+  "keeps inner tool calls visible when exec surfaces a connection request",
+  async ({ harness, renderer }) => {
+    await harness.loadSession({
+      title: "Calendar first use",
+      messages: [
+        m.user("What's on my calendar today?"),
+        m.exec({
+          js: "return await tools.google_calendar.events.list({})",
+          tools: [{ path: "google_calendar.events.list" }],
+          result: "Connection required",
+          details: {
+            connectionRequests: [
+              {
+                client: "halo",
+                clientOwner: "user",
+                owner: "user",
+                connectionName: "default",
+                integration: "google_calendar",
+                template: "google-calendar",
+              },
+            ],
+          },
+        }),
+      ],
+    });
+
+    // The nested call streamed while the exec ran. It must remain in the
+    // activity's call list after the exec's toolResult surfaces a connection
+    // request, instead of being dropped when the exec loses root status.
+    await expect(
+      renderer.page.getByRole("button", {
+        name: "Used Google Calendar",
+        exact: true,
+      }),
+    ).toBeVisible();
+    // The connection card renders in place of the (hidden) outer exec row.
+    await expect(
+      renderer.page.getByRole("region", {
+        name: "Google Calendar connection",
+      }),
+    ).toBeVisible();
+    await expect(renderer.page.getByText("Exec", { exact: true })).toHaveCount(
+      0,
+    );
+  },
+);
+
+e2eTest(
   "recovers interrupted activity from the durable session log",
   async ({ harness, renderer, server }) => {
     const loaded = await harness.loadSession({

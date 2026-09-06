@@ -384,12 +384,18 @@ function groupActivity(args: {
   const { tools, lastGroupId, live, invocations } = args;
   if (tools.length === 0) return undefined;
 
-  const visible = tools.filter((call) => call.connectionRequests.length === 0);
   const activities = activitiesForRoots(
     invocations,
-    new Set(visible.map((call) => call.id)),
+    new Set(tools.map((call) => call.id)),
   );
-  const calls = visibleToolParts(activities);
+  const connectionRequested = new Set(
+    tools
+      .filter((call) => call.connectionRequests.length > 0)
+      .map((call) => call.id),
+  );
+  const calls = visibleToolParts(activities).filter(
+    (call) => !connectionRequested.has(call.id),
+  );
 
   return {
     kind: "toolActivity",
