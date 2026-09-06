@@ -132,6 +132,41 @@ export function mapFilesystemEventsToTreeEvents(
   return mapped;
 }
 
+export async function expandDirectoryCreateEvents(
+  filesystem: FilesystemService,
+  workspaceRoot: string,
+  events: readonly WorkspaceTreeEvent[],
+  directoryPaths: Set<string>,
+): Promise<WorkspaceTreeEvent[]> {
+  const expanded: WorkspaceTreeEvent[] = [];
+  for (const event of events) {
+    expanded.push(event);
+    if (event.type !== "create" || !event.path.endsWith("/")) continue;
+    const dirRelative = event.path.slice(0, -1);
+    const absDir = join(workspaceRoot, dirRelative);
+    const children: string[] = [];
+    const walked = await walkDirectory(
+      filesystem,
+      absDir,
+      dirRelative,
+      children,
+    );
+    // The directory may have been deleted between the watch event and the
+    // walk; the create itself is still forwarded, and a subsequent delete
+    // event will clean up the renderer state.
+    if (walked instanceof Error) continue;
+    for (const child of children) {
+      // walkDirectory emits the directory's own placeholder ("dir/") when it
+      // is empty; the create event above already represents it, so skip the
+      // self-reference to avoid a duplicate in the stream.
+      if (child === event.path) continue;
+      if (child.endsWith("/")) directoryPaths.add(child);
+      expanded.push({ type: "create", path: child });
+    }
+  }
+  return expanded;
+}
+
 export function directoryPathsFromList(paths: readonly string[]): Set<string> {
   const directories = new Set<string>();
   for (const path of paths) {
@@ -182,7 +217,9 @@ export class WorkspaceService {
       },
     );
     this.unsubscribeFilesystemEvents = watchEvents.subscribe((batch) => {
-      this.handleWatchEvents(batch);
+      this.handleWatchEvents(batch).catch((cause) => {
+        console.warn("Workspace tree event handling failed:", cause);
+      });
     });
   }
 
@@ -354,16 +391,25 @@ export class WorkspaceService {
     this.unsubscribeFilesystemEvents();
   }
 
-  private handleWatchEvents(batch: FilesystemWatchBatch) {
+  private async handleWatchEvents(batch: FilesystemWatchBatch) {
+    if (this.state.status === "notStarted") return;
+    if (batch.watchedPath !== this.state.layout.root) return;
     const mapped = mapFilesystemEventsToTreeEvents(
       batch.watchedPath,
       batch.events,
       this.directoryPaths,
     );
-    if (this.state.status === "notStarted") return;
-    if (batch.watchedPath !== this.state.layout.root) return;
     if (mapped.length === 0) return;
-    this.treeEventStream.append(mapped);
+    const expanded = await expandDirectoryCreateEvents(
+      this.options.filesystem,
+      batch.watchedPath,
+      mapped,
+      this.directoryPaths,
+    );
+    // The workspace may have switched while walking; drop stale batch results.
+    if (batch.watchedPath !== this.state.layout.root) return;
+    if (expanded.length === 0) return;
+    this.treeEventStream.append(expanded);
   }
 }
 
