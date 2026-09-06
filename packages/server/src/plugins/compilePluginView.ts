@@ -56,9 +56,18 @@ export async function compilePluginView(args: {
           cause: e,
         }),
     );
-  if (built instanceof Error) return built;
+  if (built instanceof Error) {
+    // esbuild does not overwrite the outfile on a failed build, so remove the
+    // stale artifact from any prior successful build. Without this the read
+    // path (readPluginViewDist) would serve the old dist/view.js as a valid
+    // compiled view. unlink returns an error (ENOENT, not a throw) when no
+    // prior build wrote the file; that race is harmless and ignored here.
+    await args.filesystem.unlink(args.outfile);
+    return built;
+  }
 
   if (built.errors.length > 0) {
+    await args.filesystem.unlink(args.outfile);
     const first = built.errors[0];
     return new PluginViewCompileError({
       id: args.id,
