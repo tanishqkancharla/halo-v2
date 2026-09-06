@@ -9,7 +9,10 @@ import {
   DurableStreamPersistenceError,
 } from "./DurableStream.js";
 import { FilesystemService } from "./filesystem/FilesystemService.js";
-import { JsonlDurableStreamStorage } from "./JsonlDurableStreamStorage.js";
+import {
+  JsonlDurableStreamAppendError,
+  JsonlDurableStreamStorage,
+} from "./JsonlDurableStreamStorage.js";
 
 const test = baseTest.extend<{ streamFile: string }>({
   streamFile: async ({ task }, use) => {
@@ -108,6 +111,124 @@ test("stops durable consumption when aborted", async ({ streamFile }) => {
 
   abortController.abort();
   await expect(finished).resolves.toEqual({ done: true, value: undefined });
+});
+
+test("wakes a parked consumer with the persistence error on append failure", async ({
+  streamFile,
+}) => {
+  const filesystem = new FilesystemService();
+  const stream = await openStringStream(filesystem, streamFile);
+  const abortController = new AbortController();
+  const values = stream.consume({
+    afterSequence: 0,
+    abortSignal: abortController.signal,
+  });
+
+  const first = values.next();
+  await expect(stream.append("one")).resolves.toEqual({
+    sequence: 1,
+    value: "one",
+  });
+  await expect(first).resolves.toEqual({
+    done: false,
+    value: { sequence: 1, value: "one" },
+  });
+
+  const parked = values.next();
+
+  const removed = await filesystem.remove(path.dirname(streamFile), {
+    recursive: true,
+    force: true,
+  });
+  if (removed instanceof Error) throw removed;
+
+  const appended = await stream.append("two");
+  expect(appended).toBeInstanceOf(DurableStreamPersistenceError);
+  // SAFETY: the preceding expect confirmed appended is a DurableStreamPersistenceError.
+  expect((appended as DurableStreamPersistenceError).cause).toBeInstanceOf(
+    JsonlDurableStreamAppendError,
+  );
+
+  await expect(parked).rejects.toBeInstanceOf(DurableStreamPersistenceError);
+  await values.return();
+});
+
+test("a consumer opened after failure replays history then throws the error", async ({
+  streamFile,
+}) => {
+  const filesystem = new FilesystemService();
+  const stream = await openStringStream(filesystem, streamFile);
+  await expect(stream.append("one")).resolves.toEqual({
+    sequence: 1,
+    value: "one",
+  });
+
+  const removed = await filesystem.remove(path.dirname(streamFile), {
+    recursive: true,
+    force: true,
+  });
+  if (removed instanceof Error) throw removed;
+  await expect(stream.append("two")).resolves.toBeInstanceOf(
+    DurableStreamPersistenceError,
+  );
+
+  const values = stream.consume({ afterSequence: 0 });
+  await expect(values.next()).resolves.toEqual({
+    done: false,
+    value: { sequence: 1, value: "one" },
+  });
+  await expect(values.next()).rejects.toBeInstanceOf(
+    DurableStreamPersistenceError,
+  );
+  await values.return();
+});
+
+test("wakes every parked consumer when an append fails", async ({
+  streamFile,
+}) => {
+  const filesystem = new FilesystemService();
+  const stream = await openStringStream(filesystem, streamFile);
+  const abortController = new AbortController();
+  const readerA = stream.consume({
+    afterSequence: 0,
+    abortSignal: abortController.signal,
+  });
+  const readerB = stream.consume({
+    afterSequence: 0,
+    abortSignal: abortController.signal,
+  });
+
+  const firstA = readerA.next();
+  const firstB = readerB.next();
+  await expect(stream.append("one")).resolves.toEqual({
+    sequence: 1,
+    value: "one",
+  });
+  await expect(firstA).resolves.toEqual({
+    done: false,
+    value: { sequence: 1, value: "one" },
+  });
+  await expect(firstB).resolves.toEqual({
+    done: false,
+    value: { sequence: 1, value: "one" },
+  });
+
+  const parkedA = readerA.next();
+  const parkedB = readerB.next();
+
+  const removed = await filesystem.remove(path.dirname(streamFile), {
+    recursive: true,
+    force: true,
+  });
+  if (removed instanceof Error) throw removed;
+  await expect(stream.append("two")).resolves.toBeInstanceOf(
+    DurableStreamPersistenceError,
+  );
+
+  await expect(parkedA).rejects.toBeInstanceOf(DurableStreamPersistenceError);
+  await expect(parkedB).rejects.toBeInstanceOf(DurableStreamPersistenceError);
+  await readerA.return();
+  await readerB.return();
 });
 
 test("rejects malformed JSONL history", async ({ streamFile }) => {

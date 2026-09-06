@@ -54,6 +54,7 @@ export async function createDurableStream<T>(args: {
 
 export class DurableStream<T> {
   private readonly liveStream = new Stream<DurableStreamRecord<T>>();
+  private readonly failureController = new AbortController();
   private readonly records: DurableStreamRecord<T>[];
   private readonly pendingAppends: PendingAppend<T>[] = [];
   private nextSequence: number;
@@ -127,6 +128,15 @@ export class DurableStream<T> {
     };
     abortSignal?.addEventListener("abort", abort, { once: true });
     cleanup.defer(() => abortSignal?.removeEventListener("abort", abort));
+    const fail = () => {
+      wakeConsumer();
+    };
+    this.failureController.signal.addEventListener("abort", fail, {
+      once: true,
+    });
+    cleanup.defer(() =>
+      this.failureController.signal.removeEventListener("abort", fail),
+    );
 
     for (const record of replay) {
       if (aborted) return;
@@ -138,6 +148,7 @@ export class DurableStream<T> {
     while (true) {
       if (aborted) return;
       if (values.length === 0) {
+        if (this.failure !== undefined) throw this.failure;
         await new Promise<void>((resolve) => {
           wake = resolve;
         });
@@ -163,6 +174,7 @@ export class DurableStream<T> {
           cause: appended,
         });
         this.failure = failure;
+        this.failureController.abort();
         for (const pending of [...batch, ...this.pendingAppends.splice(0)]) {
           pending.resolve(failure);
         }
