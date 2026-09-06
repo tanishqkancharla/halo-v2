@@ -170,12 +170,13 @@ export class ToolRuntimeService {
     }
     const pending = this.takeConnectionByState(state);
     const cancelled = await this.runtime.cancelOAuth(state);
-    const notified =
-      pending === undefined
-        ? undefined
-        : await pending.onEvent(this.connectionEvent(pending, "cancelled"));
-    if (cancelled instanceof Error) return cancelled;
-    return notified;
+    if (cancelled instanceof Error) {
+      if (pending !== undefined) this.restorePending(pending);
+      return cancelled;
+    }
+    return pending === undefined
+      ? undefined
+      : await pending.onEvent(this.connectionEvent(pending, "cancelled"));
   }
 
   async cancelConnection(input: { connectionId: string; sessionId: string }) {
@@ -193,11 +194,11 @@ export class ToolRuntimeService {
     }
     this.takeConnection(input.connectionId);
     const cancelled = await runtime.cancelOAuth(pending.state);
-    const notified = await pending.onEvent(
-      this.connectionEvent(pending, "cancelled"),
-    );
-    if (cancelled instanceof Error) return cancelled;
-    return notified;
+    if (cancelled instanceof Error) {
+      this.restorePending(pending);
+      return cancelled;
+    }
+    return await pending.onEvent(this.connectionEvent(pending, "cancelled"));
   }
 
   private async expireConnection(connectionId: string) {
@@ -211,11 +212,11 @@ export class ToolRuntimeService {
       });
     }
     const cancelled = await runtime.cancelOAuth(pending.state);
-    const notified = await pending.onEvent(
-      this.connectionEvent(pending, "expired"),
-    );
-    if (cancelled instanceof Error) return cancelled;
-    return notified;
+    if (cancelled instanceof Error) {
+      this.restorePending(pending);
+      return cancelled;
+    }
+    return await pending.onEvent(this.connectionEvent(pending, "expired"));
   }
 
   private takeConnectionByState(state: string) {
@@ -231,6 +232,17 @@ export class ToolRuntimeService {
     this.pendingConnections.delete(connectionId);
     this.connectionIdsByState.delete(pending.state);
     return pending;
+  }
+
+  private restorePending(pending: PendingConnection) {
+    this.pendingConnections.set(pending.connectionId, pending);
+    this.connectionIdsByState.set(pending.state, pending.connectionId);
+    pending.expires = setTimeout(async () => {
+      const expired = await this.expireConnection(pending.connectionId);
+      if (expired instanceof Error) {
+        console.warn("OAuth expiry failed:", expired);
+      }
+    }, OAUTH2_SESSION_TTL_MS);
   }
 
   private connectionEvent(
