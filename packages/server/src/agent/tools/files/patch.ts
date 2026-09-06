@@ -511,13 +511,10 @@ function applyPatch(
       }
 
       case "update": {
-        const update = plan.updates.find(
-          (candidate) => candidate.path === hunk.path,
-        );
-        if (!update) throw new Error(`Missing update plan for ${hunk.path}`);
         const original = filesystemValue(
           filesystem.readFileSync(absPath, "utf8"),
         );
+        const update = planUpdateChunks(original, hunk.path, hunk.chunks);
         const newContent = applyPlannedUpdate(original, update);
 
         const dest = hunk.movePath ? resolve(cwd, hunk.movePath) : absPath;
