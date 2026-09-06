@@ -270,6 +270,7 @@ export class HaloAgentSession {
   }
 
   async prompt(text: string) {
+    if (this.eventWriteError !== undefined) return this.eventWriteError;
     if (text.trim().length === 0) return new EmptyPromptError();
     const prompted = await this.piSession
       .prompt(text, { streamingBehavior: "steer" })
