@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { PluginContributions } from "@halo/plugin-sdk/schema";
 import type { PluginManifest } from "./pluginManifest.js";
 
 export type PluginLoadError = {
@@ -17,8 +18,14 @@ export type LoadedPluginView = {
   Routes?: ComponentType;
 };
 
+export type PluginContributionDescriptor = {
+  pluginId: string;
+  contributes: PluginContributions;
+};
+
 export type PluginList = {
   plugins: PluginManifest[];
+  contributions: PluginContributionDescriptor[];
   compiledViews: CompiledPluginView[];
   errors: PluginLoadError[];
 };

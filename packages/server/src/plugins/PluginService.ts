@@ -51,7 +51,12 @@ type PluginDirectory = {
 
 export class PluginService {
   private routers = new Map<string, AnyRouter>();
-  private loaded: PluginList = { plugins: [], compiledViews: [], errors: [] };
+  private loaded: PluginList = {
+    plugins: [],
+    contributions: [],
+    compiledViews: [],
+    errors: [],
+  };
 
   private readonly filesystem: FilesystemService;
   private readonly workspace: WorkspaceService;
@@ -192,6 +197,7 @@ export class PluginService {
     if (listed instanceof Error) return listed;
 
     const plugins: PluginList["plugins"] = [];
+    const contributions: PluginList["contributions"] = [];
     const compiledViews: PluginList["compiledViews"] = [];
     const errors: PluginList["errors"] = [];
     const routers = new Map<string, AnyRouter>();
@@ -238,10 +244,16 @@ export class PluginService {
       }
 
       plugins.push(manifest);
+      if (manifest.halo.contributes !== undefined) {
+        contributions.push({
+          pluginId: plugin.id,
+          contributes: manifest.halo.contributes,
+        });
+      }
       if (compiled !== undefined) compiledViews.push(compiled);
     }
     this.routers = routers;
-    this.loaded = { plugins, compiledViews, errors };
+    this.loaded = { plugins, contributions, compiledViews, errors };
     return this.loaded;
   }
 

@@ -5,6 +5,7 @@ import { RPCLink } from "@orpc/client/fetch";
 import type { HaloClient } from "@get-halo/shared/contract";
 import { Logger } from "@repo/logger";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
+import { PluginFiles } from "./PluginFiles.js";
 
 type TestFiles = {
   write(input: { path: string; content: string | Uint8Array }): Promise<void>;
@@ -19,6 +20,7 @@ type TestPaths = {
 };
 
 export type TestHarness = {
+  pluginFiles(plugin: { directory: string }): PluginFiles;
   createClient(serverHost: string, serverPort: number): HaloClient;
   files: TestFiles;
   paths: TestPaths;
@@ -75,6 +77,9 @@ export async function createTestArtifacts(taskId: string) {
     },
   };
   const harness = {
+    pluginFiles(plugin: { directory: string }) {
+      return new PluginFiles({ directory: plugin.directory, files });
+    },
     createClient(serverHost: string, serverPort: number) {
       const link = new RPCLink({
         origin: `http://${serverHost}:${serverPort}`,

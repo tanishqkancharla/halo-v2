@@ -11,6 +11,7 @@
     "./plugins": "./src/plugins.ts",
     "./router": "./src/router.ts",
     "./sessions": "./src/sessions.ts",
+    "./testing": "./test/PluginFiles.ts",
     "./workspace": "./src/workspace.ts"
   },
   "scripts": {

@@ -25,12 +25,57 @@ export function parseVersioned<S extends TSchema>(args: {
   });
 }
 
+export const paneTargetSchema = Type.Object(
+  {
+    paneId: Type.String({ minLength: 1 }),
+    params: Type.Record(Type.String(), Type.String()),
+  },
+  { additionalProperties: false },
+);
+export type PaneTarget = Static<typeof paneTargetSchema>;
+
+export const sidebarEntitySchema = Type.Object(
+  {
+    id: Type.String({ minLength: 1 }),
+    title: Type.String({ minLength: 1 }),
+    target: paneTargetSchema,
+  },
+  { additionalProperties: false },
+);
+export type SidebarEntity = Static<typeof sidebarEntitySchema>;
+
+export const paneDefinitionSchema = Type.Object(
+  {
+    id: Type.String({ minLength: 1 }),
+    title: Type.String({ minLength: 1 }),
+    content: Type.Object(
+      {
+        kind: Type.Literal("webview"),
+        entry: Type.String({ minLength: 1 }),
+      },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);
+export type PaneDefinition = Static<typeof paneDefinitionSchema>;
+
+export const pluginContributionsSchema = Type.Object(
+  {
+    sidebar: Type.Array(sidebarEntitySchema),
+    panes: Type.Array(paneDefinitionSchema),
+  },
+  { additionalProperties: false },
+);
+export type PluginContributions = Static<typeof pluginContributionsSchema>;
+
 export const haloManifestV1 = Type.Object({
   version: Type.Literal(1),
   name: Type.String({ minLength: 1 }),
   description: Type.Optional(Type.String()),
   view: Type.Optional(Type.String({ minLength: 1 })),
   server: Type.Optional(Type.String({ minLength: 1 })),
+  contributes: Type.Optional(pluginContributionsSchema),
   capabilities: Type.Optional(
     Type.Array(Type.String({ minLength: 1 }), { uniqueItems: true }),
   ),

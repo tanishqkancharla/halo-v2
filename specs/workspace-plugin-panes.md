@@ -1,6 +1,6 @@
 # Workspace plugin panes
 
-**Status: Phase 1 SDK packaging is implemented and verified in the uncommitted working tree. Phases 2–8 are not started.** Electron still uses the current plugin loader. The iframe architecture below remains a target, not current app behavior.
+**Status: Phases 1–2 are implemented and verified. Phases 3–8 are not started.** Electron still uses the current plugin loader. The iframe architecture below remains a target, not current app behavior.
 
 | Area                   | Current implementation                                                  | Agreed direction — still to build                                                             |
 | ---------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -13,7 +13,7 @@
 
 **Already completed before this plan:** read-only plugin discovery, shared pending Tandem initialization, and the two-window synchronization regression test. These are foundations we will preserve, not new work claimed by this plan.
 
-**Proposals for review:** the exact manifest fields, default-exported pane component, bootstrap API, and phase breakdown below are implementation proposals. The iframe/server ownership and Tandem collaboration direction are agreed; these API details have not yet been implemented or individually approved.
+**Implemented for review:** the approved manifest contribution fields and parameterized targets are implemented in Phase 2. Default-exported pane rendering, the bootstrap API, and subsequent phases remain proposed. The iframe/server ownership and Tandem collaboration direction are agreed.
 
 **Still to decide:** the authenticated browser bootstrap and origin configuration before exposing plugin documents; the backend runtime and process policy before backend isolation. One child process per extension remains a recommendation.
 
@@ -228,7 +228,7 @@ The current SDK caches Tandem clients by plugin ID; full per-pane client disposa
 
 In the target architecture, Halo will render its chrome from validated contribution data. The workspace server will install and build plugins and serve their browser artifacts. Each pane will execute in an iframe with its own runtime, using a scoped SDK connection to the plugin backend. A standalone browser view will load the same frontend for agent testing. Existing Tandem synchronization will connect those views.
 
-The pane contracts below remain proposed implementation shapes, not existing APIs. Phase 1 changes SDK packaging only. Stop after each phase with changes uncommitted for review.
+The contribution schema and discovery descriptors below are implemented in Phase 2. Pane rendering, browser connections, and shell bridge contracts remain proposed. Stop after each phase with changes uncommitted for review.
 
 This plan supersedes the frontend loading and dependency decisions in [Plugin host runtime](./plugin-host-runtime.md) and [Plugin system](./plugin-system.md). Other local historical plans may describe host-provided React, SDK peers, QuickJS sidecars, Turso Cloud credentials, or VM-stored provider secrets. None of those descriptions overrides the decisions here. Backend runtime selection is explicitly outside the first frontend milestone.
 
@@ -252,13 +252,13 @@ This plan supersedes the frontend loading and dependency decisions in [Plugin ho
 - Replacing TanStack Query or building a second collaboration engine.
 - Choosing the backend execution runtime or claiming that iframe isolation protects against arbitrary VM code.
 
-## Proposed API contracts — for review, not current APIs
+## API contracts — contribution discovery implemented; rendering proposed
 
-Every type, manifest example, and component example in this section describes the proposed format. Existing plugins still use the current `view` entry and named `Sidebar`/`Routes` exports until the implementation changes them.
+The manifest contribution types below are accepted and returned by `plugins.list().contributions`. Existing plugin rendering still uses the current `view` entry and named `Sidebar`/`Routes` exports. The default-export component and connection examples describe later phases.
 
 ### Contributions and pane identity
 
-Own the author-facing schema in `packages/plugin-sdk/src/schema.ts`. Halo's internal manifest wraps this with workspace-resolved paths; clients receive public descriptors rather than server filesystem paths. The first slice has static sidebar entities. A later backend provider can return the same entity shape without injecting React into the shell.
+Own the author-facing schema in `packages/plugin-sdk/src/schema.ts`. Halo's internal manifest wraps this with workspace-resolved paths; clients receive public descriptors rather than server filesystem paths. The first slice has static sidebar entities. A later backend provider can return the same entity shape without injecting React into the shell. A pane definition identifies a kind of view, such as a session or file; each sidebar target selects an instance using string parameters such as `sessionId` or `path`. Creating a session or file will not require a new pane definition. Dynamic providers and lazy tree children are later steps; Halo will own rendering and interaction of those sidebar structures.
 
 ```ts
 type PaneTarget = {
@@ -309,7 +309,7 @@ Example fields within the plugin's `halo` manifest:
 
 `entry` is a build input inside the plugin directory, not a client URL. The server produces a browser document and resolves its assets. Identity is `(pluginId, paneId)` plus target parameters; each opening also receives a separate ephemeral `instanceId`. Neither identity nor parameters contain authentication credentials. The first route parameters are strings; introduce a richer validated parameter schema when an actual pane needs it.
 
-Each frontend entry default-exports a React component. The host-generated document bootstrap establishes the scoped SDK connection, creates a React root inside that document, and mounts the component under the pane SDK provider. Plugins can add their own storage provider and router within it. There are no `Sidebar` or `Routes` named exports in the new author contract.
+In the later rendering phase, each frontend entry default-exports a React component. The host-generated document bootstrap establishes the scoped SDK connection, creates a React root inside that document, and mounts the component under the pane SDK provider. Plugins can add their own storage provider and router within it. There are no `Sidebar` or `Routes` named exports in the new author contract.
 
 ```tsx
 // Plugin-owned view.tsx
@@ -395,11 +395,11 @@ Frontend isolation does not isolate backend crashes or guarantee a separate OS r
 - [MDN iframe](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe) — origin, sandbox, and navigation behavior; an iframe alone is not a complete security boundary.
 - [esbuild output format](https://esbuild.github.io/api/#format) — ESM browser output and conversion of bundled CommonJS dependencies.
 
-## Implementation sequence — Phase 1 implemented, later phases not started
+## Implementation sequence — Phases 1–2 complete
 
 The code phases below are review-sized changes, each targeting about 200 handwritten changed lines including tests. Generated-output deletions are separate. Split a phase before implementation if its patch exceeds that scale. During construction, the existing desktop path remains operational until the explicit cutover; this is sequencing, not permanent support for the old plugin format. At cutover update the scaffold, fixtures, and examples and remove the old format without migration machinery.
 
-**How to read the previews:** `-` marks removed behavior; `+` marks its replacement. Phase 1 shows the uncommitted change. Phases 2–8 are future previews whose starting points include earlier planned phases. The event call stacks above describe actual behavior after Phase 1 separately from those future previews.
+**How to read the previews:** `-` marks removed behavior; `+` marks its replacement. Phases 1–2 show the completed changes. Phases 3–8 are future previews whose starting points include earlier planned phases. The event call stacks above describe actual behavior after Phase 1 separately from those future previews.
 
 ### Phase 1: Build usable ESM SDK artifacts — implemented and verified
 
@@ -426,7 +426,7 @@ The code phases below are review-sized changes, each targeting about 200 handwri
 - [x] Verify a real packed SDK in `tmp/plugin-panes/consumer` using normal dependency installation, a browser bundle with no Halo aliases, and execution of public SDK APIs.
 - [x] Run SDK typechecking through `pnpm run check-affected`.
 
-### Phase 2: Expose declarative contributions through discovery
+### Phase 2: Expose declarative contributions through discovery — implemented and verified
 
 ```callstack
  readPluginManifest
@@ -446,10 +446,10 @@ type PluginContributionDescriptor = {
 };
 ```
 
-- [ ] Define contribution schemas in `packages/plugin-sdk/src/schema.ts` and validate references in `readPluginManifest.ts`.
-- [ ] Expose descriptors from `PluginService.list()` through `packages/shared/src/plugin.ts` and the plugins contract.
-- [ ] Extend `packages/server/test/plugins.test.ts` using real manifests for valid discovery and invalid target references; retain the no-remount regression.
-- [ ] Run `pnpm --filter @get-halo/server exec vitest run test/plugins.test.ts` and `pnpm run check-affected`.
+- [x] Define contribution schemas in `packages/plugin-sdk/src/schema.ts` and validate references in `readPluginManifest.ts`.
+- [x] Expose descriptors from `PluginService.list()` through `packages/shared/src/plugin.ts` and the plugins contract.
+- [x] Extend `packages/server/test/plugins.test.ts` using real manifests for valid discovery and invalid target references; retain the no-remount regression.
+- [x] Run the focused plugin API tests and `pnpm run check-affected`.
 
 ### Phase 3: Build a self-contained pane document
 
@@ -594,4 +594,12 @@ Complete the cutover in the SDK, scaffold, and author guidance. Remove only fron
 
 The packed `0.0.0-phase1` SDK was installed with npm in `tmp/plugin-panes/consumer`. That consumer typechecked with TypeScript 7.0.2 and bundled for the browser without aliases; all 4,875 bundle inputs resolved inside its installation. The bundled output rendered React with the SDK sidebar context, exercised schema APIs, and verified storage hook exports and the Maui component import. This smoke check verifies package consumption; it does not exercise Maui rendering in a browser. The assertion process was stopped after it reported success because imported runtime dependencies kept it alive.
 
-Changes remain uncommitted for review. Stop here before Phase 2.
+Phase 1 was committed as `7e56361`. Phase 2 is complete. Phase 3 is the next implementation step.
+
+## Phase 2 validation
+
+Four positive contribution workflows lead the suite: multiple targets of one pane, publishing sidebar edits after a rebuild, multiple panes in one plugin, and multiple plugins sharing local IDs. Each runs through real plugin files, the build API, and RPC discovery. Pane rendering remains a later phase. The existing rejection and failure-isolation cases are retained separately under manifest validation.
+
+`pnpm run check-affected` passed all 24 tasks, including 33 server tests (21 in the plugin suite) and SDK/server/client typechecking. The 15 Electron E2E tests passed in the preceding helper change and were cached for these API test changes.
+
+Both test harnesses expose relative file maps and manifest patches through `PluginFiles`; creation and building still use the Halo client API. The existing no-remount regression passed. Validation used the committed dependency lockfile; the unrelated working-tree lockfile was restored afterward.
