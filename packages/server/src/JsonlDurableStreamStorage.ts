@@ -60,6 +60,7 @@ export class JsonlDurableStreamStorage<
     const records: DurableStreamRecord<Static<TValueSchema>>[] = [];
     for (const [index, line] of lines.entries()) {
       const lineNumber = index + 1;
+      const isLastLine = index === lines.length - 1;
       const record = errore.try({
         try: () => {
           // SAFETY: JSON.parse is untyped; the envelope and value schemas validate its output below.
@@ -85,7 +86,12 @@ export class JsonlDurableStreamStorage<
             cause,
           }),
       });
-      if (record instanceof Error) return record;
+      if (record instanceof Error) {
+        // A malformed trailing line is uncommitted residue (e.g. an interrupted
+        // append); with a committed prefix, drop it instead of losing the file.
+        if (isLastLine && records.length > 0) break;
+        return record;
+      }
       records.push(record);
     }
     return records;

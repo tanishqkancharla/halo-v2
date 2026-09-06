@@ -121,6 +121,58 @@ test("rejects malformed JSONL history", async ({ streamFile }) => {
   expect(stream).toBeInstanceOf(DurableStreamPersistenceError);
 });
 
+test("recovers committed records when the trailing line is torn", async ({
+  streamFile,
+}) => {
+  const filesystem = new FilesystemService();
+  const written = await filesystem.writeFile(
+    streamFile,
+    '{"sequence":1,"value":"a"}\n{"sequence":2,"value":"b"}\n{"sequence":3,"value":"PARTIAL',
+  );
+  if (written instanceof Error) throw written;
+
+  const stream = await createDurableStream({
+    storage: stringStorage(filesystem, streamFile),
+  });
+  if (stream instanceof Error) throw stream;
+  expect(stream.snapshot()).toEqual([
+    { sequence: 1, value: "a" },
+    { sequence: 2, value: "b" },
+  ]);
+});
+
+test("rejects a torn trailing line when no valid record precedes it", async ({
+  streamFile,
+}) => {
+  const filesystem = new FilesystemService();
+  const written = await filesystem.writeFile(
+    streamFile,
+    '{"sequence":1,"value":"PARTIAL',
+  );
+  if (written instanceof Error) throw written;
+
+  const stream = await createDurableStream({
+    storage: stringStorage(filesystem, streamFile),
+  });
+  expect(stream).toBeInstanceOf(DurableStreamPersistenceError);
+});
+
+test("rejects mid-file corruption even with a valid prefix", async ({
+  streamFile,
+}) => {
+  const filesystem = new FilesystemService();
+  const written = await filesystem.writeFile(
+    streamFile,
+    '{"sequence":1,"value":"a"}\nGARBAGE\n{"sequence":2,"value":"b"}\n',
+  );
+  if (written instanceof Error) throw written;
+
+  const stream = await createDurableStream({
+    storage: stringStorage(filesystem, streamFile),
+  });
+  expect(stream).toBeInstanceOf(DurableStreamPersistenceError);
+});
+
 async function openStringStream(
   filesystem: FilesystemService,
   streamFile: string,
