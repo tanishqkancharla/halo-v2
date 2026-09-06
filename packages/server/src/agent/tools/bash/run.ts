@@ -35,7 +35,6 @@ export async function runBash(
     let stderr = "";
     let settled = false;
     let timeout: NodeJS.Timeout | undefined;
-    let forceKill: NodeJS.Timeout | undefined;
     let terminationError: BashRunError | undefined;
 
     const finish = (
@@ -46,7 +45,6 @@ export async function runBash(
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      if (terminationError === undefined) clearTimeout(forceKill);
       signal?.removeEventListener("abort", onAbort);
       resolve(result);
     };
@@ -68,7 +66,7 @@ export async function runBash(
       if (terminationError !== undefined) return;
       terminationError = error;
       killProcessGroup("SIGTERM");
-      forceKill = setTimeout(() => killProcessGroup("SIGKILL"), 250);
+      setTimeout(() => killProcessGroup("SIGKILL"), 250);
     };
 
     const onAbort = () => {
