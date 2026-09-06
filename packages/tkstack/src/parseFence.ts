@@ -18,7 +18,7 @@ export function pathFromDiffSource(source: string) {
   if (plus?.[1] !== undefined) return plus[1];
   const minus = /^--- [ab]\/(.+)$/m.exec(source);
   if (minus?.[1] !== undefined) return minus[1];
-  const comment = /^\/\/ (.+\S)\s*$/m.exec(source);
+  const comment = /^ ?\/\/ (.+\S)\s*$/m.exec(source);
   if (comment?.[1] !== undefined) return comment[1];
   return undefined;
 }

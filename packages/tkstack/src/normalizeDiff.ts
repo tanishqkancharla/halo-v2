@@ -4,7 +4,9 @@ export function toUnifiedDiff(source: string, path: string) {
   const lines = source.split("\n");
   const first = lines[0];
   const body =
-    first !== undefined && first.startsWith("// ") ? lines.slice(1) : lines;
+    first !== undefined && first.replace(/^ /, "").startsWith("// ")
+      ? lines.slice(1)
+      : lines;
   const normalized = body.map((line) => {
     if (
       line.startsWith("+") ||

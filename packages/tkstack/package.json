@@ -15,6 +15,7 @@
     "format:check": "oxfmt --check .",
     "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src vite.config.ts",
     "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src vite.config.ts",
+    "test": "vitest run src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -36,7 +37,8 @@
     "@vitejs/plugin-react": "^6.1.1",
     "tsx": "^4.23.13",
     "typescript": "7.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=22"
