@@ -32,3 +32,25 @@ export function applyConnectionEvent(
   }
   return { status: event.status };
 }
+
+// Preserves a terminal state so the connect-error path is order-independent
+// against a server `cancelled`/`expired` event applied first via the events
+// stream. Mirrors the cancel/expiry/applyConnectionEvent sibling updaters.
+export function applyConnectionFailure(
+  state: ConnectionState | undefined,
+): ConnectionState {
+  if (
+    (state?.status === "starting" || state?.status === "connecting") &&
+    state.wasConnected
+  ) {
+    return { status: "connected" };
+  }
+  if (
+    state?.status === "connected" ||
+    state?.status === "cancelled" ||
+    state?.status === "expired"
+  ) {
+    return state;
+  }
+  return idleConnectionState;
+}

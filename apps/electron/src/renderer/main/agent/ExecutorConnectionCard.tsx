@@ -7,6 +7,7 @@ import { connectionRequestLabel } from "@get-halo/shared/connectionRequests";
 import { useApi } from "../../api/ApiProvider.tsx";
 import { desktopApi } from "../../api/electron.ts";
 import {
+  applyConnectionFailure,
   connectionStateQueryKey,
   idleConnectionState,
   type ConnectionState,
@@ -111,16 +112,10 @@ export function ExecutorConnectionCard({
       });
     },
     onError: (error) => {
-      queryClient.setQueryData<ConnectionState>(statusKey, (current) => {
-        if (
-          (current?.status === "starting" ||
-            current?.status === "connecting") &&
-          current.wasConnected
-        ) {
-          return { status: "connected" };
-        }
-        return idleConnectionState;
-      });
+      queryClient.setQueryData<ConnectionState>(
+        statusKey,
+        applyConnectionFailure,
+      );
       console.warn("Connection failed:", error);
     },
   });
