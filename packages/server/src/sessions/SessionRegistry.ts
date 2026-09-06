@@ -15,6 +15,7 @@ export class SessionRegistry {
     string,
     Promise<Error | HaloAgentSession>
   >();
+  private readonly creating = new Set<Promise<Error | HaloAgentSession>>();
   constructor(private readonly options: HaloAgentSessionOptions) {}
 
   list() {
@@ -22,9 +23,10 @@ export class SessionRegistry {
   }
 
   async create() {
-    const session = await HaloAgentSession.create(this.options);
-    if (session instanceof Error) return session;
-    this.register(session);
+    const creating = this.createAndRegister();
+    this.creating.add(creating);
+    const session = await creating;
+    this.creating.delete(creating);
     return session;
   }
 
@@ -49,9 +51,9 @@ export class SessionRegistry {
   }
 
   async shutdown() {
-    const opening = [...this.opening.values()];
-    await Promise.all(opening);
+    await Promise.all([...this.opening.values(), ...this.creating]);
     this.opening.clear();
+    this.creating.clear();
 
     const sessions = [...this.sessions.values()];
     this.sessions.clear();
@@ -67,6 +69,13 @@ export class SessionRegistry {
       ...this.options,
       sessionId,
     });
+    if (session instanceof Error) return session;
+    this.register(session);
+    return session;
+  }
+
+  private async createAndRegister() {
+    const session = await HaloAgentSession.create(this.options);
     if (session instanceof Error) return session;
     this.register(session);
     return session;
