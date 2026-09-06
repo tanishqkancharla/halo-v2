@@ -52,6 +52,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
   }
 
   useEffect(() => {
+    const controller = new AbortController();
     let cancelled = false;
     let iterator:
       | Awaited<ReturnType<HaloClient["sessions"]["events"]>>
@@ -72,11 +73,22 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
       if (cancelled) return;
       setRecords(opened.records);
       setReadySessionId(opened.sessionId);
-      iterator = await api.sessions.events({
-        sessionId: opened.sessionId,
-        afterSequence: opened.cursor,
-      });
+      iterator = await api.sessions.events(
+        {
+          sessionId: opened.sessionId,
+          afterSequence: opened.cursor,
+        },
+        { signal: controller.signal },
+      );
+      if (cancelled) {
+        void iterator.return().catch((cause) => {
+          if (errore.isAbortError(cause)) return;
+          console.warn("Failed to close session event stream:", cause);
+        });
+        return;
+      }
       for await (const record of iterator) {
+        if (cancelled) break;
         setRecords((current) => [...current, record]);
         const event = record.value;
         if (event.type === "halo.connection") {
@@ -93,6 +105,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
 
     return () => {
       cancelled = true;
+      controller.abort();
       if (iterator === undefined) return;
       void iterator.return().catch((cause) => {
         if (errore.isAbortError(cause)) return;
