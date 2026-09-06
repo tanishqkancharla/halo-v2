@@ -64,8 +64,14 @@ export function adaptPiEvent(args: {
   if (args.event.type === "tool_execution_start") {
     const runId = args.state.activeRunId;
     if (runId === undefined) return { state: args.state, events: [] };
-    // SAFETY: Pi only emits execution events for the registered session tools.
-    const tool = args.toolIdentities.get(args.event.toolName) as ToolIdentity;
+    // Pi emits tool_execution_start with the unvalidated toolCall.name (before
+    // prepareToolCall), so names outside Halo's customTools (e.g. extension
+    // tools) reach us unchanged and must still produce a schema-valid event.
+    const known = args.toolIdentities.get(args.event.toolName);
+    const tool: ToolIdentity = known ?? {
+      path: args.event.toolName,
+      displayName: args.event.toolName,
+    };
     return {
       state: args.state,
       events: [
