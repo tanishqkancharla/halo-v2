@@ -35,6 +35,8 @@ type DeclaredPathsInput = {
 };
 
 export class PluginToolGrants {
+  private writeQueue: Promise<unknown> = Promise.resolve();
+
   constructor(
     private readonly options: {
       filesystem: FilesystemService;
@@ -43,44 +45,60 @@ export class PluginToolGrants {
   ) {}
 
   async reconcile(input: DeclaredPathsInput) {
-    const state = await this.read();
-    if (state instanceof Error) return state;
+    return this.runExclusive(async () => {
+      const state = await this.read();
+      if (state instanceof Error) return state;
 
-    const declared = uniqueSorted(input.declaredPaths);
-    const previous = state.plugins[input.pluginId];
-    const previousGranted = previous === undefined ? [] : previous.granted;
-    const declaredSet = new Set(declared);
-    const granted = previousGranted.filter((path) => declaredSet.has(path));
-    const revoked = previousGranted.filter((path) => !declaredSet.has(path));
-    state.plugins[input.pluginId] = { observed: declared, granted };
+      const declared = uniqueSorted(input.declaredPaths);
+      const previous = state.plugins[input.pluginId];
+      const previousGranted = previous === undefined ? [] : previous.granted;
+      const declaredSet = new Set(declared);
+      const granted = previousGranted.filter((path) => declaredSet.has(path));
+      const revoked = previousGranted.filter((path) => !declaredSet.has(path));
+      state.plugins[input.pluginId] = { observed: declared, granted };
 
-    const written = await this.write(state);
-    if (written instanceof Error) return written;
-    return { declared, granted, revoked };
+      const written = await this.write(state);
+      if (written instanceof Error) return written;
+      return { declared, granted, revoked };
+    });
   }
 
   async grant(input: DeclaredPathsInput & { grantPaths: readonly string[] }) {
+    return this.runExclusive(async () => {
+      const state = await this.read();
+      if (state instanceof Error) return state;
+
+      const declared = uniqueSorted(input.declaredPaths);
+      const declaredSet = new Set(declared);
+      const previous = state.plugins[input.pluginId];
+      const previousGranted = previous === undefined ? [] : previous.granted;
+      const active = previousGranted.filter((path) => declaredSet.has(path));
+      const activeSet = new Set(active);
+      const added = uniqueSorted(input.grantPaths).filter(
+        (path) => declaredSet.has(path) && !activeSet.has(path),
+      );
+      const granted = uniqueSorted([...active, ...added]);
+      state.plugins[input.pluginId] = { observed: declared, granted };
+
+      const written = await this.write(state);
+      if (written instanceof Error) return written;
+      return { declared, granted, added };
+    });
+  }
+
+  async authorize(input: DeclaredPathsInput & { path: string }) {
     const state = await this.read();
     if (state instanceof Error) return state;
 
     const declared = uniqueSorted(input.declaredPaths);
-    const declaredSet = new Set(declared);
     const previous = state.plugins[input.pluginId];
-    const previousGranted = previous === undefined ? [] : previous.granted;
-    const active = previousGranted.filter((path) => declaredSet.has(path));
-    const activeSet = new Set(active);
-    const added = uniqueSorted(input.grantPaths).filter(
-      (path) => declaredSet.has(path) && !activeSet.has(path),
-    );
-    const granted = uniqueSorted([...active, ...added]);
-    state.plugins[input.pluginId] = { observed: declared, granted };
-
-    const written = await this.write(state);
-    if (written instanceof Error) return written;
-    return { declared, granted, added };
-  }
-
-  async authorize(input: DeclaredPathsInput & { path: string }) {
+    const previousObserved = previous === undefined ? [] : previous.observed;
+    if (sameSorted(declared, previousObserved)) {
+      const previousGranted = previous === undefined ? [] : previous.granted;
+      const declaredSet = new Set(declared);
+      const granted = previousGranted.filter((path) => declaredSet.has(path));
+      return granted.includes(input.path);
+    }
     const reconciled = await this.reconcile(input);
     if (reconciled instanceof Error) return reconciled;
     return reconciled.granted.includes(input.path);
@@ -145,10 +163,30 @@ export class PluginToolGrants {
     if (layout instanceof Error) return layout;
     return nodePath.join(layout.root, ".halo", "pluginGrants.json");
   }
+
+  private async runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const result = this.writeQueue.then(fn, fn);
+    this.writeQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
 }
 
 function emptyState(): PluginToolGrantState {
   return { version: 1, plugins: {} };
+}
+
+function sameSorted(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return false;
+  }
+  return true;
 }
 
 function uniqueSorted(paths: readonly string[]) {
