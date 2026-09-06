@@ -11,6 +11,10 @@ type RunningTkstack = {
   file: string;
 };
 
+type ReadResult =
+  | { path: string; entry: RunningTkstack }
+  | { path: string; error: TkstackRegistryError };
+
 const registryDirectory = path.join(
   os.tmpdir(),
   `tkstack-${os.userInfo().uid}`,
@@ -50,15 +54,19 @@ export async function listRunningTkstacks() {
   });
   if (names instanceof Error) return names;
 
-  const [entries, readErrors] = errore.partition(
-    await Promise.all(
-      names
-        .filter((name) => name.endsWith(".json"))
-        .map((name) => readRegistryEntry(path.join(registryDirectory, name))),
-    ),
+  const results = await Promise.all(
+    names
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => readRegistryEntry(path.join(registryDirectory, name))),
   );
-  const readError = readErrors.at(0);
-  if (readError !== undefined) return readError;
+  const entries = results
+    .filter((r): r is { path: string; entry: RunningTkstack } => "entry" in r)
+    .map((r) => r.entry);
+  const skipped = results
+    .filter(
+      (r): r is { path: string; error: TkstackRegistryError } => "error" in r,
+    )
+    .map((r) => ({ path: r.path, message: r.error.message }));
 
   const [running, cleanupErrors] = errore.partition(
     await Promise.all(
@@ -76,22 +84,25 @@ export async function listRunningTkstacks() {
   );
   const cleanupError = cleanupErrors.at(0);
   if (cleanupError !== undefined) return cleanupError;
-  return running.filter((entry) => entry !== undefined);
+  return { instances: running.filter((entry) => entry !== undefined), skipped };
 }
 
-async function readRegistryEntry(registryPath: string) {
+async function readRegistryEntry(registryPath: string): Promise<ReadResult> {
   const source = await fs
     .readFile(registryPath, "utf8")
     .catch(
       (cause) => new TkstackRegistryError({ reason: "read entry", cause }),
     );
-  if (source instanceof Error) return source;
-  return errore.try({
+  if (source instanceof Error) return { path: registryPath, error: source };
+  const parsed = errore.try({
     // SAFETY: registerRunningTkstack is the only writer for registry entries.
     try: () => JSON.parse(source) as RunningTkstack,
     catch: (cause) =>
       new TkstackRegistryError({ reason: "parse entry", cause }),
   });
+  return parsed instanceof Error
+    ? { path: registryPath, error: parsed }
+    : { path: registryPath, entry: parsed };
 }
 
 async function isRunning(entry: RunningTkstack) {

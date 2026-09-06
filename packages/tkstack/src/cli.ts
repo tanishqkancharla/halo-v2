@@ -49,16 +49,22 @@ const cli = Cli.create("tkstack", {
         file: z.string(),
       }),
     ),
+    skipped: z.array(
+      z.object({
+        path: z.string(),
+        message: z.string(),
+      }),
+    ),
   }),
   async run(c) {
-    const instances = await listRunningTkstacks();
-    if (instances instanceof Error) {
+    const result = await listRunningTkstacks();
+    if (result instanceof Error) {
       return c.error({
         code: "TKSTACK",
-        message: instances.message,
+        message: result.message,
       });
     }
-    return c.ok({ instances });
+    return c.ok(result);
   },
 });
 
