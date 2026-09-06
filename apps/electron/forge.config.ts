@@ -1,6 +1,7 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import { bundleHaloCli, haloCliBundlePath } from "./forge/bundleHaloCli.js";
 import { copyMainProcessExternals } from "./forge/copyMainProcessExternals.js";
+import { buildPluginSdk } from "./forge/buildPluginSdk.js";
 
 const appleApiKey = process.env.APPLE_API_KEY;
 const appleApiKeyId = process.env.APPLE_API_KEY_ID;
@@ -43,6 +44,10 @@ const config: ForgeConfig = {
     ignoreModules: ["@parcel/watcher"],
   },
   hooks: {
+    generateAssets: async () => {
+      const built = await buildPluginSdk();
+      if (built instanceof Error) throw built;
+    },
     prePackage: async () => {
       await bundleHaloCli();
     },

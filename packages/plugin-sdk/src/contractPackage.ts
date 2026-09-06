@@ -10,13 +10,6 @@ export class ContractPackageError extends errore.createTaggedError({
 
 export const contractPackageName = "@get-halo/plugin-sdk";
 
-export const contractTypeFiles = [
-  "view.d.ts",
-  "server.d.ts",
-  "schema.d.ts",
-  "storage.d.ts",
-] as const;
-
 export const contractPeerDependencies = {
   maui: mauiPackageJson.version,
   "purse-styles": "^0.2.3",
@@ -30,6 +23,7 @@ export const contractDependencies = {
   "@tanishqkancharla/tandem-core": "0.2.0",
   "@tanishqkancharla/tandem-server": "0.2.0",
   errore: "^0.14.1",
+  "react-aria-components": "1.21.0",
 } as const;
 
 export const mauiPackage = `npm:${mauiPackageJson.name}@${mauiPackageJson.version}`;
@@ -39,6 +33,7 @@ export function contractPackageJson(version: string) {
     name: contractPackageName,
     version,
     type: "module",
+    files: ["dist"],
     repository: {
       type: "git",
       url: "https://github.com/tanishqkancharla/halo-v2.git",
@@ -49,10 +44,13 @@ export function contractPackageJson(version: string) {
     dependencies: contractDependencies,
     peerDependencies: contractPeerDependencies,
     exports: {
-      "./view": { types: "./dist/view.d.ts" },
+      "./view": { types: "./dist/view.d.ts", default: "./dist/view.js" },
       "./server": { types: "./dist/server.d.ts" },
-      "./schema": { types: "./dist/schema.d.ts" },
-      "./storage": { types: "./dist/storage.d.ts" },
+      "./schema": { types: "./dist/schema.d.ts", default: "./dist/schema.js" },
+      "./storage": {
+        types: "./dist/storage.d.ts",
+        default: "./dist/storage.js",
+      },
       "./package.json": "./package.json",
     },
   };
