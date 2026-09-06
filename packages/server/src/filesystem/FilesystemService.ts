@@ -59,6 +59,11 @@ export class FilesystemService {
   private watchState:
     | { path: string; subscription: watcher.AsyncSubscription }
     | undefined;
+  // Serialized enrichment so watch batches append in dispatch order. @parcel/watcher invokes the
+  // subscribe callback via a ThreadSafeFunction and discards its return value, so an async callback
+  // yields immediately while the native side enqueues the next batch; chaining here keeps each
+  // batch's enrichment + append behind the previous one regardless of stat latency.
+  private watchQueue: Promise<void> = Promise.resolve();
 
   exists(path: string) {
     return fs.existsSync(path);
@@ -198,14 +203,19 @@ export class FilesystemService {
     const subscription = await watcher
       .subscribe(
         path,
-        async (error, events) => {
-          if (error !== null) {
-            this.watchEventStream.append(
-              new FilesystemWatchError({ watchedPath: path, cause: error }),
-            );
-            return;
-          }
-          await this.emitWatchEvents(path, events);
+        (error, events) => {
+          const run = async () => {
+            if (error !== null) {
+              this.watchEventStream.append(
+                new FilesystemWatchError({ watchedPath: path, cause: error }),
+              );
+              return;
+            }
+            await this.emitWatchEvents(path, events);
+          };
+          this.watchQueue = this.watchQueue.then(run).catch((cause) => {
+            console.error("Watch event processing failed:", cause);
+          });
         },
         { ignore: [...parcelWatcherIgnore] },
       )
@@ -222,13 +232,16 @@ export class FilesystemService {
     const state = this.watchState;
     this.watchState = undefined;
     if (state === undefined) return;
-    return await state.subscription.unsubscribe().catch(
+    const drained = this.watchQueue;
+    const unsubscribed = await state.subscription.unsubscribe().catch(
       (cause) =>
         new FilesystemWatchError({
           watchedPath: state.path,
           cause,
         }),
     );
+    await drained;
+    return unsubscribed;
   }
 
   private async emitWatchEvents(
