@@ -1,6 +1,9 @@
-import path from "node:path";
 import * as errore from "errore";
 import type { FilesystemService } from "../../../filesystem/FilesystemService.js";
+import {
+  FilesInvalidPathError,
+  resolveInsideWorkspace,
+} from "./workspacePath.js";
 
 export class FilesEditError extends errore.createTaggedError({
   name: "FilesEditError",
@@ -53,8 +56,9 @@ export async function editFile(args: {
     });
   }
 
-  const absolutePath = path.resolve(args.cwd, filePath);
-  const raw = await args.filesystem.readFile(absolutePath, "utf8");
+  const resolved = resolveInsideWorkspace(args.cwd, filePath);
+  if (resolved instanceof FilesInvalidPathError) return resolved;
+  const raw = await args.filesystem.readFile(resolved.absolutePath, "utf8");
   if (raw instanceof Error) {
     return new FilesEditError({ path: filePath, cause: raw });
   }
@@ -90,7 +94,7 @@ export async function editFile(args: {
   const finalContent = bom + restoreLineEndings(newContent, lineEnding);
 
   const written = await args.filesystem.writeFile(
-    absolutePath,
+    resolved.absolutePath,
     finalContent,
     "utf8",
   );

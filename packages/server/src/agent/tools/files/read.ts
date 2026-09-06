@@ -1,6 +1,9 @@
-import path from "node:path";
 import * as errore from "errore";
 import type { FilesystemService } from "../../../filesystem/FilesystemService.js";
+import {
+  FilesInvalidPathError,
+  resolveInsideWorkspace,
+} from "./workspacePath.js";
 
 export class FilesReadError extends errore.createTaggedError({
   name: "FilesReadError",
@@ -17,8 +20,9 @@ export async function readFile(args: {
   };
 }) {
   const { path: filePath, offset, limit } = args.input;
-  const absolutePath = path.resolve(args.cwd, filePath);
-  const raw = await args.filesystem.readFile(absolutePath, "utf8");
+  const resolved = resolveInsideWorkspace(args.cwd, filePath);
+  if (resolved instanceof FilesInvalidPathError) return resolved;
+  const raw = await args.filesystem.readFile(resolved.absolutePath, "utf8");
   if (raw instanceof Error) {
     return new FilesReadError({ path: filePath, cause: raw });
   }

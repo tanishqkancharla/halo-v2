@@ -1,6 +1,9 @@
-import path from "node:path";
 import * as errore from "errore";
 import type { FilesystemService } from "../../../filesystem/FilesystemService.js";
+import {
+  FilesInvalidPathError,
+  resolveInsideWorkspace,
+} from "./workspacePath.js";
 
 export class FilesDeleteError extends errore.createTaggedError({
   name: "FilesDeleteError",
@@ -12,8 +15,9 @@ export async function deleteFile(args: {
   cwd: string;
   input: { path: string };
 }) {
-  const absolutePath = path.resolve(args.cwd, args.input.path);
-  const removed = await args.filesystem.unlink(absolutePath);
+  const resolved = resolveInsideWorkspace(args.cwd, args.input.path);
+  if (resolved instanceof FilesInvalidPathError) return resolved;
+  const removed = await args.filesystem.unlink(resolved.absolutePath);
   if (removed instanceof Error) {
     return new FilesDeleteError({ path: args.input.path, cause: removed });
   }

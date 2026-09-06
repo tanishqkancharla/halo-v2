@@ -1,6 +1,9 @@
-import path from "node:path";
 import * as errore from "errore";
 import type { FilesystemService } from "../../../filesystem/FilesystemService.js";
+import {
+  FilesInvalidPathError,
+  resolveInsideWorkspace,
+} from "./workspacePath.js";
 
 export class FilesWriteError extends errore.createTaggedError({
   name: "FilesWriteError",
@@ -12,9 +15,10 @@ export async function writeFile(args: {
   cwd: string;
   input: { path: string; content: string };
 }) {
-  const absolutePath = path.resolve(args.cwd, args.input.path);
+  const resolved = resolveInsideWorkspace(args.cwd, args.input.path);
+  if (resolved instanceof FilesInvalidPathError) return resolved;
   const written = await args.filesystem.writeFile(
-    absolutePath,
+    resolved.absolutePath,
     args.input.content,
     "utf8",
   );

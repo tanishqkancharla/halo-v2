@@ -14,12 +14,16 @@
  *   *** End Patch
  */
 
-import { resolve, dirname } from "node:path";
+import { dirname } from "node:path";
 import * as errore from "errore";
 import type {
   FilesystemError,
   FilesystemService,
 } from "../../../filesystem/FilesystemService.js";
+import {
+  FilesInvalidPathError,
+  resolveInsideWorkspace,
+} from "./workspacePath.js";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -445,6 +449,12 @@ function applyPlannedUpdate(
   return resultLines.join("\n");
 }
 
+function workspaceAbsolutePath(cwd: string, inputPath: string): string {
+  const resolved = resolveInsideWorkspace(cwd, inputPath);
+  if (resolved instanceof FilesInvalidPathError) throw resolved;
+  return resolved.absolutePath;
+}
+
 function createPatchPlan(
   filesystem: FilesystemService,
   patchText: string,
@@ -471,7 +481,10 @@ function createPatchPlan(
         break;
       case "update": {
         const original = filesystemValue(
-          filesystem.readFileSync(resolve(cwd, hunk.path), "utf8"),
+          filesystem.readFileSync(
+            workspaceAbsolutePath(cwd, hunk.path),
+            "utf8",
+          ),
         );
         const plan = planUpdateChunks(original, hunk.path, hunk.chunks);
         plan.movePath = hunk.movePath;
@@ -493,7 +506,7 @@ function applyPatch(
   const plan = createPatchPlan(filesystem, patchText, cwd);
 
   for (const hunk of plan.hunks) {
-    const absPath = resolve(cwd, hunk.path);
+    const absPath = workspaceAbsolutePath(cwd, hunk.path);
 
     switch (hunk.type) {
       case "add": {
@@ -520,7 +533,9 @@ function applyPatch(
         );
         const newContent = applyPlannedUpdate(original, update);
 
-        const dest = hunk.movePath ? resolve(cwd, hunk.movePath) : absPath;
+        const dest = hunk.movePath
+          ? workspaceAbsolutePath(cwd, hunk.movePath)
+          : absPath;
         const destDir = dirname(dest);
         if (!filesystem.exists(destDir)) {
           filesystemValue(filesystem.makeDirectorySync(destDir));
