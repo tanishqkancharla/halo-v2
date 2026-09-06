@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import path from "node:path";
 import { e2eTest } from "./e2eTest.js";
 
 e2eTest("opens the saved workspace", async ({ harness, renderer, server }) => {
@@ -9,11 +10,26 @@ e2eTest("opens the saved workspace", async ({ harness, renderer, server }) => {
     renderer.page.getByRole("button", { name: "New session" }),
   ).toBeVisible();
   await expect(renderer.page.getByText(/^Halo \d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(renderer.page.getByRole("alert")).toHaveCount(0);
 
   expect(await server.rpc.workspace.get()).toMatchObject({
     workspaceRoot: harness.paths.workspace,
   });
 });
+
+e2eTest(
+  "surfaces a plugins list rejection as an alert banner",
+  async ({ harness, renderer }) => {
+    await harness.files.write({
+      path: path.join(harness.paths.workspace, ".halo", "plugins"),
+      content: "not a directory",
+    });
+    await renderer.page.reload();
+    await expect(renderer.page.getByRole("alert")).toContainText(
+      "Failed to list plugins",
+    );
+  },
+);
 
 e2eTest("edits and saves a workspace note", async ({ renderer, server }) => {
   await server.rpc.workspace.writeFile({

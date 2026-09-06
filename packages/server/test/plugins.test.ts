@@ -130,6 +130,20 @@ serverTest(
   15_000,
 );
 
+serverTest(
+  "rejects plugins.list when the plugins directory cannot be read",
+  async ({ server }) => {
+    await server.harness.files.write({
+      path: path.join(server.harness.paths.workspace, ".halo", "plugins"),
+      content: "not a directory",
+    });
+    await expect(server.rpc.plugins.list()).rejects.toThrow(
+      "Failed to list plugins",
+    );
+  },
+  15_000,
+);
+
 serverTest("requires RPC credentials", async ({ server }) => {
   expect(await server.rpc.server.info()).toEqual({
     protocolVersion: haloProtocolVersion,

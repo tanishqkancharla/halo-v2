@@ -66,9 +66,12 @@ export function App() {
       pluginViews={pluginViews}
       pluginErrors={pluginErrors}
       pluginServers={pluginServers}
-      alertMessage={
-        sessionsQuery.error ? String(sessionsQuery.error) : undefined
-      }
+      alertMessage={[
+        sessionsQuery.error ? String(sessionsQuery.error) : undefined,
+        pluginsQuery.error ? String(pluginsQuery.error) : undefined,
+      ]
+        .filter(Boolean)
+        .join("; ")}
       appInfo={appInfoQuery.data}
     />
   );
