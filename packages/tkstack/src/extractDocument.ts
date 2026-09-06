@@ -1,12 +1,31 @@
 import { parseFence, type Fence } from "./parseFence.js";
+import {
+  parseViewerDocument,
+  type ViewerElement,
+  type ViewerNode,
+} from "./parseViewer.js";
 
 const fencePattern = /^```([^\n]*)\r?\n([\s\S]*?)^```/gm;
-const titlePattern = /^#\s+(.+)$/m;
 
 export function extractTitle(source: string) {
-  const match = titlePattern.exec(source);
-  if (match?.[1] === undefined) return "tkstack";
-  return match[1];
+  const doc = parseViewerDocument(source);
+  if (doc instanceof Error) return "tkstack";
+  const h1 = doc.nodes.find(
+    (node): node is ViewerElement =>
+      node.type === "element" && node.tag === "h1",
+  );
+  if (h1 === undefined) return "tkstack";
+  return viewerText(h1.children);
+}
+
+function viewerText(nodes: ViewerNode[]): string {
+  return nodes
+    .map((node) => {
+      if (node.type === "text") return node.value;
+      if (node.type === "element") return viewerText(node.children);
+      return "";
+    })
+    .join("");
 }
 
 export function extractFences(source: string) {
