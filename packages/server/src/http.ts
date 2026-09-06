@@ -53,10 +53,21 @@ export async function listenHaloHttp(options: {
     ],
   });
   const server = createServer(async (request, response) => {
-    const url = new URL(
-      request.url === undefined ? "/" : request.url,
-      "http://localhost",
-    );
+    let url: URL;
+    // Node's HTTP parser accepts absolute-form (proxy-style) request-targets that
+    // the WHATWG URL parser rejects (e.g. out-of-range port); guard the parse so
+    // a malformed target gets a clean 400 instead of an unhandled rejection and
+    // a hung socket.
+    try {
+      url = new URL(
+        request.url === undefined ? "/" : request.url,
+        "http://localhost",
+      );
+    } catch {
+      response.statusCode = 400;
+      response.end("Bad request.");
+      return;
+    }
     if (url.pathname === "/oauth/callback") {
       await handleOAuthCallback({
         url,
