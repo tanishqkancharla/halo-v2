@@ -43,6 +43,7 @@ type ToolRuntimeServiceOptions = {
 export class ToolRuntimeService {
   private runtime: ToolRuntime | undefined;
   private workspaceRoot: string | undefined;
+  private pendingCreate: Promise<ToolRuntime | Error> | undefined;
   private oauthRedirectUri: string | undefined;
   private readonly pendingConnections = new Map<string, PendingConnection>();
   private readonly connectionIdsByState = new Map<string, string>();
@@ -63,26 +64,35 @@ export class ToolRuntimeService {
       return this.runtime;
     }
 
-    const closed = await this.close();
-    if (closed instanceof Error) return closed;
-
-    const credentialVault = this.options.createCredentialVault({
-      workspaceRoot: layout.root,
-    });
-
-    const runtime = await ToolRuntime.create({
-      filesystem: this.options.filesystem,
-      workspaceRoot: layout.root,
-      userId: ownerUserId,
-      credentialVault,
-      toolPlugins: this.options.toolPlugins,
-      authority: this.options.authority,
-      oauthRedirectUri: this.oauthRedirectUri,
-    });
-    if (runtime instanceof Error) return runtime;
-    this.runtime = runtime;
-    this.workspaceRoot = layout.root;
-    return runtime;
+    let pending = this.pendingCreate;
+    if (pending === undefined) {
+      pending = (async () => {
+        try {
+          const closed = await this.close();
+          if (closed instanceof Error) return closed;
+          const credentialVault = this.options.createCredentialVault({
+            workspaceRoot: layout.root,
+          });
+          const runtime = await ToolRuntime.create({
+            filesystem: this.options.filesystem,
+            workspaceRoot: layout.root,
+            userId: ownerUserId,
+            credentialVault,
+            toolPlugins: this.options.toolPlugins,
+            authority: this.options.authority,
+            oauthRedirectUri: this.oauthRedirectUri,
+          });
+          if (runtime instanceof Error) return runtime;
+          this.runtime = runtime;
+          this.workspaceRoot = layout.root;
+          return runtime;
+        } finally {
+          this.pendingCreate = undefined;
+        }
+      })();
+      this.pendingCreate = pending;
+    }
+    return pending;
   }
 
   async close() {
