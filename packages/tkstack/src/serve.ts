@@ -59,10 +59,14 @@ export async function startServer(input: StartServerInput) {
   let registryPath: string | undefined;
   const closedBarrier = createClosedBarrier();
   let shuttingDown = false;
+  let onSigInt: () => void = noop;
+  let onSigTerm: () => void = noop;
 
   async function shutdown() {
     if (shuttingDown) return;
     shuttingDown = true;
+    process.off("SIGINT", onSigInt);
+    process.off("SIGTERM", onSigTerm);
     if (vite !== undefined) await vite.close();
     if (registryPath !== undefined) {
       const removed = await unregisterRunningTkstack(registryPath);
@@ -138,14 +142,16 @@ export async function startServer(input: StartServerInput) {
   }
   registryPath = registered;
 
-  process.once("SIGINT", () => {
+  onSigInt = () => {
     // oxlint-disable-next-line typescript/no-floating-promises -- Process signal callbacks cannot await shutdown.
     void shutdown();
-  });
-  process.once("SIGTERM", () => {
+  };
+  onSigTerm = () => {
     // oxlint-disable-next-line typescript/no-floating-promises -- Process signal callbacks cannot await shutdown.
     void shutdown();
-  });
+  };
+  process.once("SIGINT", onSigInt);
+  process.once("SIGTERM", onSigTerm);
 
   return {
     url,
