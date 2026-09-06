@@ -122,6 +122,7 @@ app.whenReady().then(async () => {
   registerDesktopApi({
     selectWorkspace: (directory) => haloServer.selectWorkspace(directory),
     getWindow: () => mainWindow,
+    getConnection: () => rpcConnection,
   });
   const listening = await haloServer.listen({
     host: "127.0.0.1",
@@ -147,7 +148,7 @@ app.whenReady().then(async () => {
     token: listening.renderer.token,
   };
   installMenu();
-  await openMainWindow(rpcConnection);
+  await openMainWindow();
   startAppUpdates({
     mode: applicationLaunchMode,
     getWindow: () => mainWindow,
@@ -160,7 +161,7 @@ app.whenReady().then(async () => {
       throw new Error("Halo RPC is unavailable after startup.");
     }
     // oxlint-disable-next-line typescript/no-floating-promises -- Electron activate callbacks cannot await window loading.
-    void openMainWindow(rpcConnection);
+    void openMainWindow();
   });
 });
 
@@ -196,17 +197,7 @@ async function closeAppServices() {
   }
 }
 
-async function openMainWindow(connection: HaloRpcConnection): Promise<void> {
-  const window = await createWindow(connection);
-  mainWindow = window;
-  window.on("closed", () => {
-    if (mainWindow === window) mainWindow = undefined;
-  });
-}
-
-async function createWindow(
-  connection: HaloRpcConnection,
-): Promise<BrowserWindow> {
+async function openMainWindow(): Promise<void> {
   const window = new BrowserWindow({
     show: shouldShowMainWindow(applicationLaunchMode),
     title: "Halo",
@@ -222,11 +213,11 @@ async function createWindow(
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
-      additionalArguments: [
-        `--halo-rpc-origin=${connection.origin}`,
-        `--halo-rpc-token=${connection.token}`,
-      ],
     },
+  });
+  mainWindow = window;
+  window.on("closed", () => {
+    if (mainWindow === window) mainWindow = undefined;
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -236,7 +227,6 @@ async function createWindow(
       join(currentDirectory, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
-  return window;
 }
 
 function shouldShowMainWindow(mode: ApplicationLaunchMode) {

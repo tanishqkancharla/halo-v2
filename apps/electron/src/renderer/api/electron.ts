@@ -7,13 +7,11 @@ import type { DesktopApi } from "../../shared/desktop.js";
 
 export const desktopApi: DesktopApi = window.haloDesktop;
 
-export function createElectronApi({
+export async function createElectronApi({
   onDisconnect,
 }: {
   onDisconnect: (error: HaloRpcConnectionError) => void;
 }): Promise<Error | HaloClient> {
-  return connectHaloRpc({
-    connection: window.haloRpc,
-    onDisconnect,
-  });
+  const connection = await desktopApi.getConnection();
+  return connectHaloRpc({ connection, onDisconnect });
 }

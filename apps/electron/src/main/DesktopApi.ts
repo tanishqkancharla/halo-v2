@@ -14,6 +14,7 @@ import {
   type DesktopRequest,
   type OpenExternalRequest,
 } from "../shared/desktop.js";
+import type { HaloRpcConnection } from "../shared/rpc.js";
 import { getAppInfo, installAppUpdate } from "./app/AppUpdate.js";
 
 class DesktopRequestError extends errore.createTaggedError({
@@ -29,6 +30,7 @@ class DesktopOperationError extends errore.createTaggedError({
 export function registerDesktopApi(args: {
   selectWorkspace: (directory: string) => Promise<WorkspaceInfo | Error>;
   getWindow: () => BrowserWindow | undefined;
+  getConnection: () => HaloRpcConnection | undefined;
 }): void {
   ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
     const window = assertTrustedSender({ event, getWindow: args.getWindow });
@@ -38,6 +40,7 @@ export function registerDesktopApi(args: {
       request: validated,
       window,
       selectWorkspace: args.selectWorkspace,
+      getConnection: args.getConnection,
     });
     if (result instanceof Error) throw result;
     return result;
@@ -55,6 +58,7 @@ async function handleDesktopRequest(args: {
   request: DesktopRequest;
   window: BrowserWindow;
   selectWorkspace: (directory: string) => Promise<WorkspaceInfo | Error>;
+  getConnection: () => HaloRpcConnection | undefined;
 }) {
   switch (args.request.type) {
     case "chooseWorkspace":
@@ -68,9 +72,23 @@ async function handleDesktopRequest(args: {
       return installAppUpdate();
     case "openExternal":
       return openExternal(args.request);
+    case "getConnection":
+      return getConnection(args.getConnection);
     default:
       return new DesktopRequestError({ operation: "desktop API" });
   }
+}
+
+function getConnection(
+  resolve: () => HaloRpcConnection | undefined,
+): HaloRpcConnection | DesktopOperationError {
+  const connection = resolve();
+  if (connection === undefined) {
+    return new DesktopOperationError({
+      operation: "provide the RPC connection",
+    });
+  }
+  return connection;
 }
 
 async function chooseWorkspace(args: {
