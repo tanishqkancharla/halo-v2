@@ -4,7 +4,7 @@ import { Cli, z } from "incur";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import { cliVersion, connectHalo } from "./connectHalo.js";
-import { HaloRpcFileError } from "./rpcFile.js";
+import { wrapRpc } from "./rpcError.js";
 import { parsePluginArgv, type PluginJson } from "./parsePluginArgv.js";
 
 type PluginProcedureOutput = Awaited<
@@ -382,13 +382,6 @@ function isAsyncIterable(
   if (value === undefined || value === null) return false;
   if (!(value instanceof Object)) return false;
   return Symbol.asyncIterator in value;
-}
-
-function wrapRpc(error: { message: string }) {
-  return new HaloRpcFileError({
-    detail: error.message,
-    cause: error,
-  });
 }
 
 function rewritePluginInvokeArgv() {

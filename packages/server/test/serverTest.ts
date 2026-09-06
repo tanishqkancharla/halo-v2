@@ -20,6 +20,7 @@ const testAppVersion = "0.0.0-test";
 type TestServer = {
   host: string;
   port: number;
+  token: string;
   rpc: HaloClient;
   harness: TestHarness;
 };
@@ -58,6 +59,7 @@ export const serverTest = baseTest.extend<{ server: TestServer }>({
     await use({
       host: connection.cli.host,
       port: connection.cli.port,
+      token: connection.cli.token,
       rpc,
       harness: artifacts.harness,
     });

@@ -6,7 +6,7 @@ import {
 import * as errore from "errore";
 import { createHaloRpcClient } from "./haloRpcClient.js";
 import { findHaloRpcFile } from "./findHaloRpcFile.js";
-import { HaloRpcFileError } from "./rpcFile.js";
+import { HaloRpcError } from "./rpcError.js";
 
 export type HaloRpcEnv = {
   HALO_RPC_FILE?: string;
@@ -36,9 +36,7 @@ export async function connectHalo(env: HaloRpcEnv) {
   const client = createHaloRpcClient<HaloClient>(file);
   const info = await client.server
     .info()
-    .catch(
-      (e) => new HaloRpcFileError({ detail: "server.info failed", cause: e }),
-    );
+    .catch((e) => new HaloRpcError({ detail: "server.info failed", cause: e }));
   if (info instanceof Error) return info;
   if (info.protocolVersion !== haloProtocolVersion) {
     return new HaloProtocolVersionError({

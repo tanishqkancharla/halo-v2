@@ -10,6 +10,7 @@ export {
   findHaloRpcFileFromEnv,
   type FindHaloRpcFileArgs,
 } from "./findHaloRpcFile.js";
+export { HaloRpcError } from "./rpcError.js";
 export {
   parsePluginArgv,
   reservedPluginCommands,
