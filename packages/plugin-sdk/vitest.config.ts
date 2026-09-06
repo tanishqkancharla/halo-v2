@@ -4,7 +4,11 @@ export default defineConfig({
   test: {
     server: {
       deps: {
-        inline: ["maui"],
+        inline: [
+          "maui",
+          "@tanishqkancharla/tandem-server",
+          "@tanishqkancharla/tandem-core",
+        ],
       },
     },
   },
