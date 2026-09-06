@@ -37,14 +37,18 @@ export class AsyncEventQueue<T> {
   }
 
   async *values(signal: AbortSignal | undefined) {
+    let current: QueueItem<T> | undefined;
     try {
       while (true) {
         const item = await this.take(signal);
         if (item === undefined) return;
+        current = item;
         yield item.value;
+        current = undefined;
         item.delivered();
       }
     } finally {
+      if (current !== undefined) current.delivered();
       this.close();
     }
   }
