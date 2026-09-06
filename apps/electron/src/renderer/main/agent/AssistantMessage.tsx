@@ -8,6 +8,7 @@ import type { Components } from "streamdown";
 import {
   Streamdown,
   defaultRehypePlugins,
+  parseMarkdownIntoBlocks,
   useIsCodeFenceIncomplete,
 } from "streamdown";
 import { code } from "@streamdown/code";
@@ -64,6 +65,81 @@ function extractText(node: ReactNode): string {
     return extractText(node.props.children);
   }
   return String(node);
+}
+
+// `useIsCodeFenceIncomplete` is block-scoped: one boolean for every fenced code
+// node in a single parsed Streamdown `Block`. `parseMarkdownIntoBlocks` merges
+// multiple fences into one block while a block-level wrapper (`<details>`,
+// `<div>`) or unbalanced `$$` is open on the streaming tail, so an already-closed
+// earlier fence inherits the trailing open fence's `isIncomplete=true` and is
+// pushed onto the plain branch. Split the streaming tail block at each closed
+// fence so closed fences land in their own blocks (`isIncomplete=false`), leaving
+// the still-open trailing fence as the sole fence in the final, incomplete block.
+// The fence scan mirrors streamdown's own block incompleteness check
+// (`^[ \t]{0,3}(`{3,}|~{3,})`, closing fence matches char and length), so the
+// closed-`</details>` and `isAnimating=false` final states split into nothing
+// and stay byte-identical to the default parser.
+const fenceLine = /^[ \t]{0,3}(`{3,}|~{3,})/;
+
+function splitStreamingBlock(block: string): string[] {
+  const segments: string[] = [];
+  let current: string[] = [];
+  let fenceChar: string | undefined;
+  let fenceLength = 0;
+  for (const line of block.split("\n")) {
+    current.push(line);
+    const match = fenceLine.exec(line);
+    if (fenceChar === undefined) {
+      if (match) {
+        fenceChar = match[1][0];
+        fenceLength = match[1].length;
+      }
+    } else if (match) {
+      const fence = match[1];
+      if (fence[0] === fenceChar && fence.length >= fenceLength) {
+        fenceChar = undefined;
+        fenceLength = 0;
+        segments.push(current.join("\n") + "\n");
+        current = [];
+      }
+    }
+  }
+  if (current.length > 0) segments.push(current.join("\n"));
+  return segments;
+}
+
+function blockHasOpenFence(block: string): boolean {
+  let fenceChar: string | undefined;
+  let fenceLength = 0;
+  for (const line of block.split("\n")) {
+    const match = fenceLine.exec(line);
+    if (fenceChar === undefined) {
+      if (match) {
+        fenceChar = match[1][0];
+        fenceLength = match[1].length;
+      }
+    } else if (match) {
+      const fence = match[1];
+      if (fence[0] === fenceChar && fence.length >= fenceLength) {
+        fenceChar = undefined;
+        fenceLength = 0;
+      }
+    }
+  }
+  return fenceChar !== undefined;
+}
+
+function parseStreamingBlocks(
+  markdown: string,
+  isAnimating: boolean,
+): string[] {
+  const blocks = parseMarkdownIntoBlocks(markdown);
+  if (!isAnimating || blocks.length === 0) return blocks;
+  const last = blocks[blocks.length - 1];
+  if (!blockHasOpenFence(last)) return blocks;
+  const subBlocks = splitStreamingBlock(last);
+  if (subBlocks.length <= 1) return blocks;
+  return [...blocks.slice(0, -1), ...subBlocks];
 }
 
 function MauiFencedCode({
@@ -157,6 +233,10 @@ export function AssistantMessage({
     () => (isAnimating ? streamingRehypePlugins : undefined),
     [isAnimating],
   );
+  const parseMarkdownIntoBlocksFn = useMemo(
+    () => (markdown: string) => parseStreamingBlocks(markdown, isAnimating),
+    [isAnimating],
+  );
 
   return (
     <div
@@ -169,6 +249,7 @@ export function AssistantMessage({
         components={streamdownComponents}
         plugins={{ code }}
         rehypePlugins={rehypePlugins}
+        parseMarkdownIntoBlocksFn={parseMarkdownIntoBlocksFn}
         // `animated` must stay stably enabled; only `isAnimating` toggles.
         // Flipping `animated`/`mode` with the stream resets stagger state and
         // makes new blocks (blockquotes, lists) pop in out of order.
