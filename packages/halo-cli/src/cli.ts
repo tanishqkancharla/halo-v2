@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Cli, z } from "incur";
+import { extension } from "./extension.js";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import { cliVersion, connectHalo } from "./connectHalo.js";
@@ -364,6 +365,7 @@ async function main() {
       },
     })
     .command(plugin)
+    .command(extension)
     .serve();
 }
 

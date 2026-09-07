@@ -1,6 +1,6 @@
 {
   "name": "@get-halo/extension-tools",
-  "version": "0.0.0-prototype",
+  "version": "0.1.0",
   "bin": {
     "halo-extension": "./dist/cli.js"
   },
@@ -14,7 +14,11 @@
       "default": "./dist/scaffold.js"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
+    "prepack": "npm run build",
     "build": "tsc -p tsconfig.build.json && node --input-type=module -e \"import { chmodSync } from 'node:fs'; chmodSync('dist/cli.js', 0o755)\"",
     "typecheck": "pnpm run build && tsc --noEmit",
     "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src test",

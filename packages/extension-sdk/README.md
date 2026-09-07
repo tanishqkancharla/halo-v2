@@ -1,4 +1,4 @@
-# Extension SDK prototype
+# Extension SDK
 
 Runtime libraries shared by standalone Halo extensions:
 
@@ -24,5 +24,5 @@ ReactDOM are normal peer dependencies within each extension's dependency tree;
 they are not injected from Halo or shared as live objects across extensions.
 
 Scaffolding and esbuild configuration live in the separate development package,
-[`@get-halo/extension-tools`](../extension-tools/README.md). Both packages use the
+[`@get-halo/extension-tools`](https://www.npmjs.com/package/@get-halo/extension-tools). Both packages use the
 repository's TypeScript version to emit their runtime JavaScript and declarations.

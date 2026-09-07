@@ -1,4 +1,4 @@
-# Extension tools prototype
+# Extension tools
 
 Shared development tooling for standalone Halo extensions. An extension installs
 `@get-halo/extension-sdk` as a dependency and `@get-halo/extension-tools` as a
@@ -22,7 +22,7 @@ const result = await scaffoldExtension({
 if (result instanceof Error) throw result;
 ```
 
-The equivalent CLI is `halo-extension scaffold my-extension`. Scaffolding
+The equivalent CLI is `npx @get-halo/extension-tools@0.1.0 scaffold my-extension`. Scaffolding
 creates a new directory and writes the source, package scripts, dependencies,
 TypeScript configuration, and gitignore. Installation is explicit:
 
@@ -34,7 +34,7 @@ npm run build
 npm start -- --port 3000 --data-dir .extension-data
 ```
 
-These prototype packages are not published. For local development, the scaffold
+The scaffold installs versioned SDK and tools packages from npm. For local development, the scaffold
 API accepts `packages: { sdk: "file:/path/to/sdk.tgz", tools: "file:/path/to/tools.tgz" }`.
 The end-to-end tests pack both packages and install them with pnpm in standalone
 test projects. pnpm reuses its shared package store across tests. Failed tests

@@ -445,6 +445,9 @@ importers:
 
   packages/halo-cli:
     dependencies:
+      '@get-halo/extension-tools':
+        specifier: 0.1.0
+        version: 0.1.0
       '@get-halo/shared':
         specifier: workspace:*
         version: link:../shared
@@ -1581,6 +1584,10 @@ packages:
 
   '@gar/promisify@1.1.3':
     resolution: {integrity: sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==}
+
+  '@get-halo/extension-tools@0.1.0':
+    resolution: {integrity: sha512-7lajjaJ+UH1/nhXzNY7SBD5FcVomcTlh5JYfY60iLwBre+L8/BV0hfEFb5yBeDMi1MSvDmYnIknREY6uhNUVLA==}
+    hasBin: true
 
   '@google/genai@1.52.0':
     resolution: {integrity: sha512-gwSvbpiN/17O9TbsqSsE/OzZcpv5Fo4RQjdngGgogtuB9RsyJ8ZHhX5KjHj1bp5N9snN2eK8LDGXSaWW2hof8Q==}
@@ -9490,6 +9497,11 @@ snapshots:
   '@fontsource/commit-mono@5.3.0': {}
 
   '@gar/promisify@1.1.3': {}
+
+  '@get-halo/extension-tools@0.1.0':
+    dependencies:
+      errore: 0.14.1
+      esbuild: 0.28.2
 
   '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.4.3))(supports-color@8.1.1)':
     dependencies:
