@@ -338,8 +338,10 @@ export class HaloAgentSession {
           sessionId: this.sessionId,
           cause: error,
         });
+        return this.eventWriteError;
       }
     }
+    this.eventWriteError = undefined;
     return this.eventWriteError;
   }
 

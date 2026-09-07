@@ -137,7 +137,12 @@ export class HaloServer {
     }
 
     const sessionsClosed = await this.context.sessions.shutdown();
-    if (sessionsClosed instanceof Error) return sessionsClosed;
+    if (sessionsClosed instanceof Error) {
+      this.context.logger.warn({
+        event: "session-shutdown-error",
+        error: sessionsClosed,
+      });
+    }
     const runtimeClosed = await this.context.toolRuntime.close();
     if (runtimeClosed instanceof Error) return runtimeClosed;
 

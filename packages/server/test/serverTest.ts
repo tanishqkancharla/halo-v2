@@ -65,7 +65,9 @@ export const serverTest = baseTest.extend<{ server: TestServer }>({
   },
 });
 
-function createServerOptions(artifacts: TestArtifacts): HaloServerOptions {
+export function createServerOptions(
+  artifacts: TestArtifacts,
+): HaloServerOptions {
   return {
     appDataDir: artifacts.paths.userData,
     appVersion: testAppVersion,
