@@ -143,14 +143,33 @@ export async function runExtension(args: {
     process.exitCode = 1;
     return;
   }
-  console.log(`Listening on ${running.url}`);
-  const shutdown = async () => {
-    const closed = await running.close();
-    if (closed instanceof Error) {
-      console.error(closed);
-      process.exitCode = 1;
+  let shutdownPromise: Promise<void> | undefined;
+  const shutdown = () => {
+    if (shutdownPromise === undefined) {
+      shutdownPromise = running.close().then((closed) => {
+        if (closed instanceof Error) {
+          console.error(closed);
+          process.exitCode = 1;
+        }
+        if (process.connected) process.disconnect();
+      });
     }
+    return shutdownPromise;
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
+  if (process.send !== undefined) {
+    process.on("message", (message) => {
+      if (message === "shutdown") return shutdown();
+    });
+    process.once("disconnect", shutdown);
+    process.send(running.url, (cause) => {
+      if (cause === null) return;
+      console.warn(
+        new ExtensionServerError({ operation: "announce server", cause }),
+      );
+      return shutdown();
+    });
+  }
+  console.log(`Listening on ${running.url}`);
 }

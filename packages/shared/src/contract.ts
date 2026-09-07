@@ -73,6 +73,9 @@ export const contract = publicProcedure.router({
   server: {
     info: oc.output(type<{ protocolVersion: typeof haloProtocolVersion }>()),
   },
+  extensions: {
+    list: oc.output(type<Array<{ id: string; url: string }>>()),
+  },
   workspace: {
     get: oc.output(type<WorkspaceInfo | undefined>()),
     listPaths: oc.output(type<string[]>()),

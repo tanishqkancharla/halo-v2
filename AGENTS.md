@@ -4,7 +4,9 @@ Halo is an open-source self-modifiable desktop app built with Electron and Pi. I
 
 ## Commands
 
-- `pnpm run check-affected` - Lint, typecheck, format-check, and test affected packages. Run this after edits before you treat the work as done.
+- During iteration, run `pnpm run check:static` and only the relevant tests. Avoid repeated full checks: they package Electron and install test dependencies.
+- `pnpm run check-affected` - Lint, typecheck, format-check, and test affected packages sequentially. Run once when the change is ready, not after every edit. Respect the user's request to avoid heavy runs on their laptop.
+- For Electron E2Es, build with `pnpm --filter @halo/desktop test:e2e:build` after app code changes, then use `pnpm --filter @halo/desktop test:e2e:run <test-file>` to reuse that package while editing tests. Local E2Es use one worker to limit resource usage.
 - `pnpm spec <file>` / `pnpm walkthrough <file>` / `pnpm exec tkstack <file>` - Serve a spec or code walkthrough as a local tkstack page.
 
 ## Releasing
@@ -65,7 +67,7 @@ Always adhere to ISO 24495-1 Technical Language Standard for responses.
 
 ## Cursor Cloud specific instructions
 
-The one service is the Halo Electron app. Start it from the repo root with `pnpm --filter @get-halo/desktop dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo-web` (see the halo-web skill). After edits, run `pnpm run check-affected` (see Commands).
+The one service is the Halo Electron app. Start it from the repo root with `pnpm --filter @get-halo/desktop dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo-web` (see the halo-web skill). Follow the incremental verification workflow in Commands.
 
 Cursor Cloud agents must record a short demo video when they add or change any UI, attach it to the PR, and show it in the walkthrough. Use screen recording against the running Halo app; do not skip this for “small” UI tweaks. This requirement does not apply to agents outside Cursor Cloud.
 

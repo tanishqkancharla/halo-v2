@@ -14,6 +14,11 @@ query object to `useQuery(storage, query)` and use Tandem transactions for edits
 Each browser owns its client and local navigation; the server owns persistent
 shared data. The SDK does not import Halo or require Electron.
 
+When launched with a Node IPC channel, the server reports its ready URL and
+accepts a `shutdown` message. It closes HTTP and Tandem before disconnecting.
+Losing the parent connection also shuts it down. Standalone CLI processes
+continue to use SIGINT or SIGTERM for shutdown.
+
 The generated application bundles the SDK and its dependencies. React and
 ReactDOM are normal peer dependencies within each extension's dependency tree;
 they are not injected from Halo or shared as live objects across extensions.

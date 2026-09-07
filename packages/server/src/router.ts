@@ -1,6 +1,10 @@
 import { contract, haloProtocolVersion } from "@get-halo/shared/contract";
 import { implement } from "@orpc/server";
 import {
+  extensionsRouter,
+  type ExtensionsRouterContext,
+} from "./extensions/extensionsRouter.js";
+import {
   pluginsRouter,
   type PluginsRouterContext,
 } from "./plugins/pluginsRouter.js";
@@ -18,6 +22,7 @@ import {
 } from "./testing/testingRouter.js";
 
 export type HaloContext = WorkspaceRouterContext &
+  ExtensionsRouterContext &
   SessionsRouterContext &
   PluginsRouterContext &
   TestingRouterContext;
@@ -33,5 +38,6 @@ export const haloRpcRouter = {
   workspace: workspaceRouter,
   sessions: sessionsRouter,
   plugins: pluginsRouter,
+  extensions: extensionsRouter,
   testHarness: testingRouter,
 };

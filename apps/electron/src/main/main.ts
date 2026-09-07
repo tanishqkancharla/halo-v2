@@ -104,6 +104,7 @@ const haloServer = new HaloServer({
   cliEntry: resolveHaloCliEntry(filesystemService, import.meta.url),
   cliNodeExecutable: isDevelopment ? "node" : process.execPath,
   cliElectronRunAsNode: !isDevelopment,
+  extensionRuntime: { executable: process.execPath, electronRunAsNode: true },
   isDevelopment,
   testingApiEnabled: applicationLaunchMode === ApplicationLaunchMode.Test,
   pluginDependencyInstaller:

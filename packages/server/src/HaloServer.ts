@@ -8,6 +8,8 @@ import {
   type HaloHttpError,
 } from "./http.js";
 import { PluginService } from "./plugins/PluginService.js";
+import { ExtensionHost } from "./extensions/ExtensionHost.js";
+import type { ExtensionRuntime } from "./extensions/ExtensionProcess.js";
 import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
 import { type HaloContext } from "./router.js";
 import { SessionRegistry } from "./sessions/SessionRegistry.js";
@@ -25,6 +27,7 @@ export type HaloServerOptions = {
   cliEntry?: string;
   cliNodeExecutable?: string;
   cliElectronRunAsNode?: boolean;
+  extensionRuntime?: ExtensionRuntime;
   isDevelopment?: boolean;
   testingApiEnabled?: boolean;
   ownerUserId: Promise<string | Error>;
@@ -84,6 +87,14 @@ export class HaloServer {
 
     this.filesystem = filesystem;
     this.context = {
+      extensions: new ExtensionHost({
+        filesystem,
+        logger: options.logger,
+        runtime:
+          options.extensionRuntime === undefined
+            ? { executable: process.execPath, electronRunAsNode: false }
+            : options.extensionRuntime,
+      }),
       workspace,
       plugins,
       pluginToolGrants,
@@ -100,7 +111,8 @@ export class HaloServer {
     corsOrigins: readonly string[];
   }): Promise<HaloHttpConnections | HaloHttpError> {
     await this.context.workspace.restore();
-    if (this.context.workspace.getWorkspace() !== undefined) {
+    const workspace = this.context.workspace.getWorkspace();
+    if (workspace !== undefined) {
       const listed = await this.context.plugins.reload();
       if (listed instanceof Error) {
         this.context.logger.warn({
@@ -108,6 +120,7 @@ export class HaloServer {
           error: listed,
         });
       }
+      await this.context.extensions.start(workspace.workspaceRoot);
     }
 
     const listening = await listenHaloHttp({
@@ -116,7 +129,10 @@ export class HaloServer {
       port: options.port,
       corsOrigins: options.corsOrigins,
     });
-    if (listening instanceof Error) return listening;
+    if (listening instanceof Error) {
+      await this.context.extensions.stop();
+      return listening;
+    }
     this.httpServer = listening.server;
     return listening.connections;
   }
@@ -141,6 +157,8 @@ export class HaloServer {
     const runtimeClosed = await this.context.toolRuntime.close();
     if (runtimeClosed instanceof Error) return runtimeClosed;
 
+    await this.context.extensions.start(selected.workspaceRoot);
+
     const pluginsLoaded = await this.context.plugins.reload();
     if (pluginsLoaded instanceof Error) {
       this.context.logger.warn({
@@ -158,6 +176,7 @@ export class HaloServer {
         : await closeHaloHttp(this.httpServer);
     const sessionsClosed = await this.context.sessions.shutdown();
     const runtimeClosed = await this.context.toolRuntime.close();
+    await this.context.extensions.stop();
     this.context.workspace.close();
     const filesystemClosed = await this.filesystem.close();
 

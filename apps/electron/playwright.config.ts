@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.e2e.test.ts",
   fullyParallel: true,
-  workers: 4,
+  workers: 1,
   timeout: 30_000,
   expect: { timeout: 10_000 },
   reporter: "list",

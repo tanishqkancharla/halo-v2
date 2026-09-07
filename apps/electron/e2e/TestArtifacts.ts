@@ -165,6 +165,11 @@ export async function createTestArtifacts(testInfo: TestInfo) {
         testInfo.status !== testInfo.expectedStatus ||
         testInfo.status === "failed"
       ) {
+        const pruned = await removeDependencyDirectories(paths.root);
+        if (pruned instanceof Error) {
+          retainArtifacts(paths.root);
+          return pruned;
+        }
         const attached = await attachArtifacts({ testInfo, paths });
         retainArtifacts(paths.root);
         return attached;
@@ -183,6 +188,36 @@ export async function createTestArtifacts(testInfo: TestInfo) {
 }
 
 export type TestArtifacts = Awaited<ReturnType<typeof createTestArtifacts>>;
+
+async function removeDependencyDirectories(
+  directory: string,
+): Promise<void | TestArtifactError> {
+  const entries = await fsPromises
+    .readdir(directory, { withFileTypes: true })
+    .catch(
+      (cause) =>
+        new TestArtifactError({
+          operation: "list dependency directories",
+          cause,
+        }),
+    );
+  if (entries instanceof Error) return entries;
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const child = path.join(directory, entry.name);
+    const removed =
+      entry.name === "node_modules"
+        ? await fsPromises.rm(child, { recursive: true, force: true }).catch(
+            (cause) =>
+              new TestArtifactError({
+                operation: "remove test dependencies",
+                cause,
+              }),
+          )
+        : await removeDependencyDirectories(child);
+    if (removed instanceof Error) return removed;
+  }
+}
 
 function captureProcessOutput(args: {
   input: NodeJS.ReadableStream;

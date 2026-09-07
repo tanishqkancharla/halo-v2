@@ -36,7 +36,9 @@ npm start -- --port 3000 --data-dir .extension-data
 
 These prototype packages are not published. For local development, the scaffold
 API accepts `packages: { sdk: "file:/path/to/sdk.tgz", tools: "file:/path/to/tools.tgz" }`.
-The end-to-end tests pack both packages and use this ordinary npm installation path.
+The end-to-end tests pack both packages and install them with pnpm in standalone
+test projects. pnpm reuses its shared package store across tests. Failed tests
+retain source, builds, data, and diagnostics, but discard `node_modules`.
 
 One build compiles the frontend and Node server, including their imported schema
 code and real dependencies. Both outputs must succeed before `dist/current.json`
@@ -46,7 +48,14 @@ build. Successful build generations are retained; pruning is not implemented.
 
 The server listens on loopback and serves `/view/`, `/api/`, and `/sync/`.
 Data is persisted to `<data-dir>/store.json` using Tandem's `JsonFileRemote`.
-This prototype has no Halo hosting, authentication, or workspace integrations.
+Halo discovers built apps in `<workspace>/.halo/extensions/<id>/` when opening
+the workspace. It starts each app with the bundled Node runtime and stores data
+in `<workspace>/.halo/extension-data/<id>/`. `extensions.list()` exposes their
+running view URLs without starting or rebuilding anything. Workspace switching
+and app shutdown stop the hosted processes.
+
+Sidebar contributions, iframe panes, authentication, and workspace tool access
+are not connected yet.
 JSON persistence is a prototype default, not the final database design.
 
 ## Verification

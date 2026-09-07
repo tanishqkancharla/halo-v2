@@ -36,6 +36,8 @@ type E2ETestHarness = TestArtifacts["harness"] & {
 };
 
 type E2EFixtures = {
+  runningApp: { app: ElectronApplication; close(): Promise<void> };
+  closeApp(): Promise<void>;
   agentBrowser: { open(url: string): Promise<Page> };
   testArtifacts: TestArtifacts;
   electronApp: ElectronApplication;
@@ -64,7 +66,7 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
     const finished = await artifacts.finish();
     if (finished instanceof Error) throw finished;
   },
-  electronApp: async ({ testArtifacts }, use) => {
+  runningApp: async ({ testArtifacts }, use) => {
     await using cleanup = new errore.AsyncDisposableStack();
     const executablePath = resolveUnpackedExecutable();
     if (executablePath instanceof Error) throw executablePath;
@@ -91,7 +93,13 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
       const screenshot = await testArtifacts.captureScreenshot(page);
       if (screenshot instanceof Error) throw screenshot;
     });
-    await use(app);
+    await use({ app, close: () => cleanup.disposeAsync() });
+  },
+  electronApp: async ({ runningApp }, use) => {
+    await use(runningApp.app);
+  },
+  closeApp: async ({ runningApp }, use) => {
+    await use(() => runningApp.close());
   },
   renderer: async ({ electronApp }, use) => {
     await use({ page: await electronApp.firstWindow() });

@@ -22,8 +22,9 @@
     "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src forge e2e forge.config.ts playwright.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
     "test": "pnpm run test:e2e",
     "test:e2e:build": "electron-forge package",
+    "test:e2e:run": "playwright test",
     "test:e2e": "pnpm run test:e2e:build && playwright test",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json"
+    "typecheck": "pnpm --filter @get-halo/extension-tools build && tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.83.0",
@@ -86,6 +87,7 @@
     "@electron-forge/plugin-vite": "^7.11.2",
     "@electron-forge/publisher-github": "^7.11.2",
     "@electron-forge/shared-types": "^7.11.2",
+    "@get-halo/extension-tools": "workspace:*",
     "@playwright/test": "1.62.1",
     "@repo/typescript-config": "workspace:*",
     "@types/electron-squirrel-startup": "^1.0.2",

@@ -18,7 +18,8 @@
     "format": "turbo run format",
     "format:check": "turbo run format:check",
     "typecheck": "turbo run typecheck",
-    "check": "turbo run typecheck lint format:check test --affected",
+    "check": "turbo run typecheck lint format:check test --affected --concurrency=1",
+    "check:static": "turbo run typecheck lint format:check --affected --concurrency=1",
     "check-affected": "pnpm run check"
   },
   "devDependencies": {

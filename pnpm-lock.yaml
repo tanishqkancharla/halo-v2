@@ -314,6 +314,9 @@ importers:
       '@electron-forge/shared-types':
         specifier: ^7.11.2
         version: 7.11.2(bluebird@3.7.2)(supports-color@8.1.1)
+      '@get-halo/extension-tools':
+        specifier: workspace:*
+        version: link:../../packages/extension-tools
       '@playwright/test':
         specifier: 1.62.1
         version: 1.62.1

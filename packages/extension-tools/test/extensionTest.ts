@@ -53,14 +53,18 @@ export const extensionTest = base.extend<
       const root = await mkdtemp(
         path.join(repository, "tmp", "extension-prototype", "loaded-"),
       );
+      const directory = path.join(root, "app");
       cleanup.defer(async () => {
+        await rm(path.join(directory, "node_modules"), {
+          recursive: true,
+          force: true,
+        });
         if (info.status !== info.expectedStatus) {
           console.warn(`Extension artifacts retained: ${root}`);
           return;
         }
         await rm(root, { recursive: true, force: true });
       });
-      const directory = path.join(root, "app");
       const scaffolded = await scaffoldExtension({
         directory,
         name: "test-extension",
@@ -76,13 +80,16 @@ export const extensionTest = base.extend<
         }
       }
       await command(
-        "npm",
+        "pnpm",
         [
           "install",
+          "--dir",
+          directory,
+          "--lockfile-dir",
+          directory,
+          "--ignore-workspace",
           "--ignore-scripts",
-          "--no-audit",
-          "--no-fund",
-          "--package-lock=false",
+          "--config.manage-package-manager-versions=false",
         ],
         directory,
       );
