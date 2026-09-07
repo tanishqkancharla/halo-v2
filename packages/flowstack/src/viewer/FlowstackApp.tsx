@@ -26,12 +26,20 @@ import {
   type Program,
   type Service,
 } from "../model/Program.js";
+import { promptStory } from "../model/promptStory.js";
+import type { Story } from "../model/Story.js";
 import { ProcessBadge, StateChip } from "./badges.tsx";
 import { carrierIcons } from "./carriers.tsx";
 import { MermaidBlock } from "./MermaidBlock.tsx";
 import { CallStack, type Expansion } from "./CallStack.tsx";
+import { StoryView } from "./StoryView.tsx";
 
-type Selection = { kind: "map" } | { kind: "flow"; id: string };
+type Selection =
+  | { kind: "map" }
+  | { kind: "flow"; id: string }
+  | { kind: "story"; id: string };
+
+const stories: Story[] = [promptStory];
 
 const program = haloProgram;
 const services = new Map(
@@ -69,6 +77,10 @@ export function FlowstackApp() {
   const selectedFlow =
     selection.kind === "flow"
       ? program.flows.find((flow) => flow.id === selection.id)
+      : undefined;
+  const selectedStory =
+    selection.kind === "story"
+      ? stories.find((story) => story.id === selection.id)
       : undefined;
   const main = useStyles(styles.main);
 
@@ -112,9 +124,27 @@ export function FlowstackApp() {
               <FlowLabel flow={flow} />
             </button>
           ))}
+          <div className={sectionLabel}>Stories</div>
+          {stories.map((story) => (
+            <button
+              key={story.id}
+              type="button"
+              className={navItem}
+              aria-current={
+                selection.kind === "story" && selection.id === story.id
+                  ? "page"
+                  : undefined
+              }
+              onClick={() => setSelection({ kind: "story", id: story.id })}
+            >
+              {story.title}
+            </button>
+          ))}
         </nav>
         <main className={main}>
-          {selectedFlow === undefined ? (
+          {selectedStory !== undefined ? (
+            <StoryPage key={selectedStory.id} story={selectedStory} />
+          ) : selectedFlow === undefined ? (
             <ProgramMap program={program} />
           ) : (
             <FlowPage
@@ -200,6 +230,22 @@ function FlowPage(props: {
         services={props.services}
         expansion={props.expansion}
       />
+      <Legend />
+    </div>
+  );
+}
+
+function StoryPage(props: { story: Story }) {
+  const page = useStyles(styles.page);
+  const heading = useStyles(styles.heading);
+  const description = useStyles(styles.description);
+  return (
+    <div className={page}>
+      <div>
+        <h1 className={heading}>{props.story.title}</h1>
+        <p className={description}>{props.story.description}</p>
+      </div>
+      <StoryView story={props.story} />
       <Legend />
     </div>
   );
