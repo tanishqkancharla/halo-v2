@@ -86,4 +86,4 @@ mkdir -p /home/ubuntu/halo-workspace /workspace/.halo
 echo '{"workspaceRoot":"/home/ubuntu/halo-workspace"}' > /workspace/.halo/workspace.json
 ```
 
-`.halo/` holds dev userData and is gitignored. Choosing a workspace seeds `{workspace}/.pi/agent/skills/halo-plugin/SKILL.md`. Halo provides the Maui skill from its installed runtime package, and each scaffolded view plugin also installs it under `node_modules/maui/skills/maui/SKILL.md`. Reload (View → Reload, or Cmd-R / Ctrl-R) to pick up plugin edits.
+`.halo/` holds dev userData and is gitignored. Choosing a workspace seeds `{workspace}/.pi/agent/skills/halo-extension/SKILL.md`. Each scaffolded extension installs its Maui skill under `node_modules/maui/skills/maui/SKILL.md`. Build inside the extension with `npm run build`, then use `halo extension reload` to start newly discovered extensions and reload the renderer to refresh the sidebar. Existing extension servers keep their current build until Halo restarts.

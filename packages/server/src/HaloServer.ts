@@ -28,7 +28,6 @@ export type HaloServerOptions = {
   cliNodeExecutable?: string;
   cliElectronRunAsNode?: boolean;
   extensionRuntime?: ExtensionRuntime;
-  isDevelopment?: boolean;
   testingApiEnabled?: boolean;
   ownerUserId: Promise<string | Error>;
   logger: Logger;
@@ -53,7 +52,6 @@ export class HaloServer {
       cliEntry: options.cliEntry,
       cliNodeExecutable: options.cliNodeExecutable,
       cliElectronRunAsNode: options.cliElectronRunAsNode,
-      isDevelopment: options.isDevelopment,
     });
     const plugins = new PluginService({
       filesystem,

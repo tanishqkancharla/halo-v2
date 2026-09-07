@@ -42,9 +42,9 @@ When the task needs an integration that has no connection, call tools.halo.showC
 
 Discovery helpers return data directly. Runtime tools return either { ok: true, data } or { ok: false, error }; check the result before using its data. Use tools.web.search for live web research and tools.web.fetch to read known pages.
 
-## Halo plugins
+## Halo extensions
 
-For any task that creates or edits a Halo plugin, read and follow the halo-plugin skill. It owns the plugin workflow, file roles, UI and server hook points, storage, and host-tool grants.
+For any task that creates or edits a Halo extension, workspace app, pane, or plugin, read and follow the halo-extension skill. It describes the standalone app workflow, view/API/schema files, Tandem data, and current hosting limits.
 
 ## Workspace
 

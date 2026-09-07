@@ -18,7 +18,7 @@ import {
   FilesystemService,
 } from "../filesystem/FilesystemService.js";
 import { haloCliBinDir, installHaloCli } from "./installHaloCli.js";
-import { seedPluginWorkspace } from "../plugins/seedPluginWorkspace.js";
+import { seedExtensionWorkspace } from "../extensions/seedExtensionWorkspace.js";
 
 export type WorkspaceLayout = {
   root: string;
@@ -158,7 +158,6 @@ type WorkspaceServiceOptions = {
   cliEntry?: string;
   cliNodeExecutable?: string;
   cliElectronRunAsNode?: boolean;
-  isDevelopment?: boolean;
 };
 
 export class WorkspaceService {
@@ -315,10 +314,10 @@ export class WorkspaceService {
       return new WorkspaceIoError({ cause: sessionDir });
     }
 
-    const seeded = await seedPluginWorkspace(this.options.filesystem, layout, {
-      appVersion: this.options.appVersion,
-      alwaysWrite: this.options.isDevelopment === true,
-    });
+    const seeded = await seedExtensionWorkspace(
+      this.options.filesystem,
+      layout,
+    );
     if (seeded instanceof Error) return seeded;
 
     if (this.options.cliEntry !== undefined) {
