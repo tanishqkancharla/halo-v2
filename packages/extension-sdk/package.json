@@ -1,0 +1,55 @@
+{
+  "name": "@get-halo/extension-sdk",
+  "version": "0.0.0-prototype",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./view": {
+      "types": "./dist/view.d.ts",
+      "default": "./dist/view.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "default": "./dist/schema.js"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src test",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@orpc/client": "2.0.0-beta.29",
+    "@orpc/server": "2.0.0-beta.29",
+    "@sinclair/typebox": "^0.34.52",
+    "@tanishqkancharla/tandem-core": "0.2.0",
+    "@tanishqkancharla/tandem-server": "0.2.0",
+    "errore": "^0.14.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/react": "19.2.18",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "7.0.2"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

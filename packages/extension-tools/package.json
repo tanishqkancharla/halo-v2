@@ -1,0 +1,34 @@
+{
+  "name": "@get-halo/extension-tools",
+  "version": "0.0.0-prototype",
+  "bin": {
+    "halo-extension": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    "./scaffold": {
+      "types": "./dist/scaffold.d.ts",
+      "default": "./dist/scaffold.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node --input-type=module -e \"import { chmodSync } from 'node:fs'; chmodSync('dist/cli.js', 0o755)\"",
+    "typecheck": "pnpm run build && tsc --noEmit",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src test",
+    "format:check": "oxfmt --check .",
+    "test": "pnpm --filter @get-halo/extension-sdk build && pnpm run build && playwright test"
+  },
+  "dependencies": {
+    "errore": "^0.14.1",
+    "esbuild": "0.28.2"
+  },
+  "devDependencies": {
+    "@get-halo/extension-sdk": "workspace:*",
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^22.20.1",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,67 @@
+import path from "node:path";
+import { expect } from "@playwright/test";
+import { extensionTest } from "./extensionTest.js";
+
+const tasks = path.join(import.meta.dirname, "fixtures", "tasks");
+
+extensionTest(
+  "serves nested view URLs and calls extension API routes without Halo",
+  async ({ loadExtension, page }) => {
+    const extension = await loadExtension(tasks);
+    const response = page.waitForResponse(
+      (result) => new URL(result.url()).pathname === "/api/title",
+    );
+    await page.goto(`${extension.url}tasks/today`);
+    await response;
+    await expect(
+      page.getByRole("heading", { name: "Shared tasks" }),
+    ).toBeVisible();
+  },
+);
+
+extensionTest(
+  "syncs task edits between independent browsers",
+  async ({ loadExtension, page, browser }) => {
+    const extension = await loadExtension(tasks);
+    const collaborator = await browser.newContext();
+    const other = await collaborator.newPage();
+    await page.goto(extension.url);
+    await other.goto(extension.url);
+    await page
+      .getByRole("textbox", { name: "New task" })
+      .fill("Plan the launch");
+    await page.getByRole("button", { name: "Add task" }).click();
+    await other.getByText("Plan the launch", { exact: true }).click();
+    await expect(
+      page.getByRole("checkbox", { name: "Plan the launch" }),
+    ).toBeChecked();
+    await collaborator.close();
+  },
+);
+
+extensionTest(
+  "preserves tasks across a server restart",
+  async ({ loadExtension, page, browser }) => {
+    const extension = await loadExtension(tasks);
+    const observer = await browser.newContext();
+    const observed = await observer.newPage();
+    await page.goto(extension.url);
+    await observed.goto(extension.url);
+    await page
+      .getByRole("textbox", { name: "New task" })
+      .fill("Keep this task");
+    await page.getByRole("button", { name: "Add task" }).click();
+    // A remote observation confirms the write reached the server before restarting it.
+    await observed.getByRole("checkbox", { name: "Keep this task" }).waitFor();
+    await observer.close();
+    await page.close();
+    await extension.restart();
+    const fresh = await browser.newContext();
+    const reopened = await fresh.newPage();
+    await reopened.goto(extension.url);
+    await expect(
+      reopened.getByRole("checkbox", { name: "Keep this task" }),
+    ).toBeVisible();
+    await fresh.close();
+  },
+);

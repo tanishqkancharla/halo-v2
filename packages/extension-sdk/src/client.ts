@@ -1,0 +1,70 @@
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import type { AnyRouter, RouterClient } from "@orpc/server";
+import {
+  TandemClient,
+  type AnySchema,
+  type RuntimeSchemaDefinition,
+  type RemoteApi,
+} from "@tanishqkancharla/tandem-core";
+import * as errore from "errore";
+import type { syncRouter } from "./sync.js";
+
+class ExtensionConnectionError extends errore.createTaggedError({
+  name: "ExtensionConnectionError",
+  message: "Extension connection failed",
+}) {}
+
+type SyncClient<Schema extends AnySchema> = {
+  push(input: Parameters<RemoteApi<Schema>["push"]>[0]): Promise<void>;
+  pull(
+    input: Parameters<RemoteApi<Schema>["pull"]>[0],
+  ): ReturnType<RemoteApi<Schema>["pull"]>;
+  connect: RouterClient<ReturnType<typeof syncRouter>>["connect"];
+};
+
+export async function connectExtension<Schema extends AnySchema>(
+  schema: RuntimeSchemaDefinition<Schema>,
+) {
+  const api = createORPCClient<RouterClient<AnyRouter>>(
+    new RPCLink({ url: "/api/", origin: location.origin }),
+  );
+  const sync = createORPCClient<SyncClient<Schema>>(
+    new RPCLink({ url: "/sync/", origin: location.origin }),
+  );
+  const remote: RemoteApi<Schema> = {
+    push: (input) => sync.push(input),
+    pull: (input) => sync.pull(input),
+    connect: async ({ clientId, poke }) => {
+      const controller = new AbortController();
+      const events = await sync.connect(
+        { clientId },
+        { signal: controller.signal },
+      );
+      // The first event confirms the server registered this client before push/pull can run.
+      await events.next();
+      const consumed = (async () => {
+        for await (const event of events) {
+          if (event.type === "poke") poke();
+        }
+      })().catch((cause) => {
+        if (controller.signal.aborted) return;
+        console.error(new ExtensionConnectionError({ cause }));
+      });
+      return async () => {
+        controller.abort();
+        await consumed;
+      };
+    },
+  };
+  const storage = new TandemClient({ schema, remote, autoConnect: false });
+  const ready = await storage.ready.catch(
+    (cause) => new ExtensionConnectionError({ cause }),
+  );
+  if (ready instanceof Error) return ready;
+  const connected = await storage
+    .connect()
+    .catch((cause) => new ExtensionConnectionError({ cause }));
+  if (connected instanceof Error) return connected;
+  return { api, storage };
+}

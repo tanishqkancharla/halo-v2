@@ -381,6 +381,65 @@ importers:
 
   packages/copy-path-to-symbol: {}
 
+  packages/extension-sdk:
+    dependencies:
+      '@orpc/client':
+        specifier: 2.0.0-beta.29
+        version: 2.0.0-beta.29(@opentelemetry/api@1.9.0)
+      '@orpc/server':
+        specifier: 2.0.0-beta.29
+        version: 2.0.0-beta.29(@opentelemetry/api@1.9.0)
+      '@sinclair/typebox':
+        specifier: ^0.34.52
+        version: 0.34.52
+      '@tanishqkancharla/tandem-core':
+        specifier: 0.2.0
+        version: 0.2.0(react@19.2.8)
+      '@tanishqkancharla/tandem-server':
+        specifier: 0.2.0
+        version: 0.2.0(react@19.2.8)
+      errore:
+        specifier: ^0.14.1
+        version: 0.14.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      '@types/react':
+        specifier: 19.2.18
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/extension-tools:
+    dependencies:
+      errore:
+        specifier: ^0.14.1
+        version: 0.14.1
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+    devDependencies:
+      '@get-halo/extension-sdk':
+        specifier: workspace:*
+        version: link:../extension-sdk
+      '@playwright/test':
+        specifier: ^1.61.0
+        version: 1.62.1
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   packages/halo-cli:
     dependencies:
       '@get-halo/shared':
