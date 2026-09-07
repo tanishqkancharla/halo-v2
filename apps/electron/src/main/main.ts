@@ -99,6 +99,12 @@ const ownerUserId = userService
   .getUser()
   .then((user) => (user instanceof Error ? user : user.id));
 const haloServer = new HaloServer({
+  appBrowserTarget: isDevelopment
+    ? {
+        cdpUrl: "http://127.0.0.1:4445",
+        pageUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
+      }
+    : undefined,
   appDataDir: applicationConfig.dataDir,
   appVersion: app.getVersion(),
   cliEntry: resolveHaloCliEntry(filesystemService, import.meta.url),

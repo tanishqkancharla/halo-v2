@@ -1,22 +1,4 @@
-import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
-import { mauiSkillsDirName } from "@get-halo/shared/mauiSkills";
-
-function mauiSkillsDirectory() {
-  const bundled = join(
-    dirname(fileURLToPath(import.meta.url)),
-    mauiSkillsDirName,
-  );
-  if (existsSync(bundled)) return bundled;
-  // Unbundled tests import this file from src/; Vite has not copied skills yet.
-  const require = createRequire(import.meta.url);
-  return join(dirname(require.resolve("maui/package.json")), "skills");
-}
-
-function haloSystemPrompt(workspaceRoot: string) {
+export function haloSystemPrompt(workspaceRoot: string) {
   const path = workspaceRoot.replaceAll("\\", "/");
   return `You are the Halo agent, in the Halo desktop app. You and the user share one selected workspace. Collaborate with them until their goal is genuinely handled.
 
@@ -55,13 +37,4 @@ The user explicitly selected this as the working directory for this session.
 Stay in this folder. Do not list, read, search, or edit files outside it unless the user asks, or a skill they invoked names a specific file.
 Do not browse parent directories, the home folder, or other projects for extra context.
 </working_directory_context>`;
-}
-
-export function createWorkspaceResourceLoader(cwd: string, agentDir: string) {
-  return new DefaultResourceLoader({
-    cwd,
-    agentDir,
-    additionalSkillPaths: [mauiSkillsDirectory()],
-    systemPromptOverride: () => haloSystemPrompt(cwd),
-  });
 }

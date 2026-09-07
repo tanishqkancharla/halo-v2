@@ -51,7 +51,6 @@ type RunningE2EApp = {
 type E2EFixtures = {
   launchApp(): Promise<RunningE2EApp>;
   runningApp: RunningE2EApp;
-  agentBrowser: { open(url: string): Promise<Page> };
   testArtifacts: TestArtifacts;
   electronApp: ElectronApplication;
   renderer: { page: Page };
@@ -60,14 +59,6 @@ type E2EFixtures = {
 };
 
 export const e2eTest = baseTest.extend<E2EFixtures>({
-  agentBrowser: async ({ page }, use) => {
-    await use({
-      async open(url) {
-        await page.goto(url);
-        return page;
-      },
-    });
-  },
   // oxlint-disable-next-line eslint/no-empty-pattern -- Playwright fixture callbacks require an object-destructured first parameter.
   testArtifacts: async ({}, use, testInfo) => {
     const artifacts = await createTestArtifacts(testInfo);

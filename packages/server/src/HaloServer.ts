@@ -1,3 +1,7 @@
+import {
+  BrowserService,
+  type AppBrowserTarget,
+} from "./browser/BrowserService.js";
 import type { Logger } from "@repo/logger";
 import type { Server as HttpServer } from "node:http";
 import { FilesystemService } from "./filesystem/FilesystemService.js";
@@ -22,6 +26,7 @@ import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPl
 import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
 
 export type HaloServerOptions = {
+  appBrowserTarget?: AppBrowserTarget;
   appDataDir: string;
   appVersion: string;
   cliEntry?: string;
@@ -85,6 +90,8 @@ export class HaloServer {
 
     this.filesystem = filesystem;
     this.context = {
+      browsers: new BrowserService(options.appBrowserTarget),
+      browserControlAllowed: false,
       extensions: new ExtensionHost({
         filesystem,
         logger: options.logger,
@@ -150,6 +157,7 @@ export class HaloServer {
       return selected;
     }
 
+    await this.context.browsers.shutdown();
     const sessionsClosed = await this.context.sessions.shutdown();
     if (sessionsClosed instanceof Error) return sessionsClosed;
     const runtimeClosed = await this.context.toolRuntime.close();
@@ -172,6 +180,7 @@ export class HaloServer {
       this.httpServer === undefined
         ? undefined
         : await closeHaloHttp(this.httpServer);
+    await this.context.browsers.shutdown();
     const sessionsClosed = await this.context.sessions.shutdown();
     const runtimeClosed = await this.context.toolRuntime.close();
     await this.context.extensions.stop();

@@ -28,7 +28,7 @@ import type { FilesystemService } from "../filesystem/FilesystemService.js";
 import type { ToolRuntimeService } from "./runtime/ToolRuntimeService.js";
 import { createAuthorizedCodingTools } from "./tools/codingTools.js";
 import { createExecTool } from "./tools/execTool.js";
-import { createWorkspaceResourceLoader } from "./workspacePrompt.js";
+import { WorkspaceResourceLoader } from "./WorkspaceResourceLoader.js";
 import {
   adaptPiEvent,
   interruptedSessionEvents,
@@ -177,10 +177,7 @@ export class HaloAgentSession {
     const runtimeDescription = await runtime.getAgentDescription();
     if (runtimeDescription instanceof Error) return runtimeDescription;
 
-    const resourceLoader = createWorkspaceResourceLoader(
-      layout.root,
-      layout.agentDir,
-    );
+    const resourceLoader = new WorkspaceResourceLoader(layout.root);
     const reloaded = await resourceLoader
       .reload()
       .catch((e) => new CreateAgentSessionError({ cause: e }));

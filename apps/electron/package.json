@@ -63,7 +63,9 @@
     "errore": "^0.14.1",
     "esbuild": "0.28.2",
     "jiti": "2.7.0",
+    "libretto-browser-tools": "^0.1.2",
     "maui": "npm:@tanishqkancharla/maui@0.0.13",
+    "playwright": "1.62.1",
     "purse-styles": "^0.2.3",
     "quickjs-emscripten": "0.31.0",
     "react": "^19.2.8",
@@ -99,7 +101,6 @@
     "agentation": "^3.0.2",
     "agentation-mcp": "^1.2.0",
     "electron": "^44.0.0",
-    "playwright": "1.62.1",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"
   },

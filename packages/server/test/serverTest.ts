@@ -21,6 +21,7 @@ type TestServer = {
   host: string;
   port: number;
   rpc: HaloClient;
+  rendererRpc: HaloClient;
   harness: TestHarness;
 };
 
@@ -59,6 +60,11 @@ export const serverTest = baseTest.extend<{ server: TestServer }>({
       host: connection.cli.host,
       port: connection.cli.port,
       rpc,
+      rendererRpc: createHaloRpcClient<HaloClient>({
+        version: 1,
+        ...connection.renderer,
+        host: "127.0.0.1",
+      }),
       harness: artifacts.harness,
     });
     outcome.passed = task.result?.state === "pass";

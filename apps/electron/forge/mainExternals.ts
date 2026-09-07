@@ -2,6 +2,8 @@
 // packs `/.vite`, so packaging must copy these and their runtime closure.
 export const mainProcessExternals = [
   "@libsql/client",
+  // Playwright loads its driver, registry, and browser installer from disk.
+  "playwright",
   "@parcel/watcher",
   "esbuild",
   "jiti",

@@ -8,7 +8,7 @@ e2eTest.use({ trace: "retain-on-failure", screenshot: "only-on-failure" });
 
 e2eTest(
   "builds an interactive plugin pane that runs in a standalone browser",
-  async ({ harness, server, agentBrowser }) => {
+  async ({ harness, server }) => {
     const plugin = await server.rpc.plugins.create({ id: "greeting" });
     await harness.tools.files.write({
       path: path.join(plugin.directory, "Greeting.tsx"),
@@ -92,12 +92,20 @@ e2eTest(
     );
     expect(pane).toHaveProperty("url", expect.any(String));
     // @ts-expect-error -- Test-first: discovery does not expose pane URLs yet; the assertion above requires one.
-    const page = await agentBrowser.open(pane!.url);
-
-    await page.getByRole("textbox", { name: "Your name" }).fill("Ada");
-    await page.getByRole("button", { name: "Greet", exact: true }).click();
-    await expect(page.getByRole("status")).toHaveText("Hello, Ada!");
-    await expect(page.getByRole("main")).toHaveCSS("row-gap", "24px");
+    const browser = await server.rpc.browser.open({ url: pane!.url });
+    const result = await server.rpc.browser.exec({
+      id: browser.id,
+      source: `
+        await page.getByRole("textbox", { name: "Your name" }).fill("Ada");
+        await page.getByRole("button", { name: "Greet", exact: true }).click();
+        await page.getByRole("status").filter({ hasText: "Hello, Ada!" }).waitFor();
+        return {
+          greeting: await page.getByRole("status").innerText(),
+          gap: await page.getByRole("main").evaluate(element => getComputedStyle(element).rowGap),
+        };
+      `,
+    });
+    expect(result.result).toEqual({ greeting: "Hello, Ada!", gap: "24px" });
   },
 );
 

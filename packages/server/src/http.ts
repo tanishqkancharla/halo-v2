@@ -76,7 +76,11 @@ export async function listenHaloHttp(options: {
     }
     const handled = await handler.handle(request, response, {
       prefix: "/rpc",
-      context: options.context,
+      context: {
+        ...options.context,
+        browserControlAllowed:
+          request.headers.authorization === `Bearer ${cliToken}`,
+      },
     });
     if (handled.matched) return;
     response.statusCode = 404;

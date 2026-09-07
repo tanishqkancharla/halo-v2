@@ -69,9 +69,48 @@ export type ConnectionStarted =
       expiresInMs: number;
     };
 
+const browserSnapshot = type<{
+  url: string;
+  title: string;
+  tree: string;
+  errors: string[];
+}>();
+const browserExecution = type<{
+  result: unknown;
+  stdout: string;
+  stderr: string;
+  snapshotDiff: string;
+  errors: string[];
+}>();
+
 export const contract = publicProcedure.router({
   server: {
     info: oc.output(type<{ protocolVersion: typeof haloProtocolVersion }>()),
+  },
+  browser: {
+    open: oc.input(type<{ url: string }>()).output(
+      type<{
+        id: string;
+        url: string;
+        title: string;
+        tree: string;
+        errors: string[];
+      }>(),
+    ),
+    list: oc.output(type<Array<{ id: string; url: string }>>()),
+    exec: oc
+      .input(type<{ id: string; source: string }>())
+      .output(browserExecution),
+    snapshot: oc.input(type<{ id: string }>()).output(browserSnapshot),
+    screenshot: oc
+      .input(type<{ id: string }>())
+      .output(type<{ path: string }>()),
+    close: oc.input(type<{ id: string }>()).output(type<void>()),
+  },
+  app: {
+    exec: oc.input(type<{ source: string }>()).output(browserExecution),
+    snapshot: oc.output(browserSnapshot),
+    screenshot: oc.output(type<{ path: string }>()),
   },
   extensions: {
     list: oc.output(type<Array<{ id: string; url: string }>>()),

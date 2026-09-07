@@ -60,17 +60,36 @@ export class ExtensionHost {
   private async discover(workspaceRoot: string) {
     const directory = join(workspaceRoot, ".halo", "extensions");
     const entries = await this.options.filesystem.listDirectory(directory);
-    if (entries instanceof FilesystemPathNotFoundError) return;
-    if (entries instanceof Error) {
+    if (
+      entries instanceof Error &&
+      !(entries instanceof FilesystemPathNotFoundError)
+    ) {
       this.options.logger.warn({
         event: "extension-discovery-failed",
         error: entries,
       });
       return;
     }
-    for (const entry of entries
-      .filter((item) => item.isDirectory() && !item.name.startsWith("."))
-      .toSorted((a, b) => a.name.localeCompare(b.name))) {
+    const discovered =
+      entries instanceof FilesystemPathNotFoundError
+        ? []
+        : entries.filter(
+            (item) => item.isDirectory() && !item.name.startsWith("."),
+          );
+    const ids = new Set(discovered.map((entry) => entry.name));
+    for (const [id, extension] of this.processes) {
+      if (ids.has(id)) continue;
+      const stopped = await extension.stop();
+      this.processes.delete(id);
+      if (stopped instanceof Error)
+        this.options.logger.warn({
+          event: "extension-stop-failed",
+          error: stopped,
+        });
+    }
+    for (const entry of discovered.toSorted((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
       if (this.processes.get(entry.name)?.isRunning()) continue;
       const extension = await startExtension({
         id: entry.name,

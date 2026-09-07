@@ -54,7 +54,8 @@ export const extension = Cli.create("extension", {
     },
   })
   .command("reload", {
-    description: "Discover and start built extensions in the open workspace",
+    description:
+      "Discover built extensions and stop servers for deleted extensions",
     env,
     async run(c) {
       const connected = await connectHalo(c.env);
