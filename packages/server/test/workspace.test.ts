@@ -39,3 +39,12 @@ serverTest("rejects files outside the public workspace", async ({ server }) => {
     server.rpc.workspace.readFile({ path: "../outside.txt" }),
   ).rejects.toThrow("'../outside.txt' is not a workspace file");
 });
+
+serverTest("disables the tool bridge outside E2E runs", async ({ server }) => {
+  await expect(
+    server.rpc.testHarness.invokeTool({
+      path: "files.write",
+      input: { path: "notes.md", content: "This must not be written" },
+    }),
+  ).rejects.toThrow("The testing API is unavailable outside an E2E run.");
+});

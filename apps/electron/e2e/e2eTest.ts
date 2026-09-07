@@ -14,6 +14,7 @@ import {
 } from "playwright";
 import { createTestArtifacts, type TestArtifacts } from "./TestArtifacts.js";
 import { resolveUnpackedExecutable } from "./resolveUnpackedExecutable.js";
+import { createHarnessTools } from "./tools.js";
 import {
   loadSessionDescription,
   sessionDescriptionEvents,
@@ -29,11 +30,13 @@ type E2ESession = {
 };
 
 type E2ETestHarness = TestArtifacts["harness"] & {
+  tools: ReturnType<typeof createHarnessTools>;
   openWindow(): Promise<Page>;
   loadSession(description: SessionDescription): Promise<E2ESession>;
 };
 
 type E2EFixtures = {
+  agentBrowser: { open(url: string): Promise<Page> };
   testArtifacts: TestArtifacts;
   electronApp: ElectronApplication;
   renderer: { page: Page };
@@ -46,6 +49,14 @@ type E2EFixtures = {
 };
 
 export const e2eTest = baseTest.extend<E2EFixtures>({
+  agentBrowser: async ({ page }, use) => {
+    await use({
+      async open(url) {
+        await page.goto(url);
+        return page;
+      },
+    });
+  },
   // oxlint-disable-next-line eslint/no-empty-pattern -- Playwright fixture callbacks require an object-destructured first parameter.
   testArtifacts: async ({}, use, testInfo) => {
     const artifacts = await createTestArtifacts(testInfo);
@@ -88,6 +99,7 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
   harness: async ({ electronApp, renderer, server, testArtifacts }, use) => {
     await use({
       ...testArtifacts.harness,
+      tools: createHarnessTools(server.rpc),
       async openWindow() {
         const opened = electronApp.waitForEvent("window");
         await electronApp.evaluate(({ app }) =>

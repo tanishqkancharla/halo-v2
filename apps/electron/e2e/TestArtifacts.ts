@@ -5,7 +5,6 @@ import path from "node:path";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { HaloClient } from "@get-halo/shared/contract";
-import { PluginFiles } from "@get-halo/server/testing";
 import type { ConsoleMessage, Page, Request, TestInfo } from "@playwright/test";
 import * as errore from "errore";
 
@@ -13,11 +12,6 @@ class TestArtifactError extends errore.createTaggedError({
   name: "TestArtifactError",
   message: "Could not $operation E2E test artifacts",
 }) {}
-
-type TestFiles = {
-  write(input: { path: string; content: string | Uint8Array }): Promise<void>;
-  read(path: string): Promise<Buffer>;
-};
 
 type TestPaths = {
   root: string;
@@ -33,9 +27,7 @@ type TestPaths = {
 };
 
 type E2ETestHarness = {
-  pluginFiles(plugin: { directory: string }): PluginFiles;
   createClient(serverHost: string, serverPort: number): HaloClient;
-  files: TestFiles;
   paths: TestPaths;
 };
 
@@ -82,32 +74,7 @@ export async function createTestArtifacts(testInfo: TestInfo) {
   });
   let rendererIndex = 0;
 
-  const resolveFilePath = (filePath: string) => {
-    const resolved = path.resolve(root, filePath);
-    const relative = path.relative(root, resolved);
-    if (relative === "..") throw new Error("Test file path escapes its root.");
-    if (relative.startsWith(`..${path.sep}`)) {
-      throw new Error("Test file path escapes its root.");
-    }
-    if (path.isAbsolute(relative)) {
-      throw new Error("Test file path escapes its root.");
-    }
-    return resolved;
-  };
-  const files: TestFiles = {
-    async write(input) {
-      const filePath = resolveFilePath(input.path);
-      await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
-      await fsPromises.writeFile(filePath, input.content);
-    },
-    read(filePath) {
-      return fsPromises.readFile(resolveFilePath(filePath));
-    },
-  };
   const harness: E2ETestHarness = {
-    pluginFiles(plugin) {
-      return new PluginFiles({ directory: plugin.directory, files });
-    },
     createClient(serverHost, serverPort) {
       const link = new RPCLink({
         origin: `http://${serverHost}:${serverPort}`,
@@ -116,7 +83,6 @@ export async function createTestArtifacts(testInfo: TestInfo) {
       // SAFETY: the server host and port point to the Halo RPC contract.
       return createORPCClient(link) as HaloClient;
     },
-    files,
     paths,
   };
   return {

@@ -15,6 +15,11 @@ class TestingToolNotFoundError extends errore.createTaggedError({
   message: "Executor has no user-facing tool at '$path'.",
 }) {}
 
+class TestingToolInvocationError extends errore.createTaggedError({
+  name: "TestingToolInvocationError",
+  message: "Tool '$path' failed: $detail",
+}) {}
+
 export type TestingRouterContext = {
   sessions: SessionRegistry;
   toolRuntime: ToolRuntimeService;
@@ -24,6 +29,28 @@ export type TestingRouterContext = {
 const os = implement(contract.testHarness).$context<TestingRouterContext>();
 
 export const testingRouter = os.router({
+  invokeTool: os.invokeTool.handler(async ({ input, context, signal }) => {
+    if (!context.testingApiEnabled) {
+      return orpcErrors.badRequest(new TestingApiUnavailableError());
+    }
+    const runtime = await context.toolRuntime.get();
+    if (runtime instanceof Error) return orpcErrors.badRequest(runtime);
+    const result = await runtime.invokePath({
+      path: input.path,
+      args: input.input,
+      signal,
+    });
+    if (result instanceof Error) return orpcErrors.badRequest(result);
+    if (!result.ok) {
+      return orpcErrors.badRequest(
+        new TestingToolInvocationError({
+          path: input.path,
+          detail: result.error.message,
+        }),
+      );
+    }
+    return result.data;
+  }),
   appendSessionEvents: os.appendSessionEvents.handler(
     async ({ input, context }) => {
       if (!context.testingApiEnabled) {

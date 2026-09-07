@@ -1,6 +1,6 @@
 # Workspace plugin panes
 
-**Status: Phases 1–2 are implemented and verified. Phases 3–8 are not started.** Electron still uses the current plugin loader. The iframe architecture below remains a target, not current app behavior.
+**Status: Phases 1–2 are implemented and verified. A test-first browser workflow is drafted; production Phases 3–8 are not implemented.** Electron still uses the current plugin loader. The iframe architecture below remains a target, not current app behavior.
 
 | Area                   | Current implementation                                                  | Agreed direction — still to build                                                             |
 | ---------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -16,6 +16,16 @@
 **Implemented for review:** the approved manifest contribution fields and parameterized targets are implemented in Phase 2. Default-exported pane rendering, the bootstrap API, and subsequent phases remain proposed. The iframe/server ownership and Tandem collaboration direction are agreed.
 
 **Still to decide:** the authenticated browser bootstrap and origin configuration before exposing plugin documents; the backend runtime and process policy before backend isolation. One child process per extension remains a recommendation.
+
+## Agreed opening model — test-first, not implemented
+
+Mounting a plugin makes its backend and built frontend available through the workspace host's shared HTTP server. Discovery returns a stable, server-generated `url` for each available pane in `contributions[].contributes.panes[]`. This URL is runtime discovery data, not an author-supplied manifest field. The stable document URL selects the last successful build; the build's individual assets can remain immutable.
+
+Opening a pane is ordinary navigation to that URL. It does not create a host-managed view session or mount/reload the backend. Authentication and plugin-scoped connection establishment happen when the document loads and connects. The exact browser authentication/origin configuration remains a Phase 4 implementation decision. Pane parameters select an instance within a pane; their URL encoding is still to be specified.
+
+Electron embeds the URL in an iframe. The agent will have its own browser on the workspace VM and can open the same URL there. For the first E2E test, `agentBrowser.open(url)` is a temporary local adapter backed by a real Playwright browser. It substitutes for VM browser access only; the test still uses real creation, file tools, build, discovery, and document serving. `harness.tools.files` forwards through the E2E-only RPC bridge to the running app's production tool runtime, with agent authority and workspace context.
+
+The test is written ahead of implementation and currently stops at the missing discovery URL. No pane-opening RPC is planned. Shell navigation requests described below are local UI messages, not server lifecycle calls.
 
 ## System flow
 
@@ -360,7 +370,7 @@ The connection has two responsibilities:
 | Backend calls and subscriptions | A view can invoke only its bound plugin through the workspace gateway. Reuse oRPC transport, cancellation, and stream semantics rather than inventing a parallel RPC protocol.                                                                                                  |
 | Shell operations                | Initialization, theme updates, and `openPane` are the initial messages. Bind the source to its view instance. `openPane` targets a declared pane of the same plugin on the initiating client only. A standalone host opens within its own view, never a user's Electron window. |
 
-The trusted opener establishes a view session; plugin code does not select its own authorization scope by sending a `pluginId`. Bootstrap must bind the browser connection to that session. Use a dedicated pane origin, separate from the shell, and a scoped bootstrap/connection. Never give a pane the existing full renderer/CLI bearer token, Electron preload, or grant-changing APIs. Account for document and asset authentication as well as RPC: iframe navigation cannot attach the current custom Authorization header. Resolve this HTTP bootstrap in phase 4 before exposing any plugin document; do not temporarily make private plugin assets public.
+Navigating to the discovered URL loads the pane document and establishes its authenticated browser connection. The host binds that connection to the plugin identified by the served document; plugin code cannot choose arbitrary authorization scope by sending a `pluginId`. No opener-created view session or pane-opening RPC is required. Use a dedicated pane origin, separate from the shell, and a scoped bootstrap/connection. Never give a pane the existing full renderer/CLI bearer token, Electron preload, or grant-changing APIs. Account for document and asset authentication as well as RPC: iframe navigation cannot attach the current custom Authorization header. Resolve this HTTP bootstrap in phase 4 before exposing any plugin document; do not temporarily make private plugin assets public.
 
 For Electron, validate the iframe message source and origin before establishing its channel. Sandbox and CSP must prevent access to shell DOM and top-level navigation. Different plugins must also be unable to read each other's documents, bootstrap credentials, or browser storage when open simultaneously. A shared pane origin by itself does not satisfy that requirement; the phase 4 bootstrap design must establish isolation between plugins as well as from Halo. A standalone browser must retain the same scoped API authority without relying on the presence of an Electron parent. Protocol mismatch reports an unavailable pane; no compatibility layer is required for the unreleased format.
 
@@ -477,18 +487,13 @@ type BuiltPane = { pluginId: string; paneId: string; buildId: string };
 ```callstack
  authenticated client opens pane
 -└── full Halo client facade passed to renderer component
-+└── create view session bound to plugin and pane
-+    └── authenticated document/assets bootstrap and scoped oRPC connection
++└── navigate to the stable pane URL from discovery
++    └── authenticated document/assets bootstrap and plugin-scoped oRPC connection
 ```
 
-Implement the view session through `pluginsRouter.ts` and `http.ts`. Keep it as a private session record owned by the workspace host; opening a session does not mount or reload a backend. Before writing this patch, trace the existing oRPC stream transport and settle the exact document bootstrap and origin configuration against the constraints above. This is an implementation design task for the primary agent, not delegated discretion.
+Implement stable pane document URLs and authenticated browser connections through `pluginsRouter.ts` and `http.ts`. The workspace host multiplexes plugin frontends and backends on its HTTP server. Discovery and document navigation do not mount or reload a backend. Before writing this patch, trace the existing oRPC stream transport and settle the exact document bootstrap and origin configuration against the constraints above.
 
-```ts
-// packages/server/src/plugins/PluginPaneSessions.ts — proposed owner
-type OpenPaneInput = { pluginId: string; target: PaneTarget };
-```
-
-- [ ] Add `PluginPaneSessions` and bind every request to its server-owned plugin scope in `pluginsRouter.ts`.
+- [ ] Expose each available pane's server-generated stable URL in discovery; bind backend requests to the served plugin's scope.
 - [ ] Wire authenticated document/assets and plugin RPC routing into `http.ts`; credentials must not grant access to the full Halo router.
 - [ ] Extend `packages/server/test/plugins.test.ts` through actual HTTP requests to cover cross-plugin denial, document authentication, and stream cancellation on close. Record the browser-origin configuration for the phase 7 isolation test.
 - [ ] Run `pnpm --filter @get-halo/server exec vitest run test/plugins.test.ts` and `pnpm run check-affected`.
@@ -509,9 +514,9 @@ Add the browser pane initialization in `packages/plugin-sdk/src/pane.ts`. Reuse 
 initializePane(): Promise<PaneInitialization>;
 ```
 
-- [ ] Initialize the real browser RPC client in `PluginServerProvider.ts` and connect it to the scoped session; keep public consumer hooks recognizable.
+- [ ] Initialize the real browser RPC client in `PluginServerProvider.ts` and connect it to the plugin-scoped backend; keep public consumer hooks recognizable.
 - [ ] Add the pane-only document mount and local shell request handling; clean up the Tandem connection on disposal.
-- [ ] Extend `apps/electron/e2e/e2eTest.ts` with a fixture-owned independent browser context and open the built pane through the real API in `plugins.e2e.test.ts`.
+- [ ] Make the test-first `plugins.e2e.test.ts` workflow pass: create, write source files, build, discover the pane URL, and open it through `agentBrowser.open(url)`. The temporary adapter uses a fixture-owned real Playwright browser; later it will connect to the agent browser on the VM.
 - [ ] Run `pnpm --filter @halo/desktop test:e2e -- plugins.e2e.test.ts` and `pnpm run check-affected`.
 
 ### Phase 6: Render Halo chrome from contributions
