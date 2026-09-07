@@ -343,13 +343,11 @@ const styles = {
     minWidth: 0,
     backgroundColor: backgroundColor.app,
   }),
-  userMessage: style(radius.pill, spacing.padding({ x: 6, y: 3 }), {
+  userMessage: style(radius.lg, spacing.padding({ x: 6, y: 3 }), {
     width: "fit-content",
     maxWidth: "80%",
     minWidth: 0,
     backgroundColor: colors.gray[3],
-    // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- Chromium defines this CSS property name.
-    cornerShape: "squircle",
   }),
   assistantRow: style(flex({ direction: "column", gap: 6 }), {
     minWidth: 0,
