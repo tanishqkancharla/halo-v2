@@ -205,6 +205,20 @@ type PluginsQueryData = LoadedPluginList & {
   servers: PluginServers;
 };
 
+export function useExtensionsQuery(workspace: WorkspaceState | undefined) {
+  const api = useApi();
+  const workspaceRoot =
+    workspace?.status === "ready"
+      ? workspace.workspace.workspaceRoot
+      : undefined;
+
+  return useQuery({
+    queryKey: ["extensions", workspaceRoot],
+    queryFn: () => api.extensions.list(),
+    enabled: workspaceRoot !== undefined,
+  });
+}
+
 export function usePluginsQuery(
   workspace: WorkspaceState | undefined,
 ): UseQueryResult<PluginsQueryData> {

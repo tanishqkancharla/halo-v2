@@ -25,6 +25,7 @@ import type {
 import { useInstallAppUpdateMutation } from "../api/ApiProvider.tsx";
 import { FilesystemSection } from "./FilesystemSection.tsx";
 import { SessionsSection } from "./SessionsSection.tsx";
+import { ExtensionsSection } from "./ExtensionsSection.js";
 
 type SidebarProps = {
   sessions: SessionSummary[];
@@ -61,6 +62,7 @@ export function Sidebar({
       <NavigationSidebar aria-label="Workspace" className={navigation}>
         <FilesystemSection />
         <SessionsSection sessions={sessions} />
+        <ExtensionsSection />
         {pluginViews.map((plugin) => {
           if (plugin.Sidebar === undefined) return undefined;
           return (

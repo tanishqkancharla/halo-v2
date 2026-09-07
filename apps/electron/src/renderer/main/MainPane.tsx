@@ -5,6 +5,7 @@ import type { SessionSummary } from "@get-halo/shared/rpc";
 import { AgentPane, DraftAgentPane } from "./agent/AgentPane.tsx";
 import { FilePane } from "./FilePane.tsx";
 import { MissingPluginPane, PluginPane } from "./PluginPane.tsx";
+import { ExtensionPane } from "./ExtensionPane.js";
 
 export function MainPane({
   sessions,
@@ -17,6 +18,11 @@ export function MainPane({
 }) {
   return (
     <Switch>
+      <Route path="/extensions/:extensionId">
+        {(params) => (
+          <ExtensionPane extensionId={decodeURIComponent(params.extensionId)} />
+        )}
+      </Route>
       <Route path="/files/*">
         {(params) => <FilePane path={decodeURIComponent(params["*"])} />}
       </Route>

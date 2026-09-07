@@ -57,8 +57,14 @@ It preserves existing servers and their URLs; it does not rebuild or restart
 running extensions. Reloads are serialized with workspace changes and shutdown.
 Workspace switching and app shutdown stop the hosted processes.
 
-Sidebar contributions, iframe panes, authentication, and workspace tool access
-are not connected yet.
+Halo lists running extensions in its sidebar. Opening an entry displays its
+`/view/` app in a sandboxed iframe at `/extensions/<id>`, with a Halo-owned pane
+header. The iframe retains its extension origin for API calls and storage.
+After adding an extension, call `extensions.reload()` and reload the renderer
+to refresh the sidebar.
+
+Named sub-panes, dynamic sidebar contributions, authentication, and workspace
+tool access are not connected yet.
 JSON persistence is a prototype default, not the final database design.
 
 ## Verification
