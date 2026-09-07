@@ -262,16 +262,7 @@ async function restoreWorkspace(api: HaloClient): Promise<WorkspaceState> {
     return { status: "needs-workspace", message: active.message };
   }
   if (active !== undefined) return readyWorkspace(active);
-
-  const selected = await desktopApi
-    .chooseWorkspace()
-    .catch((e) => new WorkspaceRestoreError({ cause: e }));
-  if (selected instanceof Error) {
-    return { status: "needs-workspace", message: selected.message };
-  }
-  return selected === undefined
-    ? { status: "needs-workspace" }
-    : readyWorkspace(selected);
+  return { status: "needs-workspace" };
 }
 
 function readyWorkspace(workspace: WorkspaceInfo): WorkspaceState {
