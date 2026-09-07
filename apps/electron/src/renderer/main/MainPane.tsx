@@ -21,7 +21,9 @@ export function MainPane({
         {(params) => <FilePane path={decodeURIComponent(params["*"])} />}
       </Route>
       <Route path="/draft/:draftId">
-        {(params) => <DraftAgentPane draftId={params.draftId} />}
+        {(params) => (
+          <DraftAgentPane key={params.draftId} draftId={params.draftId} />
+        )}
       </Route>
       <Route path="/sessions/:sessionId">
         {(params) => (

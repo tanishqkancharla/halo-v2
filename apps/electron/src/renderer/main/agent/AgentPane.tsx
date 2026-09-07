@@ -83,7 +83,6 @@ export function DraftAgentPane({ draftId }: { draftId: string }) {
             <SessionView state={state} sessionId={sessionId} />
           ) : undefined}
           <Composer
-            key={draftId}
             autoFocus
             error={state.error}
             isWorking={state.isWorking}

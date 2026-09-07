@@ -1,4 +1,5 @@
 import { test as baseTest } from "@playwright/test";
+import nodePath from "node:path";
 import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
@@ -58,6 +59,11 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
       env: {
         ...processEnvironment(),
         HALO_E2E: "1",
+        PI_CODING_AGENT_DIR: nodePath.join(
+          testArtifacts.paths.workspace,
+          ".pi",
+          "agent",
+        ),
       },
     });
     cleanup.defer(() => app.close());
