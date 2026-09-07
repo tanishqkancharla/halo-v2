@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import * as errore from "errore";
@@ -14,7 +14,14 @@ class ExtensionSetupError extends errore.createTaggedError({
 }) {}
 
 export const extensionE2eTest = e2eTest.extend<
-  {},
+  {
+    loadExtension(
+      sourceDirectory: string,
+    ): Promise<{ id: string; directory: string }>;
+    prepareExtension(
+      sourceDirectory: string,
+    ): Promise<{ id: string; directory: string }>;
+  },
   { extensionPackages: { sdk: string; tools: string } }
 >({
   extensionPackages: [
@@ -40,38 +47,56 @@ export const extensionE2eTest = e2eTest.extend<
     },
     { scope: "worker", timeout: 180_000 },
   ],
-  testArtifacts: async ({ testArtifacts, extensionPackages }, use) => {
+  loadExtension: async ({ prepareExtension, server, renderer }, use) => {
+    await use(async (sourceDirectory) => {
+      const extension = await prepareExtension(sourceDirectory);
+      // @ts-expect-error -- Test-first: rediscovering built extensions is the next host API to implement.
+      await server.rpc.extensions.reload();
+      await renderer.page.reload();
+      return extension;
+    });
+  },
+  prepareExtension: async (
+    { testArtifacts, extensionPackages },
+    use,
+    testInfo,
+  ) => {
     const { scaffoldExtension } =
       await import("@get-halo/extension-tools/scaffold");
-    const parent = path.join(
-      testArtifacts.paths.workspace,
-      ".halo",
-      "extensions",
-    );
-    await mkdir(parent, { recursive: true });
-    const directory = path.join(parent, "starter");
-    const scaffolded = await scaffoldExtension({
-      directory,
-      name: "starter",
-      packages: extensionPackages,
+    await use(async (sourceDirectory) => {
+      const source = path.resolve(path.dirname(testInfo.file), sourceDirectory);
+      const id = path.basename(source);
+      const parent = path.join(
+        testArtifacts.paths.workspace,
+        ".halo",
+        "extensions",
+      );
+      await mkdir(parent, { recursive: true });
+      const directory = path.join(parent, id);
+      const scaffolded = await scaffoldExtension({
+        directory,
+        name: id,
+        packages: extensionPackages,
+      });
+      if (scaffolded instanceof Error) throw scaffolded;
+      await cp(source, directory, { recursive: true });
+      await command(
+        "pnpm",
+        [
+          "install",
+          "--dir",
+          directory,
+          "--lockfile-dir",
+          directory,
+          "--ignore-workspace",
+          "--ignore-scripts",
+          "--config.manage-package-manager-versions=false",
+        ],
+        directory,
+      );
+      await command("npm", ["run", "build"], directory);
+      return { id, directory };
     });
-    if (scaffolded instanceof Error) throw scaffolded;
-    await command(
-      "pnpm",
-      [
-        "install",
-        "--dir",
-        directory,
-        "--lockfile-dir",
-        directory,
-        "--ignore-workspace",
-        "--ignore-scripts",
-        "--config.manage-package-manager-versions=false",
-      ],
-      directory,
-    );
-    await command("npm", ["run", "build"], directory);
-    await use(testArtifacts);
   },
 });
 

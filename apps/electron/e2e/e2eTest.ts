@@ -35,19 +35,28 @@ type E2ETestHarness = TestArtifacts["harness"] & {
   loadSession(description: SessionDescription): Promise<E2ESession>;
 };
 
+type E2EServer = {
+  host: string;
+  port: number;
+  rpc: HaloClient;
+};
+
+type RunningE2EApp = {
+  app: ElectronApplication;
+  renderer: { page: Page };
+  server: E2EServer;
+  close(): Promise<void>;
+};
+
 type E2EFixtures = {
-  runningApp: { app: ElectronApplication; close(): Promise<void> };
-  closeApp(): Promise<void>;
+  launchApp(): Promise<RunningE2EApp>;
+  runningApp: RunningE2EApp;
   agentBrowser: { open(url: string): Promise<Page> };
   testArtifacts: TestArtifacts;
   electronApp: ElectronApplication;
   renderer: { page: Page };
   harness: E2ETestHarness;
-  server: {
-    host: string;
-    port: number;
-    rpc: HaloClient;
-  };
+  server: E2EServer;
 };
 
 export const e2eTest = baseTest.extend<E2EFixtures>({
@@ -66,43 +75,60 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
     const finished = await artifacts.finish();
     if (finished instanceof Error) throw finished;
   },
-  runningApp: async ({ testArtifacts }, use) => {
+  launchApp: async ({ testArtifacts }, use) => {
     await using cleanup = new errore.AsyncDisposableStack();
-    const executablePath = resolveUnpackedExecutable();
-    if (executablePath instanceof Error) throw executablePath;
-    const app = await electron.launch({
-      executablePath,
-      args: [`--user-data-dir=${testArtifacts.paths.userData}`],
-      artifactsDir: testArtifacts.paths.playwright,
-      env: {
-        ...processEnvironment(),
-        HALO_E2E: "1",
-      },
+    await use(async () => {
+      const resources = new errore.AsyncDisposableStack();
+      cleanup.defer(() => resources.disposeAsync());
+      const executablePath = resolveUnpackedExecutable();
+      if (executablePath instanceof Error) throw executablePath;
+      const app = await electron.launch({
+        executablePath,
+        args: [`--user-data-dir=${testArtifacts.paths.userData}`],
+        artifactsDir: testArtifacts.paths.playwright,
+        env: {
+          ...processEnvironment(),
+          HALO_E2E: "1",
+        },
+      });
+      resources.defer(() => app.close());
+      const captured = testArtifacts.captureProcess(app.process());
+      if (captured instanceof Error) throw captured;
+      await app.context().tracing.start({ screenshots: true, snapshots: true });
+      resources.defer(() =>
+        app.context().tracing.stop({ path: testArtifacts.paths.trace }),
+      );
+      const page = await app.firstWindow();
+      const rendererCaptured = await testArtifacts.captureRenderer(page);
+      if (rendererCaptured instanceof Error) throw rendererCaptured;
+      resources.defer(async () => {
+        const screenshot = await testArtifacts.captureScreenshot(page);
+        if (screenshot instanceof Error) throw screenshot;
+      });
+      const connection = await readHaloRpcFile(
+        rpcFilePath(testArtifacts.paths.userData),
+      );
+      if (connection instanceof Error) throw connection;
+      return {
+        app,
+        renderer: { page },
+        server: {
+          host: connection.host,
+          port: connection.port,
+          rpc: createHaloRpcClient<HaloClient>(connection),
+        },
+        close: () => resources.disposeAsync(),
+      };
     });
-    cleanup.defer(() => app.close());
-    const captured = testArtifacts.captureProcess(app.process());
-    if (captured instanceof Error) throw captured;
-    await app.context().tracing.start({ screenshots: true, snapshots: true });
-    cleanup.defer(() =>
-      app.context().tracing.stop({ path: testArtifacts.paths.trace }),
-    );
-    const page = await app.firstWindow();
-    const rendererCaptured = await testArtifacts.captureRenderer(page);
-    if (rendererCaptured instanceof Error) throw rendererCaptured;
-    cleanup.defer(async () => {
-      const screenshot = await testArtifacts.captureScreenshot(page);
-      if (screenshot instanceof Error) throw screenshot;
-    });
-    await use({ app, close: () => cleanup.disposeAsync() });
+  },
+  runningApp: async ({ launchApp }, use) => {
+    await use(await launchApp());
   },
   electronApp: async ({ runningApp }, use) => {
     await use(runningApp.app);
   },
-  closeApp: async ({ runningApp }, use) => {
-    await use(() => runningApp.close());
-  },
-  renderer: async ({ electronApp }, use) => {
-    await use({ page: await electronApp.firstWindow() });
+  renderer: async ({ runningApp }, use) => {
+    await use(runningApp.renderer);
   },
   harness: async ({ electronApp, renderer, server, testArtifacts }, use) => {
     await use({
@@ -138,27 +164,18 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
       },
     });
   },
-  server: async ({ electronApp, testArtifacts }, use) => {
-    await electronApp.firstWindow();
+  server: async ({ runningApp, testArtifacts }, use) => {
     const directory = nodePath.join(
       testArtifacts.paths.userData,
       "plugin-dependencies",
     );
-    const appVersion = await electronApp.evaluate(({ app }) =>
+    const appVersion = await runningApp.app.evaluate(({ app }) =>
       app.getVersion(),
     );
     const installed = await installPluginSdkContract({ directory, appVersion });
     if (installed instanceof Error) throw installed;
     await copyPluginWorkspacePackages(directory);
-    const connection = await readHaloRpcFile(
-      rpcFilePath(testArtifacts.paths.userData),
-    );
-    if (connection instanceof Error) throw connection;
-    await use({
-      host: connection.host,
-      port: connection.port,
-      rpc: createHaloRpcClient<HaloClient>(connection),
-    });
+    await use(runningApp.server);
   },
 });
 

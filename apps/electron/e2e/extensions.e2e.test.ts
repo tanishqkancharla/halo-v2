@@ -5,15 +5,17 @@ extensionE2eTest.setTimeout(90_000);
 
 extensionE2eTest(
   "runs the saved workspace's extensions until Halo quits",
-  async ({ server, agentBrowser, closeApp, request }) => {
+  async ({ prepareExtension, launchApp, agentBrowser, request }) => {
+    const prepared = await prepareExtension("./fixtures/greeting");
+    const { server, close } = await launchApp();
     const extensions = await server.rpc.extensions.list();
-    const extension = extensions.find((entry) => entry.id === "starter")!;
+    const extension = extensions.find((entry) => entry.id === prepared.id)!;
     const page = await agentBrowser.open(extension.url);
     await expect(
-      page.getByRole("heading", { name: "Hello, extension" }),
+      page.getByRole("textbox", { name: "Your name" }),
     ).toBeVisible();
 
-    await closeApp();
+    await close();
 
     await expect(
       request.get(extension.url, { timeout: 5_000 }),
