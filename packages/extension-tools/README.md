@@ -51,8 +51,11 @@ Data is persisted to `<data-dir>/store.json` using Tandem's `JsonFileRemote`.
 Halo discovers built apps in `<workspace>/.halo/extensions/<id>/` when opening
 the workspace. It starts each app with the bundled Node runtime and stores data
 in `<workspace>/.halo/extension-data/<id>/`. `extensions.list()` exposes their
-running view URLs without starting or rebuilding anything. Workspace switching
-and app shutdown stop the hosted processes.
+running view URLs without starting or rebuilding anything. `extensions.reload()`
+rescans the current workspace and starts extensions that are not running yet.
+It preserves existing servers and their URLs; it does not rebuild or restart
+running extensions. Reloads are serialized with workspace changes and shutdown.
+Workspace switching and app shutdown stop the hosted processes.
 
 Sidebar contributions, iframe panes, authentication, and workspace tool access
 are not connected yet.

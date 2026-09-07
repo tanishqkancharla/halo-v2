@@ -42,10 +42,22 @@ export class ExtensionHost {
     return this.lifecycle;
   }
 
+  reload() {
+    this.lifecycle = this.lifecycle.then(() => {
+      if (this.workspaceRoot === undefined) return;
+      return this.discover(this.workspaceRoot);
+    });
+    return this.lifecycle;
+  }
+
   private async startWorkspace(workspaceRoot: string) {
     if (this.workspaceRoot === workspaceRoot) return;
     await this.stopWorkspace();
     this.workspaceRoot = workspaceRoot;
+    await this.discover(workspaceRoot);
+  }
+
+  private async discover(workspaceRoot: string) {
     const directory = join(workspaceRoot, ".halo", "extensions");
     const entries = await this.options.filesystem.listDirectory(directory);
     if (entries instanceof FilesystemPathNotFoundError) return;
@@ -59,6 +71,7 @@ export class ExtensionHost {
     for (const entry of entries
       .filter((item) => item.isDirectory() && !item.name.startsWith("."))
       .toSorted((a, b) => a.name.localeCompare(b.name))) {
+      if (this.processes.get(entry.name)?.isRunning()) continue;
       const extension = await startExtension({
         id: entry.name,
         directory: join(directory, entry.name),

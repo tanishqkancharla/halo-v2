@@ -7,4 +7,5 @@ const os = implement(contract.extensions).$context<ExtensionsRouterContext>();
 
 export const extensionsRouter = os.router({
   list: os.list.handler(({ context }) => context.extensions.list()),
+  reload: os.reload.handler(({ context }) => context.extensions.reload()),
 });

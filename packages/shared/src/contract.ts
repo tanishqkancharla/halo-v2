@@ -75,6 +75,7 @@ export const contract = publicProcedure.router({
   },
   extensions: {
     list: oc.output(type<Array<{ id: string; url: string }>>()),
+    reload: oc.output(type<void>()),
   },
   workspace: {
     get: oc.output(type<WorkspaceInfo | undefined>()),

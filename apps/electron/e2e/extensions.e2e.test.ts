@@ -22,3 +22,24 @@ extensionE2eTest(
     ).rejects.toThrow(/ECONNREFUSED/);
   },
 );
+
+extensionE2eTest(
+  "keeps a newly loaded extension reachable across concurrent reloads",
+  async ({ loadExtension, server, agentBrowser }) => {
+    const loaded = await loadExtension("./fixtures/greeting");
+    const extensions = await server.rpc.extensions.list();
+    const extension = extensions.find((entry) => entry.id === loaded.id)!;
+    const page = await agentBrowser.open(extension.url);
+
+    await Promise.all([
+      server.rpc.extensions.reload(),
+      server.rpc.extensions.reload(),
+    ]);
+
+    await page.reload();
+    await expect(
+      page.getByRole("textbox", { name: "Your name" }),
+    ).toBeVisible();
+    expect(await server.rpc.extensions.list()).toEqual([extension]);
+  },
+);

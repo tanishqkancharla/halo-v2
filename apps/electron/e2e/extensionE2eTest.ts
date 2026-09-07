@@ -50,7 +50,6 @@ export const extensionE2eTest = e2eTest.extend<
   loadExtension: async ({ prepareExtension, server, renderer }, use) => {
     await use(async (sourceDirectory) => {
       const extension = await prepareExtension(sourceDirectory);
-      // @ts-expect-error -- Test-first: rediscovering built extensions is the next host API to implement.
       await server.rpc.extensions.reload();
       await renderer.page.reload();
       return extension;
