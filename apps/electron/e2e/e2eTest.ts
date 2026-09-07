@@ -99,6 +99,9 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
         if (loaded instanceof Error) throw loaded;
         await renderer.page.reload();
         await renderer.page
+          .getByRole("link", { name: description.title, exact: true })
+          .click();
+        await renderer.page
           .getByRole("main", { name: description.title, exact: true })
           .waitFor();
         return createE2ESession({

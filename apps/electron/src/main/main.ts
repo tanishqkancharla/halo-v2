@@ -391,7 +391,9 @@ async function switchWorkspace(): Promise<void> {
     return;
   }
 
-  mainWindow.reload();
+  const rendererUrl = new URL(mainWindow.webContents.getURL());
+  rendererUrl.hash = "";
+  await mainWindow.loadURL(rendererUrl.href);
 }
 
 function getRendererOrigin() {

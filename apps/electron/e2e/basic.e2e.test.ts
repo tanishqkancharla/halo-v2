@@ -32,6 +32,23 @@ e2eTest("edits and saves a workspace note", async ({ renderer, server }) => {
     .toContain("Edited in Halo");
 });
 
+e2eTest("keeps the current file after reload", async ({ renderer, server }) => {
+  const path = "Meeting notes #1.md";
+  await server.rpc.workspace.writeFile({ path, content: "# Meeting notes" });
+  await renderer.page.getByRole("link", { name: path }).click();
+  const filePane = renderer.page.getByRole("main", { name: path });
+  await expect(filePane.getByLabel(path, { exact: true })).toHaveText(
+    "Meeting notes",
+  );
+
+  await renderer.page.reload();
+
+  await expect(filePane).toBeVisible();
+  await expect(filePane.getByLabel(path, { exact: true })).toHaveText(
+    "Meeting notes",
+  );
+});
+
 e2eTest(
   "places the markdown cursor at the end when clicking below the text",
   async ({ renderer, server }) => {
