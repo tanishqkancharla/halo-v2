@@ -9,6 +9,7 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { useWorkspaceFileQuery } from "../api/ApiProvider.tsx";
+import { AutosaveStatusIndicator } from "./AutosaveStatus.tsx";
 import { CodeViewFileEditor } from "./CodeViewFileEditor.tsx";
 import { fileKind, fileLanguage } from "./fileKind.ts";
 import { PaneHeader } from "./PaneHeader.tsx";
@@ -60,14 +61,17 @@ function MarkdownFileEditor({
   const autosave = useAutosaveFile({ path, loaded });
   const editor = useStyles(styles.markdownEditor);
   return (
-    <Editor
-      content={loaded}
-      onChange={autosave.onChange}
-      placeholder="Write…"
-      aria-label={path}
-      size="sm"
-      className={editor}
-    />
+    <>
+      <AutosaveStatusIndicator status={autosave.status} />
+      <Editor
+        content={loaded}
+        onChange={autosave.onChange}
+        placeholder="Write…"
+        aria-label={path}
+        size="sm"
+        className={editor}
+      />
+    </>
   );
 }
 

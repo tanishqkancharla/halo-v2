@@ -3,6 +3,7 @@ import { Editor, type EditorOptions } from "@pierre/diffs/edit";
 import { CodeView, EditProvider, type CodeViewItem } from "@pierre/diffs/react";
 import { monoFontFamily, useTheme } from "maui";
 import { style, useStyles } from "purse-styles";
+import { AutosaveStatusIndicator } from "./AutosaveStatus.tsx";
 import { useAutosaveFile } from "./useAutosaveFile.ts";
 
 const diffsTheme = {
@@ -58,6 +59,7 @@ export function CodeViewFileEditor({
 
   return (
     <div className={host}>
+      <AutosaveStatusIndicator status={autosave.status} />
       <EditProvider createEditor={createPierreEditor}>
         <CodeView
           items={items}
