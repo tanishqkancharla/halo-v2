@@ -2,7 +2,7 @@ import { expect, type Locator } from "@playwright/test";
 import { e2eTest } from "./e2eTest.js";
 import { m } from "./SessionDescription.js";
 
-e2eTest("starts a new session", async ({ harness, renderer }) => {
+e2eTest("starts a new session", async ({ harness, app }) => {
   await harness.loadSession({
     title: "Existing conversation",
     messages: [
@@ -11,43 +11,75 @@ e2eTest("starts a new session", async ({ harness, renderer }) => {
     ],
   });
 
-  await renderer.page.getByRole("button", { name: "New session" }).click();
+  await app.page.getByRole("button", { name: "New session" }).click();
 
-  const newSession = renderer.page.getByRole("main", { name: "New session" });
+  const newSession = app.page.getByRole("main", { name: "New session" });
   await expect(newSession).toBeVisible();
   await expect(newSession.getByLabel("Message")).toBeFocused();
 });
 
 e2eTest(
   "keeps the selected session and draft pages after reload",
-  async ({ harness, renderer }) => {
+  async ({ harness, app }) => {
     for (const title of ["Earlier conversation", "Latest conversation"]) {
       await harness.loadSession({
         title,
         messages: [m.user(title), m.assistant("Saved reply")],
       });
     }
-    await renderer.page
+    await app.page
       .getByRole("link", { name: "Earlier conversation", exact: true })
       .click();
-    await renderer.page.reload();
+    await app.page.reload();
     await expect(
-      renderer.page.getByRole("main", { name: "Earlier conversation" }),
+      app.page.getByRole("main", { name: "Earlier conversation" }),
     ).toBeVisible();
 
-    await renderer.page.getByRole("button", { name: "New session" }).click();
-    const draft = renderer.page.getByRole("main", { name: "New session" });
+    await app.page.getByRole("button", { name: "New session" }).click();
+    const draft = app.page.getByRole("main", { name: "New session" });
     await expect(draft).toBeVisible();
-    await renderer.page.reload();
+    await app.page.reload();
     await expect(draft).toBeVisible();
   },
 );
 
 e2eTest(
+  "reopens saved history and receives new activity after quitting Halo",
+  async ({ app, harness }) => {
+    const session = await harness.loadSession({
+      title: "Saved conversation",
+      messages: [
+        m.user("Remember the project notes"),
+        m.assistant("The notes are saved."),
+      ],
+    });
+
+    await app.quit();
+    await app.open();
+
+    const pane = app.page.getByRole("main", { name: "Saved conversation" });
+    await expect(
+      pane.getByText("Remember the project notes", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      pane.getByText("The notes are saved.", { exact: true }),
+    ).toBeVisible();
+
+    await session.append([
+      m.user("Continue the conversation"),
+      m.assistant("Continuing after reopening."),
+    ]);
+    await expect(
+      pane.getByText("Continuing after reopening.", { exact: true }),
+    ).toBeVisible();
+  },
+);
+
+e2eTest(
   "keeps the first message and shows the error when authentication is missing",
-  async ({ renderer }) => {
-    await renderer.page.getByRole("button", { name: "New session" }).click();
-    const draft = renderer.page.getByRole("main", { name: "New session" });
+  async ({ app }) => {
+    await app.page.getByRole("button", { name: "New session" }).click();
+    const draft = app.page.getByRole("main", { name: "New session" });
     const message = draft.getByLabel("Message");
 
     for (const text of [
@@ -66,13 +98,13 @@ e2eTest(
       ).toBeEnabled();
     }
 
-    await renderer.page.getByRole("button", { name: "New session" }).click();
+    await app.page.getByRole("button", { name: "New session" }).click();
     await expect(message).toHaveText("");
     await expect(draft.getByRole("alert")).not.toBeVisible();
   },
 );
 
-e2eTest("shows a connection request", async ({ harness, renderer }) => {
+e2eTest("shows a connection request", async ({ harness, app }) => {
   await harness.loadSession({
     title: "Drive search",
     messages: [
@@ -88,7 +120,7 @@ e2eTest("shows a connection request", async ({ harness, renderer }) => {
     ],
   });
 
-  const card = renderer.page.getByRole("region", {
+  const card = app.page.getByRole("region", {
     name: "Google Drive connection",
   });
   await expect(card).toBeVisible();
@@ -97,7 +129,7 @@ e2eTest("shows a connection request", async ({ harness, renderer }) => {
 
 e2eTest(
   "recovers interrupted activity from the durable session log",
-  async ({ harness, renderer, server }) => {
+  async ({ harness, app }) => {
     const loaded = await harness.loadSession({
       title: "Interrupted session",
       messages: [
@@ -111,13 +143,13 @@ e2eTest(
       ],
     });
 
-    const pane = renderer.page.getByRole("main", {
+    const pane = app.page.getByRole("main", {
       name: "Interrupted session",
     });
     await expect(pane.getByText("Read the project notes")).toBeVisible();
     await expect(pane.getByText("Working", { exact: true })).not.toBeVisible();
 
-    const opened = await server.rpc.sessions.open({
+    const opened = await app.server.rpc.sessions.open({
       sessionId: loaded.sessionId,
     });
     expect(
@@ -137,7 +169,7 @@ e2eTest(
   },
 );
 
-e2eTest("shows tools used inside exec", async ({ harness, renderer }) => {
+e2eTest("shows tools used inside exec", async ({ harness, app }) => {
   const descriptionJs =
     "return await tools.describe.tool({ path: 'google_calendar.events.list' })";
   const searchJs = "return await tools.search({ query: 'web search' })";
@@ -168,22 +200,22 @@ e2eTest("shows tools used inside exec", async ({ harness, renderer }) => {
     ],
   });
 
-  const summary = renderer.page.getByRole("button", {
+  const summary = app.page.getByRole("button", {
     name: "Searched tools and used Google Calendar, Web Search",
     exact: true,
   });
   await expect(summary).toBeVisible();
   await summary.click();
   await expect(
-    renderer.page.getByText("Searched tools", { exact: true }),
+    app.page.getByText("Searched tools", { exact: true }),
   ).toHaveCount(2);
   await expect(
-    renderer.page.getByText("Used Google Calendar", { exact: true }),
+    app.page.getByText("Used Google Calendar", { exact: true }),
   ).toHaveCount(1);
   await expect(
-    renderer.page.getByText("Used Web Search", { exact: true }),
+    app.page.getByText("Used Web Search", { exact: true }),
   ).toHaveCount(1);
-  await expect(renderer.page.getByText("Exec", { exact: true })).toHaveCount(0);
+  await expect(app.page.getByText("Exec", { exact: true })).toHaveCount(0);
   for (const tool of [
     {
       path: "describe.tool",
@@ -210,12 +242,12 @@ e2eTest("shows tools used inside exec", async ({ harness, renderer }) => {
       result: "Done",
     },
   ]) {
-    const call = renderer.page.getByRole("button", {
+    const call = app.page.getByRole("button", {
       name: `${tool.label} (${tool.path})`,
       exact: true,
     });
     await call.click();
-    const details = renderer.page.getByRole("region", {
+    const details = app.page.getByRole("region", {
       name: tool.path,
       exact: true,
     });
@@ -226,7 +258,7 @@ e2eTest("shows tools used inside exec", async ({ harness, renderer }) => {
 
 e2eTest(
   "wraps exec code and results in individual tool details",
-  async ({ harness, renderer }) => {
+  async ({ harness, app }) => {
     const query = "calendar scheduling ".repeat(25);
     const js = `return await tools.search({ query: '${query}' });`;
     const result = `https://example.com/${"calendar".repeat(80)}`;
@@ -240,13 +272,13 @@ e2eTest(
         }),
       ],
     });
-    await renderer.page
+    await app.page
       .getByRole("button", { name: "Searched tools", exact: true })
       .click();
-    await renderer.page
+    await app.page
       .getByRole("button", { name: "Searched tools (search)", exact: true })
       .click();
-    const details = renderer.page.getByRole("region", {
+    const details = app.page.getByRole("region", {
       name: "search",
       exact: true,
     });
@@ -279,11 +311,11 @@ e2eTest(
 
 e2eTest(
   "streams tool activity labels as session events arrive",
-  async ({ harness, renderer }) => {
+  async ({ harness, app }) => {
     const session = await harness.loadSession({
       title: "Live cross-tool lookup",
     });
-    const pane = renderer.page.getByRole("main", {
+    const pane = app.page.getByRole("main", {
       name: "Live cross-tool lookup",
     });
 
@@ -458,9 +490,9 @@ const expansionScenarios: {
 for (const scenario of expansionScenarios) {
   e2eTest(
     `expands ${scenario.name} tool calls while streaming and after reload`,
-    async ({ harness, renderer }) => {
+    async ({ harness, app }) => {
       const session = await harness.loadSession({ title: "Expandable tools" });
-      const pane = renderer.page.getByRole("main", {
+      const pane = app.page.getByRole("main", {
         name: "Expandable tools",
       });
       const lifecycle = scenario.nested ? m.exec.tool : m.tool;
@@ -527,7 +559,7 @@ for (const scenario of expansionScenarios) {
       await completedCall.click();
       await expect(details.getByText(result, { exact: true })).toBeVisible();
 
-      await renderer.page.reload();
+      await app.page.reload();
       await pane
         .getByRole("button", { name: scenario.aggregate, exact: true })
         .click();
@@ -539,9 +571,9 @@ for (const scenario of expansionScenarios) {
 
 e2eTest(
   "keeps parallel tool activity visible when another tool finishes",
-  async ({ harness, renderer }) => {
+  async ({ harness, app }) => {
     const session = await harness.loadSession({ title: "Parallel tools" });
-    const pane = renderer.page.getByRole("main", { name: "Parallel tools" });
+    const pane = app.page.getByRole("main", { name: "Parallel tools" });
     await session.append([
       m.run.start({ id: "lookup" }),
       m.exec.start({
@@ -594,7 +626,7 @@ e2eTest(
 
 e2eTest(
   "shows a generic label for unlabeled exec work",
-  async ({ harness, renderer }) => {
+  async ({ harness, app }) => {
     await harness.loadSession({
       title: "Generic tool work",
       messages: [
@@ -603,15 +635,15 @@ e2eTest(
       ],
     });
 
-    const summary = renderer.page.getByRole("button", {
+    const summary = app.page.getByRole("button", {
       name: "Used tools",
       exact: true,
     });
     await summary.click();
-    await renderer.page
+    await app.page
       .getByRole("button", { name: "Used tools (exec)", exact: true })
       .click();
-    const details = renderer.page.getByRole("region", {
+    const details = app.page.getByRole("region", {
       name: "exec",
       exact: true,
     });
@@ -641,7 +673,7 @@ async function expectThinkingVisible(indicator: Locator) {
 
 e2eTest(
   "deduplicates completed file activity by normalized path",
-  async ({ harness, renderer }) => {
+  async ({ harness, app }) => {
     await harness.loadSession({
       title: "Read project files",
       messages: [
@@ -656,7 +688,7 @@ e2eTest(
     });
 
     await expect(
-      renderer.page.getByRole("button", {
+      app.page.getByRole("button", {
         name: "Read 2 files",
         exact: true,
       }),

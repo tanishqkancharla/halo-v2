@@ -1,47 +1,69 @@
 import { expect } from "@playwright/test";
 import { e2eTest } from "./e2eTest.js";
 
-e2eTest("opens the saved workspace", async ({ harness, renderer, server }) => {
+e2eTest("opens the saved workspace", async ({ harness, app }) => {
   await expect(
-    renderer.page.getByRole("main", { name: "New session" }),
+    app.page.getByRole("main", { name: "New session" }),
   ).toBeVisible();
   await expect(
-    renderer.page.getByRole("button", { name: "New session" }),
+    app.page.getByRole("button", { name: "New session" }),
   ).toBeVisible();
-  await expect(renderer.page.getByText(/^Halo \d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(app.page.getByText(/^Halo \d+\.\d+\.\d+$/)).toBeVisible();
 
-  expect(await server.rpc.workspace.get()).toMatchObject({
+  expect(await app.server.rpc.workspace.get()).toMatchObject({
     workspaceRoot: harness.paths.workspace,
   });
 });
 
-e2eTest("edits and saves a workspace note", async ({ renderer, server }) => {
-  await server.rpc.workspace.writeFile({
-    path: "notes.md",
-    content: "# Original",
-  });
+e2eTest(
+  "keeps an edited workspace note after quitting and reopening",
+  async ({ app, harness }) => {
+    await app.server.rpc.workspace.writeFile({
+      path: "notes.md",
+      content: "# Original",
+    });
 
-  await renderer.page.getByRole("link", { name: "notes.md" }).click();
-  const filePane = renderer.page.getByRole("main", { name: "notes.md" });
-  const editor = filePane.getByLabel("notes.md", { exact: true });
-  await expect(editor).toHaveText("Original");
-  await editor.fill("Edited in Halo");
+    await app.page.getByRole("link", { name: "notes.md" }).click();
+    const filePane = app.page.getByRole("main", { name: "notes.md" });
+    const editor = filePane.getByLabel("notes.md", { exact: true });
+    await expect(editor).toHaveText("Original");
+    await editor.fill("Edited in Halo");
 
-  await expect
-    .poll(() => server.rpc.workspace.readFile({ path: "notes.md" }))
-    .toContain("Edited in Halo");
-});
+    await expect
+      .poll(() => app.server.rpc.workspace.readFile({ path: "notes.md" }))
+      .toContain("Edited in Halo");
 
-e2eTest("keeps the current file after reload", async ({ renderer, server }) => {
+    await app.quit();
+    await app.open();
+
+    await app.page.getByRole("link", { name: "notes.md" }).click();
+    await expect(
+      app.page
+        .getByRole("main", { name: "notes.md" })
+        .getByLabel("notes.md", { exact: true }),
+    ).toHaveText("Edited in Halo");
+    expect(await app.server.rpc.workspace.get()).toMatchObject({
+      workspaceRoot: harness.paths.workspace,
+    });
+    expect(await harness.tools.files.read({ path: "notes.md" })).toMatchObject({
+      text: expect.stringContaining("Edited in Halo"),
+    });
+  },
+);
+
+e2eTest("keeps the current file after reload", async ({ app }) => {
   const path = "Meeting notes #1.md";
-  await server.rpc.workspace.writeFile({ path, content: "# Meeting notes" });
-  await renderer.page.getByRole("link", { name: path }).click();
-  const filePane = renderer.page.getByRole("main", { name: path });
+  await app.server.rpc.workspace.writeFile({
+    path,
+    content: "# Meeting notes",
+  });
+  await app.page.getByRole("link", { name: path }).click();
+  const filePane = app.page.getByRole("main", { name: path });
   await expect(filePane.getByLabel(path, { exact: true })).toHaveText(
     "Meeting notes",
   );
 
-  await renderer.page.reload();
+  await app.page.reload();
 
   await expect(filePane).toBeVisible();
   await expect(filePane.getByLabel(path, { exact: true })).toHaveText(
@@ -51,14 +73,14 @@ e2eTest("keeps the current file after reload", async ({ renderer, server }) => {
 
 e2eTest(
   "places the markdown cursor at the end when clicking below the text",
-  async ({ renderer, server }) => {
-    await server.rpc.workspace.writeFile({
+  async ({ app }) => {
+    await app.server.rpc.workspace.writeFile({
       path: "notes.md",
       content: "# Title\n\nLast line",
     });
 
-    await renderer.page.getByRole("link", { name: "notes.md" }).click();
-    const filePane = renderer.page.getByRole("main", { name: "notes.md" });
+    await app.page.getByRole("link", { name: "notes.md" }).click();
+    const filePane = app.page.getByRole("main", { name: "notes.md" });
     const editor = filePane.getByLabel("notes.md", { exact: true });
     await editor.getByRole("heading", { name: "Title" }).click();
     const pageContent = filePane.getByTestId("file-page-content");
@@ -71,12 +93,12 @@ e2eTest(
     });
 
     await expect(editor).toBeFocused();
-    await renderer.page.keyboard.type(" appended");
+    await app.page.keyboard.type(" appended");
     await expect(
       editor.getByText("Last line appended", { exact: true }),
     ).toBeVisible();
     await expect
-      .poll(() => server.rpc.workspace.readFile({ path: "notes.md" }))
+      .poll(() => app.server.rpc.workspace.readFile({ path: "notes.md" }))
       .toContain("Last line appended");
   },
 );

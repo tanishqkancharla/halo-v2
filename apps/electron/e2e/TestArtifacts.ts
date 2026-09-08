@@ -18,12 +18,15 @@ type TestPaths = {
   workspace: string;
   userData: string;
   playwright: string;
+  rendererLog: string;
+  haloLog: string;
+};
+
+type LaunchArtifacts = {
   mainStdoutLog: string;
   mainStderrLog: string;
-  rendererLog: string;
   screenshot: string;
   trace: string;
-  haloLog: string;
 };
 
 type E2ETestHarness = {
@@ -45,11 +48,7 @@ export async function createTestArtifacts(testInfo: TestInfo) {
     workspace: path.join(root, "workspace"),
     userData: path.join(root, "user-data"),
     playwright: path.join(root, "playwright"),
-    mainStdoutLog: path.join(root, "main.stdout.log"),
-    mainStderrLog: path.join(root, "main.stderr.log"),
     rendererLog: path.join(root, "renderer.console.log"),
-    screenshot: path.join(root, "renderer.png"),
-    trace: path.join(root, "trace.zip"),
     haloLog: path.join(root, "user-data", "logs", "halo.jsonl"),
   };
   await Promise.all([
@@ -63,6 +62,7 @@ export async function createTestArtifacts(testInfo: TestInfo) {
 
   const outputPrefix = `[e2e:${testInfo.title}:main]`;
   const captureFinalizers: Array<() => Promise<void>> = [];
+  const launches: LaunchArtifacts[] = [];
 
   const rendererLogInitialized = fsPromises
     .writeFile(paths.rendererLog, "")
@@ -90,20 +90,31 @@ export async function createTestArtifacts(testInfo: TestInfo) {
   return {
     harness,
     paths,
-    captureProcess(mainProcess: ChildProcess) {
+    createLaunch() {
+      const prefix = path.join(root, `launch-${launches.length + 1}`);
+      const launch = {
+        mainStdoutLog: `${prefix}.main.stdout.log`,
+        mainStderrLog: `${prefix}.main.stderr.log`,
+        screenshot: `${prefix}.renderer.png`,
+        trace: `${prefix}.trace.zip`,
+      };
+      launches.push(launch);
+      return launch;
+    },
+    captureProcess(mainProcess: ChildProcess, launch: LaunchArtifacts) {
       if (mainProcess.stdout === null || mainProcess.stderr === null) {
         return new TestArtifactError({ operation: "capture main process" });
       }
       captureFinalizers.push(
         captureProcessOutput({
           input: mainProcess.stdout,
-          logPath: paths.mainStdoutLog,
+          logPath: launch.mainStdoutLog,
           prefix: outputPrefix,
           terminal: process.stdout,
         }),
         captureProcessOutput({
           input: mainProcess.stderr,
-          logPath: paths.mainStderrLog,
+          logPath: launch.mainStderrLog,
           prefix: outputPrefix,
           terminal: process.stderr,
         }),
@@ -140,9 +151,9 @@ export async function createTestArtifacts(testInfo: TestInfo) {
         await rendererLog.finish();
       });
     },
-    async captureScreenshot(page: Page) {
+    async captureScreenshot(page: Page, launch: LaunchArtifacts) {
       return await page
-        .screenshot({ path: paths.screenshot, fullPage: true })
+        .screenshot({ path: launch.screenshot, fullPage: true })
         .then(() => undefined)
         .catch(
           (cause) =>
@@ -172,7 +183,7 @@ export async function createTestArtifacts(testInfo: TestInfo) {
           retainArtifacts(paths.root);
           return pruned;
         }
-        const attached = await attachArtifacts({ testInfo, paths });
+        const attached = await attachArtifacts({ testInfo, paths, launches });
         retainArtifacts(paths.root);
         return attached;
       }
@@ -265,12 +276,21 @@ function createRendererLog(args: { path: string; prefix: string }) {
   };
 }
 
-async function attachArtifacts(args: { testInfo: TestInfo; paths: TestPaths }) {
+async function attachArtifacts(args: {
+  testInfo: TestInfo;
+  paths: TestPaths;
+  launches: LaunchArtifacts[];
+}) {
   const attachments = [
-    ["renderer screenshot", args.paths.screenshot],
-    ["Playwright trace", args.paths.trace],
-    ["main stdout", args.paths.mainStdoutLog],
-    ["main stderr", args.paths.mainStderrLog],
+    ...args.launches.flatMap(
+      (launch, index) =>
+        [
+          [`launch ${index + 1} renderer screenshot`, launch.screenshot],
+          [`launch ${index + 1} Playwright trace`, launch.trace],
+          [`launch ${index + 1} main stdout`, launch.mainStdoutLog],
+          [`launch ${index + 1} main stderr`, launch.mainStderrLog],
+        ] as const,
+    ),
     ["renderer console", args.paths.rendererLog],
     ["Halo JSONL log", args.paths.haloLog],
   ] as const;

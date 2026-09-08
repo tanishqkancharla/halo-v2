@@ -5,16 +5,17 @@ extensionE2eTest.setTimeout(90_000);
 
 extensionE2eTest(
   "runs the saved workspace's extensions until Halo quits",
-  async ({ prepareExtension, launchApp, request }) => {
+  async ({ prepareExtension, app, request }) => {
+    await app.quit();
     const prepared = await prepareExtension("./fixtures/greeting");
-    const { server, close } = await launchApp();
-    const extensions = await server.rpc.extensions.list();
+    await app.open();
+    const extensions = await app.server.rpc.extensions.list();
     const extension = extensions.find((entry) => entry.id === prepared.id)!;
-    const browser = await server.rpc.browser.open({ url: extension.url });
-    const view = await server.rpc.browser.snapshot({ id: browser.id });
+    const browser = await app.server.rpc.browser.open({ url: extension.url });
+    const view = await app.server.rpc.browser.snapshot({ id: browser.id });
     expect(view.tree).toContain("Your name");
 
-    await close();
+    await app.quit();
 
     await expect(
       request.get(extension.url, { timeout: 5_000 }),
@@ -24,18 +25,18 @@ extensionE2eTest(
 
 extensionE2eTest(
   "keeps a newly loaded extension reachable across concurrent reloads",
-  async ({ loadExtension, server }) => {
+  async ({ loadExtension, app }) => {
     const loaded = await loadExtension("./fixtures/greeting");
-    const extensions = await server.rpc.extensions.list();
+    const extensions = await app.server.rpc.extensions.list();
     const extension = extensions.find((entry) => entry.id === loaded.id)!;
-    const browser = await server.rpc.browser.open({ url: extension.url });
+    const browser = await app.server.rpc.browser.open({ url: extension.url });
 
     await Promise.all([
-      server.rpc.extensions.reload(),
-      server.rpc.extensions.reload(),
+      app.server.rpc.extensions.reload(),
+      app.server.rpc.extensions.reload(),
     ]);
 
-    const view = await server.rpc.browser.exec({
+    const view = await app.server.rpc.browser.exec({
       id: browser.id,
       source: `
         await page.reload();
@@ -44,6 +45,6 @@ extensionE2eTest(
       `,
     });
     expect(view.result).toBe(true);
-    expect(await server.rpc.extensions.list()).toEqual([extension]);
+    expect(await app.server.rpc.extensions.list()).toEqual([extension]);
   },
 );

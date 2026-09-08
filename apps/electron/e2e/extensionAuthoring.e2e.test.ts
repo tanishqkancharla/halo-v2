@@ -3,7 +3,7 @@ import { e2eTest } from "./e2eTest.js";
 
 e2eTest(
   "authors and loads an extension through the agent's shell and file tools",
-  async ({ harness, renderer }) => {
+  async ({ harness, app }) => {
     e2eTest.setTimeout(120_000);
     const created = await harness.tools.bash.run({
       command: "halo extension new greeting",
@@ -35,11 +35,9 @@ e2eTest(
     });
     expect(reloaded.code, `${reloaded.stdout}\n${reloaded.stderr}`).toBe(0);
 
-    await renderer.page.reload();
-    await renderer.page
-      .getByRole("link", { name: "greeting", exact: true })
-      .click();
-    const pane = renderer.page
+    await app.page.reload();
+    await app.page.getByRole("link", { name: "greeting", exact: true }).click();
+    const pane = app.page
       .getByTitle("greeting", { exact: true })
       .contentFrame();
     await expect(

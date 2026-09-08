@@ -45,11 +45,11 @@ export const extensionE2eTest = e2eTest.extend<
     },
     { scope: "worker", timeout: 180_000 },
   ],
-  loadExtension: async ({ prepareExtension, server, renderer }, use) => {
+  loadExtension: async ({ prepareExtension, app }, use) => {
     await use(async (sourceDirectory) => {
       const extension = await prepareExtension(sourceDirectory);
-      await server.rpc.extensions.reload();
-      await renderer.page.reload();
+      await app.server.rpc.extensions.reload();
+      await app.page.reload();
       return extension;
     });
   },

@@ -19,10 +19,10 @@ type HarnessTools = {
   };
 };
 
-export function createHarnessTools(client: HaloClient): HarnessTools {
+export function createHarnessTools(getClient: () => HaloClient): HarnessTools {
   return createORPCClient<HarnessTools>({
     call(path, input, options) {
-      return client.testHarness.invokeTool(
+      return getClient().testHarness.invokeTool(
         { path: path.join("."), input },
         { signal: options.signal },
       );

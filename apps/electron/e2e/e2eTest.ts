@@ -1,15 +1,8 @@
 import { test as baseTest } from "@playwright/test";
-import nodePath from "node:path";
-import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
-import {
-  _electron as electron,
-  type ElectronApplication,
-  type Page,
-} from "playwright";
 import { createTestArtifacts, type TestArtifacts } from "./TestArtifacts.js";
-import { resolveUnpackedExecutable } from "./resolveUnpackedExecutable.js";
+import { ElectronTestApp } from "./ElectronTestApp.js";
 import { createHarnessTools } from "./tools.js";
 import {
   loadSessionDescription,
@@ -27,31 +20,13 @@ type E2ESession = {
 
 type E2ETestHarness = TestArtifacts["harness"] & {
   tools: ReturnType<typeof createHarnessTools>;
-  openWindow(): Promise<Page>;
   loadSession(description: SessionDescription): Promise<E2ESession>;
 };
 
-type E2EServer = {
-  host: string;
-  port: number;
-  rpc: HaloClient;
-};
-
-type RunningE2EApp = {
-  app: ElectronApplication;
-  renderer: { page: Page };
-  server: E2EServer;
-  close(): Promise<void>;
-};
-
 type E2EFixtures = {
-  launchApp(): Promise<RunningE2EApp>;
-  runningApp: RunningE2EApp;
+  app: ElectronTestApp;
   testArtifacts: TestArtifacts;
-  electronApp: ElectronApplication;
-  renderer: { page: Page };
   harness: E2ETestHarness;
-  server: E2EServer;
 };
 
 export const e2eTest = baseTest.extend<E2EFixtures>({
@@ -62,137 +37,66 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
     const finished = await artifacts.finish();
     if (finished instanceof Error) throw finished;
   },
-  launchApp: async ({ testArtifacts }, use) => {
-    await using cleanup = new errore.AsyncDisposableStack();
-    await use(async () => {
-      const resources = new errore.AsyncDisposableStack();
-      cleanup.defer(() => resources.disposeAsync());
-      const executablePath = resolveUnpackedExecutable();
-      if (executablePath instanceof Error) throw executablePath;
-      const app = await electron.launch({
-        executablePath,
-        args: [`--user-data-dir=${testArtifacts.paths.userData}`],
-        artifactsDir: testArtifacts.paths.playwright,
-        env: {
-          ...processEnvironment(),
-          HALO_E2E: "1",
-          PI_CODING_AGENT_DIR: nodePath.join(
-            testArtifacts.paths.workspace,
-            ".pi",
-            "agent",
-          ),
-        },
-      });
-      resources.defer(() => app.close());
-      const captured = testArtifacts.captureProcess(app.process());
-      if (captured instanceof Error) throw captured;
-      await app.context().tracing.start({ screenshots: true, snapshots: true });
-      resources.defer(() =>
-        app.context().tracing.stop({ path: testArtifacts.paths.trace }),
-      );
-      const page = await app.firstWindow();
-      const rendererCaptured = await testArtifacts.captureRenderer(page);
-      if (rendererCaptured instanceof Error) throw rendererCaptured;
-      resources.defer(async () => {
-        const screenshot = await testArtifacts.captureScreenshot(page);
-        if (screenshot instanceof Error) throw screenshot;
-      });
-      const connection = await readHaloRpcFile(
-        rpcFilePath(testArtifacts.paths.userData),
-      );
-      if (connection instanceof Error) throw connection;
-      return {
-        app,
-        renderer: { page },
-        server: {
-          host: connection.host,
-          port: connection.port,
-          rpc: createHaloRpcClient<HaloClient>(connection),
-        },
-        close: () => resources.disposeAsync(),
-      };
-    });
-  },
-  runningApp: async ({ launchApp }, use) => {
-    await use(await launchApp());
-  },
-  electronApp: async ({ runningApp }, use) => {
-    await use(runningApp.app);
-  },
-  renderer: async ({ runningApp }, use) => {
-    await use(runningApp.renderer);
-  },
-  harness: async ({ electronApp, renderer, server, testArtifacts }, use) => {
+  app: [
+    async ({ testArtifacts }, use) => {
+      await using cleanup = new errore.AsyncDisposableStack();
+      const app = new ElectronTestApp(testArtifacts);
+      cleanup.defer(() => app.quit());
+      await app.open();
+      await use(app);
+    },
+    { auto: true },
+  ],
+  harness: async ({ app, testArtifacts }, use) => {
     await use({
       ...testArtifacts.harness,
-      tools: createHarnessTools(server.rpc),
-      async openWindow() {
-        const opened = electronApp.waitForEvent("window");
-        await electronApp.evaluate(({ app }) =>
-          app.emit("halo:e2e:open-window"),
-        );
-        const page = await opened;
-        const captured = await testArtifacts.captureRenderer(page);
-        if (captured instanceof Error) throw captured;
-        return page;
-      },
+      tools: createHarnessTools(() => app.server.rpc),
       async loadSession(description) {
-        await renderer.page.getByRole("main").waitFor();
+        await app.page.getByRole("main").waitFor();
         const loaded = await loadSessionDescription({
           description,
           workspaceRoot: testArtifacts.paths.workspace,
           getToolIdentity: (path) =>
-            server.rpc.testHarness.getToolIdentity({ path }),
+            app.server.rpc.testHarness.getToolIdentity({ path }),
         });
         if (loaded instanceof Error) throw loaded;
-        await renderer.page.reload();
-        await renderer.page
+        await app.page.reload();
+        await app.page
           .getByRole("link", { name: description.title, exact: true })
           .click();
-        await renderer.page
+        await app.page
           .getByRole("main", { name: description.title, exact: true })
           .waitFor();
         return createE2ESession({
           sessionId: loaded.sessionId,
-          server: server.rpc,
+          getServer: () => app.server.rpc,
         });
       },
     });
   },
-  server: async ({ runningApp }, use) => use(runningApp.server),
 });
 
 function createE2ESession(args: {
   sessionId: string;
-  server: HaloClient;
+  getServer(): HaloClient;
 }): E2ESession {
   return {
     sessionId: args.sessionId,
     async append(items) {
-      const opened = await args.server.sessions.open({
+      const server = args.getServer();
+      const opened = await server.sessions.open({
         sessionId: args.sessionId,
       });
       const events = await sessionDescriptionEvents({
         items: Array.isArray(items) ? items : [items],
         history: opened.records.map((record) => record.value),
-        getToolIdentity: (path) =>
-          args.server.testHarness.getToolIdentity({ path }),
+        getToolIdentity: (path) => server.testHarness.getToolIdentity({ path }),
       });
       if (events instanceof Error) throw events;
-      await args.server.testHarness.appendSessionEvents({
+      await server.testHarness.appendSessionEvents({
         sessionId: args.sessionId,
         events,
       });
     },
   };
-}
-
-function processEnvironment() {
-  // Electron treats the packaged app as a Node process when this inherited variable is present.
-  return Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] =>
-        entry[0] !== "ELECTRON_RUN_AS_NODE" && entry[1] !== undefined,
-    ),
-  );
 }
