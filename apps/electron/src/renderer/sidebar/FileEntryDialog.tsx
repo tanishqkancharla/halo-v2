@@ -15,8 +15,6 @@ import {
 import { style, useStyles } from "purse-styles";
 
 export type FileEntryAction =
-  | { kind: "file"; parent: string }
-  | { kind: "directory"; parent: string }
   | { kind: "rename"; path: string; isDirectory: boolean }
   | { kind: "delete"; path: string; isDirectory: boolean }
   | { kind: "move"; path: string; isDirectory: boolean };
@@ -36,20 +34,10 @@ export function FileEntryDialog({
   onSubmit(path: string): void;
   onClose(): void;
 }) {
-  const existing =
-    action.kind === "rename" ||
-    action.kind === "move" ||
-    action.kind === "delete";
-  const originalName = existing
-    ? action.path.slice(action.path.lastIndexOf("/") + 1)
-    : action.kind === "file"
-      ? "Untitled.md"
-      : "Untitled folder";
+  const originalName = action.path.slice(action.path.lastIndexOf("/") + 1);
   const [name, setName] = useState(originalName);
   const [folder, setFolder] = useState(
-    existing
-      ? action.path.slice(0, Math.max(0, action.path.lastIndexOf("/")))
-      : action.parent,
+    action.path.slice(0, Math.max(0, action.path.lastIndexOf("/"))),
   );
   const overlay = useStyles(styles.overlay);
   const modal = useStyles(styles.modal);
@@ -59,15 +47,11 @@ export function FileEntryDialog({
   const buttons = useStyles(styles.buttons);
   const errorClass = useStyles(styles.error);
   const title =
-    action.kind === "file"
-      ? "New file"
-      : action.kind === "directory"
-        ? "New folder"
-        : action.kind === "rename"
-          ? "Rename"
-          : action.kind === "delete"
-            ? `Delete ${originalName}?`
-            : `Move ${originalName}`;
+    action.kind === "rename"
+      ? "Rename"
+      : action.kind === "delete"
+        ? `Delete ${originalName}?`
+        : `Move ${originalName}`;
   const validName =
     action.kind === "delete" ||
     (name.trim().length > 0 &&
@@ -75,11 +59,9 @@ export function FileEntryDialog({
       !name.startsWith(".") &&
       name !== "node_modules");
   const destination = folder === "" ? name.trim() : `${folder}/${name.trim()}`;
-  const unchanged =
-    action.kind !== "delete" && existing && destination === action.path;
+  const unchanged = action.kind !== "delete" && destination === action.path;
   const availableFolders = folders.filter(
     (path) =>
-      !existing ||
       !action.isDirectory ||
       (path !== action.path && !path.startsWith(`${action.path}/`)),
   );
@@ -136,7 +118,7 @@ export function FileEntryDialog({
             )}
             {action.kind !== "rename" && action.kind !== "delete" && (
               <Select
-                label={action.kind === "move" ? "Move to" : "Location"}
+                label="Move to"
                 selectedKey={folder === "" ? "/" : folder}
                 onSelectionChange={(key) => {
                   if (key === null) return;
@@ -174,9 +156,7 @@ export function FileEntryDialog({
                     ? "Delete"
                     : action.kind === "rename"
                       ? "Rename"
-                      : action.kind === "move"
-                        ? "Move"
-                        : "Create"}
+                      : "Move"}
               </Button>
             </div>
           </form>

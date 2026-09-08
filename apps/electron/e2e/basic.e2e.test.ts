@@ -87,28 +87,19 @@ e2eTest(
   "creates and organizes notes through the Files sidebar",
   async ({ renderer, server }) => {
     const page = renderer.page;
-    await page
-      .getByRole("button", { name: "New file or folder", exact: true })
-      .click();
-    await page
-      .getByRole("menuitem", { name: "New folder…", exact: true })
-      .click();
-    await page
-      .getByRole("dialog", { name: "New folder", exact: true })
-      .getByRole("textbox", { name: "Name" })
-      .fill("Notes");
-    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await page.getByRole("button", { name: "New folder", exact: true }).click();
+    const folderName = page.getByRole("textbox", { name: "New folder name" });
+    await folderName.fill("Notes");
+    await folderName.press("Enter");
     await page
       .getByRole("button", { name: "Actions for Notes", exact: true })
       .click();
     await page
       .getByRole("menuitem", { name: "New file…", exact: true })
       .click();
-    await page
-      .getByRole("dialog", { name: "New file", exact: true })
-      .getByRole("textbox", { name: "Name" })
-      .fill("Today.md");
-    await page.getByRole("button", { name: "Create", exact: true }).click();
+    const fileName = page.getByRole("textbox", { name: "New file name" });
+    await fileName.fill("Today.md");
+    await fileName.press("Enter");
     const editor = page
       .getByRole("main", { name: "Notes/Today.md", exact: true })
       .getByLabel("Notes/Today.md", { exact: true });
@@ -142,18 +133,11 @@ e2eTest(
       "Plan.md",
     ]);
 
-    await page
-      .getByRole("button", { name: "New file or folder", exact: true })
-      .click();
-    await page
-      .getByRole("menuitem", { name: "New file…", exact: true })
-      .click();
-    await page.getByRole("textbox", { name: "Name" }).fill("Plan.md");
-    await page.getByRole("button", { name: "Create", exact: true }).click();
-    await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
-      "already exists",
-    );
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.getByRole("button", { name: "New file", exact: true }).click();
+    await fileName.fill("Plan.md");
+    await fileName.press("Enter");
+    await expect(page.getByRole("alert")).toContainText("already exists");
+    await fileName.press("Escape");
     await page.reload();
     await expect(
       page.getByRole("main", { name: "Plan.md", exact: true }),
@@ -411,5 +395,41 @@ e2eTest(
     await expect(
       page.getByRole("button", { name: "Open externally", exact: true }),
     ).toBeEnabled();
+  },
+);
+
+e2eTest(
+  "names new files inline, preserves extensions, and cancels with Escape",
+  async ({ renderer, server }) => {
+    const page = renderer.page;
+    await page.getByRole("button", { name: "New file", exact: true }).click();
+    const name = page.getByRole("textbox", { name: "New file name" });
+    await expect(name).toBeFocused();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await name.fill("discard.txt");
+    await name.press("Escape");
+    await expect(name).toHaveCount(0);
+    expect(await server.rpc.workspace.listPaths()).toEqual([]);
+    await page.getByRole("button", { name: "New file", exact: true }).click();
+    await name.fill("notes.txt");
+    await page.getByText("Files", { exact: true }).click();
+    await expect(
+      page.getByRole("main", { name: "notes.txt", exact: true }),
+    ).toBeVisible();
+    expect(await server.rpc.workspace.listPaths()).toEqual(["notes.txt"]);
+    await page.getByRole("button", { name: "New folder", exact: true }).click();
+    const folder = page.getByRole("textbox", { name: "New folder name" });
+    await folder.fill("Archive");
+    await folder.press("Enter");
+    await expect(folder).toHaveCount(0);
+    await page
+      .locator('[data-file-path="notes.txt"]')
+      .dragTo(page.locator('[data-file-path="Archive"]'));
+    await expect(
+      page.getByRole("main", { name: "Archive/notes.txt", exact: true }),
+    ).toBeVisible();
+    expect(await server.rpc.workspace.listPaths()).toEqual([
+      "Archive/notes.txt",
+    ]);
   },
 );

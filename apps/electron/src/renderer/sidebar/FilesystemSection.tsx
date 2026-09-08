@@ -1,10 +1,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+  type ReactNode,
+} from "react";
 import { Button as AriaButton } from "react-aria-components";
 import {
   Menu,
   MenuItem,
   MenuTrigger,
+  Tooltip,
   colors,
   flex,
   focusRing,
@@ -20,7 +27,7 @@ import {
   type FileEntryAction,
 } from "./FileEntryDialog.js";
 import { flushFileAutosaves } from "../main/useAutosaveFile.js";
-import { File, Folder, Plus, DotsHorizontal } from "maui/icons";
+import { File, Folder, FilePlus, FolderPlus, DotsHorizontal } from "maui/icons";
 import type { WorkspaceTreeEvent } from "@get-halo/shared/rpc";
 import type { HaloClient } from "@get-halo/shared/contract";
 import {
@@ -32,6 +39,11 @@ import {
 import { useExpandSidebar } from "./navigation/NavigationSidebar.js";
 import { SidebarItem } from "./navigation/SidebarItem.js";
 import { SidebarSection } from "./navigation/SidebarSection.js";
+
+import { FileEntryInput, type FileCreationAction } from "./FileEntryInput.js";
+
+type FileAction = FileEntryAction | FileCreationAction;
+type FileCreationRow = { parent: string; content: ReactNode };
 
 type FileNavigationNode = {
   path: string;
@@ -60,10 +72,12 @@ export function FilesystemSection() {
   );
   const workspaceRoot = workspace?.workspaceRoot;
   const [location, navigate] = useLocation();
-  const [action, setAction] = useState<FileEntryAction>();
+  const [action, setAction] = useState<FileAction>();
   const [dragged, setDragged] = useState<string>();
   const rootLabel = useStyles(styles.rootLabel);
   const feedback = useStyles(styles.feedback);
+  const controls = useStyles(styles.controls);
+  const iconButton = useStyles(styles.menuButton);
   const mutation = useMutation({
     mutationFn: async (operation: FileOperation) => {
       if (operation.kind === "create") {
@@ -133,12 +147,18 @@ export function FilesystemSection() {
     },
   });
   const folders = ["", ...allFolders(files)];
-  function openAction(next: FileEntryAction) {
+  function openAction(next: FileAction) {
     mutation.reset();
     setAction(next);
+    if (
+      (next.kind === "file" || next.kind === "directory") &&
+      next.parent !== ""
+    )
+      expand([`file:${next.parent}/`]);
   }
   function canDrop(folder: string) {
-    if (dragged === undefined || mutation.isPending) return false;
+    if (dragged === undefined || mutation.isPending || action !== undefined)
+      return false;
     const parent = dragged.slice(0, Math.max(0, dragged.lastIndexOf("/")));
     return (
       folder !== dragged &&
@@ -180,6 +200,32 @@ export function FilesystemSection() {
     return () => controller.abort();
   }, [api, queryClient, workspaceRoot]);
 
+  const creation: FileCreationRow | undefined =
+    action !== undefined &&
+    (action.kind === "file" || action.kind === "directory")
+      ? {
+          parent: action.parent,
+          content: (
+            <FileEntryInput
+              key={`${action.kind}:${action.parent}`}
+              action={action}
+              pending={mutation.isPending}
+              error={
+                mutation.error === null ? undefined : mutation.error.message
+              }
+              onClose={() => setAction(undefined)}
+              onSubmit={(path) =>
+                mutation.mutate({
+                  kind: "create",
+                  path,
+                  entryKind: action.kind,
+                })
+              }
+            />
+          ),
+        }
+      : undefined;
+
   return (
     <SidebarSection
       label={
@@ -195,14 +241,6 @@ export function FilesystemSection() {
           onDrop={(event) => drop(event, "")}
         >
           Files
-          {dragged !== undefined && canDrop("")
-            ? " · Drop here for workspace"
-            : ""}
-          {files.length === 0 && (
-            <span className={feedback}>
-              Create a file or folder to get started.
-            </span>
-          )}
           {action === undefined && mutation.isError && (
             <span role="alert" className={feedback}>
               {mutation.error.message}
@@ -212,44 +250,58 @@ export function FilesystemSection() {
       }
       actions={
         <>
-          <FileMenu
-            label="New file or folder"
-            onAction={openAction}
-            disabled={mutation.isPending}
-          />
+          <span className={controls}>
+            <Tooltip content="New file">
+              <AriaButton
+                aria-label="New file"
+                className={iconButton}
+                isDisabled={mutation.isPending || action !== undefined}
+                onPress={() => openAction({ kind: "file", parent: "" })}
+              >
+                <FilePlus size="sm" />
+              </AriaButton>
+            </Tooltip>
+            <Tooltip content="New folder">
+              <AriaButton
+                aria-label="New folder"
+                className={iconButton}
+                isDisabled={mutation.isPending || action !== undefined}
+                onPress={() => openAction({ kind: "directory", parent: "" })}
+              >
+                <FolderPlus size="sm" />
+              </AriaButton>
+            </Tooltip>
+          </span>
           {action === undefined &&
             mutation.isPending &&
             mutation.variables.kind === "move" && <FileMoveProgress />}
-          {action !== undefined && (
-            <FileEntryDialog
-              action={action}
-              folders={folders}
-              pending={mutation.isPending}
-              error={
-                mutation.error === null ? undefined : mutation.error.message
-              }
-              onClose={() => setAction(undefined)}
-              onSubmit={(path) => {
-                if (action.kind === "file" || action.kind === "directory")
-                  mutation.mutate({
-                    kind: "create",
-                    path,
-                    entryKind: action.kind,
-                  });
-                else if (action.kind === "delete")
-                  mutation.mutate({ kind: "delete", path: action.path });
-                else
-                  mutation.mutate({
-                    kind: "move",
-                    source: action.path,
-                    destination: path,
-                  });
-              }}
-            />
-          )}
+          {action !== undefined &&
+            action.kind !== "file" &&
+            action.kind !== "directory" && (
+              <FileEntryDialog
+                action={action}
+                folders={folders}
+                pending={mutation.isPending}
+                error={
+                  mutation.error === null ? undefined : mutation.error.message
+                }
+                onClose={() => setAction(undefined)}
+                onSubmit={(path) => {
+                  if (action.kind === "delete")
+                    mutation.mutate({ kind: "delete", path: action.path });
+                  else
+                    mutation.mutate({
+                      kind: "move",
+                      source: action.path,
+                      destination: path,
+                    });
+                }}
+              />
+            )}
         </>
       }
     >
+      {creation?.parent === "" && creation.content}
       {files.map((node) => (
         <FileNavigationItem
           key={node.path}
@@ -258,7 +310,8 @@ export function FilesystemSection() {
           onDrag={setDragged}
           canDrop={canDrop}
           onDrop={drop}
-          pending={mutation.isPending}
+          pending={mutation.isPending || action !== undefined}
+          creation={creation}
         />
       ))}
     </SidebarSection>
@@ -272,13 +325,15 @@ function FileNavigationItem({
   canDrop,
   onDrop,
   pending,
+  creation,
 }: {
   node: FileNavigationNode;
-  onAction(action: FileEntryAction): void;
+  onAction(action: FileAction): void;
   onDrag(path: string | undefined): void;
   canDrop(folder: string): boolean;
   onDrop(event: DragEvent, folder: string): void;
   pending: boolean;
+  creation: FileCreationRow | undefined;
 }) {
   const path = node.isDirectory ? node.path.slice(0, -1) : node.path;
   const [over, setOver] = useState(false);
@@ -298,17 +353,23 @@ function FileNavigationItem({
           disabled={pending}
         />
       }
-      items={node.children.map((child) => (
-        <FileNavigationItem
-          key={child.path}
-          node={child}
-          onAction={onAction}
-          onDrag={onDrag}
-          canDrop={canDrop}
-          onDrop={onDrop}
-          pending={pending}
-        />
-      ))}
+      items={
+        <>
+          {node.isDirectory && creation?.parent === path && creation.content}
+          {node.children.map((child) => (
+            <FileNavigationItem
+              key={child.path}
+              node={child}
+              onAction={onAction}
+              onDrag={onDrag}
+              canDrop={canDrop}
+              onDrop={onDrop}
+              pending={pending}
+              creation={creation}
+            />
+          ))}
+        </>
+      }
     >
       <span
         className={label}
@@ -348,50 +409,37 @@ function FileMenu({
   disabled,
 }: {
   label: string;
-  node?: { path: string; isDirectory: boolean };
-  onAction(action: FileEntryAction): void;
+  node: { path: string; isDirectory: boolean };
+  onAction(action: FileAction): void;
   disabled?: boolean;
 }) {
   const button = useStyles(styles.menuButton);
-  const parent = node === undefined ? "" : node.path;
+  const parent = node.path;
   return (
     <MenuTrigger>
       <AriaButton aria-label={label} className={button} isDisabled={disabled}>
-        {node === undefined ? (
-          <>
-            <Plus size="sm" />
-            New
-          </>
-        ) : (
-          <DotsHorizontal size="sm" />
-        )}
+        <DotsHorizontal size="sm" />
       </AriaButton>
       <Menu aria-label={label}>
-        {(node === undefined || node.isDirectory) && (
+        {node.isDirectory && (
           <MenuItem onAction={() => onAction({ kind: "file", parent })}>
             New file…
           </MenuItem>
         )}
-        {(node === undefined || node.isDirectory) && (
+        {node.isDirectory && (
           <MenuItem onAction={() => onAction({ kind: "directory", parent })}>
             New folder…
           </MenuItem>
         )}
-        {node !== undefined && (
-          <MenuItem onAction={() => onAction({ kind: "rename", ...node })}>
-            Rename…
-          </MenuItem>
-        )}
-        {node !== undefined && (
-          <MenuItem onAction={() => onAction({ kind: "move", ...node })}>
-            Move to…
-          </MenuItem>
-        )}
-        {node !== undefined && (
-          <MenuItem onAction={() => onAction({ kind: "delete", ...node })}>
-            Delete…
-          </MenuItem>
-        )}
+        <MenuItem onAction={() => onAction({ kind: "rename", ...node })}>
+          Rename…
+        </MenuItem>
+        <MenuItem onAction={() => onAction({ kind: "move", ...node })}>
+          Move to…
+        </MenuItem>
+        <MenuItem onAction={() => onAction({ kind: "delete", ...node })}>
+          Delete…
+        </MenuItem>
       </Menu>
     </MenuTrigger>
   );
@@ -463,6 +511,7 @@ async function listenWorkspaceTree(
 }
 
 const styles = {
+  controls: style(flex({ align: "center", gap: 1 })),
   menuButton: style(
     focusRing(),
     radius.sm,
