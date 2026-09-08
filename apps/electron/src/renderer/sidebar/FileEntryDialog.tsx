@@ -166,20 +166,6 @@ export function FileEntryDialog({
   );
 }
 
-export function FileMoveProgress() {
-  const overlay = useStyles(styles.overlay);
-  const modal = useStyles(styles.modal);
-  return (
-    <ModalOverlay isOpen isKeyboardDismissDisabled className={overlay}>
-      <Modal className={modal}>
-        <Dialog aria-label="Moving files">
-          <p role="status">Moving…</p>
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
-  );
-}
-
 const styles = {
   overlay: style({
     position: "fixed",

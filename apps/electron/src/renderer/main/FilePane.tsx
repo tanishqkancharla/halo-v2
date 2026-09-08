@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useApi } from "../api/ApiProvider.js";
 import { desktopApi } from "../api/electron.js";
 import { MediaFilePreview } from "./MediaFilePreview.js";
@@ -21,6 +21,7 @@ import { flushFileAutosaves, useAutosaveFile } from "./useAutosaveFile.ts";
 
 export function FilePane({ path }: { path: string }) {
   const api = useApi();
+  const changingEntry = useIsMutating({ mutationKey: ["workspace-entry"] });
   const preview = useQuery({
     queryKey: ["workspace-preview", path],
     queryFn: () => api.workspace.previewFile({ path }),
@@ -36,7 +37,7 @@ export function FilePane({ path }: { path: string }) {
   const pane = useStyles(styles.pane);
   const status = useStyles(styles.status);
   return (
-    <main className={pane} aria-label={path}>
+    <main className={pane} aria-label={path} inert={changingEntry > 0}>
       <PaneHeader
         section="Files"
         title={path}

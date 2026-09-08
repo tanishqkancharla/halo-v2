@@ -21,11 +21,7 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { useLocation } from "wouter";
-import {
-  FileEntryDialog,
-  FileMoveProgress,
-  type FileEntryAction,
-} from "./FileEntryDialog.js";
+import { FileEntryDialog, type FileEntryAction } from "./FileEntryDialog.js";
 import { flushFileAutosaves } from "../main/useAutosaveFile.js";
 import { File, Folder, FilePlus, FolderPlus, DotsHorizontal } from "maui/icons";
 import type { WorkspaceTreeEvent } from "@get-halo/shared/rpc";
@@ -79,6 +75,7 @@ export function FilesystemSection() {
   const controls = useStyles(styles.controls);
   const iconButton = useStyles(styles.menuButton);
   const mutation = useMutation({
+    mutationKey: ["workspace-entry"],
     mutationFn: async (operation: FileOperation) => {
       if (operation.kind === "create") {
         return api.workspace.createEntry({
@@ -272,9 +269,6 @@ export function FilesystemSection() {
               </AriaButton>
             </Tooltip>
           </span>
-          {action === undefined &&
-            mutation.isPending &&
-            mutation.variables.kind === "move" && <FileMoveProgress />}
           {action !== undefined &&
             action.kind !== "file" &&
             action.kind !== "directory" && (
