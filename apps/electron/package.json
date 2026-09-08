@@ -1,6 +1,6 @@
 {
   "name": "@halo/desktop",
-  "version": "0.1.37",
+  "version": "0.1.38",
   "private": true,
   "description": "Halo desktop app",
   "license": "MIT",
@@ -101,6 +101,7 @@
     "agentation": "^3.0.2",
     "agentation-mcp": "^1.2.0",
     "electron": "^44.0.0",
+    "execa": "9.6.1",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"
   },

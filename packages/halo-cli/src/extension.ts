@@ -1,15 +1,12 @@
-import { execFile } from "node:child_process";
+import { execa } from "execa";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { scaffoldExtension } from "@get-halo/extension-tools/scaffold";
 import { Cli, z } from "incur";
 import * as errore from "errore";
 import { connectHalo, type HaloRpcEnv } from "./connectHalo.js";
 import { packDevelopmentExtensions } from "./extensionDevelopment.js";
 import type { ExtensionPermissionReport } from "@get-halo/shared/contract";
-
-const exec = promisify(execFile);
 
 class ExtensionCommandError extends errore.createTaggedError({
   name: "ExtensionCommandError",
@@ -200,7 +197,7 @@ async function createExtension({
 }
 
 async function runNpm(directory: string, args: string[]) {
-  return await exec(
+  return await execa(
     "npm",
     [
       ...args,

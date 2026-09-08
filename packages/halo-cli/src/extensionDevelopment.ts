@@ -1,11 +1,8 @@
-import { execFile } from "node:child_process";
+import { execa } from "execa";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import * as errore from "errore";
-
-const exec = promisify(execFile);
 
 class ExtensionDevelopmentError extends errore.createTaggedError({
   name: "ExtensionDevelopmentError",
@@ -44,7 +41,7 @@ export async function packDevelopmentExtensions(args: {
 
   const pack = async (name: string) => {
     const cwd = join(args.sourceDirectory, name);
-    const built = await exec("npm", ["run", "build"], { cwd }).catch(
+    const built = await execa("npm", ["run", "build"], { cwd }).catch(
       (cause) =>
         new ExtensionDevelopmentError({
           detail: `build ${name}: ${cause.message}`,
@@ -52,7 +49,7 @@ export async function packDevelopmentExtensions(args: {
         }),
     );
     if (built instanceof Error) return built;
-    const packed = await exec(
+    const packed = await execa(
       "npm",
       ["pack", "--ignore-scripts", "--pack-destination", temporary],
       { cwd },

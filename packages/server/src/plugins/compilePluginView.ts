@@ -99,7 +99,10 @@ function loadEsbuild(filesystem: FilesystemService) {
 }
 
 function packagedEsbuildBinary(filesystem: FilesystemService) {
-  const binaryName = process.platform === "win32" ? "esbuild.exe" : "esbuild";
+  const binarySegments =
+    process.platform === "win32"
+      ? ["@esbuild", `win32-${process.arch}`, "esbuild.exe"]
+      : ["esbuild", "bin", "esbuild"];
   const resourcesDir =
     process.platform === "darwin"
       ? join(dirname(process.execPath), "..", "Resources")
@@ -108,9 +111,7 @@ function packagedEsbuildBinary(filesystem: FilesystemService) {
     resourcesDir,
     "app.asar.unpacked",
     "node_modules",
-    "esbuild",
-    "bin",
-    binaryName,
+    ...binarySegments,
   );
   if (!filesystem.exists(binaryPath)) return undefined;
   return binaryPath;

@@ -1,11 +1,9 @@
-import { execFile } from "node:child_process";
+import { execa } from "execa";
 import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import * as errore from "errore";
 import { e2eTest } from "./e2eTest.js";
 
-const exec = promisify(execFile);
 const repository = path.resolve(import.meta.dirname, "../../..");
 
 class ExtensionSetupError extends errore.createTaggedError({
@@ -101,7 +99,7 @@ export const extensionE2eTest = e2eTest.extend<
 });
 
 async function command(executable: string, args: string[], cwd: string) {
-  const result = await exec(executable, args, {
+  const result = await execa(executable, args, {
     cwd,
     maxBuffer: 4 * 1024 * 1024,
   }).catch(
