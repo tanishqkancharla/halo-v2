@@ -1,5 +1,10 @@
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useApi } from "../api/ApiProvider.js";
+import { desktopApi } from "../api/electron.js";
+import { MediaFilePreview } from "./MediaFilePreview.js";
+import { TextFileEditor } from "./TextFileEditor.js";
 import {
-  CodeBlock,
+  Button,
   Editor,
   backgroundColor,
   flex,
@@ -10,14 +15,62 @@ import {
 import { style, useStyles } from "purse-styles";
 import { useWorkspaceFileQuery } from "../api/ApiProvider.tsx";
 import { CodeViewFileEditor } from "./CodeViewFileEditor.tsx";
-import { fileKind, fileLanguage } from "./fileKind.ts";
+import { fileKind } from "./fileKind.ts";
 import { PaneHeader } from "./PaneHeader.tsx";
-import { useAutosaveFile } from "./useAutosaveFile.ts";
+import { flushFileAutosaves, useAutosaveFile } from "./useAutosaveFile.ts";
 
 export function FilePane({ path }: { path: string }) {
+  const api = useApi();
+  const preview = useQuery({
+    queryKey: ["workspace-preview", path],
+    queryFn: () => api.workspace.previewFile({ path }),
+    gcTime: 0,
+  });
+  const open = useMutation({
+    mutationFn: async () => {
+      const saved = await flushFileAutosaves();
+      if (saved instanceof Error) throw saved;
+      return desktopApi.openWorkspaceFile(path);
+    },
+  });
+  const pane = useStyles(styles.pane);
+  const status = useStyles(styles.status);
+  return (
+    <main className={pane} aria-label={path}>
+      <PaneHeader
+        section="Files"
+        title={path}
+        actions={
+          <Button onClick={() => open.mutate()} disabled={open.isPending}>
+            Open externally
+          </Button>
+        }
+      />
+      {open.isError && (
+        <div role="alert" className={status}>
+          {open.error.message}
+        </div>
+      )}
+      {preview.isPending ? (
+        <div className={status}>Loading file…</div>
+      ) : preview.isError ? (
+        <div role="alert" className={status}>
+          {preview.error.message}
+        </div>
+      ) : preview.data.kind === "text" ? (
+        <TextFileContent path={path} />
+      ) : preview.data.kind === "unsupported" ? (
+        <div className={status}>{preview.data.reason}</div>
+      ) : (
+        <MediaFilePreview key={path} preview={preview.data} path={path} />
+      )}
+    </main>
+  );
+}
+
+function TextFileContent({ path }: { path: string }) {
   const file = useWorkspaceFileQuery(path);
   const kind = fileKind(path);
-  const pane = useStyles(styles.pane);
   const body = useStyles(kind === "code" ? styles.codeBody : styles.body);
   const content = useStyles(
     kind === "code" ? styles.codeContent : styles.content,
@@ -25,28 +78,25 @@ export function FilePane({ path }: { path: string }) {
   const status = useStyles(styles.status);
 
   return (
-    <main className={pane} aria-label={path}>
-      <PaneHeader section="Files" title={path} />
-      <div className={body}>
-        {file.isPending ? (
-          <div className={status}>Loading file…</div>
-        ) : file.isError ? (
-          <div className={status} role="alert">
-            {String(file.error)}
-          </div>
-        ) : (
-          <div className={content} data-testid="file-page-content">
-            {kind === "markdown" ? (
-              <MarkdownFileEditor key={path} path={path} loaded={file.data} />
-            ) : kind === "code" ? (
-              <CodeViewFileEditor key={path} path={path} loaded={file.data} />
-            ) : (
-              <CodeBlock lang={fileLanguage(path)}>{file.data}</CodeBlock>
-            )}
-          </div>
-        )}
-      </div>
-    </main>
+    <div className={body}>
+      {file.isPending ? (
+        <div className={status}>Loading file…</div>
+      ) : file.isError ? (
+        <div className={status} role="alert">
+          {String(file.error)}
+        </div>
+      ) : (
+        <div className={content} data-testid="file-page-content">
+          {kind === "markdown" ? (
+            <MarkdownFileEditor key={path} path={path} loaded={file.data} />
+          ) : kind === "code" ? (
+            <CodeViewFileEditor key={path} path={path} loaded={file.data} />
+          ) : (
+            <TextFileEditor key={path} path={path} loaded={file.data} />
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

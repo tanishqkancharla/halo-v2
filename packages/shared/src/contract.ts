@@ -1,3 +1,4 @@
+import type { WorkspaceFilePreview } from "./rpc.js";
 import {
   asyncIteratorObject,
   error,
@@ -136,6 +137,9 @@ export const contract = publicProcedure.router({
     deleteEntry: oc
       .input(type<{ path: string }>())
       .output(type<{ path: string }>()),
+    previewFile: oc
+      .input(type<{ path: string }>())
+      .output(type<WorkspaceFilePreview>()),
     readFile: oc.input(type<{ path: string }>()).output(type<string>()),
     writeFile: oc
       .input(type<{ path: string; content: string }>())

@@ -22,6 +22,11 @@ export const workspaceRouter = os.router({
     if (paths instanceof Error) return orpcErrors.badRequest(paths);
     return paths;
   }),
+  previewFile: os.previewFile.handler(async ({ context, input }) => {
+    const preview = await context.workspace.previewFile(input.path);
+    if (preview instanceof Error) return orpcErrors.badRequest(preview);
+    return preview;
+  }),
   readFile: os.readFile.handler(async ({ context, input }) => {
     context.logger.info({ event: "readWorkspaceFile", path: input.path });
     const contents = await context.workspace.readFile(input.path);

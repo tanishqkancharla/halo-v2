@@ -331,3 +331,45 @@ serverTest(
     );
   },
 );
+
+serverTest(
+  "previews binary files without decoding them as text",
+  async ({ server }) => {
+    const image =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="blue"/></svg>';
+    await server.rpc.workspace.writeFile({ path: "Image.SVG", content: image });
+    const preview = await server.rpc.workspace.previewFile({
+      path: "Image.SVG",
+    });
+    expect(preview.kind).toBe("image");
+    if (preview.kind !== "image") throw new Error("Expected image preview");
+    expect(preview.file.type).toBe("image/svg+xml");
+    expect(await preview.file.text()).toBe(image);
+    await server.rpc.workspace.writeFile({
+      path: "notes.txt",
+      content: "Editable plain text",
+    });
+    expect(
+      await server.rpc.workspace.previewFile({ path: "notes.txt" }),
+    ).toEqual({ kind: "text" });
+    await fs.writeFile(nodeFile("archive.zip"), Buffer.from([80, 75, 0, 255]));
+    expect(
+      await server.rpc.workspace.previewFile({ path: "archive.zip" }),
+    ).toMatchObject({ kind: "unsupported" });
+    await fs.writeFile(nodeFile("large.txt"), "");
+    await fs.truncate(nodeFile("large.txt"), 101 * 1024 * 1024);
+    expect(
+      await server.rpc.workspace.previewFile({ path: "large.txt" }),
+    ).toMatchObject({ kind: "unsupported" });
+    await expect(
+      server.rpc.workspace.previewFile({ path: "../outside.txt" }),
+    ).rejects.toThrow("not a workspace file");
+    await fs.symlink(nodeFile("notes.txt"), nodeFile("link.txt"));
+    await expect(
+      server.rpc.workspace.previewFile({ path: "link.txt" }),
+    ).rejects.toThrow("not a workspace file");
+    function nodeFile(name: string) {
+      return path.join(server.harness.paths.workspace, name);
+    }
+  },
+);

@@ -283,3 +283,128 @@ e2eTest(
     ).toHaveCount(0);
   },
 );
+
+e2eTest(
+  "edits plain text and displays an image preview",
+  async ({ renderer, server }) => {
+    await server.rpc.workspace.writeFile({
+      path: "notes.txt",
+      content: "Plain text",
+    });
+    await server.rpc.workspace.writeFile({
+      path: "picture.svg",
+      content:
+        '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="60"><rect width="80" height="60" fill="blue"/></svg>',
+    });
+    const page = renderer.page;
+    await page.getByRole("link", { name: "notes.txt", exact: true }).click();
+    const editor = page.getByRole("textbox", {
+      name: "notes.txt",
+      exact: true,
+    });
+    await expect(editor).toHaveValue("Plain text");
+    await editor.fill("Saved plain text");
+    await expect
+      .poll(() => server.rpc.workspace.readFile({ path: "notes.txt" }))
+      .toBe("Saved plain text");
+    await page.getByRole("link", { name: "picture.svg", exact: true }).click();
+    const image = page.getByRole("img", { name: "picture.svg", exact: true });
+    await expect(image).toBeVisible();
+    await expect
+      .poll(() =>
+        image.evaluate((element: HTMLImageElement) => element.naturalWidth),
+      )
+      .toBe(80);
+    await page.getByRole("link", { name: "notes.txt", exact: true }).click();
+    await expect(editor).toHaveValue("Saved plain text");
+  },
+);
+
+e2eTest(
+  "renders a PDF with the built-in document viewer",
+  async ({ renderer, harness }) => {
+    const objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ];
+    const stream = "BT /F1 20 Tf 30 240 Td (Halo PDF preview) Tj ET";
+    objects.push(
+      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    );
+    let pdf = "%PDF-1.4\n";
+    const offsets = [0];
+    for (const [index, object] of objects.entries()) {
+      offsets.push(pdf.length);
+      pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    }
+    const xref = pdf.length;
+    pdf += `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
+    pdf += offsets
+      .slice(1)
+      .map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`)
+      .join("");
+    pdf += `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    await fs.writeFile(
+      nodePath.join(harness.paths.workspace, "document.pdf"),
+      pdf,
+    );
+    const page = renderer.page;
+    await page.getByRole("link", { name: "document.pdf", exact: true }).click();
+    const frame = page.frameLocator(
+      'iframe[title="PDF preview: document.pdf"]',
+    );
+    await expect(frame.locator('embed[type="application/pdf"]')).toBeAttached();
+    await expect(
+      page.getByRole("button", { name: "Open externally", exact: true }),
+    ).toBeVisible();
+  },
+);
+
+e2eTest(
+  "plays audio and explains unsupported binary files",
+  async ({ renderer, harness }) => {
+    const wav = Buffer.alloc(44 + 16000);
+    wav.write("RIFF", 0);
+    wav.writeUInt32LE(wav.length - 8, 4);
+    wav.write("WAVEfmt ", 8);
+    wav.writeUInt32LE(16, 16);
+    wav.writeUInt16LE(1, 20);
+    wav.writeUInt16LE(1, 22);
+    wav.writeUInt32LE(8000, 24);
+    wav.writeUInt32LE(16000, 28);
+    wav.writeUInt16LE(2, 32);
+    wav.writeUInt16LE(16, 34);
+    wav.write("data", 36);
+    wav.writeUInt32LE(16000, 40);
+    await fs.writeFile(
+      nodePath.join(harness.paths.workspace, "recording.wav"),
+      wav,
+    );
+    await fs.writeFile(
+      nodePath.join(harness.paths.workspace, "archive.zip"),
+      Buffer.from([80, 75, 0, 255]),
+    );
+    const page = renderer.page;
+    await page
+      .getByRole("link", { name: "recording.wav", exact: true })
+      .click();
+    const player = page.locator('audio[aria-label="recording.wav"]');
+    await expect(player).toBeVisible();
+    await expect
+      .poll(() =>
+        player.evaluate((element: HTMLAudioElement) => element.duration),
+      )
+      .toBe(1);
+    await page.getByRole("link", { name: "archive.zip", exact: true }).click();
+    await expect(
+      page.getByText(
+        "This file type has no preview. Open it in its default app.",
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Open externally", exact: true }),
+    ).toBeEnabled();
+  },
+);

@@ -8,6 +8,7 @@ import {
   FilesystemService,
   FilesystemPathNotFoundError,
 } from "../filesystem/FilesystemService.js";
+import { workspaceFilePreview } from "./WorkspaceFilePreview.js";
 import { installHaloCli } from "./installHaloCli.js";
 import { seedExtensionWorkspace } from "../extensions/seedExtensionWorkspace.js";
 
@@ -185,6 +186,25 @@ export class WorkspaceService {
     if (paths instanceof Error) return paths;
     this.directoryPaths = directoryPathsFromList(paths);
     return paths;
+  }
+
+  async previewFile(path: string) {
+    const absolutePath = await this.resolveEntryPath(path);
+    if (absolutePath instanceof Error) return absolutePath;
+    const metadata = await this.options.filesystem.lstat(absolutePath);
+    if (metadata instanceof Error)
+      return new WorkspaceIoError({ cause: metadata });
+    if (!metadata.isFile()) return new WorkspaceInvalidPathError({ path });
+    if (metadata.size > 100 * 1024 * 1024) {
+      return {
+        kind: "unsupported" as const,
+        reason: "Files larger than 100 MB can be opened in their default app.",
+      };
+    }
+    const contents = await this.options.filesystem.readFile(absolutePath);
+    if (contents instanceof Error)
+      return new WorkspaceIoError({ cause: contents });
+    return workspaceFilePreview(path, contents);
   }
 
   async readFile(path: string) {

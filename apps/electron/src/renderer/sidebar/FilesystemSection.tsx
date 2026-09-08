@@ -95,6 +95,10 @@ export function FilesystemSection() {
         queryKey: ["workspace-file"],
         refetchType: "none",
       });
+      await queryClient.invalidateQueries({
+        queryKey: ["workspace-preview"],
+        refetchType: "none",
+      });
       if (operation.kind === "create") {
         if (operation.entryKind === "file") navigate(fileRoute(operation.path));
         setAction(undefined);

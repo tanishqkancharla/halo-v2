@@ -6,6 +6,8 @@ import { LOG_CHANNELS } from "../shared/channels.js";
 import { DESKTOP_CHANNEL, type DesktopApi } from "../shared/desktop.js";
 
 const desktopApi: DesktopApi = {
+  openWorkspaceFile: (path) =>
+    ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "openWorkspaceFile", path }),
   getConnection: () =>
     ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getConnection" }),
   chooseWorkspace: () =>
