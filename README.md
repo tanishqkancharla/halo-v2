@@ -7,7 +7,7 @@ Halo is an Electron desktop app with a React renderer and Pi in the main process
 - `apps/electron/src/renderer`: React UI built with Maui and Vite.
 - `apps/electron/src/main`: Electron main process, preload bridge, workspace service, and Pi service.
 - `infra`: Cloudflare infrastructure via [Alchemy](https://alchemy.run/) (`alchemy.run.ts`).
-- `packages/halo-web-cli`: Debug UI control through Libretto Browser Tools.
+- `packages/halo-cli`: Workspace commands, private browser testing, and debug app control.
 - `packages/logger`: Shared structured logger.
 - `packages/typescript-config`: Shared TypeScript settings.
 
@@ -58,13 +58,15 @@ Halo also reads provider keys from the first `.env` file found in `apps/electron
 Development builds expose Electron's Chrome DevTools Protocol on `127.0.0.1:4445`. The CLI attaches with [Libretto Browser Tools](https://libretto.sh/browser-tools) and leaves Halo running:
 
 ```sh
-pnpm halo-web status
-pnpm halo-web snapshot
-pnpm halo-web exec "return await page.locator('body').innerText()"
-pnpm halo-web exec "await page.getByRole('button', { name: 'New session' }).click()"
+pnpm halo status
+pnpm halo app snapshot
+pnpm halo app exec "return await page.locator('body').innerText()"
+pnpm halo app exec "await page.getByRole('button', { name: 'New session' }).click()"
 ```
 
-Pass `--stdin` for longer scripts. Output uses TOON by default; pass `--json` for JSON. Packaged builds do not expose the debug port.
+Use `halo browser open <url>` for an isolated extension preview, followed by `halo browser exec <id>`, `snapshot <id>`, `screenshot <id>`, and `close <id>`. Halo owns these browsers and provisions Chromium on first use.
+
+Pass `--stdin` or `--file checks.js` for longer scripts. Output uses TOON by default; pass `--json` for JSON. Packaged builds do not expose the debug port.
 
 ## Cloudflare infrastructure
 

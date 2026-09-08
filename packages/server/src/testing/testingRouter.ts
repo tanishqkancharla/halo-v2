@@ -3,7 +3,7 @@ import * as errore from "errore";
 import { contract } from "@get-halo/shared/contract";
 import { orpcErrors } from "../orpcErrors.js";
 import type { SessionRegistry } from "../sessions/SessionRegistry.js";
-import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
+import type { ToolRuntime } from "../agent/runtime/ToolRuntime.js";
 
 class TestingApiUnavailableError extends errore.createTaggedError({
   name: "TestingApiUnavailableError",
@@ -15,15 +15,41 @@ class TestingToolNotFoundError extends errore.createTaggedError({
   message: "Executor has no user-facing tool at '$path'.",
 }) {}
 
+class TestingToolInvocationError extends errore.createTaggedError({
+  name: "TestingToolInvocationError",
+  message: "Tool '$path' failed: $detail",
+}) {}
+
 export type TestingRouterContext = {
   sessions: SessionRegistry;
-  toolRuntime: ToolRuntimeService;
+  toolRuntime: ToolRuntime;
   testingApiEnabled: boolean;
 };
 
 const os = implement(contract.testHarness).$context<TestingRouterContext>();
 
 export const testingRouter = os.router({
+  invokeTool: os.invokeTool.handler(async ({ input, context, signal }) => {
+    if (!context.testingApiEnabled) {
+      return orpcErrors.badRequest(new TestingApiUnavailableError());
+    }
+    const runtime = context.toolRuntime;
+    const result = await runtime.invokePath({
+      path: input.path,
+      args: input.input,
+      signal,
+    });
+    if (result instanceof Error) return orpcErrors.badRequest(result);
+    if (!result.ok) {
+      return orpcErrors.badRequest(
+        new TestingToolInvocationError({
+          path: input.path,
+          detail: result.error.message,
+        }),
+      );
+    }
+    return result.data;
+  }),
   appendSessionEvents: os.appendSessionEvents.handler(
     async ({ input, context }) => {
       if (!context.testingApiEnabled) {
@@ -39,8 +65,7 @@ export const testingRouter = os.router({
     if (!context.testingApiEnabled) {
       return orpcErrors.badRequest(new TestingApiUnavailableError());
     }
-    const runtime = await context.toolRuntime.get();
-    if (runtime instanceof Error) return orpcErrors.badRequest(runtime);
+    const runtime = context.toolRuntime;
     const identity = runtime.getToolIdentity(input.path);
     if (identity === undefined) {
       return orpcErrors.badRequest(

@@ -325,7 +325,7 @@ type ToolRuntimeOptions = {
   credentialVault: CredentialVault;
   toolPlugins: readonly HaloToolPlugin[];
   authority: AgentAuthority;
-  oauthRedirectUri: string | undefined;
+  oauthRedirectUri: string;
 };
 
 export class ToolRuntime {
@@ -654,16 +654,17 @@ async function createToolRuntime(
   ).catch((cause) => new ToolRuntimeError({ operation: "startup", cause }));
   if (executor instanceof Error) return executor;
 
-  const installed = await installGooglePresets(executor);
-  if (installed instanceof Error) {
+  await using cleanup = new errore.AsyncDisposableStack();
+  cleanup.defer(async () => {
     const closed = await Effect.runPromise(executor.close()).catch(
       (cause) => new ToolRuntimeError({ operation: "close", cause }),
     );
-    if (closed instanceof Error) {
-      console.warn("Failed to close Executor after Google setup:", closed);
-    }
-    return installed;
-  }
+    if (closed instanceof Error)
+      console.warn("Failed to close Executor after startup failure:", closed);
+  });
+
+  const installed = await installGooglePresets(executor);
+  if (installed instanceof Error) return installed;
 
   const integrations = await Effect.runPromise(
     executor.integrations.list(),
@@ -671,18 +672,7 @@ async function createToolRuntime(
     (cause) =>
       new ToolRuntimeError({ operation: "integration listing", cause }),
   );
-  if (integrations instanceof Error) {
-    const closed = await Effect.runPromise(executor.close()).catch(
-      (cause) => new ToolRuntimeError({ operation: "close", cause }),
-    );
-    if (closed instanceof Error) {
-      console.warn(
-        "Failed to close Executor after integration listing:",
-        closed,
-      );
-    }
-    return integrations;
-  }
+  if (integrations instanceof Error) return integrations;
   const integrationNames = new Map(
     integrations.map((integration) => [
       String(integration.slug),
@@ -702,7 +692,7 @@ async function createToolRuntime(
       integrationNames,
     }),
   });
-  return new ToolRuntime({
+  const runtime = new ToolRuntime({
     executor,
     engine,
     toolInvoker: makeExecutorToolInvoker(executor, { invokeOptions: {} }),
@@ -715,6 +705,8 @@ async function createToolRuntime(
     ),
     integrationNames,
   });
+  cleanup.move();
+  return runtime;
 }
 
 function withToolActivity<E extends Cause.YieldableError>(input: {

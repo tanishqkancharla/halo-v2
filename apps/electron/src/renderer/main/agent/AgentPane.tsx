@@ -21,6 +21,7 @@ import {
 } from "@get-halo/shared/sessionLog";
 import { AssistantMessage } from "./AssistantMessage.tsx";
 import { Editor } from "./Editor.tsx";
+import { ExtensionPermissionRequests } from "../../ExtensionPermissions.js";
 import { ExecutorConnectionCard } from "./ExecutorConnectionCard.tsx";
 import { ToolActivity } from "./ToolActivity.tsx";
 import { type SessionSummary } from "@get-halo/shared/rpc";
@@ -48,6 +49,7 @@ export function AgentPane({
       <div className={body}>
         <div className={column}>
           <SessionView state={state} sessionId={sessionId} />
+          <ExtensionPermissionRequests />
           <Composer
             key={sessionId}
             autoFocus
@@ -82,6 +84,7 @@ export function DraftAgentPane({ draftId }: { draftId: string }) {
           {hasMessages ? (
             <SessionView state={state} sessionId={sessionId} />
           ) : undefined}
+          <ExtensionPermissionRequests />
           <Composer
             autoFocus
             error={state.error}
@@ -342,13 +345,11 @@ const styles = {
     minWidth: 0,
     backgroundColor: backgroundColor.app,
   }),
-  userMessage: style(radius.pill, spacing.padding({ x: 6, y: 3 }), {
+  userMessage: style(radius.lg, spacing.padding({ x: 6, y: 3 }), {
     width: "fit-content",
     maxWidth: "80%",
     minWidth: 0,
     backgroundColor: colors.gray[3],
-    // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- Chromium defines this CSS property name.
-    cornerShape: "squircle",
   }),
   assistantRow: style(flex({ direction: "column", gap: 6 }), {
     minWidth: 0,

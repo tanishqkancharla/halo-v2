@@ -43,25 +43,21 @@ export async function openExecutorDatabase(input: {
     catch: (cause) => new ExecutorDatabaseError({ operation: "open", cause }),
   });
   if (client instanceof Error) return client;
+  using cleanup = new errore.DisposableStack();
+  cleanup.defer(() => client.close());
 
   const foreignKeys = await client
     .execute("PRAGMA foreign_keys = ON")
     .catch(
       (cause) => new ExecutorDatabaseError({ operation: "configure", cause }),
     );
-  if (foreignKeys instanceof Error) {
-    client.close();
-    return foreignKeys;
-  }
+  if (foreignKeys instanceof Error) return foreignKeys;
   const journal = await client
     .execute("PRAGMA journal_mode = WAL")
     .catch(
       (cause) => new ExecutorDatabaseError({ operation: "configure", cause }),
     );
-  if (journal instanceof Error) {
-    client.close();
-    return journal;
-  }
+  if (journal instanceof Error) return journal;
 
   const options = {
     tables: input.tables,
@@ -77,10 +73,7 @@ export async function openExecutorDatabase(input: {
     catch: (cause) =>
       new ExecutorDatabaseError({ operation: "create schema", cause }),
   });
-  if (database instanceof Error) {
-    client.close();
-    return database;
-  }
+  if (database instanceof Error) return database;
   const ensured = await ensureDrizzleRuntimeSchemaFromTables(
     database,
     options,
@@ -88,20 +81,15 @@ export async function openExecutorDatabase(input: {
     (cause) =>
       new ExecutorDatabaseError({ operation: "initialize schema", cause }),
   );
-  if (ensured instanceof Error) {
-    client.close();
-    return ensured;
-  }
+  if (ensured instanceof Error) return ensured;
 
   const executorDatabase = errore.try({
     try: () => createExecutorFumaDb(database, options),
     catch: (cause) =>
       new ExecutorDatabaseError({ operation: "create adapter", cause }),
   });
-  if (executorDatabase instanceof Error) {
-    client.close();
-    return executorDatabase;
-  }
+  if (executorDatabase instanceof Error) return executorDatabase;
+  cleanup.move();
   return {
     db: executorDatabase.db,
     close: () => client.close(),

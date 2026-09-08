@@ -14,10 +14,7 @@ import { useWorkspaceQuery } from "../../api/ApiProvider.tsx";
 
 export function ToolCall({ part }: { part: ToolPart }) {
   const workspace = useWorkspaceQuery().data;
-  const workspaceRoot =
-    workspace?.status === "ready"
-      ? workspace.workspace.workspaceRoot
-      : undefined;
+  const workspaceRoot = workspace?.workspaceRoot;
   const label = toolPartLabel(part, workspaceRoot);
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();

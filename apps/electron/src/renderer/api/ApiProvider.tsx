@@ -4,10 +4,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
-  type UseQueryResult,
 } from "@tanstack/react-query";
-import type { AnyRouter, RouterClient } from "@orpc/server";
-import * as errore from "errore";
 import {
   createContext,
   useCallback,
@@ -15,15 +12,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type {
-  HaloClient,
-  PluginInvocationInput,
-} from "@get-halo/shared/contract";
+import type { HaloClient } from "@get-halo/shared/contract";
 import type { WorkspaceInfo } from "@get-halo/shared/rpc";
-import {
-  loadPluginViews,
-  type LoadedPluginList,
-} from "../evaluatePluginView.js";
+import { Onboarding } from "../Onboarding.tsx";
 import { LoadingPage } from "../LoadingPage.tsx";
 import { ConnectionPage } from "../ConnectionPage.tsx";
 import { desktopApi } from "./electron.js";
@@ -31,15 +22,6 @@ import {
   IncompatibleServerError,
   type HaloRpcConnectionError,
 } from "./HaloRpcClient.js";
-
-class WorkspaceRestoreError extends errore.createTaggedError({
-  name: "WorkspaceRestoreError",
-  message: "Workspace restore failed",
-}) {}
-
-type WorkspaceState =
-  | { status: "needs-workspace"; message?: string }
-  | { status: "ready"; workspace: WorkspaceInfo };
 
 type ApiContextValue = {
   api: HaloClient;
@@ -56,7 +38,7 @@ export function ApiProvider({
 }: {
   createApi: (options: {
     onDisconnect: (error: HaloRpcConnectionError) => void;
-  }) => Promise<Error | HaloClient>;
+  }) => Promise<Error | HaloClient | undefined>;
   children: ReactNode;
 }) {
   const [queryClient] = useState(
@@ -87,7 +69,7 @@ function ResolveApi({
 }: {
   createApi: (options: {
     onDisconnect: (error: HaloRpcConnectionError) => void;
-  }) => Promise<Error | HaloClient>;
+  }) => Promise<Error | HaloClient | undefined>;
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
@@ -98,7 +80,10 @@ function ResolveApi({
   }, []);
   const apiQuery = useQuery({
     queryKey: haloApiQueryKey,
-    queryFn: () => createApi({ onDisconnect: disconnect }),
+    queryFn: async () => {
+      const api = await createApi({ onDisconnect: disconnect });
+      return { api };
+    },
   });
 
   if (apiQuery.isPending) return <LoadingPage />;
@@ -107,18 +92,16 @@ function ResolveApi({
     return <ConnectionPage status="disconnected" />;
   }
   if (disconnected) return <ConnectionPage status="disconnected" />;
-  if (apiQuery.data instanceof IncompatibleServerError) {
-    return <ConnectionPage status="incompatible" error={apiQuery.data} />;
+  const api = apiQuery.data.api;
+  if (api === undefined) return <ChooseWorkspace />;
+  if (api instanceof IncompatibleServerError) {
+    return <ConnectionPage status="incompatible" error={api} />;
   }
-  if (apiQuery.data instanceof Error) {
+  if (api instanceof Error) {
     return <ConnectionPage status="disconnected" />;
   }
 
-  return (
-    <ApiContext value={{ api: apiQuery.data, queryClient }}>
-      {children}
-    </ApiContext>
-  );
+  return <ApiContext value={{ api, queryClient }}>{children}</ApiContext>;
 }
 
 export function useApi(): HaloClient {
@@ -129,28 +112,29 @@ export function useWorkspaceQuery() {
   const api = useApi();
   return useQuery({
     queryKey: workspaceQueryKey,
-    queryFn: () => restoreWorkspace(api),
+    queryFn: () => api.workspace.get(),
   });
 }
 
-export function useChooseWorkspaceMutation() {
-  const { queryClient } = useContext(ApiContext);
-  return useMutation({
+function ChooseWorkspace() {
+  const choose = useMutation({
     mutationFn: () => desktopApi.chooseWorkspace(),
     onSuccess: (workspace) => {
-      if (workspace !== undefined) {
-        queryClient.setQueryData(workspaceQueryKey, readyWorkspace(workspace));
-      }
+      if (workspace !== undefined) window.location.reload();
     },
   });
+  return (
+    <Onboarding
+      message={choose.error === null ? undefined : String(choose.error)}
+      isChoosing={choose.isPending}
+      onChoose={() => choose.mutate()}
+    />
+  );
 }
 
-export function useSessionsQuery(workspace: WorkspaceState | undefined) {
+export function useSessionsQuery(workspace: WorkspaceInfo | undefined) {
   const api = useApi();
-  const workspaceRoot =
-    workspace?.status === "ready"
-      ? workspace.workspace.workspaceRoot
-      : undefined;
+  const workspaceRoot = workspace?.workspaceRoot;
 
   return useQuery({
     queryKey: ["sessions", workspaceRoot],
@@ -163,12 +147,9 @@ export function workspacePathsQueryKey(workspaceRoot: string | undefined) {
   return ["workspace-paths", workspaceRoot] as const;
 }
 
-export function useWorkspacePathsQuery(workspace: WorkspaceState | undefined) {
+export function useWorkspacePathsQuery(workspace: WorkspaceInfo | undefined) {
   const api = useApi();
-  const workspaceRoot =
-    workspace?.status === "ready"
-      ? workspace.workspace.workspaceRoot
-      : undefined;
+  const workspaceRoot = workspace?.workspaceRoot;
 
   return useQuery({
     queryKey: workspacePathsQueryKey(workspaceRoot),
@@ -199,81 +180,13 @@ export function useInstallAppUpdateMutation() {
   });
 }
 
-type PluginServers = Record<string, RouterClient<AnyRouter>>;
-
-type PluginsQueryData = LoadedPluginList & {
-  servers: PluginServers;
-};
-
-export function usePluginsQuery(
-  workspace: WorkspaceState | undefined,
-): UseQueryResult<PluginsQueryData> {
+export function useExtensionsQuery(workspace: WorkspaceInfo | undefined) {
   const api = useApi();
-  const workspaceRoot =
-    workspace?.status === "ready"
-      ? workspace.workspace.workspaceRoot
-      : undefined;
+  const workspaceRoot = workspace?.workspaceRoot;
 
   return useQuery({
-    queryKey: ["plugins", workspaceRoot],
-    queryFn: async (): Promise<PluginsQueryData> => {
-      const list = await api.plugins.list();
-      const loaded = loadPluginViews(list);
-      const servers: PluginServers = {};
-      for (const plugin of list.plugins) {
-        if (plugin.serverPath === undefined) continue;
-        servers[plugin.id] = pluginApiFacade(api, plugin.id);
-      }
-      return { ...loaded, servers };
-    },
+    queryKey: ["extensions", workspaceRoot],
+    queryFn: () => api.extensions.list(),
     enabled: workspaceRoot !== undefined,
   });
-}
-
-/**
- * Preserves the plugin's typed router API over Halo's untyped invoke route.
- * `server.todos.list(input)` becomes
- * `plugins.invoke({ pluginId, path: ["todos", "list"], input })`.
- */
-function pluginApiFacade(api: HaloClient, pluginId: string) {
-  function node(path: string[]): RouterClient<AnyRouter> {
-    const invoke = (
-      input: PluginInvocationInput["input"],
-      options?: { signal?: AbortSignal; lastEventId?: string },
-    ) => api.plugins.invoke({ pluginId, path, input }, options);
-    // SAFETY: each property appends a procedure path and each call delegates to plugins.invoke.
-    return new Proxy(invoke, {
-      get(_target, property) {
-        // Promise resolution reads `.then`; the facade must not be a thenable.
-        if (property === "then") return undefined;
-        return node([...path, property.toString()]);
-      },
-    }) as RouterClient<AnyRouter>;
-  }
-
-  return node([]);
-}
-
-async function restoreWorkspace(api: HaloClient): Promise<WorkspaceState> {
-  const active = await api.workspace
-    .get()
-    .catch((e) => new WorkspaceRestoreError({ cause: e }));
-  if (active instanceof Error) {
-    return { status: "needs-workspace", message: active.message };
-  }
-  if (active !== undefined) return readyWorkspace(active);
-
-  const selected = await desktopApi
-    .chooseWorkspace()
-    .catch((e) => new WorkspaceRestoreError({ cause: e }));
-  if (selected instanceof Error) {
-    return { status: "needs-workspace", message: selected.message };
-  }
-  return selected === undefined
-    ? { status: "needs-workspace" }
-    : readyWorkspace(selected);
-}
-
-function readyWorkspace(workspace: WorkspaceInfo): WorkspaceState {
-  return { status: "ready", workspace };
 }

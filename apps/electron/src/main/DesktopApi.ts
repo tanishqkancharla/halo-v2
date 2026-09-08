@@ -7,6 +7,7 @@ import {
 } from "electron";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
+import type { HaloRpcConnection } from "../shared/rpc.js";
 import type { WorkspaceInfo } from "@get-halo/shared/rpc";
 import {
   DESKTOP_CHANNEL,
@@ -27,17 +28,22 @@ class DesktopOperationError extends errore.createTaggedError({
 }) {}
 
 export function registerDesktopApi(args: {
-  selectWorkspace: (directory: string) => Promise<WorkspaceInfo | Error>;
-  getWindow: () => BrowserWindow | undefined;
+  selectWorkspace: (
+    directory: string,
+    sender: BrowserWindow,
+  ) => Promise<WorkspaceInfo | Error>;
+  getConnection: () => HaloRpcConnection | undefined;
+  ownsWindow: (window: BrowserWindow) => boolean;
 }): void {
   ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
-    const window = assertTrustedSender({ event, getWindow: args.getWindow });
+    const window = assertTrustedSender({ event, ownsWindow: args.ownsWindow });
     const validated = validateDesktopRequest(request);
     if (validated instanceof Error) throw validated;
     const result = await handleDesktopRequest({
       request: validated,
       window,
       selectWorkspace: args.selectWorkspace,
+      getConnection: args.getConnection,
     });
     if (result instanceof Error) throw result;
     return result;
@@ -53,10 +59,16 @@ function validateDesktopRequest(
 
 async function handleDesktopRequest(args: {
   request: DesktopRequest;
+  getConnection: () => HaloRpcConnection | undefined;
   window: BrowserWindow;
-  selectWorkspace: (directory: string) => Promise<WorkspaceInfo | Error>;
+  selectWorkspace: (
+    directory: string,
+    sender: BrowserWindow,
+  ) => Promise<WorkspaceInfo | Error>;
 }) {
   switch (args.request.type) {
+    case "getConnection":
+      return args.getConnection();
     case "chooseWorkspace":
       return chooseWorkspace({
         window: args.window,
@@ -75,7 +87,10 @@ async function handleDesktopRequest(args: {
 
 async function chooseWorkspace(args: {
   window: BrowserWindow;
-  selectWorkspace: (directory: string) => Promise<WorkspaceInfo | Error>;
+  selectWorkspace: (
+    directory: string,
+    sender: BrowserWindow,
+  ) => Promise<WorkspaceInfo | Error>;
 }) {
   const selection = await dialog
     .showOpenDialog(args.window, {
@@ -92,7 +107,7 @@ async function chooseWorkspace(args: {
     );
   if (selection instanceof Error) return selection;
   if (selection.canceled) return undefined;
-  return args.selectWorkspace(selection.filePaths[0]!);
+  return args.selectWorkspace(selection.filePaths[0]!, args.window);
 }
 
 async function openExternal(request: OpenExternalRequest) {
@@ -119,11 +134,10 @@ async function openExternal(request: OpenExternalRequest) {
 
 function assertTrustedSender(args: {
   event: IpcMainInvokeEvent;
-  getWindow: () => BrowserWindow | undefined;
+  ownsWindow: (window: BrowserWindow) => boolean;
 }): BrowserWindow {
-  const window = args.getWindow();
   const senderWindow = BrowserWindow.fromWebContents(args.event.sender);
-  if (senderWindow === null || senderWindow !== window) {
+  if (senderWindow === null || !args.ownsWindow(senderWindow)) {
     throw new Error("Halo rejected IPC from an unknown renderer.");
   }
   return senderWindow;
