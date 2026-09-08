@@ -243,6 +243,7 @@ e2eTest(
 
     await session.append(
       m.exec.start({
+        id: "lookup",
         js: "await Promise.all([tools.google_calendar.events.list({}), tools.web.search({ query: 'Halo' })])",
       }),
     );
@@ -258,7 +259,9 @@ e2eTest(
       execSummary.getByRole("img", { name: "Expand tool activity" }),
     ).toBeHidden();
 
-    await session.append(m.exec.tool.start("search"));
+    await session.append(
+      m.exec.tool.start("search", { id: "discovery", parentId: "lookup" }),
+    );
     const discoverySummary = pane.getByRole("button", {
       name: "Searching tools",
       exact: true,
@@ -294,7 +297,7 @@ e2eTest(
       discoverySummary.getByRole("img", { name: "Expand tool activity" }),
     ).toBeHidden();
 
-    await session.append(m.exec.tool.end());
+    await session.append(m.exec.tool.end({ id: "discovery" }));
     await expect(discoverySummary).toBeVisible();
     await expect(
       pane.getByText("Searching tools", { exact: true }),
@@ -303,7 +306,12 @@ e2eTest(
       1,
     );
 
-    await session.append(m.exec.tool.start("google_calendar.events.list"));
+    await session.append(
+      m.exec.tool.start("google_calendar.events.list", {
+        id: "calendar",
+        parentId: "lookup",
+      }),
+    );
     await expect(
       pane.getByRole("button", { name: "Using Google Calendar", exact: true }),
     ).toBeVisible();
@@ -314,7 +322,10 @@ e2eTest(
       pane.getByText("Using Google Calendar", { exact: true }),
     ).toHaveCount(2);
 
-    await session.append([m.exec.tool.end(), m.exec.tool.start("web.search")]);
+    await session.append([
+      m.exec.tool.end({ id: "calendar" }),
+      m.exec.tool.start("web.search", { id: "web", parentId: "lookup" }),
+    ]);
     await expect(
       pane.getByText("Used Google Calendar", { exact: true }),
     ).toHaveCount(1);
@@ -325,7 +336,11 @@ e2eTest(
       pane.getByText("Using Web Search", { exact: true }),
     ).toHaveCount(2);
 
-    await session.append([m.exec.tool.end(), m.exec.end(), m.run.end()]);
+    await session.append([
+      m.exec.tool.end({ id: "web" }),
+      m.exec.end({ id: "lookup" }),
+      m.run.end(),
+    ]);
     const completedSummary = pane.getByRole("button", {
       name: "Searched tools and used Google Calendar, Web Search",
       exact: true,
@@ -409,10 +424,14 @@ for (const scenario of expansionScenarios) {
         : scenario.result;
       await session.append(m.run.start());
       if (scenario.nested) {
-        await session.append(m.exec.start({ js }));
+        await session.append(m.exec.start({ id: "exec", js }));
       }
       await session.append(
-        lifecycle.start(scenario.path, { arguments: scenario.args }),
+        lifecycle.start(scenario.path, {
+          id: "tool",
+          parentId: scenario.nested ? "exec" : undefined,
+          arguments: scenario.args,
+        }),
       );
 
       const summary = pane.getByRole("button", {
@@ -440,12 +459,14 @@ for (const scenario of expansionScenarios) {
         summary.getByRole("status", { name: "Working" }),
       );
 
-      await session.append(lifecycle.end({ result: scenario.result }));
+      await session.append(
+        lifecycle.end({ id: "tool", result: scenario.result }),
+      );
       if (scenario.nested) {
         await expect(
           details.getByText(scenario.result, { exact: true }),
         ).toHaveCount(0);
-        await session.append(m.exec.end({ result }));
+        await session.append(m.exec.end({ id: "exec", result }));
       }
       await expect(details.getByText(result, { exact: true })).toBeVisible();
       const completedCall = pane.getByRole("button", {
@@ -475,7 +496,7 @@ for (const scenario of expansionScenarios) {
 }
 
 e2eTest(
-  "matches tool endings by path, latest start, and explicit ID",
+  "keeps parallel tool activity visible when another tool finishes",
   async ({ harness, renderer }) => {
     const session = await harness.loadSession({ title: "Parallel tools" });
     const pane = renderer.page.getByRole("main", { name: "Parallel tools" });
@@ -485,81 +506,44 @@ e2eTest(
         js: "return await tools.google_calendar.events.list({})",
         id: "calendar",
       }),
-      m.exec.tool.start("google_calendar.events.list", { id: "events" }),
-      m.exec.start({ js: "return await tools.web.search({ query: 'Halo' })" }),
-      m.exec.tool.start("web.search"),
-      m.exec.tool.start("search"),
+      m.exec.tool.start("google_calendar.events.list", {
+        id: "events",
+        parentId: "calendar",
+      }),
+      m.exec.start({
+        id: "web",
+        js: "return await tools.web.search({ query: 'Halo' })",
+      }),
+      m.exec.tool.start("web.search", { id: "search", parentId: "web" }),
     ]);
     await pane
-      .getByRole("button", { name: "Searching tools", exact: true })
+      .getByRole("button", { name: "Using Web Search", exact: true })
       .click();
 
-    await session.append(m.exec.tool.end({ path: "web.search" }));
-    await expect(
-      pane.getByText("Used Web Search", { exact: true }),
-    ).toHaveCount(1);
-    await expect(
-      pane.getByText("Searching tools", { exact: true }),
-    ).toHaveCount(2);
-    await expect(
-      pane.getByText("Using Google Calendar", { exact: true }),
-    ).toHaveCount(1);
-
-    await session.append([m.exec.tool.end(), m.exec.end()]);
-    await expect(pane.getByText("Searched tools", { exact: true })).toHaveCount(
-      1,
-    );
-    await expect(
-      pane.getByText("Using Google Calendar", { exact: true }),
-    ).toHaveCount(2);
-
-    await session.append(m.exec.tool.start("web.search"));
-    await session.append(m.exec.tool.end({ id: "events" }));
-    await expect(
-      pane.getByText("Used Google Calendar", { exact: true }),
-    ).toHaveCount(1);
-    await expect(
-      pane.getByText("Using Web Search", { exact: true }),
-    ).toHaveCount(2);
-
-    await expect(
-      session.append(m.exec.tool.end({ id: "events" })),
-    ).rejects.toThrow("No matching unfinished start");
     await session.append([
-      m.exec.tool.end(),
+      m.exec.tool.end({ id: "events" }),
       m.exec.end({ id: "calendar" }),
+    ]);
+    await expect(
+      pane.getByRole("button", {
+        name: "Used Google Calendar (google_calendar.events.list)",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      pane.getByRole("button", {
+        name: "Using Web Search (web.search)",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await session.append([
+      m.exec.tool.end({ id: "search" }),
+      m.exec.end({ id: "web" }),
       m.run.end({ id: "lookup" }),
     ]);
     await expect(
       pane.getByRole("button", {
-        name: "Searched tools and used Google Calendar, Web Search",
-        exact: true,
-      }),
-    ).toBeVisible();
-
-    await session.append([
-      m.run.start(),
-      m.tool.start("read", { arguments: { path: "notes.md" } }),
-      m.tool.start("read", { arguments: { path: "README.md" } }),
-    ]);
-    await pane
-      .getByRole("button", { name: "Reading README.md", exact: true })
-      .click();
-    await session.append(m.tool.end());
-    await expect(pane.getByText("Read README.md", { exact: true })).toHaveCount(
-      1,
-    );
-    await expect(
-      pane.getByText("Reading notes.md", { exact: true }),
-    ).toHaveCount(2);
-    await session.append([
-      m.tool.end(),
-      m.read({ path: "notes.md", result: "Notes again" }),
-      m.run.end(),
-    ]);
-    await expect(
-      pane.getByRole("button", {
-        name: "Searched tools, read 2 files, and used Google Calendar, Web Search",
+        name: "Used Google Calendar, Web Search",
         exact: true,
       }),
     ).toBeVisible();
