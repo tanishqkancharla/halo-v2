@@ -172,7 +172,7 @@ e2eTest("shows tools used inside exec", async ({ harness, renderer }) => {
 
 e2eTest(
   "wraps exec code and results in individual tool details",
-  async ({ harness, renderer }, testInfo) => {
+  async ({ harness, renderer }) => {
     const query = "calendar scheduling ".repeat(25);
     const js = `return await tools.search({ query: '${query}' });`;
     const result = `https://example.com/${"calendar".repeat(80)}`;
@@ -220,16 +220,12 @@ e2eTest(
         )
         .toBeGreaterThan(1);
     }
-    await testInfo.attach("wrapped exec details", {
-      body: await details.screenshot(),
-      contentType: "image/png",
-    });
   },
 );
 
 e2eTest(
   "streams tool activity labels as session events arrive",
-  async ({ harness, renderer }, testInfo) => {
+  async ({ harness, renderer }) => {
     const session = await harness.loadSession({
       title: "Live cross-tool lookup",
     });
@@ -273,10 +269,6 @@ e2eTest(
     await expect(
       discoverySummary.getByRole("img", { name: "Expand tool activity" }),
     ).toBeHidden();
-    await testInfo.attach("live tool activity", {
-      body: await pane.screenshot(),
-      contentType: "image/png",
-    });
 
     await discoverySummary.hover();
     await expect(
@@ -412,7 +404,7 @@ const expansionScenarios: {
 for (const scenario of expansionScenarios) {
   e2eTest(
     `expands ${scenario.name} tool calls while streaming and after reload`,
-    async ({ harness, renderer }, testInfo) => {
+    async ({ harness, renderer }) => {
       const session = await harness.loadSession({ title: "Expandable tools" });
       const pane = renderer.page.getByRole("main", {
         name: "Expandable tools",
@@ -474,10 +466,6 @@ for (const scenario of expansionScenarios) {
         exact: true,
       });
       await expect(completedCall).toHaveAttribute("aria-expanded", "true");
-      await testInfo.attach("expanded tool details", {
-        body: await pane.screenshot(),
-        contentType: "image/png",
-      });
       await session.append(m.run.end());
 
       await completedCall.click();
