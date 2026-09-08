@@ -1,4 +1,5 @@
 const vscode = require("vscode");
+const { rangePath } = require("./rangePath.js");
 
 const {
   findDocumentSymbolPath,
@@ -9,12 +10,21 @@ function isDocumentSymbol(symbol) {
   return Array.isArray(symbol.children);
 }
 
-async function copyPathToSymbol() {
+async function copyPath() {
   const editor = vscode.window.activeTextEditor;
   if (editor === undefined) {
     await vscode.window.showInformationMessage(
-      "Open a file and select a symbol first.",
+      "Open a file and place the cursor or select a range first.",
     );
+    return;
+  }
+
+  const filePath = vscode.workspace.asRelativePath(editor.document.uri, false);
+  const selection = editor.selection;
+  if (!selection.isEmpty) {
+    const value = rangePath(filePath, selection);
+    await vscode.env.clipboard.writeText(value);
+    vscode.window.setStatusBarMessage(`Copied ${value}`, 3000);
     return;
   }
 
@@ -30,7 +40,7 @@ async function copyPathToSymbol() {
     return;
   }
 
-  const position = editor.selection.start;
+  const position = selection.start;
   const symbolPath = isDocumentSymbol(symbols[0])
     ? findDocumentSymbolPath(symbols, position)
     : findSymbolInformationPath(symbols, position);
@@ -42,7 +52,6 @@ async function copyPathToSymbol() {
     return;
   }
 
-  const filePath = vscode.workspace.asRelativePath(editor.document.uri, false);
   const value = `${filePath}#${symbolPath.join(".")}`;
   await vscode.env.clipboard.writeText(value);
   vscode.window.setStatusBarMessage(`Copied ${value}`, 3000);
@@ -50,7 +59,8 @@ async function copyPathToSymbol() {
 
 function activate(context) {
   context.subscriptions.push(
-    vscode.commands.registerCommand("halo.copyPathToSymbol", copyPathToSymbol),
+    vscode.commands.registerCommand("halo.copyPathToSymbol", copyPath),
+    vscode.commands.registerCommand("halo.copyPathToRange", copyPath),
   );
 }
 

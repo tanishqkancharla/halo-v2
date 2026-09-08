@@ -1,9 +1,9 @@
 {
   "name": "halo-copy-path-to-symbol",
   "displayName": "Copy Path to Symbol",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
-  "description": "Copy a workspace-relative file path and the selected symbol name.",
+  "description": "Copy a workspace-relative file path with the current symbol or selected line range.",
   "categories": [
     "Other"
   ],
@@ -18,6 +18,10 @@
       {
         "command": "halo.copyPathToSymbol",
         "title": "Copy Path to Symbol"
+      },
+      {
+        "command": "halo.copyPathToRange",
+        "title": "Copy Path to Range"
       }
     ],
     "menus": {
@@ -25,12 +29,28 @@
         {
           "command": "halo.copyPathToSymbol",
           "group": "navigation@20",
-          "when": "editorTextFocus"
+          "when": "editorTextFocus && !editorHasSelection"
+        },
+        {
+          "command": "halo.copyPathToRange",
+          "group": "navigation@20",
+          "when": "editorTextFocus && editorHasSelection"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "halo.copyPathToSymbol",
+          "when": "!editorHasSelection"
+        },
+        {
+          "command": "halo.copyPathToRange",
+          "when": "editorHasSelection"
         }
       ]
     }
   },
   "activationEvents": [
+    "onCommand:halo.copyPathToRange",
     "onCommand:halo.copyPathToSymbol"
   ],
   "engines": {
