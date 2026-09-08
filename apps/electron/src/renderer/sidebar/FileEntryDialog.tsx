@@ -18,6 +18,7 @@ export type FileEntryAction =
   | { kind: "file"; parent: string }
   | { kind: "directory"; parent: string }
   | { kind: "rename"; path: string; isDirectory: boolean }
+  | { kind: "delete"; path: string; isDirectory: boolean }
   | { kind: "move"; path: string; isDirectory: boolean };
 
 export function FileEntryDialog({
@@ -35,7 +36,10 @@ export function FileEntryDialog({
   onSubmit(path: string): void;
   onClose(): void;
 }) {
-  const existing = action.kind === "rename" || action.kind === "move";
+  const existing =
+    action.kind === "rename" ||
+    action.kind === "move" ||
+    action.kind === "delete";
   const originalName = existing
     ? action.path.slice(action.path.lastIndexOf("/") + 1)
     : action.kind === "file"
@@ -61,14 +65,18 @@ export function FileEntryDialog({
         ? "New folder"
         : action.kind === "rename"
           ? "Rename"
-          : `Move ${originalName}`;
+          : action.kind === "delete"
+            ? `Delete ${originalName}?`
+            : `Move ${originalName}`;
   const validName =
-    name.trim().length > 0 &&
-    !/[\\/]/.test(name) &&
-    !name.startsWith(".") &&
-    name !== "node_modules";
+    action.kind === "delete" ||
+    (name.trim().length > 0 &&
+      !/[\\/]/.test(name) &&
+      !name.startsWith(".") &&
+      name !== "node_modules");
   const destination = folder === "" ? name.trim() : `${folder}/${name.trim()}`;
-  const unchanged = existing && destination === action.path;
+  const unchanged =
+    action.kind !== "delete" && existing && destination === action.path;
   const availableFolders = folders.filter(
     (path) =>
       !existing ||
@@ -92,11 +100,21 @@ export function FileEntryDialog({
             className={form}
             onSubmit={(event) => {
               event.preventDefault();
-              if (validName && !unchanged && !pending) onSubmit(destination);
+              if (validName && !unchanged && !pending)
+                onSubmit(action.kind === "delete" ? action.path : destination);
             }}
           >
             <h2 className={heading}>{title}</h2>
-            {action.kind !== "move" && (
+            {action.kind === "delete" && (
+              <p>
+                This permanently deletes{" "}
+                {action.isDirectory
+                  ? "this folder and everything inside it"
+                  : "this file"}
+                . This cannot be undone.
+              </p>
+            )}
+            {action.kind !== "move" && action.kind !== "delete" && (
               <label className={label}>
                 Name
                 <TextField
@@ -116,7 +134,7 @@ export function FileEntryDialog({
                 />
               </label>
             )}
-            {action.kind !== "rename" && (
+            {action.kind !== "rename" && action.kind !== "delete" && (
               <Select
                 label={action.kind === "move" ? "Move to" : "Location"}
                 selectedKey={folder === "" ? "/" : folder}
@@ -149,12 +167,16 @@ export function FileEntryDialog({
                 disabled={!validName || unchanged || pending}
               >
                 {pending
-                  ? "Saving…"
-                  : action.kind === "rename"
-                    ? "Rename"
-                    : action.kind === "move"
-                      ? "Move"
-                      : "Create"}
+                  ? action.kind === "delete"
+                    ? "Deleting…"
+                    : "Saving…"
+                  : action.kind === "delete"
+                    ? "Delete"
+                    : action.kind === "rename"
+                      ? "Rename"
+                      : action.kind === "move"
+                        ? "Move"
+                        : "Create"}
               </Button>
             </div>
           </form>

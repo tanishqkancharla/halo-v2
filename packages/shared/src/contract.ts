@@ -133,6 +133,9 @@ export const contract = publicProcedure.router({
     moveEntry: oc
       .input(type<{ source: string; destination: string }>())
       .output(type<{ path: string }>()),
+    deleteEntry: oc
+      .input(type<{ path: string }>())
+      .output(type<{ path: string }>()),
     readFile: oc.input(type<{ path: string }>()).output(type<string>()),
     writeFile: oc
       .input(type<{ path: string; content: string }>())

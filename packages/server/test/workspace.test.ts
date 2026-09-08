@@ -301,3 +301,33 @@ serverTest(
     );
   },
 );
+
+serverTest(
+  "deletes files and folders while preserving neighboring files",
+  async ({ server }) => {
+    await server.rpc.workspace.writeFile({
+      path: "Notes/Today.txt",
+      content: "remove",
+    });
+    await server.rpc.workspace.writeFile({ path: "Keep.txt", content: "keep" });
+    await server.rpc.workspace.deleteEntry({ path: "Notes/Today.txt" });
+    expect(await server.rpc.workspace.listPaths()).toEqual([
+      "Keep.txt",
+      "Notes/",
+    ]);
+    await server.rpc.workspace.writeFile({
+      path: "Notes/Nested/Plan.txt",
+      content: "remove",
+    });
+    await server.rpc.workspace.deleteEntry({ path: "Notes" });
+    expect(await server.rpc.workspace.listPaths()).toEqual(["Keep.txt"]);
+    for (const invalid of ["", "../outside", ".pi"]) {
+      await expect(
+        server.rpc.workspace.deleteEntry({ path: invalid }),
+      ).rejects.toThrow("not a workspace file");
+    }
+    expect(await server.rpc.workspace.readFile({ path: "Keep.txt" })).toBe(
+      "keep",
+    );
+  },
+);

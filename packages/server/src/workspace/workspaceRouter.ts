@@ -38,6 +38,11 @@ export const workspaceRouter = os.router({
     if (moved instanceof Error) return orpcErrors.badRequest(moved);
     return moved;
   }),
+  deleteEntry: os.deleteEntry.handler(async ({ context, input }) => {
+    const deleted = await context.workspace.deleteEntry(input);
+    if (deleted instanceof Error) return orpcErrors.badRequest(deleted);
+    return deleted;
+  }),
   writeFile: os.writeFile.handler(async ({ context, input }) => {
     context.logger.info({ event: "writeWorkspaceFile", path: input.path });
     const written = await context.workspace.writeFile(

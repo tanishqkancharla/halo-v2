@@ -14,7 +14,11 @@ import {
 } from "maui";
 import { style, useStyles } from "purse-styles";
 import { useLocation } from "wouter";
-import { FileEntryDialog, FileMoveProgress, type FileEntryAction } from "./FileEntryDialog.js";
+import {
+  FileEntryDialog,
+  FileMoveProgress,
+  type FileEntryAction,
+} from "./FileEntryDialog.js";
 import { flushFileAutosaves } from "../main/useAutosaveFile.js";
 import { File, Folder, Plus, DotsHorizontal } from "maui/icons";
 import type { WorkspaceTreeEvent } from "@get-halo/shared/rpc";
@@ -38,6 +42,7 @@ type FileNavigationNode = {
 
 type FileOperation =
   | { kind: "create"; path: string; entryKind: "file" | "directory" }
+  | { kind: "delete"; path: string }
   | { kind: "move"; source: string; destination: string };
 
 const fileDragType = "application/x-halo-workspace-path";
@@ -69,11 +74,13 @@ export function FilesystemSection() {
       }
       const saved = await flushFileAutosaves();
       if (saved instanceof Error) throw saved;
+      if (operation.kind === "delete")
+        return api.workspace.deleteEntry({ path: operation.path });
       return api.workspace.moveEntry(operation);
     },
     onSuccess: async (_result, operation) => {
       const destination =
-        operation.kind === "create" ? operation.path : operation.destination;
+        operation.kind !== "move" ? operation.path : operation.destination;
       const segments = destination.split("/");
       expand(
         segments.map(
@@ -98,6 +105,15 @@ export function FilesystemSection() {
         return;
       }
       const openPath = decodeURIComponent(location.slice("/files/".length));
+      if (operation.kind === "delete") {
+        if (
+          openPath === operation.path ||
+          openPath.startsWith(`${operation.path}/`)
+        )
+          navigate("/", { replace: true });
+        setAction(undefined);
+        return;
+      }
       if (
         openPath === operation.source ||
         openPath.startsWith(`${operation.source}/`)
@@ -216,6 +232,8 @@ export function FilesystemSection() {
                     path,
                     entryKind: action.kind,
                   });
+                else if (action.kind === "delete")
+                  mutation.mutate({ kind: "delete", path: action.path });
                 else
                   mutation.mutate({
                     kind: "move",
@@ -363,6 +381,11 @@ function FileMenu({
         {node !== undefined && (
           <MenuItem onAction={() => onAction({ kind: "move", ...node })}>
             Move to…
+          </MenuItem>
+        )}
+        {node !== undefined && (
+          <MenuItem onAction={() => onAction({ kind: "delete", ...node })}>
+            Delete…
           </MenuItem>
         )}
       </Menu>

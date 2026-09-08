@@ -261,6 +261,17 @@ export class WorkspaceService {
     return { path: input.destination };
   }
 
+  async deleteEntry(input: { path: string }) {
+    const path = await this.resolveEntryPath(input.path);
+    if (path instanceof Error) return path;
+    const removed = await this.options.filesystem.remove(path, {
+      recursive: true,
+    });
+    if (removed instanceof Error)
+      return new WorkspaceIoError({ cause: removed });
+    return { path: input.path };
+  }
+
   private async resolveEntryPath(path: string) {
     const absolutePath = resolve(this.layout.root, path);
     if (

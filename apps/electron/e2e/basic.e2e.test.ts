@@ -241,3 +241,45 @@ e2eTest(
     ).toContain("Keep this unsaved edit");
   },
 );
+
+e2eTest(
+  "confirms folder deletion and closes its open file",
+  async ({ renderer, server }) => {
+    await server.rpc.workspace.writeFile({
+      path: "Notes/Today.md",
+      content: "# Today",
+    });
+    await server.rpc.workspace.writeFile({
+      path: "Keep.md",
+      content: "# Keep",
+    });
+    const page = renderer.page;
+    await page
+      .getByRole("button", { name: "Expand Notes", exact: true })
+      .click();
+    await page.getByRole("link", { name: "Today.md", exact: true }).click();
+    const editor = page
+      .getByRole("main", { name: "Notes/Today.md" })
+      .getByLabel("Notes/Today.md", { exact: true });
+    await editor.fill("Latest edit");
+    await page
+      .getByRole("button", { name: "Actions for Notes", exact: true })
+      .click();
+    await page.getByRole("menuitem", { name: "Delete…", exact: true }).click();
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(editor).toBeVisible();
+    await page
+      .getByRole("button", { name: "Actions for Notes", exact: true })
+      .click();
+    await page.getByRole("menuitem", { name: "Delete…", exact: true }).click();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(page.getByRole("main", { name: "New session" })).toBeVisible();
+    await expect
+      .poll(() => server.rpc.workspace.listPaths())
+      .toEqual(["Keep.md"]);
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "Actions for Notes", exact: true }),
+    ).toHaveCount(0);
+  },
+);
