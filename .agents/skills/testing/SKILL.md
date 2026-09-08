@@ -27,7 +27,7 @@ Use Vitest for service, API, and library tests, and Playwright for UI end-to-end
   - Action: an action is taken on the service
   - Assertion: we verify the service and external state is as we expect
 - Tests should be as readable as possible. That means every line in a test should be one of two things:
-  - An assertion
+  - An assertion or setup for an assertion (minimal)
   - A single action taken on the service, which should correspond to the same actions available to human, agent, or code drivers.
 - Boilerplate setup/assertion does not belong in a test - file it in Vitest fixtures as much as possible.
 - Tests should be isolated and unique. They should not re-test correctness already verified in other tests.
