@@ -14,11 +14,22 @@ export async function flushFileAutosaves() {
 
 class WorkspaceFileWriteError extends errore.createTaggedError({
   name: "WorkspaceFileWriteError",
-  message: "Failed to save $path. Please try again before moving it.",
+  message:
+    "Failed to save $path. Please try again before changing its location or deleting it.",
 }) {}
 
 class FileAutosave {
-  mounted = false;
+  private mounted = false;
+
+  mount() {
+    this.mounted = true;
+  }
+
+  async unmount() {
+    this.mounted = false;
+    await this.flush();
+    if (!this.mounted) fileSaves.delete(this);
+  }
   private content: string;
   private lastWritten: string;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -83,16 +94,10 @@ export function useAutosaveFile(args: { path: string; loaded: string }) {
   );
 
   useEffect(() => {
-    save.mounted = true;
+    save.mount();
     fileSaves.add(save);
     return () => {
-      save.mounted = false;
-      void save
-        .flush()
-        .then(() => {
-          if (!save.mounted) fileSaves.delete(save);
-        })
-        .catch(console.error);
+      void save.unmount().catch(console.error);
     };
   }, [save]);
 

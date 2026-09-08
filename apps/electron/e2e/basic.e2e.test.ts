@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import path from "node:path";
+import nodePath from "node:path";
 import { expect } from "@playwright/test";
 import { e2eTest } from "./e2eTest.js";
 
@@ -213,7 +213,7 @@ e2eTest(
       .getByRole("main", { name: "notes.md", exact: true })
       .getByLabel("notes.md", { exact: true });
     await expect(editor).toHaveText("Original");
-    const file = path.join(harness.paths.workspace, "notes.md");
+    const file = nodePath.join(harness.paths.workspace, "notes.md");
     await fs.unlink(file);
     await fs.mkdir(file);
     await editor.fill("Keep this unsaved edit");

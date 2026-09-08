@@ -80,6 +80,7 @@ export function FileEntryDialog({
     <ModalOverlay
       isOpen
       isDismissable={!pending}
+      isKeyboardDismissDisabled={pending}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
@@ -167,7 +168,7 @@ export function FileMoveProgress() {
   const overlay = useStyles(styles.overlay);
   const modal = useStyles(styles.modal);
   return (
-    <ModalOverlay isOpen className={overlay}>
+    <ModalOverlay isOpen isKeyboardDismissDisabled className={overlay}>
       <Modal className={modal}>
         <Dialog aria-label="Moving files">
           <p role="status">Moving…</p>
