@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import type { Logger } from "@repo/logger";
 import {
   FilesystemPathNotFoundError,
@@ -15,6 +16,8 @@ export class ExtensionHost {
   private readonly processes = new Map<string, RunningExtension>();
   private workspaceRoot: string | undefined;
   private lifecycle = Promise.resolve();
+  private toolsOrigin: string | undefined;
+  private readonly toolTokens = new Map<string, string>();
 
   constructor(
     private readonly options: {
@@ -28,6 +31,22 @@ export class ExtensionHost {
     return [...this.processes.values()]
       .filter((extension) => extension.isRunning())
       .map(({ id, url }) => ({ id, url }));
+  }
+
+  setToolsOrigin(origin: string) {
+    this.toolsOrigin = origin;
+  }
+
+  identifyToolConnection(
+    authorization: string | undefined,
+    workspaceRoot: string | undefined,
+  ) {
+    if (authorization === undefined || workspaceRoot !== this.workspaceRoot)
+      return undefined;
+    const id = this.toolTokens.get(authorization);
+    if (id === undefined || !this.processes.get(id)?.isRunning())
+      return undefined;
+    return id;
   }
 
   start(workspaceRoot: string) {
@@ -81,6 +100,7 @@ export class ExtensionHost {
       if (ids.has(id)) continue;
       const stopped = await extension.stop();
       this.processes.delete(id);
+      this.removeToolConnection(id);
       if (stopped instanceof Error)
         this.options.logger.warn({
           event: "extension-stop-failed",
@@ -91,6 +111,13 @@ export class ExtensionHost {
       a.name.localeCompare(b.name),
     )) {
       if (this.processes.get(entry.name)?.isRunning()) continue;
+      if (this.toolsOrigin === undefined)
+        throw new Error(
+          "Extension tool endpoint must be configured before starting extensions",
+        );
+      this.removeToolConnection(entry.name);
+      const token = randomUUID();
+      this.toolTokens.set(`Bearer ${token}`, entry.name);
       const extension = await startExtension({
         id: entry.name,
         directory: join(directory, entry.name),
@@ -102,8 +129,10 @@ export class ExtensionHost {
         ),
         runtime: this.options.runtime,
         logger: this.options.logger,
+        tools: { origin: this.toolsOrigin, token },
       });
       if (extension instanceof Error) {
+        this.removeToolConnection(entry.name);
         this.options.logger.warn({
           event: "extension-start-failed",
           error: extension,
@@ -117,6 +146,7 @@ export class ExtensionHost {
   private async stopWorkspace() {
     const processes = [...this.processes.values()];
     this.processes.clear();
+    this.toolTokens.clear();
     this.workspaceRoot = undefined;
     for (const result of await Promise.all(
       processes.map((extension) => extension.stop()),
@@ -126,6 +156,12 @@ export class ExtensionHost {
           event: "extension-stop-failed",
           error: result,
         });
+    }
+  }
+
+  private removeToolConnection(id: string) {
+    for (const [token, extensionId] of this.toolTokens) {
+      if (extensionId === id) this.toolTokens.delete(token);
     }
   }
 }

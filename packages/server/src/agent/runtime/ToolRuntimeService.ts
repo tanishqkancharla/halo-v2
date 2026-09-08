@@ -42,6 +42,7 @@ type ToolRuntimeServiceOptions = {
 
 export class ToolRuntimeService {
   private runtime: ToolRuntime | undefined;
+  private lifecycle = Promise.resolve();
   private workspaceRoot: string | undefined;
   private oauthRedirectUri: string | undefined;
   private readonly pendingConnections = new Map<string, PendingConnection>();
@@ -53,7 +54,21 @@ export class ToolRuntimeService {
     this.oauthRedirectUri = oauthRedirectUri;
   }
 
-  async get() {
+  get() {
+    return this.serial(() => this.openRuntime());
+  }
+
+  close() {
+    return this.serial(() => this.closeRuntime());
+  }
+
+  private serial<T>(operation: () => Promise<T>) {
+    const result = this.lifecycle.then(operation);
+    this.lifecycle = result.then(() => undefined);
+    return result;
+  }
+
+  private async openRuntime() {
     const layout = this.options.workspace.getLayout();
     if (layout instanceof Error) return layout;
     const ownerUserId = await this.options.ownerUserId;
@@ -63,7 +78,7 @@ export class ToolRuntimeService {
       return this.runtime;
     }
 
-    const closed = await this.close();
+    const closed = await this.closeRuntime();
     if (closed instanceof Error) return closed;
 
     const credentialVault = this.options.createCredentialVault({
@@ -85,7 +100,7 @@ export class ToolRuntimeService {
     return runtime;
   }
 
-  async close() {
+  private async closeRuntime() {
     const runtime = this.runtime;
     this.runtime = undefined;
     this.workspaceRoot = undefined;

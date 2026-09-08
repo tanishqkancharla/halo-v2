@@ -8,6 +8,7 @@ import type { AnyRouter } from "@orpc/server";
 import { JsonFileRemote } from "@tanishqkancharla/tandem-server";
 import * as errore from "errore";
 import { syncRouter } from "./sync.js";
+import { createExtensionTools } from "./tools.js";
 
 class ExtensionServerError extends errore.createTaggedError({
   name: "ExtensionServerError",
@@ -63,11 +64,12 @@ export async function serveExtension(args: {
     filePath: join(args.dataDirectory, "store.json"),
   });
   const apiHandler = new RPCHandler(args.router);
+  const tools = createExtensionTools();
   const syncHandler = new RPCHandler(syncRouter(remote));
   const server = createServer(async (request, response) => {
     const handled = await apiHandler.handle(request, response, {
       prefix: "/api",
-      context: {},
+      context: { tools },
     });
     if (handled.matched) return;
     const synced = await syncHandler.handle(request, response, {

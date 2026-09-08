@@ -13,6 +13,7 @@ import {
 } from "./http.js";
 import { PluginService } from "./plugins/PluginService.js";
 import { ExtensionHost } from "./extensions/ExtensionHost.js";
+import { ExtensionTools } from "./extensions/ExtensionTools.js";
 import type { ExtensionRuntime } from "./extensions/ExtensionProcess.js";
 import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
 import { type HaloContext } from "./router.js";
@@ -92,6 +93,12 @@ export class HaloServer {
     this.context = {
       browsers: new BrowserService(options.appBrowserTarget),
       browserControlAllowed: false,
+      extensionApprovalAllowed: false,
+      extensionTools: new ExtensionTools({
+        filesystem,
+        workspace,
+        toolRuntime,
+      }),
       extensions: new ExtensionHost({
         filesystem,
         logger: options.logger,
@@ -125,7 +132,6 @@ export class HaloServer {
           error: listed,
         });
       }
-      await this.context.extensions.start(workspace.workspaceRoot);
     }
 
     const listening = await listenHaloHttp({
@@ -139,6 +145,8 @@ export class HaloServer {
       return listening;
     }
     this.httpServer = listening.server;
+    if (workspace !== undefined)
+      await this.context.extensions.start(workspace.workspaceRoot);
     return listening.connections;
   }
 
@@ -160,10 +168,12 @@ export class HaloServer {
     await this.context.browsers.shutdown();
     const sessionsClosed = await this.context.sessions.shutdown();
     if (sessionsClosed instanceof Error) return sessionsClosed;
+    await this.context.extensions.stop();
     const runtimeClosed = await this.context.toolRuntime.close();
     if (runtimeClosed instanceof Error) return runtimeClosed;
 
-    await this.context.extensions.start(selected.workspaceRoot);
+    if (this.httpServer !== undefined)
+      await this.context.extensions.start(selected.workspaceRoot);
 
     const pluginsLoaded = await this.context.plugins.reload();
     if (pluginsLoaded instanceof Error) {
@@ -182,8 +192,8 @@ export class HaloServer {
         : await closeHaloHttp(this.httpServer);
     await this.context.browsers.shutdown();
     const sessionsClosed = await this.context.sessions.shutdown();
-    const runtimeClosed = await this.context.toolRuntime.close();
     await this.context.extensions.stop();
+    const runtimeClosed = await this.context.toolRuntime.close();
     this.context.workspace.close();
     const filesystemClosed = await this.filesystem.close();
 

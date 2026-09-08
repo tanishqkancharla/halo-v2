@@ -69,6 +69,15 @@ export type ConnectionStarted =
       expiresInMs: number;
     };
 
+export type ExtensionPermissionRequest = { id: string; paths: string[] };
+export type ExtensionPermissionReport = {
+  requested: string[];
+  existing: string[];
+  granted: string[];
+  pending: string[];
+  missing: string[];
+};
+
 const browserSnapshot = type<{
   url: string;
   title: string;
@@ -115,6 +124,26 @@ export const contract = publicProcedure.router({
   extensions: {
     list: oc.output(type<Array<{ id: string; url: string }>>()),
     reload: oc.output(type<void>()),
+    tools: {
+      add: oc
+        .input(type<{ id: string; paths: string[] }>())
+        .output(type<ExtensionPermissionReport>()),
+      check: oc
+        .input(type<{ id: string }>())
+        .output(type<ExtensionPermissionReport>()),
+      requests: oc.output(
+        asyncIteratorObject(type<ExtensionPermissionRequest[]>()),
+      ),
+      decide: oc
+        .input(
+          type<{
+            id: string;
+            paths: string[];
+            action: "allow" | "deny" | "revoke";
+          }>(),
+        )
+        .output(type<ExtensionPermissionReport>()),
+    },
   },
   workspace: {
     get: oc.output(type<WorkspaceInfo | undefined>()),

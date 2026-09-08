@@ -2,6 +2,10 @@
 
 The Electron E2E suite packages Halo once, then launches a fresh app with an isolated workspace and user-data directory for every test.
 
+Extension tests use `extensionE2eTest` and `loadExtension("./fixtures/name")`. The fixture scaffolds an independent package, copies the extension's source files, installs the SDK, typechecks and builds the package, and reloads Halo. Extension source is checked against its installed dependencies, separately from the harness TypeScript project.
+
+`extensionTools.e2e.test.ts` loads a real extension, requests `files.read` through `halo extension tools add`, navigates from the conversation to the extension while its Permissions card is pending, approves access, and clicks Refresh notes to display a workspace file through `context.tools.files.read`. Its source declares the types of the tool it consumes. Separate tests verify revocation in an open pane and approval persistence after restarting Halo. These cover a real workspace tool; they do not establish OAuth or external-service behavior.
+
 Use the Halo client directly: `server.rpc.plugins.create({ id, storage: true })` and `server.rpc.plugins.build()`. The server fixture prepares the local SDK and workspace packages for E2E dependency installation, so tests exercise the current build without relying on a published SDK version.
 
 Use `harness.tools.files.read({ path })` and `harness.tools.files.write({ path, content })` to author plugin files. These calls reach the running app's real tool runtime through the E2E-only RPC bridge. The runtime checks agent authority, validates tool inputs, resolves workspace paths, and invokes the registered production file tool. The harness has no filesystem implementation or separate runtime.

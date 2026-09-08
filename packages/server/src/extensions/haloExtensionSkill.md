@@ -55,7 +55,9 @@ Use `useQuery` from `@get-halo/extension-sdk/view` with a stable query object, f
 
 Use React state for local navigation and unfinished form input. Use Tandem for records that other views should see. Halo stores hosted data in `.halo/extension-data/<id>/store.json`; do not write that file directly or replace shared records with browser localStorage.
 
-## Inspect independently, then load in Halo
+## Test the requested behavior
+
+Choose the server that can exercise the requested behavior. Extensions using connected services or workspace tools must be tested on their Halo-hosted URL; a standalone preview cannot prove tool access. Use a standalone preview with isolated data for extension-owned storage and layout checks.
 
 For standalone inspection through the Bash tool, start the built server in the background inside the extension directory:
 
@@ -98,4 +100,53 @@ Delete its directory under `.halo/extensions/`, then run `halo extension reload`
 
 Halo currently supplies one sidebar entry per extension. The extension owns routing within its view. Declarative sidebar contributions, app-header actions, and named panes are not implemented.
 
-Extension handlers currently receive an empty context. They do not inherit the agent's connected tools or credentials. Do not use the legacy plugin SDK, `context.tools`, plugin grants, or `halo plugin` commands for extensions. If the requested app needs live integration access, explain that the extension bridge is not connected yet; do not silently substitute sample data or local records for the service.
+## Workspace tools and connected services
+
+Hosted extension API handlers receive `context.tools`. Calls go through Halo's existing tool runtime and connected accounts. Keep these calls in `api.ts`; the view calls your API. Never copy provider credentials into extension source or frontend code.
+
+Request the tools the extension needs:
+
+```sh
+halo extension tools add notes files.read
+halo extension tools status notes
+```
+
+`tools add` updates `halo.capabilities` in the extension's `package.json` and asks the user to approve access in Halo. It returns `awaiting-approval` until the user approves; it does not wait for their answer or grant itself permission. Previously approved tools remain available. Unavailable tool paths are reported as `missing` rather than silently approved.
+
+The user can decline the request or revoke access using the **Permissions** icon in the extension header. Halo stores approvals separately from the manifest and checks them on every call. Removing a capability revokes its approval when Halo next checks the manifest; adding it again requires approval again.
+
+Declare the types of the tools your handler consumes, then call them as you would from the agent's tool runtime:
+
+```ts
+import { os, type ExtensionToolResult } from "@get-halo/extension-sdk/api";
+
+const api = os.$context<{
+  tools: {
+    files: {
+      read(input: {
+        path: string;
+      }): Promise<ExtensionToolResult<{ path: string; text: string }>>;
+    };
+  };
+}>();
+
+export default {
+  notes: api.handler(async ({ context }) => {
+    const result = await context.tools.files.read({ path: "notes.txt" });
+    if (!result.ok) throw new Error(result.error.message);
+    return result.data.text;
+  }),
+};
+```
+
+Tool paths and inputs match Halo's live catalog, including connected services. The example's types describe the existing file tool contract; service tool types must match their actual schema. Handle failed calls and show their errors in the view. Granting a tool does not connect an account; if a service is disconnected, have the user connect it in Halo. Do not substitute sample records for live service data.
+
+For testing tool access, open the hosted extension URL with `halo browser`. A standalone `npm start` preview still supports its own API and storage, but tool calls return `halo_not_connected` unless Halo supplied the tool connection.
+
+In Halo's development app, `halo extension new` builds and installs the repository's local SDK and build tools as npm tarballs. No publishing is needed. After changing those packages, run `halo extension update <id>` to install the current local builds into an existing extension, typecheck it, and rebuild. Restart Halo to load the rebuilt server. These commands build on demand; they do not start a watcher.
+
+The released app uses published npm packages. The published SDK 0.1.0 does not supply `context.tools`; use the development app's local packages until the bridge is released. A TypeScript context declaration describes the runtime; it does not supply missing tools.
+
+Before reporting completion, exercise the user's main workflow in the hosted view and verify the actual result. For a calendar, wait for a successful events request and confirm the events render, or confirm that a successful response contains no events. Clicking Next day and seeing the heading change does not verify calendar access. Check failed API responses and visible error states as well as browser errors; `errors: []` does not mean that a caught API failure succeeded.
+
+If permission, account connection, or a platform dependency prevents the main workflow, report the task as blocked or incomplete and name the missing step. Do not describe a broken integration as completed with a caveat. Keep reusable browser checks that assert the main result and fail when the view reports an error.

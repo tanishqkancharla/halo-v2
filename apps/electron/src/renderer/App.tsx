@@ -62,6 +62,7 @@ export function App() {
 
   return (
     <WorkspaceShell
+      key={workspace.workspace.workspaceRoot}
       sessions={sessions}
       pluginViews={pluginViews}
       pluginErrors={pluginErrors}

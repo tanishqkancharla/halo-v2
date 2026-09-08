@@ -21,6 +21,7 @@ import {
 } from "@get-halo/shared/sessionLog";
 import { AssistantMessage } from "./AssistantMessage.tsx";
 import { Editor } from "./Editor.tsx";
+import { ExtensionPermissionRequests } from "../../ExtensionPermissions.js";
 import { ExecutorConnectionCard } from "./ExecutorConnectionCard.tsx";
 import { ToolActivity } from "./ToolActivity.tsx";
 import { type SessionSummary } from "@get-halo/shared/rpc";
@@ -48,6 +49,7 @@ export function AgentPane({
       <div className={body}>
         <div className={column}>
           <SessionView state={state} sessionId={sessionId} />
+          <ExtensionPermissionRequests />
           <Composer
             key={sessionId}
             autoFocus
@@ -82,6 +84,7 @@ export function DraftAgentPane({ draftId }: { draftId: string }) {
           {hasMessages ? (
             <SessionView state={state} sessionId={sessionId} />
           ) : undefined}
+          <ExtensionPermissionRequests />
           <Composer
             key={draftId}
             autoFocus

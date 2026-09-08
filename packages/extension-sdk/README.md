@@ -26,3 +26,16 @@ they are not injected from Halo or shared as live objects across extensions.
 Scaffolding and esbuild configuration live in the separate development package,
 [`@get-halo/extension-tools`](https://www.npmjs.com/package/@get-halo/extension-tools). Both packages use the
 repository's TypeScript version to emit their runtime JavaScript and declarations.
+
+When Halo hosts the extension, API handlers receive `context.tools`. Calls use
+Halo's connected services and require tools declared in `halo.capabilities` and
+approved by the user. Request access with `halo extension tools add <id> <paths...>`;
+then call the tool from `api.ts`, keeping credentials out of the view. Import
+`ExtensionToolResult` from `/api` to describe a tool's result.
+
+A standalone server still serves its API and storage, but calls to Halo tools
+return `halo_not_connected`. Verify connected-service behavior through the
+Halo-hosted view. The development app installs local package builds when creating extensions.
+Use `halo extension update <id>` to install updated local packages and rebuild an
+existing extension, then restart Halo. Published SDK 0.1.0 does not include tool
+support.

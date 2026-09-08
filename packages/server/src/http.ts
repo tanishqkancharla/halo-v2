@@ -6,6 +6,7 @@ import { CORSHandlerPlugin } from "@orpc/server/plugins";
 import * as errore from "errore";
 import { handleOAuthCallback } from "./oauth.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
+import { extensionToolRouter } from "./extensions/extensionsRouter.js";
 
 type HaloHttpConnection = {
   host: string;
@@ -52,6 +53,7 @@ export async function listenHaloHttp(options: {
       }),
     ],
   });
+  const extensionHandler = new RPCHandler(extensionToolRouter);
   const server = createServer(async (request, response) => {
     const url = new URL(
       request.url === undefined ? "/" : request.url,
@@ -64,6 +66,25 @@ export async function listenHaloHttp(options: {
         response,
         context: options.context,
       });
+      return;
+    }
+    if (url.pathname.startsWith("/extension-tools/")) {
+      const extensionId = options.context.extensions.identifyToolConnection(
+        request.headers.authorization,
+        options.context.workspace.getWorkspace()?.workspaceRoot,
+      );
+      if (extensionId === undefined) {
+        response.writeHead(401).end();
+        return;
+      }
+      const handled = await extensionHandler.handle(request, response, {
+        prefix: "/extension-tools",
+        context: {
+          extensionId,
+          extensionTools: options.context.extensionTools,
+        },
+      });
+      if (!handled.matched) response.writeHead(404).end();
       return;
     }
     if (
@@ -80,6 +101,8 @@ export async function listenHaloHttp(options: {
         ...options.context,
         browserControlAllowed:
           request.headers.authorization === `Bearer ${cliToken}`,
+        extensionApprovalAllowed:
+          request.headers.authorization === `Bearer ${rendererToken}`,
       },
     });
     if (handled.matched) return;
@@ -96,6 +119,9 @@ export async function listenHaloHttp(options: {
   }
   // SAFETY: listen receives a numeric port and host, so Node returns AddressInfo instead of a pipe name.
   const tcpAddress = address as AddressInfo;
+  options.context.extensions.setToolsOrigin(
+    `http://${options.host}:${tcpAddress.port}`,
+  );
   options.context.toolRuntime.setOAuthRedirectUri(
     `http://${options.host}:${tcpAddress.port}/oauth/callback`,
   );

@@ -35,16 +35,9 @@ export function resolveHaloCliEntry(
   return undefined;
 }
 
-function readInstalledHaloVersion(script: string) {
-  const node = /process\.env\.HALO_VERSION = "([^"]+)"/.exec(script);
-  if (node !== null) return node[1];
-  const shell = /^export HALO_VERSION='([^']+)'/m.exec(script);
-  if (shell === null) return undefined;
-  return shell[1];
-}
-
 function wrapHaloCli(args: {
   appVersion: string;
+  appDataDir: string;
   cliEntry: string;
   importHook?: string;
   nodeExecutable: string;
@@ -59,9 +52,14 @@ function wrapHaloCli(args: {
   const runAsNode = args.electronRunAsNode
     ? "export ELECTRON_RUN_AS_NODE=1\n"
     : "";
+  const development =
+    args.importHook === undefined
+      ? ""
+      : `export HALO_EXTENSION_SOURCE=${shQuote(join(dirname(args.cliEntry), "../.."))}\n`;
   return `#!/bin/sh
 export HALO_VERSION=${shQuote(args.appVersion)}
-${runAsNode}exec ${shQuote(args.nodeExecutable)} ${nodeArgs.map(shQuote).join(" ")} "$@"
+export HALO_USER_DATA=${shQuote(args.appDataDir)}
+${development}${runAsNode}exec ${shQuote(args.nodeExecutable)} ${nodeArgs.map(shQuote).join(" ")} "$@"
 `;
 }
 
@@ -83,19 +81,12 @@ export async function installHaloCli(args: {
   filesystem: FilesystemService;
   workspaceRoot: string;
   appVersion: string;
+  appDataDir: string;
   cliEntry: string;
   nodeExecutable?: string;
   electronRunAsNode?: boolean;
 }) {
   const binPath = haloCliBinPath(args.workspaceRoot);
-  if (args.filesystem.exists(binPath)) {
-    const existing = await args.filesystem.readFile(binPath, "utf8");
-    if (existing instanceof Error) {
-      return new InstallHaloCliError({ detail: "read halo", cause: existing });
-    }
-    if (readInstalledHaloVersion(existing) === args.appVersion) return binPath;
-  }
-
   const importHook = resolveHaloCliImportHook(args.cliEntry);
   if (importHook instanceof Error) return importHook;
 
@@ -111,12 +102,19 @@ export async function installHaloCli(args: {
 
   const script = wrapHaloCli({
     appVersion: args.appVersion,
+    appDataDir: args.appDataDir,
     cliEntry: args.cliEntry,
     importHook,
     nodeExecutable:
       args.nodeExecutable === undefined ? "node" : args.nodeExecutable,
     electronRunAsNode: args.electronRunAsNode === true,
   });
+  if (args.filesystem.exists(binPath)) {
+    const existing = await args.filesystem.readFile(binPath, "utf8");
+    if (existing instanceof Error)
+      return new InstallHaloCliError({ detail: "read halo", cause: existing });
+    if (existing === script) return binPath;
+  }
   const written = await args.filesystem.writeFile(binPath, script, {
     mode: 0o755,
   });

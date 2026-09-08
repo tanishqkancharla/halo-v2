@@ -7,22 +7,40 @@ description: Choose, write, and review tests that exercise real consumer behavio
 
 Use Vitest for service, API, and library tests, and Playwright for UI end-to-end tests. These conventions apply across projects.
 
-## Principles
+# Principles
 
-1. Prioritize positive tests that prove successful user or consumer workflows. Exercise those workflows end to end at the boundary being tested. Rejection cases can supplement these workflows, but should not dominate the suite. Keep negative coverage grouped separately.
-2. Do not use mocks such as `vi.fn`, `vi.mock`, or hand-rolled fake collaborators.
-3. Act and observe the system the way a consumer would:
-   - UI: drive the running application with Playwright and assert visible elements, roles, labels, text, and behavior.
-   - Services and APIs: call public methods and observe results through the same public API or another real collaborator a consumer would use.
-   - Libraries: use the public interface and verify the result or observable effect.
-   - State the tested boundary accurately. An API test does not establish that a UI displays the result correctly.
-4. Give each test one distinct behavior to verify. Split unrelated behaviors into independently reported cases with isolated state. Multiple steps or assertions are appropriate when they establish that one behavior.
-5. Assertions should belong to the behavior named by the test. Do not repeat assertions another test already owns. Shared setup may repeat without reasserting that setup works. Before/after observations needed to prove a particular transition still belong together.
-6. Assert only the relevant observable result, rather than checking an entire response when most fields are covered elsewhere. Avoid assertions about private implementation details, internal file layouts, or formatting that is not part of the public contract.
-7. Prefer Vitest fixtures and Playwright fixtures for shared setup, isolated state, and cleanup instead of ad-hoc helpers or manual cleanup. Tests should run independently of execution order. See the [Vitest fixtures documentation](https://vitest.dev/guide/test-context.html#test-extend) and [Playwright fixtures documentation](https://playwright.dev/docs/test-fixtures).
-8. Keep setup readable. Use small harness helpers for repetitive mechanics such as preparing files, inputs, and resources. Keep scenario actions and assertions visible in the test; helpers should not silently perform those actions or verify unrelated behavior. Use the real client API for operations it already exposes.
-9. When consumer-style tests are difficult to write, improve the harness at the real boundary. Preserve the consumer workflow instead of bypassing it or introducing mocks to make the test easier.
-
-## Example: distinct assertion ownership
-
-A creation test verifies that a new record can be created and read. A rename test creates a record as setup, renames it, and asserts the new name. It should not repeat the initial creation or initial-name assertions. If a test concerns a transition, keep the observations needed to establish that transition together; the goal is distinct behavior coverage, not an arbitrary limit on assertion count.
+- Services are code programs and modules to be tested. Services can compose multiple sub-services. E.g. electron app is a service that uses the renderer and main process as sub-services.
+- Services receive events in, and emit events out.
+- A driver of a service sends events in, and expects some events out.
+  - An API request a server returns some response
+  - Clicking on a link in the app opens the page
+- Tests are meant to test a service. Services can theoretically be used in multiple different ways:
+  - a human is driving the service
+  - an agent is driving the service
+  - the service is being used programmatically (code is driving the service)
+  - the test is driving the service
+- In all scenarios, the service should be used identically, so we know the tests are representative of real usage. Importantly, this means: the behavior of a service during a test should be as identical as possible to other situations:
+  - No mocks
+  - Minimize test-specific configuration
+- Tests are generally composed of 3 phases: setup, action, assertion
+  - Setup: Service is driven into the state being tested. Previous tests cover correctness of these actions
+  - Action: an action is taken on the service
+  - Assertion: we verify the service and external state is as we expect
+- Tests should be as readable as possible. That means every line in a test should be one of two things:
+  - An assertion
+  - A single action taken on the service, which should correspond to the same actions available to human, agent, or code drivers.
+- Boilerplate setup/assertion does not belong in a test - file it in Vitest fixtures as much as possible.
+- Tests should be isolated and unique. They should not re-test correctness already verified in other tests.
+- Services can be made up of sub-services. Tests should not test the data flow internally between sub-services - these are considered implementation details. Only test the externally visible outcomes.
+  - Examples of implementation details:
+    - Asserting a server sends a specific request to another server - just test the response back to the driver
+    - Asserting it updates an internal database with specific rows - instead, ask if it did update properly, what end-driver outcome could we measure/see?
+  - Examples of externally visible outcomes
+    - Asserting that a file is really deleted in the filesystem after deleting it in the app. The filesystem is not an implementation detail if the driver expects to interact with it not through the app. But if the filesystem is being used to store an internal db that’s not meant to be directly used by drivers, then it would be considered an implementation detail.
+- The fixtures available to a test code driver should be the following
+  - The service being tested, able to send events to it at the same fidelity as other drivers.
+    - E.g. for a web page, this might be the playwright page. For a server, it’s the ability to directly call routes.
+  - External services that should be visible to the driver. Examples:
+    - For sync engine, this could be a timer object, and a secondary client
+    - For web pages, it could be a second client/browser to load the same web page and assert some change propagated
+  - Different drivers (like code, human, agent) might have different external services exposed to them. The test should contain the union of these. Don’t add external services that might plausibly be used by other drivers, until we decide behavior on those services should be tested.

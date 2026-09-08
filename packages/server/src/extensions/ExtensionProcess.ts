@@ -29,6 +29,7 @@ export async function startExtension(args: {
   dataDirectory: string;
   runtime: ExtensionRuntime;
   logger: Logger;
+  tools: { origin: string; token: string };
 }) {
   const child = errore.try({
     try: () =>
@@ -39,6 +40,8 @@ export async function startExtension(args: {
           cwd: args.directory,
           env: {
             ...process.env,
+            HALO_EXTENSION_TOOLS_ORIGIN: args.tools.origin,
+            HALO_EXTENSION_TOOLS_TOKEN: args.tools.token,
             ELECTRON_RUN_AS_NODE: args.runtime.electronRunAsNode
               ? "1"
               : undefined,

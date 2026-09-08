@@ -93,6 +93,7 @@ export const extensionE2eTest = e2eTest.extend<
         ],
         directory,
       );
+      await command("npm", ["run", "typecheck"], directory);
       await command("npm", ["run", "build"], directory);
       return { id, directory };
     });

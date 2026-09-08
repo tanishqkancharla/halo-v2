@@ -3,6 +3,10 @@ import { backgroundColor, flex, Padding, Text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { useExtensionsQuery, useWorkspaceQuery } from "../api/ApiProvider.tsx";
 import { PaneHeader } from "./PaneHeader.js";
+import {
+  ExtensionPermissionRequests,
+  ExtensionPermissionsButton,
+} from "../ExtensionPermissions.js";
 
 export function ExtensionPane({ extensionId }: { extensionId: string }) {
   const workspace = useWorkspaceQuery().data;
@@ -13,7 +17,16 @@ export function ExtensionPane({ extensionId }: { extensionId: string }) {
 
   return (
     <main className={pane} aria-label={extensionId}>
-      <PaneHeader section="Extensions" title={extensionId} />
+      <PaneHeader
+        section="Extensions"
+        title={extensionId}
+        actions={
+          extension === undefined ? undefined : (
+            <ExtensionPermissionsButton key={extensionId} id={extensionId} />
+          )
+        }
+      />
+      <ExtensionPermissionRequests extensionId={extensionId} />
       {extensions.isPending && (
         <Padding xy={8}>
           <Text role="status">Loading extension…</Text>

@@ -325,6 +325,7 @@ export class WorkspaceService {
         filesystem: this.options.filesystem,
         workspaceRoot: root,
         appVersion: this.options.appVersion,
+        appDataDir: this.options.appDataDir,
         cliEntry: this.options.cliEntry,
         nodeExecutable: this.options.cliNodeExecutable,
         electronRunAsNode: this.options.cliElectronRunAsNode,
