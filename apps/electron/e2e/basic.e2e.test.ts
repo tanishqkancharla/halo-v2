@@ -352,10 +352,15 @@ e2eTest(
     );
     const page = renderer.page;
     await page.getByRole("link", { name: "document.pdf", exact: true }).click();
-    const frame = page.frameLocator(
-      'iframe[title="PDF preview: document.pdf"]',
-    );
-    await expect(frame.locator('embed[type="application/pdf"]')).toBeAttached();
+    const viewerUrl = /^chrome-extension:\/\/.*\/index.html$/;
+    await expect
+      .poll(() => page.frames().some((frame) => viewerUrl.test(frame.url())))
+      .toBe(true);
+    const viewer = page.frame({ url: viewerUrl });
+    if (viewer === null) throw new Error("PDF viewer did not open");
+    await expect(
+      viewer.getByRole("textbox", { name: "Page number", exact: true }),
+    ).toHaveValue("1");
     await expect(
       page.getByRole("button", { name: "Open externally", exact: true }),
     ).toBeVisible();
