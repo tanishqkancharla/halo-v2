@@ -344,6 +344,7 @@ function FileNavigationItem({
       id={`file:${node.path}`}
       href={node.isDirectory ? undefined : fileRoute(node.path)}
       pageTitle={node.name}
+      hasChildItems={node.isDirectory}
       icon={node.isDirectory ? Folder : File}
       trailing={
         <FileMenu

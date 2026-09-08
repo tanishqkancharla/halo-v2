@@ -27,6 +27,7 @@ type SidebarItemProps = {
   pageTitle: string;
   children: ReactNode;
   items?: ReactNode;
+  hasChildItems?: boolean;
   icon?: IconComponent;
   trailing?: ReactNode;
   className?: string;
@@ -60,6 +61,7 @@ export function SidebarItem(props: SidebarItemProps) {
     <NavigationTreeItem
       id={props.id}
       href={href}
+      hasChildItems={props.hasChildItems}
       textValue={props.pageTitle}
       className={joinClassNames(itemClassName, props.className)}
     >

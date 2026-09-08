@@ -400,7 +400,7 @@ e2eTest(
 
 e2eTest(
   "names new files inline, preserves extensions, and cancels with Escape",
-  async ({ renderer, server }) => {
+  async ({ harness, renderer, server }) => {
     const page = renderer.page;
     await page.getByRole("button", { name: "New file", exact: true }).click();
     const name = page.getByRole("textbox", { name: "New file name" });
@@ -422,6 +422,29 @@ e2eTest(
     await folder.fill("Archive");
     await folder.press("Enter");
     await expect(folder).toHaveCount(0);
+    expect(
+      (
+        await fs.stat(nodePath.join(harness.paths.workspace, "Archive"))
+      ).isDirectory(),
+    ).toBe(true);
+    const collapse = page.getByRole("button", {
+      name: "Collapse Archive",
+      exact: true,
+    });
+    const expand = page.getByRole("button", {
+      name: "Expand Archive",
+      exact: true,
+    });
+    await collapse.click();
+    await expand.click();
+    await expect(collapse).toBeVisible();
+    await page.keyboard.press("ArrowLeft");
+    await expect(expand).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    await expect(collapse).toBeVisible();
+    await page.reload();
+    await expand.click();
+    await expect(collapse).toBeVisible();
     await page
       .locator('[data-file-path="notes.txt"]')
       .dragTo(page.locator('[data-file-path="Archive"]'));
@@ -431,5 +454,11 @@ e2eTest(
     expect(await server.rpc.workspace.listPaths()).toEqual([
       "Archive/notes.txt",
     ]);
+    await server.rpc.workspace.deleteEntry({ path: "Archive/notes.txt" });
+    await expect(
+      page.locator('[data-file-path="Archive/notes.txt"]'),
+    ).toHaveCount(0);
+    await collapse.click();
+    await expect(expand).toBeVisible();
   },
 );
