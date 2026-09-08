@@ -194,3 +194,110 @@ for (const failure of [
     },
   );
 }
+
+serverTest(
+  "creates folders and moves their contents without overwriting files",
+  async ({ server }) => {
+    await server.rpc.workspace.createEntry({
+      path: "Notes",
+      kind: "directory",
+    });
+    await server.rpc.workspace.createEntry({
+      path: "Archive",
+      kind: "directory",
+    });
+    await server.rpc.workspace.createEntry({
+      path: "Notes/Today.md",
+      kind: "file",
+    });
+    await server.rpc.workspace.writeFile({
+      path: "Notes/Today.md",
+      content: "Keep this note",
+    });
+    await server.rpc.workspace.moveEntry({
+      source: "Notes/Today.md",
+      destination: "Notes/Plan.md",
+    });
+    await server.rpc.workspace.moveEntry({
+      source: "Notes",
+      destination: "Archive/Notes",
+    });
+    expect(
+      await server.rpc.workspace.readFile({ path: "Archive/Notes/Plan.md" }),
+    ).toBe("Keep this note");
+    expect(await server.rpc.workspace.listPaths()).toEqual([
+      "Archive/Notes/Plan.md",
+    ]);
+
+    await expect(
+      server.rpc.workspace.createEntry({
+        path: "Archive/Notes/Plan.md",
+        kind: "file",
+      }),
+    ).rejects.toThrow("already exists");
+    await server.rpc.workspace.createEntry({ path: "Other.md", kind: "file" });
+    await expect(
+      server.rpc.workspace.moveEntry({
+        source: "Other.md",
+        destination: "Archive/Notes/Plan.md",
+      }),
+    ).rejects.toThrow("already exists");
+    expect(
+      await server.rpc.workspace.readFile({ path: "Archive/Notes/Plan.md" }),
+    ).toBe("Keep this note");
+    await expect(
+      server.rpc.workspace.moveEntry({
+        source: "Archive",
+        destination: "Archive/Notes/Nested",
+      }),
+    ).rejects.toThrow("cannot be moved into itself");
+  },
+);
+
+serverTest(
+  "keeps file management inside the visible workspace",
+  async ({ server }) => {
+    for (const invalid of [
+      "../outside.md",
+      ".pi/secret.md",
+      "node_modules/new.md",
+      "",
+    ]) {
+      await expect(
+        server.rpc.workspace.createEntry({ path: invalid, kind: "file" }),
+      ).rejects.toThrow("not a workspace file");
+    }
+    const outside = path.join(server.harness.paths.root, "outside");
+    await fs.mkdir(outside);
+    await fs.symlink(
+      outside,
+      path.join(server.harness.paths.workspace, "Shortcut"),
+      "junction",
+    );
+    await expect(
+      server.rpc.workspace.createEntry({
+        path: "Shortcut/file.md",
+        kind: "file",
+      }),
+    ).rejects.toThrow("not a workspace file");
+    expect(await fs.readdir(outside)).toEqual([]);
+  },
+);
+
+serverTest(
+  "renames a note when only capitalization changes",
+  async ({ server }) => {
+    await server.rpc.workspace.writeFile({
+      path: "notes.md",
+      content: "Keep my note",
+    });
+    await server.rpc.workspace.moveEntry({
+      source: "notes.md",
+      destination: "Notes.md",
+    });
+    expect(await server.rpc.workspace.listPaths()).toEqual(["Notes.md"]);
+    expect(await server.rpc.workspace.readFile({ path: "Notes.md" })).toBe(
+      "Keep my note",
+    );
+  },
+);

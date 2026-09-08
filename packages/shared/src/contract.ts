@@ -127,6 +127,12 @@ export const contract = publicProcedure.router({
   workspace: {
     get: oc.output(type<WorkspaceInfo>()),
     listPaths: oc.output(type<string[]>()),
+    createEntry: oc
+      .input(type<{ path: string; kind: "file" | "directory" }>())
+      .output(type<{ path: string }>()),
+    moveEntry: oc
+      .input(type<{ source: string; destination: string }>())
+      .output(type<{ path: string }>()),
     readFile: oc.input(type<{ path: string }>()).output(type<string>()),
     writeFile: oc
       .input(type<{ path: string; content: string }>())

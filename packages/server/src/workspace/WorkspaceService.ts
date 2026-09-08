@@ -6,6 +6,7 @@ import {
   type FilesystemWatchBatch,
   type FilesystemWatchEvent,
   FilesystemService,
+  FilesystemPathNotFoundError,
 } from "../filesystem/FilesystemService.js";
 import { installHaloCli } from "./installHaloCli.js";
 import { seedExtensionWorkspace } from "../extensions/seedExtensionWorkspace.js";
@@ -30,6 +31,16 @@ export class WorkspaceIoError extends errore.createTaggedError({
 export class WorkspaceInvalidPathError extends errore.createTaggedError({
   name: "WorkspaceInvalidPathError",
   message: "'$path' is not a workspace file.",
+}) {}
+
+export class WorkspaceEntryExistsError extends errore.createTaggedError({
+  name: "WorkspaceEntryExistsError",
+  message: "An item named '$entryName' already exists in this folder.",
+}) {}
+
+export class WorkspaceInvalidMoveError extends errore.createTaggedError({
+  name: "WorkspaceInvalidMoveError",
+  message: "A folder cannot be moved into itself.",
 }) {}
 
 /** Finder-hidden names (leading `.`) plus `node_modules` for walk cost. */
@@ -219,6 +230,70 @@ export class WorkspaceService {
     if (written instanceof Error)
       return new WorkspaceIoError({ cause: written });
     return { path };
+  }
+
+  async createEntry(input: { path: string; kind: "file" | "directory" }) {
+    const path = await this.resolveEntryPath(input.path);
+    if (path instanceof Error) return path;
+    const available = await this.checkAvailable(path);
+    if (available instanceof Error) return available;
+    const created =
+      input.kind === "directory"
+        ? await this.options.filesystem.makeDirectory(path)
+        : await this.options.filesystem.writeFile(path, "", { flag: "wx" });
+    if (created instanceof Error)
+      return new WorkspaceIoError({ cause: created });
+    return { path: input.path };
+  }
+
+  async moveEntry(input: { source: string; destination: string }) {
+    const source = await this.resolveEntryPath(input.source);
+    if (source instanceof Error) return source;
+    const destination = await this.resolveEntryPath(input.destination);
+    if (destination instanceof Error) return destination;
+    if (destination === source || destination.startsWith(`${source}${sep}`)) {
+      return new WorkspaceInvalidMoveError();
+    }
+    const available = await this.checkAvailable(destination, source);
+    if (available instanceof Error) return available;
+    const moved = await this.options.filesystem.rename(source, destination);
+    if (moved instanceof Error) return new WorkspaceIoError({ cause: moved });
+    return { path: input.destination };
+  }
+
+  private async resolveEntryPath(path: string) {
+    const absolutePath = resolve(this.layout.root, path);
+    if (
+      toPosixRelative(this.layout.root, absolutePath) !== path ||
+      isSkippedRelativePath(path)
+    ) {
+      return new WorkspaceInvalidPathError({ path });
+    }
+    const parent = await this.options.filesystem.realpath(
+      dirname(absolutePath),
+    );
+    if (parent instanceof Error) return new WorkspaceIoError({ cause: parent });
+    const root = await this.options.filesystem.realpath(this.layout.root);
+    if (root instanceof Error) return new WorkspaceIoError({ cause: root });
+    if (parent !== root && toPosixRelative(root, parent) === undefined) {
+      return new WorkspaceInvalidPathError({ path });
+    }
+    return absolutePath;
+  }
+
+  private async checkAvailable(path: string, source?: string) {
+    const existing = await this.options.filesystem.lstat(path);
+    if (existing instanceof FilesystemPathNotFoundError) return;
+    if (existing instanceof Error)
+      return new WorkspaceIoError({ cause: existing });
+    if (source !== undefined && source.toLowerCase() === path.toLowerCase()) {
+      const original = await this.options.filesystem.lstat(source);
+      if (original instanceof Error)
+        return new WorkspaceIoError({ cause: original });
+      if (original.dev === existing.dev && original.ino === existing.ino)
+        return;
+    }
+    return new WorkspaceEntryExistsError({ entryName: basename(path) });
   }
 
   async initialize() {
