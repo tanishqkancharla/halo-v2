@@ -114,7 +114,12 @@ export class ExtensionHost {
       entries instanceof FilesystemPathNotFoundError
         ? []
         : entries.filter(
-            (item) => item.isDirectory() && !item.name.startsWith("."),
+            (item) =>
+              item.isDirectory() &&
+              !item.name.startsWith(".") &&
+              this.options.filesystem.exists(
+                join(directory, item.name, "package.json"),
+              ),
           );
     const ids = new Set(discovered.map((entry) => entry.name));
     for (const [id, extension] of this.processes) {

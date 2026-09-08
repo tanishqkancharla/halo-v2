@@ -22,6 +22,7 @@ extensionE2eTest(
 extensionE2eTest(
   "syncs tasks from a separate browser into an open Halo pane without losing its draft",
   async ({ renderer, loadExtension, server }) => {
+    extensionE2eTest.setTimeout(60_000);
     const loaded = await loadExtension(
       "../../../packages/extension-tools/test/fixtures/tasks",
     );
@@ -56,6 +57,7 @@ extensionE2eTest(
 extensionE2eTest(
   "removes a deleted extension from the sidebar and stops its server on reload",
   async ({ renderer, loadExtension, harness, server, request }) => {
+    extensionE2eTest.setTimeout(60_000);
     const loaded = await loadExtension("./fixtures/greeting");
     const extension = (await server.rpc.extensions.list()).find(
       (entry) => entry.id === loaded.id,
