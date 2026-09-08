@@ -1,4 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
+import type { HaloRpcConnection } from "./rpc.js";
 import type { WorkspaceInfo } from "@get-halo/shared/rpc";
 
 export type AppUpdateStatus =
@@ -17,6 +18,10 @@ export type AppInfo = {
 export const DESKTOP_CHANNEL = "halo:desktop";
 
 export const desktopRequestSchema = Type.Union([
+  Type.Object(
+    { type: Type.Literal("getConnection") },
+    { additionalProperties: false },
+  ),
   Type.Object(
     { type: Type.Literal("chooseWorkspace") },
     { additionalProperties: false },
@@ -45,6 +50,7 @@ export type OpenExternalRequest = Extract<
 >;
 
 export type DesktopApi = {
+  getConnection: () => Promise<HaloRpcConnection | undefined>;
   chooseWorkspace: () => Promise<WorkspaceInfo | undefined>;
   getAppInfo: () => Promise<AppInfo>;
   installAppUpdate: () => Promise<void>;

@@ -13,11 +13,6 @@ class TestArtifactError extends errore.createTaggedError({
   message: "Could not $operation E2E test artifacts",
 }) {}
 
-type TestFiles = {
-  write(input: { path: string; content: string | Uint8Array }): Promise<void>;
-  read(path: string): Promise<Buffer>;
-};
-
 type TestPaths = {
   root: string;
   workspace: string;
@@ -33,16 +28,17 @@ type TestPaths = {
 
 type E2ETestHarness = {
   createClient(serverHost: string, serverPort: number): HaloClient;
-  files: TestFiles;
   paths: TestPaths;
 };
 
 export async function createTestArtifacts(testInfo: TestInfo) {
   const parent = path.resolve(import.meta.dirname, "../../../tmp/e2e");
   await fsPromises.mkdir(parent, { recursive: true });
+  // Keep nested executable paths below Windows process-spawning limits.
   const testName = testInfo.titlePath
     .join("-")
-    .replaceAll(/[^a-zA-Z0-9._-]/g, "-");
+    .replaceAll(/[^a-zA-Z0-9._-]/g, "-")
+    .slice(0, 40);
   const root = await fsPromises.mkdtemp(path.join(parent, `${testName}-`));
   const paths = {
     root,
@@ -68,28 +64,18 @@ export async function createTestArtifacts(testInfo: TestInfo) {
   const outputPrefix = `[e2e:${testInfo.title}:main]`;
   const captureFinalizers: Array<() => Promise<void>> = [];
 
-  const resolveFilePath = (filePath: string) => {
-    const resolved = path.resolve(root, filePath);
-    const relative = path.relative(root, resolved);
-    if (relative === "..") throw new Error("Test file path escapes its root.");
-    if (relative.startsWith(`..${path.sep}`)) {
-      throw new Error("Test file path escapes its root.");
-    }
-    if (path.isAbsolute(relative)) {
-      throw new Error("Test file path escapes its root.");
-    }
-    return resolved;
-  };
-  const files: TestFiles = {
-    async write(input) {
-      const filePath = resolveFilePath(input.path);
-      await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
-      await fsPromises.writeFile(filePath, input.content);
-    },
-    read(filePath) {
-      return fsPromises.readFile(resolveFilePath(filePath));
-    },
-  };
+  const rendererLogInitialized = fsPromises
+    .writeFile(paths.rendererLog, "")
+    .catch(
+      (cause) =>
+        new TestArtifactError({ operation: "initialize renderer log", cause }),
+    );
+  const rendererLog = createRendererLog({
+    path: paths.rendererLog,
+    prefix: `[e2e:${testInfo.title}:renderer]`,
+  });
+  let rendererIndex = 0;
+
   const harness: E2ETestHarness = {
     createClient(serverHost, serverPort) {
       const link = new RPCLink({
@@ -99,7 +85,6 @@ export async function createTestArtifacts(testInfo: TestInfo) {
       // SAFETY: the server host and port point to the Halo RPC contract.
       return createORPCClient(link) as HaloClient;
     },
-    files,
     paths,
   };
   return {
@@ -125,35 +110,24 @@ export async function createTestArtifacts(testInfo: TestInfo) {
       );
     },
     async captureRenderer(page: Page) {
-      const initialized = await fsPromises
-        .writeFile(paths.rendererLog, "")
-        .catch(
-          (cause) =>
-            new TestArtifactError({
-              operation: "initialize renderer log",
-              cause,
-            }),
-        );
+      const initialized = await rendererLogInitialized;
       if (initialized instanceof Error) return initialized;
-
-      const prefix = `[e2e:${testInfo.title}:renderer]`;
-      const rendererLog = createRendererLog({
-        path: paths.rendererLog,
-        prefix,
-      });
+      const windowLabel = `[window:${rendererIndex++}]`;
       const onConsole = (message: ConsoleMessage) => {
-        rendererLog.write(`[console:${message.type()}] ${message.text()}`);
+        rendererLog.write(
+          `${windowLabel}[console:${message.type()}] ${message.text()}`,
+        );
       };
       const onPageError = (error: Error) => {
         rendererLog.write(
-          `[pageerror] ${error.stack === undefined ? error.message : error.stack}`,
+          `${windowLabel}[pageerror] ${error.stack === undefined ? error.message : error.stack}`,
         );
       };
       const onRequestFailed = (request: Request) => {
         const failure = request.failure();
         const detail = failure === null ? "unknown failure" : failure.errorText;
         rendererLog.write(
-          `[requestfailed] ${request.method()} ${request.url()}: ${detail}`,
+          `${windowLabel}[requestfailed] ${request.method()} ${request.url()}: ${detail}`,
         );
       };
       page.on("console", onConsole);
@@ -189,7 +163,15 @@ export async function createTestArtifacts(testInfo: TestInfo) {
         return finalized;
       }
 
-      if (testInfo.status !== testInfo.expectedStatus) {
+      if (
+        testInfo.status !== testInfo.expectedStatus ||
+        testInfo.status === "failed"
+      ) {
+        const pruned = await removeDependencyDirectories(paths.root);
+        if (pruned instanceof Error) {
+          retainArtifacts(paths.root);
+          return pruned;
+        }
         const attached = await attachArtifacts({ testInfo, paths });
         retainArtifacts(paths.root);
         return attached;
@@ -208,6 +190,36 @@ export async function createTestArtifacts(testInfo: TestInfo) {
 }
 
 export type TestArtifacts = Awaited<ReturnType<typeof createTestArtifacts>>;
+
+async function removeDependencyDirectories(
+  directory: string,
+): Promise<void | TestArtifactError> {
+  const entries = await fsPromises
+    .readdir(directory, { withFileTypes: true })
+    .catch(
+      (cause) =>
+        new TestArtifactError({
+          operation: "list dependency directories",
+          cause,
+        }),
+    );
+  if (entries instanceof Error) return entries;
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const child = path.join(directory, entry.name);
+    const removed =
+      entry.name === "node_modules"
+        ? await fsPromises.rm(child, { recursive: true, force: true }).catch(
+            (cause) =>
+              new TestArtifactError({
+                operation: "remove test dependencies",
+                cause,
+              }),
+          )
+        : await removeDependencyDirectories(child);
+    if (removed instanceof Error) return removed;
+  }
+}
 
 function captureProcessOutput(args: {
   input: NodeJS.ReadableStream;

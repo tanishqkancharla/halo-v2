@@ -1,11 +1,17 @@
 import crypto from "node:crypto";
-import { createServer, type Server as HttpServer } from "node:http";
+import {
+  createServer,
+  type Server as HttpServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import type { AddressInfo } from "node:net";
 import { RPCHandler } from "@orpc/server/node";
 import { CORSHandlerPlugin } from "@orpc/server/plugins";
 import * as errore from "errore";
 import { handleOAuthCallback } from "./oauth.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
+import { extensionToolRouter } from "./extensions/extensionsRouter.js";
 
 type HaloHttpConnection = {
   host: string;
@@ -13,7 +19,7 @@ type HaloHttpConnection = {
   token: string;
 };
 
-export type HaloHttpConnections = {
+type HaloHttpConnections = {
   cli: HaloHttpConnection;
   renderer: HaloHttpConnection;
 };
@@ -21,6 +27,7 @@ export type HaloHttpConnections = {
 type ListeningHaloHttp = {
   connections: HaloHttpConnections;
   server: HttpServer;
+  origin: string;
 };
 
 export class HaloHttpError extends errore.createTaggedError({
@@ -29,13 +36,44 @@ export class HaloHttpError extends errore.createTaggedError({
 }) {}
 
 export async function listenHaloHttp(options: {
-  context: HaloContext;
   host: string;
   port: number;
-  corsOrigins: readonly string[];
 }): Promise<ListeningHaloHttp | HaloHttpError> {
-  const cliToken = crypto.randomBytes(32).toString("base64url");
-  const rendererToken = crypto.randomBytes(32).toString("base64url");
+  const server = createServer(startingResponse);
+  const started = await listen(server, options);
+  if (started instanceof Error) return started;
+  // SAFETY: Node returns a TCP address after successfully listening with a numeric port.
+  const address = server.address() as AddressInfo;
+  return {
+    server,
+    origin: `http://${options.host}:${address.port}`,
+    connections: {
+      cli: {
+        host: options.host,
+        port: address.port,
+        token: crypto.randomBytes(32).toString("base64url"),
+      },
+      renderer: {
+        host: options.host,
+        port: address.port,
+        token: crypto.randomBytes(32).toString("base64url"),
+      },
+    },
+  };
+}
+
+function startingResponse(_request: IncomingMessage, response: ServerResponse) {
+  response.writeHead(503).end("Halo is starting.");
+}
+
+export function serveHaloHttp(options: {
+  server: HttpServer;
+  connections: HaloHttpConnections;
+  context: HaloContext;
+  corsOrigins: readonly string[];
+}) {
+  const cliToken = options.connections.cli.token;
+  const rendererToken = options.connections.renderer.token;
   const authorizations = new Set([
     `Bearer ${cliToken}`,
     `Bearer ${rendererToken}`,
@@ -52,7 +90,9 @@ export async function listenHaloHttp(options: {
       }),
     ],
   });
-  const server = createServer(async (request, response) => {
+  const extensionHandler = new RPCHandler(extensionToolRouter);
+  options.server.removeListener("request", startingResponse);
+  options.server.on("request", async (request, response) => {
     const url = new URL(
       request.url === undefined ? "/" : request.url,
       "http://localhost",
@@ -66,6 +106,24 @@ export async function listenHaloHttp(options: {
       });
       return;
     }
+    if (url.pathname.startsWith("/extension-tools/")) {
+      const extensionId = options.context.extensions.identifyToolConnection(
+        request.headers.authorization,
+      );
+      if (extensionId === undefined) {
+        response.writeHead(401).end();
+        return;
+      }
+      const handled = await extensionHandler.handle(request, response, {
+        prefix: "/extension-tools",
+        context: {
+          extensionId,
+          extensionTools: options.context.extensionTools,
+        },
+      });
+      if (!handled.matched) response.writeHead(404).end();
+      return;
+    }
     if (
       request.method !== "OPTIONS" &&
       !isAuthorized(request.headers.authorization)
@@ -76,36 +134,18 @@ export async function listenHaloHttp(options: {
     }
     const handled = await handler.handle(request, response, {
       prefix: "/rpc",
-      context: options.context,
+      context: {
+        ...options.context,
+        browserControlAllowed:
+          request.headers.authorization === `Bearer ${cliToken}`,
+        extensionApprovalAllowed:
+          request.headers.authorization === `Bearer ${rendererToken}`,
+      },
     });
     if (handled.matched) return;
     response.statusCode = 404;
     response.end();
   });
-  const started = await listen(server, options);
-  if (started instanceof Error) return started;
-
-  const address = server.address();
-  if (address === null) {
-    server.close();
-    return new HaloHttpError({ detail: "server has no TCP address" });
-  }
-  // SAFETY: listen receives a numeric port and host, so Node returns AddressInfo instead of a pipe name.
-  const tcpAddress = address as AddressInfo;
-  options.context.toolRuntime.setOAuthRedirectUri(
-    `http://${options.host}:${tcpAddress.port}/oauth/callback`,
-  );
-  return {
-    connections: {
-      cli: { host: options.host, port: tcpAddress.port, token: cliToken },
-      renderer: {
-        host: options.host,
-        port: tcpAddress.port,
-        token: rendererToken,
-      },
-    },
-    server,
-  };
 }
 
 export function closeHaloHttp(server: HttpServer) {

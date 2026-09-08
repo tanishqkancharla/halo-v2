@@ -1,24 +1,31 @@
+import type { ReactNode } from "react";
 import { border, flex, flexItem, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 
 export function PaneHeader({
   section,
   title,
+  actions,
 }: {
   section?: string;
   title?: string;
+  actions?: ReactNode;
 }) {
   const header = useStyles(headerClass);
+  const actionsClassName = useStyles(actionsClass);
   const titleClassName = useStyles(titleClass);
   const label = paneLabel(section, title);
 
-  if (label === undefined) {
+  if (label === undefined && actions === undefined) {
     return <header className={header} aria-hidden="true" />;
   }
 
   return (
     <header className={header} aria-label={label}>
       <div className={titleClassName}>{label}</div>
+      {actions === undefined ? undefined : (
+        <div className={actionsClassName}>{actions}</div>
+      )}
     </header>
   );
 }
@@ -52,3 +59,10 @@ const titleClass = style(
     textAlign: "left",
   },
 );
+
+const actionsClass = style({
+  marginInlineStart: "auto",
+  paddingInlineStart: spacing.value(4),
+  flexShrink: 0,
+  WebkitAppRegion: "no-drag",
+});

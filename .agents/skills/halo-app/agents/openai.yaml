@@ -1,0 +1,4 @@
+interface:
+  display_name: "Halo App"
+  short_description: "Drive and test the running Halo webview"
+  default_prompt: "Use $halo-app to inspect and test the running Halo Electron app."

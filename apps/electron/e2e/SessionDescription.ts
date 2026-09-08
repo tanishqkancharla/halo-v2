@@ -6,11 +6,9 @@ import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type { AgentMessage } from "@get-halo/shared/rpc";
 import {
   projectSession,
-  type ProjectedSession,
   type SessionLogEvent,
   type SessionLogRecord,
   type ToolIdentity,
-  type ToolInvocation,
 } from "@get-halo/shared/sessionLog";
 import * as errore from "errore";
 
@@ -48,19 +46,14 @@ type ExecDescription = {
   isError?: boolean;
 };
 
-type ToolSelector = {
-  id?: string;
-  path?: string;
-  parentId?: string;
-};
-
 type ToolStartOptions = {
-  id?: string;
+  id: string;
   parentId?: string;
   arguments?: ToolArguments;
 };
 
-type ToolEndOptions = ToolSelector & {
+type ToolEndOptions = {
+  id: string;
   result?: string;
   isError?: boolean;
   details?: ToolResultDetails;
@@ -94,7 +87,7 @@ export type SessionDescriptionItem =
 
 function toolLifecycle(nested: boolean) {
   return {
-    start(toolPath: string, options: ToolStartOptions = {}) {
+    start(toolPath: string, options: ToolStartOptions) {
       return {
         type: "tool.start" as const,
         nested,
@@ -102,7 +95,7 @@ function toolLifecycle(nested: boolean) {
         ...options,
       };
     },
-    end(options: ToolEndOptions = {}) {
+    end(options: ToolEndOptions) {
       return { type: "tool.end" as const, nested, ...options };
     },
   };
@@ -179,7 +172,7 @@ export const m = {
       ...input,
     }),
     {
-      start(input: { js: string; id?: string }) {
+      start(input: { js: string; id: string }) {
         return {
           type: "tool.start" as const,
           nested: false,
@@ -188,11 +181,10 @@ export const m = {
           arguments: { js: input.js },
         };
       },
-      end(options: Omit<ToolEndOptions, "path" | "parentId"> = {}) {
+      end(options: ToolEndOptions) {
         return {
           type: "tool.end" as const,
           nested: false,
-          path: "exec",
           ...options,
         };
       },
@@ -366,11 +358,9 @@ async function resolveDescriptionItem(args: {
     case "tool.start": {
       if (state.activeRunId === undefined) return missingStart();
       const parent = item.nested
-        ? findTool({
-            state,
-            selector: { id: item.parentId, path: "exec" },
-            nested: false,
-          })
+        ? state.toolInvocations.find(
+            ({ invocation }) => invocation.id === item.parentId,
+          )?.invocation
         : undefined;
       if (item.nested && parent === undefined) return missingStart();
       const tool = item.nested
@@ -380,7 +370,7 @@ async function resolveDescriptionItem(args: {
         : directToolIdentity(item.path);
       if (tool instanceof Error) return tool;
       const invocation = {
-        id: item.id === undefined ? crypto.randomUUID() : item.id,
+        id: item.id,
         runId: state.activeRunId,
         parentId: parent?.id,
         tool,
@@ -408,11 +398,9 @@ async function resolveDescriptionItem(args: {
       return events;
     }
     case "tool.end": {
-      const invocation = findTool({
-        state,
-        selector: item,
-        nested: item.nested,
-      });
+      const invocation = state.toolInvocations.find(
+        (entry) => entry.invocation.id === item.id,
+      )?.invocation;
       if (invocation === undefined) return missingStart();
       const content =
         item.result === undefined
@@ -459,52 +447,38 @@ async function resolveDescriptionItem(args: {
     case "exec": {
       const items: SessionDescriptionItem[] = [];
       const standalone = state.activeRunId === undefined;
+      const id = crypto.randomUUID();
       if (standalone) items.push(m.run.start());
       if (item.type === "exec") {
-        items.push(m.exec.start({ js: item.js }));
+        items.push(m.exec.start({ id, js: item.js }));
         for (const tool of item.tools === undefined ? [] : item.tools) {
+          const toolId = crypto.randomUUID();
           items.push(
-            m.exec.tool.start(tool.path, { arguments: tool.arguments }),
-            m.exec.tool.end({ result: tool.result, isError: tool.isError }),
+            m.exec.tool.start(tool.path, {
+              id: toolId,
+              parentId: id,
+              arguments: tool.arguments,
+            }),
+            m.exec.tool.end({
+              id: toolId,
+              result: tool.result,
+              isError: tool.isError,
+            }),
           );
         }
-        items.push(m.exec.end({ result: item.result, isError: item.isError }));
+        items.push(
+          m.exec.end({ id, result: item.result, isError: item.isError }),
+        );
       } else {
         items.push(
-          m.tool.start(item.name, { arguments: item.arguments }),
-          m.tool.end({ result: item.result, details: item.details }),
+          m.tool.start(item.name, { id, arguments: item.arguments }),
+          m.tool.end({ id, result: item.result, details: item.details }),
         );
       }
       if (standalone) items.push(m.run.end());
       return sessionDescriptionEvents({ ...args, items });
     }
   }
-}
-
-function findTool(args: {
-  state: ProjectedSession;
-  selector: ToolSelector;
-  nested: boolean;
-}): ToolInvocation | undefined {
-  const { state, selector, nested } = args;
-  const parent =
-    nested && selector.id === undefined
-      ? findTool({
-          state,
-          selector: { id: selector.parentId, path: "exec" },
-          nested: false,
-        })
-      : undefined;
-  return state.toolInvocations.findLast(
-    ({ invocation, completion }) =>
-      completion === undefined &&
-      invocation.runId === state.activeRunId &&
-      (invocation.parentId !== undefined) === nested &&
-      (selector.path === undefined || invocation.tool.path === selector.path) &&
-      (selector.id === undefined
-        ? !nested || (parent !== undefined && invocation.parentId === parent.id)
-        : invocation.id === selector.id),
-  )?.invocation;
 }
 
 function directToolIdentity(name: string): ToolIdentity {

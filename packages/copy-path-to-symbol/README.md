@@ -5,5 +5,5 @@ Select a symbol or place the cursor inside one, then run **Copy Path to Symbol**
 The extension copies a workspace-relative reference such as:
 
 ```text
-apps/electron/src/main/PluginService.ts#PluginService.load
+packages/server/src/extensions/ExtensionHost.ts#ExtensionHost.list
 ```

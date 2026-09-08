@@ -180,38 +180,3 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
         run: pnpm run publish
-
-  publish-plugin-sdk:
-    name: Publish @get-halo/plugin-sdk
-    needs: [prepare, release]
-    environment: Release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
-        with:
-          runtime: node@24
-          cache: true
-          install: false
-
-      - name: Setup npm registry
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Pack contract
-        run: pnpm --filter @halo/plugin-sdk pack:contract ${{ needs.prepare.outputs.version }}
-
-      - name: Publish contract
-        working-directory: packages/plugin-sdk/contract
-        run: npm publish --access public

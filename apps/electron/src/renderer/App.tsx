@@ -1,71 +1,40 @@
 import { useState } from "react";
-import type { AnyRouter, RouterClient } from "@orpc/server";
 import { colors, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import type { SessionSummary } from "@get-halo/shared/rpc";
 import type { AppInfo } from "../shared/desktop.js";
-import { SidebarNavigationProvider } from "@halo/plugin-sdk/view";
-import type {
-  LoadedPluginView,
-  PluginLoadError,
-} from "@get-halo/shared/plugin";
 import { LoadingPage } from "./LoadingPage.tsx";
 import { MainPane } from "./main/MainPane.tsx";
-import { Onboarding } from "./Onboarding.tsx";
+import { ConnectionPage } from "./ConnectionPage.tsx";
 import { Sidebar } from "./sidebar/Sidebar.tsx";
 import {
   useSessionsQuery,
-  useChooseWorkspaceMutation,
   useWorkspaceQuery,
   useAppInfoQuery,
-  usePluginsQuery,
 } from "./api/ApiProvider.tsx";
 
 export function App() {
   const workspaceQuery = useWorkspaceQuery();
   const workspace = workspaceQuery.data;
-  const chooseWorkspace = useChooseWorkspaceMutation();
   const sessionsQuery = useSessionsQuery(workspace);
   const appInfoQuery = useAppInfoQuery();
-  const pluginsQuery = usePluginsQuery(workspace);
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
-  const pluginViews =
-    pluginsQuery.data === undefined ? [] : pluginsQuery.data.views;
-  const pluginErrors =
-    pluginsQuery.data === undefined ? [] : pluginsQuery.data.errors;
-  const pluginServers =
-    pluginsQuery.data === undefined ? {} : pluginsQuery.data.servers;
+
+  if (workspaceQuery.isError) return <ConnectionPage status="disconnected" />;
 
   if (workspaceQuery.isPending || workspace === undefined) {
     return <LoadingPage />;
   }
 
-  if (workspace.status !== "ready") {
-    return (
-      <Onboarding
-        message={
-          chooseWorkspace.error
-            ? String(chooseWorkspace.error)
-            : workspace.message
-        }
-        isChoosing={chooseWorkspace.isPending}
-        onChoose={() => chooseWorkspace.mutate()}
-      />
-    );
-  }
-
-  if (!sessionsQuery.isFetched || !pluginsQuery.isFetched) {
+  if (!sessionsQuery.isFetched) {
     return <LoadingPage />;
   }
 
   return (
     <WorkspaceShell
       sessions={sessions}
-      pluginViews={pluginViews}
-      pluginErrors={pluginErrors}
-      pluginServers={pluginServers}
       alertMessage={
         sessionsQuery.error ? String(sessionsQuery.error) : undefined
       }
@@ -76,16 +45,10 @@ export function App() {
 
 function WorkspaceShell({
   sessions,
-  pluginViews,
-  pluginErrors,
-  pluginServers,
   alertMessage,
   appInfo,
 }: {
   sessions: SessionSummary[];
-  pluginViews: LoadedPluginView[];
-  pluginErrors: PluginLoadError[];
-  pluginServers: Record<string, RouterClient<AnyRouter>>;
   alertMessage?: string;
   appInfo?: AppInfo;
 }) {
@@ -104,22 +67,10 @@ function WorkspaceShell({
         </div>
       )}
       <Router hook={hook}>
-        <SidebarNavigationProvider>
-          <div className={shell} data-testid="sessions-shell">
-            <Sidebar
-              sessions={sessions}
-              pluginViews={pluginViews}
-              pluginErrors={pluginErrors}
-              pluginServers={pluginServers}
-              appInfo={appInfo}
-            />
-            <MainPane
-              sessions={sessions}
-              pluginViews={pluginViews}
-              pluginServers={pluginServers}
-            />
-          </div>
-        </SidebarNavigationProvider>
+        <div className={shell} data-testid="sessions-shell">
+          <Sidebar sessions={sessions} appInfo={appInfo} />
+          <MainPane sessions={sessions} />
+        </div>
       </Router>
     </div>
   );
