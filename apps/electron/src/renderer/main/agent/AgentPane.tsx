@@ -86,7 +86,6 @@ export function DraftAgentPane({ draftId }: { draftId: string }) {
           ) : undefined}
           <ExtensionPermissionRequests />
           <Composer
-            key={draftId}
             autoFocus
             error={state.error}
             isWorking={state.isWorking}

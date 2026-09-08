@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { colors, spacing, text } from "maui";
 import { style, useStyles } from "purse-styles";
-import { Router } from "wouter";
-import { memoryLocation } from "wouter/memory-location";
+import { Redirect, Route, Router } from "wouter";
+import { useHashLocation } from "wouter/use-hash-location";
 import type { SessionSummary } from "@get-halo/shared/rpc";
 import type { AppInfo } from "../shared/desktop.js";
 import { LoadingPage } from "./LoadingPage.tsx";
@@ -52,9 +51,6 @@ function WorkspaceShell({
   alertMessage?: string;
   appInfo?: AppInfo;
 }) {
-  const [{ hook }] = useState(() =>
-    memoryLocation({ path: initialHostPath(sessions) }),
-  );
   const readyApp = useStyles(styles.readyApp);
   const shell = useStyles(styles.shell);
   const errorClassName = useStyles(styles.error);
@@ -66,7 +62,11 @@ function WorkspaceShell({
           {alertMessage}
         </div>
       )}
-      <Router hook={hook}>
+      {/* oxlint-disable-next-line react/hooks -- Wouter calls the location hook supplied to Router. */}
+      <Router hook={useHashLocation}>
+        <Route path="/">
+          <Redirect to={initialHostPath(sessions)} replace />
+        </Route>
         <div className={shell} data-testid="sessions-shell">
           <Sidebar sessions={sessions} appInfo={appInfo} />
           <MainPane sessions={sessions} />

@@ -131,7 +131,7 @@ app.whenReady().then(async () => {
     selectWorkspace: async (directory, sender) => {
       const selected = await workspaceServer.select(directory);
       if (selected instanceof Error) return selected;
-      reloadWindows(sender);
+      await reloadWindows(sender);
       return selected;
     },
     getConnection: () => workspaceServer.getConnection(),
@@ -374,12 +374,15 @@ async function switchWorkspace(): Promise<void> {
     return;
   }
   if (previous === workspaceServer.getConnection()) return;
-  reloadWindows();
+  await reloadWindows();
 }
 
-function reloadWindows(except?: BrowserWindow) {
+async function reloadWindows(except?: BrowserWindow) {
   for (const window of windows) {
-    if (window !== except) window.reload();
+    if (window === except) continue;
+    const rendererUrl = new URL(window.webContents.getURL());
+    rendererUrl.hash = "";
+    await window.loadURL(rendererUrl.href);
   }
 }
 

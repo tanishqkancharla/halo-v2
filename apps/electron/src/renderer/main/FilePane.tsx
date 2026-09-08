@@ -100,7 +100,10 @@ const styles = {
     minWidth: 0,
     height: "100%",
   }),
-  markdownEditor: style({ minHeight: "100%" }),
+  markdownEditor: style(flex({ direction: "column" }), {
+    minHeight: "100%",
+    "& .ProseMirror": { flex: "1 0 auto" },
+  }),
   codeContent: style({
     width: "100%",
     flex: "1 1 auto",

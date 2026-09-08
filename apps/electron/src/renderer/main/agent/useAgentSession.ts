@@ -33,7 +33,9 @@ type UseAgentSessionResult = {
 /**
  * Opens a saved session and projects its durable event records.
  */
-export function useAgentSession(sessionId: string): UseAgentSessionResult {
+export function useAgentSession(
+  sessionId: string | undefined,
+): UseAgentSessionResult {
   const api = useApi();
   const queryClient = useQueryClient();
   const queryClientRef = useRef(queryClient);
@@ -52,6 +54,7 @@ export function useAgentSession(sessionId: string): UseAgentSessionResult {
   }
 
   useEffect(() => {
+    if (sessionId === undefined) return;
     let cancelled = false;
     let iterator:
       | Awaited<ReturnType<HaloClient["sessions"]["events"]>>
@@ -156,42 +159,47 @@ type UseDraftAgentSessionResult = {
   abort: () => Promise<void | AbortFailedError>;
 };
 
-/**
- * Draft chat: creates a Pi session on first prompt, then navigates to that id.
- */
 export function useDraftAgentSession(
-  onCreated: (sessionId: string) => void,
+  onAccepted: (sessionId: string) => void,
 ): UseDraftAgentSessionResult {
   const api = useApi();
   const queryClient = useQueryClient();
   const [localError, setLocalError] = useState<string | undefined>(undefined);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const sessionIdRef = useRef<string | undefined>(undefined);
-  const onCreatedRef = useRef(onCreated);
+  const onAcceptedRef = useRef(onAccepted);
+  const { state, abort } = useAgentSession(sessionId);
+  const hasMessages = state.messages.length > 0;
 
   useEffect(() => {
-    onCreatedRef.current = onCreated;
-  }, [onCreated]);
+    onAcceptedRef.current = onAccepted;
+  }, [onAccepted]);
+
+  useEffect(() => {
+    if (sessionId === undefined || !hasMessages) return;
+    onAcceptedRef.current(sessionId);
+  }, [sessionId, hasMessages]);
 
   async function prompt(text: string) {
-    const created = await api.sessions.create().catch(
-      (e) =>
-        new PromptFailedError({
-          reason: e instanceof Error ? e.message : String(e),
-          cause: e,
-        }),
-    );
-    if (created instanceof Error) {
-      setLocalError(created.message);
-      return created;
-    }
-    sessionIdRef.current = created.sessionId;
-    setSessionId(created.sessionId);
-    onCreatedRef.current(created.sessionId);
-
     setLocalError(undefined);
+    if (sessionIdRef.current === undefined) {
+      const created = await api.sessions.create().catch(
+        (e) =>
+          new PromptFailedError({
+            reason: e instanceof Error ? e.message : String(e),
+            cause: e,
+          }),
+      );
+      if (created instanceof Error) {
+        setLocalError(created.message);
+        return created;
+      }
+      sessionIdRef.current = created.sessionId;
+      setSessionId(created.sessionId);
+    }
+
     const result = await api.sessions
-      .prompt({ sessionId: created.sessionId, text })
+      .prompt({ sessionId: sessionIdRef.current, text })
       .then(() => undefined)
       .catch(
         (e) =>
@@ -210,27 +218,11 @@ export function useDraftAgentSession(
     });
   }
 
-  async function abort() {
-    const createdSessionId = sessionIdRef.current;
-    if (createdSessionId === undefined) return;
-    const result = await api.sessions
-      .abort({ sessionId: createdSessionId })
-      .then(() => undefined)
-      .catch(
-        (e) =>
-          new AbortFailedError({
-            reason: e instanceof Error ? e.message : String(e),
-            cause: e,
-          }),
-      );
-    if (result instanceof AbortFailedError) {
-      console.warn("Failed to stop session:", result);
-      return result;
-    }
-  }
-
   return {
-    state: projectRecords([], localError),
+    state:
+      localError === undefined
+        ? state
+        : { ...state, error: localError, isWorking: false },
     sessionId,
     prompt,
     abort,
