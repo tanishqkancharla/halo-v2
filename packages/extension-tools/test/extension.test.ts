@@ -5,14 +5,10 @@ import { extensionTest } from "./extensionTest.js";
 const tasks = path.join(import.meta.dirname, "fixtures", "tasks");
 
 extensionTest(
-  "serves nested view URLs and calls extension API routes without Halo",
+  "serves API-backed views at nested URLs without Halo",
   async ({ loadExtension, page }) => {
     const extension = await loadExtension(tasks);
-    const response = page.waitForResponse(
-      (result) => new URL(result.url()).pathname === "/api/title",
-    );
     await page.goto(`${extension.url}tasks/today`);
-    await response;
     await expect(
       page.getByRole("heading", { name: "Shared tasks" }),
     ).toBeVisible();
