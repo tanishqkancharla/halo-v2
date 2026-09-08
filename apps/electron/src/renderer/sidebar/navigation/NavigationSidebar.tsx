@@ -1,30 +1,32 @@
-/* oxlint-disable react/no-children-prop -- React Aria requires children in props for createElement calls. */
-import { createElement, type ReactElement, type ReactNode } from "react";
-import { NavigationTree } from "react-aria-components/NavigationTree";
+import type { ReactNode } from "react";
 import { RouterProvider } from "react-aria-components";
+import { NavigationTree } from "react-aria-components/NavigationTree";
 import { flex } from "maui";
 import { style, useStyles } from "purse-styles";
 import { useLocation } from "wouter";
 
-type SidebarProps = {
+type NavigationSidebarProps = {
   children: ReactNode;
   className?: string;
   "aria-label"?: string;
 };
 
-export function Sidebar(props: SidebarProps): ReactElement {
+export function NavigationSidebar(props: NavigationSidebarProps) {
   const [location, navigate] = useLocation();
   const treeClassName = useStyles(tree);
-  return createElement(RouterProvider, {
-    navigate,
-    children: createElement(NavigationTree, {
-      "aria-label": props["aria-label"],
-      className: joinClassNames(treeClassName, props.className),
-      selectedRoute: canonicalRoute(location),
-      defaultExpandedKeys: "all",
-      children: props.children,
-    }),
-  });
+
+  return (
+    <RouterProvider navigate={navigate}>
+      <NavigationTree
+        aria-label={props["aria-label"]}
+        className={joinClassNames(treeClassName, props.className)}
+        selectedRoute={canonicalRoute(location)}
+        defaultExpandedKeys="all"
+      >
+        {props.children}
+      </NavigationTree>
+    </RouterProvider>
+  );
 }
 
 const tree = style(flex({ direction: "column", gap: 4 }), {

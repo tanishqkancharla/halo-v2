@@ -11,11 +11,9 @@ import {
   type HaloHttpConnections,
   type HaloHttpError,
 } from "./http.js";
-import { PluginService } from "./plugins/PluginService.js";
 import { ExtensionHost } from "./extensions/ExtensionHost.js";
 import { ExtensionTools } from "./extensions/ExtensionTools.js";
 import type { ExtensionRuntime } from "./extensions/ExtensionProcess.js";
-import { PluginToolGrants } from "./plugins/PluginToolGrants.js";
 import { type HaloContext } from "./router.js";
 import { SessionRegistry } from "./sessions/SessionRegistry.js";
 import { WorkspaceService } from "./workspace/WorkspaceService.js";
@@ -37,7 +35,6 @@ export type HaloServerOptions = {
   testingApiEnabled?: boolean;
   ownerUserId: Promise<string | Error>;
   logger: Logger;
-  pluginDependencyInstaller?: (directory: string) => Promise<Error | void>;
   createCredentialVault: (input: {
     filesystem: FilesystemService;
     workspaceRoot: string;
@@ -59,12 +56,6 @@ export class HaloServer {
       cliNodeExecutable: options.cliNodeExecutable,
       cliElectronRunAsNode: options.cliElectronRunAsNode,
     });
-    const plugins = new PluginService({
-      filesystem,
-      workspace,
-      dependencyInstaller: options.pluginDependencyInstaller,
-    });
-    const pluginToolGrants = new PluginToolGrants({ filesystem, workspace });
     const toolRuntime = new ToolRuntimeService({
       filesystem,
       workspace,
@@ -108,8 +99,6 @@ export class HaloServer {
             : options.extensionRuntime,
       }),
       workspace,
-      plugins,
-      pluginToolGrants,
       sessions,
       toolRuntime,
       logger: options.logger,
@@ -124,16 +113,6 @@ export class HaloServer {
   }): Promise<HaloHttpConnections | HaloHttpError> {
     await this.context.workspace.restore();
     const workspace = this.context.workspace.getWorkspace();
-    if (workspace !== undefined) {
-      const listed = await this.context.plugins.reload();
-      if (listed instanceof Error) {
-        this.context.logger.warn({
-          event: "plugin-startup-load-failed",
-          error: listed,
-        });
-      }
-    }
-
     const listening = await listenHaloHttp({
       context: this.context,
       host: options.host,
@@ -175,13 +154,6 @@ export class HaloServer {
     if (this.httpServer !== undefined)
       await this.context.extensions.start(selected.workspaceRoot);
 
-    const pluginsLoaded = await this.context.plugins.reload();
-    if (pluginsLoaded instanceof Error) {
-      this.context.logger.warn({
-        event: "plugin-workspace-load-failed",
-        error: pluginsLoaded,
-      });
-    }
     return selected;
   }
 

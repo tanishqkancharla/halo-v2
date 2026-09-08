@@ -1,8 +1,9 @@
-import { SidebarItem, SidebarSection } from "@halo/plugin-sdk/view";
 import { Text } from "maui";
 import * as MauiIcons from "maui/icons";
 
 import { useExtensionsQuery, useWorkspaceQuery } from "../api/ApiProvider.tsx";
+import { SidebarItem } from "./navigation/SidebarItem.js";
+import { SidebarSection } from "./navigation/SidebarSection.js";
 
 const icons = new Map(Object.entries(MauiIcons));
 

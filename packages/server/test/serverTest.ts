@@ -1,9 +1,5 @@
 import { createHaloRpcClient } from "@halo/cli";
 import { HaloServer, type HaloServerOptions } from "@get-halo/server";
-import {
-  copyPluginWorkspacePackages,
-  installPluginSdkContract,
-} from "@get-halo/server/plugins";
 import type { HaloClient } from "@get-halo/shared/contract";
 import path from "node:path";
 import * as errore from "errore";
@@ -77,14 +73,6 @@ function createServerOptions(artifacts: TestArtifacts): HaloServerOptions {
     appVersion: testAppVersion,
     ownerUserId: Promise.resolve("server-test-user"),
     logger: artifacts.logger,
-    pluginDependencyInstaller: async (directory) => {
-      const contract = await installPluginSdkContract({
-        directory,
-        appVersion: testAppVersion,
-      });
-      if (contract instanceof Error) return contract;
-      return copyPluginWorkspacePackages(directory);
-    },
     createCredentialVault: ({ filesystem, workspaceRoot }) =>
       new TemporaryCredentialVault({
         filesystem,

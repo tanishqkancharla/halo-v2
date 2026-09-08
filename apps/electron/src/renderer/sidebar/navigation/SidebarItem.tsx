@@ -1,18 +1,9 @@
-/* oxlint-disable react/no-children-prop -- React Aria requires children in props for createElement calls. */
-import {
-  createElement,
-  Fragment,
-  type ComponentType,
-  type ReactElement,
-  type ReactNode,
-  type SVGProps,
-} from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
 import {
   Button,
   Link,
   NavigationTreeItem,
   NavigationTreeItemContent,
-  type NavigationTreeItemContentRenderProps,
 } from "react-aria-components/NavigationTree";
 import {
   backgroundColor,
@@ -27,7 +18,6 @@ import { ChevronRight } from "maui/icons";
 import { style, useStyles } from "purse-styles";
 import { useRoute, useRouter } from "wouter";
 import { sidebarPadding } from "./SidebarSection.js";
-import { useRegisterSidebarNavigation } from "./SidebarNavigationProvider.js";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -42,7 +32,7 @@ type SidebarItemProps = {
   className?: string;
 };
 
-export function SidebarItem(props: SidebarItemProps): ReactElement {
+export function SidebarItem(props: SidebarItemProps) {
   const route =
     props.href === undefined ? "/__sidebar-directory__" : props.href;
   const [isActive] = useRoute(route);
@@ -66,58 +56,45 @@ export function SidebarItem(props: SidebarItemProps): ReactElement {
     props.href === undefined
       ? undefined
       : absoluteHref(router.base, props.href);
-  useRegisterSidebarNavigation({ active: isActive, page: props.pageTitle });
-
-  return createElement(NavigationTreeItem, {
-    id: props.id,
-    href,
-    textValue: props.pageTitle,
-    className: joinClassNames(itemClassName, props.className),
-    children: createElement(
-      Fragment,
-      undefined,
-      createElement(NavigationTreeItemContent, {
-        children: ({
-          hasChildItems,
-          isExpanded,
-        }: NavigationTreeItemContentRenderProps) =>
-          createElement(
-            Fragment,
-            undefined,
-            hasChildItems
-              ? createElement(
-                  Button,
-                  { slot: "chevron", className: chevronClassName },
-                  createElement(ChevronRight, {
-                    size: "sm",
-                    className: isExpanded
+  return (
+    <NavigationTreeItem
+      id={props.id}
+      href={href}
+      textValue={props.pageTitle}
+      className={joinClassNames(itemClassName, props.className)}
+    >
+      <NavigationTreeItemContent>
+        {({ hasChildItems, isExpanded }) => (
+          <>
+            {hasChildItems ? (
+              <Button slot="chevron" className={chevronClassName}>
+                <ChevronRight
+                  size="sm"
+                  className={
+                    isExpanded
                       ? chevronIconExpandedClassName
-                      : chevronIconClassName,
-                  }),
-                )
-              : Icon === undefined
-                ? undefined
-                : createElement(
-                    "span",
-                    { className: iconWrapClassName, "aria-hidden": "true" },
-                    createElement(Icon, { className: iconClassName }),
-                  ),
-            createElement(Link, { className: linkClassName }, props.children),
-            props.trailing === undefined
-              ? undefined
-              : createElement(
-                  "span",
-                  { className: trailingClassName },
-                  props.trailing,
-                ),
-          ),
-      }),
-      props.items,
-    ),
-  });
+                      : chevronIconClassName
+                  }
+                />
+              </Button>
+            ) : Icon === undefined ? undefined : (
+              <span className={iconWrapClassName} aria-hidden="true">
+                <Icon className={iconClassName} />
+              </span>
+            )}
+            <Link className={linkClassName}>{props.children}</Link>
+            {props.trailing === undefined ? undefined : (
+              <span className={trailingClassName}>{props.trailing}</span>
+            )}
+          </>
+        )}
+      </NavigationTreeItemContent>
+      {props.items}
+    </NavigationTreeItem>
+  );
 }
 
-export const sidebarItem = style(navigationItem, sidebarPadding, {
+const sidebarItem = style(navigationItem, sidebarPadding, {
   display: "flex",
   alignItems: "center",
   gap: spacing.value(2),

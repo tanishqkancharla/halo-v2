@@ -4,9 +4,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
-  type UseQueryResult,
 } from "@tanstack/react-query";
-import type { AnyRouter, RouterClient } from "@orpc/server";
 import * as errore from "errore";
 import {
   createContext,
@@ -15,15 +13,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type {
-  HaloClient,
-  PluginInvocationInput,
-} from "@get-halo/shared/contract";
+import type { HaloClient } from "@get-halo/shared/contract";
 import type { WorkspaceInfo } from "@get-halo/shared/rpc";
-import {
-  loadPluginViews,
-  type LoadedPluginList,
-} from "../evaluatePluginView.js";
 import { LoadingPage } from "../LoadingPage.tsx";
 import { ConnectionPage } from "../ConnectionPage.tsx";
 import { desktopApi } from "./electron.js";
@@ -199,12 +190,6 @@ export function useInstallAppUpdateMutation() {
   });
 }
 
-type PluginServers = Record<string, RouterClient<AnyRouter>>;
-
-type PluginsQueryData = LoadedPluginList & {
-  servers: PluginServers;
-};
-
 export function useExtensionsQuery(workspace: WorkspaceState | undefined) {
   const api = useApi();
   const workspaceRoot =
@@ -217,55 +202,6 @@ export function useExtensionsQuery(workspace: WorkspaceState | undefined) {
     queryFn: () => api.extensions.list(),
     enabled: workspaceRoot !== undefined,
   });
-}
-
-export function usePluginsQuery(
-  workspace: WorkspaceState | undefined,
-): UseQueryResult<PluginsQueryData> {
-  const api = useApi();
-  const workspaceRoot =
-    workspace?.status === "ready"
-      ? workspace.workspace.workspaceRoot
-      : undefined;
-
-  return useQuery({
-    queryKey: ["plugins", workspaceRoot],
-    queryFn: async (): Promise<PluginsQueryData> => {
-      const list = await api.plugins.list();
-      const loaded = loadPluginViews(list);
-      const servers: PluginServers = {};
-      for (const plugin of list.plugins) {
-        if (plugin.serverPath === undefined) continue;
-        servers[plugin.id] = pluginApiFacade(api, plugin.id);
-      }
-      return { ...loaded, servers };
-    },
-    enabled: workspaceRoot !== undefined,
-  });
-}
-
-/**
- * Preserves the plugin's typed router API over Halo's untyped invoke route.
- * `server.todos.list(input)` becomes
- * `plugins.invoke({ pluginId, path: ["todos", "list"], input })`.
- */
-function pluginApiFacade(api: HaloClient, pluginId: string) {
-  function node(path: string[]): RouterClient<AnyRouter> {
-    const invoke = (
-      input: PluginInvocationInput["input"],
-      options?: { signal?: AbortSignal; lastEventId?: string },
-    ) => api.plugins.invoke({ pluginId, path, input }, options);
-    // SAFETY: each property appends a procedure path and each call delegates to plugins.invoke.
-    return new Proxy(invoke, {
-      get(_target, property) {
-        // Promise resolution reads `.then`; the facade must not be a thenable.
-        if (property === "then") return undefined;
-        return node([...path, property.toString()]);
-      },
-    }) as RouterClient<AnyRouter>;
-  }
-
-  return node([]);
 }
 
 async function restoreWorkspace(api: HaloClient): Promise<WorkspaceState> {

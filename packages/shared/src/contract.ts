@@ -12,53 +12,21 @@ import type {
   ToolIdentity,
 } from "./sessionLog.js";
 import type {
-  PluginList,
-  PluginLoadError,
   SessionSummary,
   WorkspaceInfo,
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const haloProtocolVersion = 3 as const;
+export const haloProtocolVersion = 4 as const;
 
 export const RequestRejectedError = error("BAD_REQUEST", {
   message: "Halo could not complete the request.",
   data: type<{ message: string }>(),
 });
 
-export const PluginInvocationError = error("PLUGIN_ERROR", {
-  message: "Halo could not invoke the plugin.",
-  data: type<{ message: string }>(),
-});
-
 const publicProcedure = oc.errors({
   [RequestRejectedError.code]: RequestRejectedError,
 });
-
-export const reservedPluginIds = [
-  "new",
-  "servers",
-  "create",
-  "build",
-  "types",
-  "list",
-  "check",
-  "grant",
-  "call",
-] as const;
-
-type PluginTypeDiagnostic = {
-  id: string;
-  file: string;
-  line: number;
-  message: string;
-};
-
-export type PluginInvocationInput = {
-  pluginId: string;
-  path: string[];
-  input: unknown;
-};
 
 export type ConnectionStarted =
   | { status: "connected" }
@@ -196,43 +164,6 @@ export const contract = publicProcedure.router({
     getToolIdentity: oc
       .input(type<{ path: string }>())
       .output(type<ToolIdentity>()),
-  },
-  plugins: {
-    list: oc.output(type<PluginList>()),
-    create: oc
-      .input(type<{ id: string; storage?: boolean }>())
-      .output(type<{ id: string; directory: string }>()),
-    build: oc.output(type<{ built: string[]; errors: PluginLoadError[] }>()),
-    types:
-      oc.output(
-        type<{
-          written: string[];
-          diagnostics: PluginTypeDiagnostic[];
-        }>(),
-      ),
-    invoke: oc
-      .input(type<PluginInvocationInput>())
-      .output(type<unknown>())
-      .errors({
-        [PluginInvocationError.code]: PluginInvocationError,
-      }),
-    check: oc.input(type<{ pluginId: string }>()).output(
-      type<{
-        requested: string[];
-        existing: string[];
-        granted: string[];
-        missing: string[];
-      }>(),
-    ),
-    grant: oc.input(type<{ pluginId: string }>()).output(
-      type<{
-        requested: string[];
-        existing: string[];
-        granted: string[];
-        newlyGranted: string[];
-        missing: string[];
-      }>(),
-    ),
   },
 });
 

@@ -1,10 +1,5 @@
 import { test as baseTest } from "@playwright/test";
 import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
-import {
-  copyPluginWorkspacePackages,
-  installPluginSdkContract,
-} from "@get-halo/server/plugins";
-import nodePath from "node:path";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import {
@@ -155,19 +150,7 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
       },
     });
   },
-  server: async ({ runningApp, testArtifacts }, use) => {
-    const directory = nodePath.join(
-      testArtifacts.paths.userData,
-      "plugin-dependencies",
-    );
-    const appVersion = await runningApp.app.evaluate(({ app }) =>
-      app.getVersion(),
-    );
-    const installed = await installPluginSdkContract({ directory, appVersion });
-    if (installed instanceof Error) throw installed;
-    await copyPluginWorkspacePackages(directory);
-    await use(runningApp.server);
-  },
+  server: async ({ runningApp }, use) => use(runningApp.server),
 });
 
 function createE2ESession(args: {

@@ -10,13 +10,7 @@ export default defineConfig({
     minify: false,
   },
   optimizeDeps: {
-    include: [
-      "@tanishqkancharla/tandem-core",
-      "@tanishqkancharla/tandem-core",
-      "@halo/plugin-sdk/storage",
-      "@pierre/diffs/react",
-      "@pierre/diffs/edit",
-    ],
+    include: ["@pierre/diffs/react", "@pierre/diffs/edit"],
   },
   resolve: {
     alias: {

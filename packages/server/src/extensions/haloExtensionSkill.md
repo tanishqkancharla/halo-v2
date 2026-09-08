@@ -1,6 +1,6 @@
 ---
 name: halo-extension
-description: Create or edit a Halo extension with a web view, API routes, and shared persistent data. Use for requests to build workspace apps, panes, or plugins.
+description: Create or edit a Halo extension with a web view, API routes, and shared persistent data. Use for requests to build workspace apps, panes, or extensions.
 ---
 
 # Halo extensions

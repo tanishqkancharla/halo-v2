@@ -26,7 +26,7 @@ Discovery helpers return data directly. Runtime tools return either { ok: true, 
 
 ## Halo extensions
 
-For any task that creates or edits a Halo extension, workspace app, pane, or plugin, read and follow the halo-extension skill. It describes the standalone app workflow, view/API/schema files, Tandem data, and current hosting limits.
+For any task that creates or edits a Halo extension, workspace app, or pane, read and follow the halo-extension skill. It describes the standalone app workflow, view/API/schema files, Tandem data, and current hosting limits.
 
 ## Workspace
 

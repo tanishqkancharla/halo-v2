@@ -1,10 +1,4 @@
 import {
-  PluginServerProvider,
-  Sidebar as NavigationSidebar,
-  sidebarPadding,
-} from "@halo/plugin-sdk/view";
-import type { AnyRouter, RouterClient } from "@orpc/server";
-import {
   Button,
   Icons,
   colors,
@@ -15,42 +9,29 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import { Router, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import type { SessionSummary } from "@get-halo/shared/rpc";
 import type { AppInfo } from "../../shared/desktop.js";
-import type {
-  LoadedPluginView,
-  PluginLoadError,
-} from "@get-halo/shared/plugin";
 import { useInstallAppUpdateMutation } from "../api/ApiProvider.tsx";
 import { FilesystemSection } from "./FilesystemSection.tsx";
 import { SessionsSection } from "./SessionsSection.tsx";
 import { ExtensionsSection } from "./ExtensionsSection.js";
+import { NavigationSidebar } from "./navigation/NavigationSidebar.js";
+import { sidebarPadding } from "./navigation/SidebarSection.js";
 
 type SidebarProps = {
   sessions: SessionSummary[];
-  pluginViews: LoadedPluginView[];
-  pluginErrors: PluginLoadError[];
-  pluginServers: Record<string, RouterClient<AnyRouter>>;
   appInfo?: AppInfo;
 };
 
-export function Sidebar({
-  sessions,
-  pluginViews,
-  pluginErrors,
-  pluginServers,
-  appInfo,
-}: SidebarProps) {
+export function Sidebar({ sessions, appInfo }: SidebarProps) {
   const sidebar = useStyles(styles.sidebar);
   const titleBar = useStyles(styles.titleBar);
   const newButton = useStyles(styles.newButton);
   const navigation = useStyles(styles.navigation);
-  const sessionList = useStyles(styles.sessionList);
   const footer = useStyles(styles.footer);
   const versionLabel = useStyles(styles.versionLabel);
   const updateLabel = useStyles(styles.updateLabel);
-  const pluginError = useStyles(styles.pluginError);
   const newSessionPad = useStyles(sidebarPadding);
 
   return (
@@ -63,31 +44,7 @@ export function Sidebar({
         <FilesystemSection />
         <SessionsSection sessions={sessions} />
         <ExtensionsSection />
-        {pluginViews.map((plugin) => {
-          if (plugin.Sidebar === undefined) return undefined;
-          return (
-            <Router key={plugin.id} base={`/plugins/${plugin.id}`}>
-              <PluginServerProvider
-                pluginId={plugin.id}
-                server={pluginServers[plugin.id]}
-              >
-                <plugin.Sidebar />
-              </PluginServerProvider>
-            </Router>
-          );
-        })}
       </NavigationSidebar>
-      {pluginErrors.length > 0 ? (
-        <ul className={sessionList}>
-          {pluginErrors.map((error) => (
-            <li key={error.id}>
-              <div className={pluginError} data-testid="plugin-error">
-                {error.id}: {error.message}
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : undefined}
       {appInfo !== undefined && (
         <div className={footer} data-testid="app-update-status">
           <div className={versionLabel}>Halo {appInfo.version}</div>
@@ -181,13 +138,6 @@ const styles = {
     alignSelf: "stretch",
     width: "100%",
   }),
-  sessionList: style(flex({ direction: "column" }), {
-    listStyleType: "none",
-    padding: 0,
-    margin: 0,
-    width: "100%",
-    gap: "1px",
-  }),
   footer: style(
     flex({ direction: "column", gap: 1 }),
     sidebarPadding,
@@ -212,17 +162,6 @@ const styles = {
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
-    },
-  ),
-  pluginError: style(
-    text({ size: "xs", fontWeight: 500, color: "highContrast" }),
-    sidebarPadding,
-    {
-      color: "light-dark(#b42318, #ff9592)",
-      whiteSpace: "pre-wrap",
-      overflowWrap: "anywhere",
-      paddingTop: spacing.value(2),
-      paddingBottom: spacing.value(2),
     },
   ),
 };

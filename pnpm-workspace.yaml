@@ -26,8 +26,8 @@ overrides:
   "@effect/platform-node": "4.0.0-beta.103"
   "@effect/platform-node-shared": "4.0.0-beta.103"
   effect: "4.0.0-beta.103"
-  # tsx 4.23.13 depends on esbuild 0.28.1; Halo compiles plugins with 0.28.2.
-  # A hoisted tree can pair 0.28.2 JS with a 0.28.1 binary and fail plugin builds.
+  # tsx 4.23.13 depends on esbuild 0.28.1; Halo bundles its CLI with 0.28.2.
+  # A hoisted tree can pair 0.28.2 JS with a 0.28.1 binary and fail CLI builds.
   esbuild: "0.28.2"
 minimumReleaseAgeExclude:
   - '@get-halo/extension-tools@0.1.0'

@@ -17,7 +17,7 @@ export async function seedExtensionWorkspace(
   layout: WorkspaceLayout,
 ) {
   const skillsDirectory = join(layout.root, ".agents", "skills");
-  for (const name of ["halo-plugin", "halo-extension", "maui"]) {
+  for (const name of ["halo-extension", "maui"]) {
     const removed = await filesystem.remove(
       join(layout.agentDir, "skills", name),
       {

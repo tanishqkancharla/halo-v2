@@ -1,4 +1,4 @@
-import { createElement, type ReactElement, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   NavigationTreeHeader,
   NavigationTreeSection,
@@ -12,11 +12,10 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import { SidebarSectionContext } from "./SidebarNavigationProvider.js";
 
 export const sidebarPadding = style(spacing.padding({ x: 4 }));
 
-export const sidebarSection = style(
+const sidebarSection = style(
   flex({ direction: "column" }),
   spacing.padding({ y: 2 }),
   {
@@ -39,22 +38,19 @@ type SidebarSectionProps = {
   className?: string;
 };
 
-export function SidebarSection(props: SidebarSectionProps): ReactElement {
+export function SidebarSection(props: SidebarSectionProps) {
   const sectionClassName = useStyles(sidebarSection);
   const labelClassName = useStyles(sectionLabel);
-  return createElement(
-    SidebarSectionContext.Provider,
-    { value: props.label },
-    createElement(
-      NavigationTreeSection,
-      { className: joinClassNames(sectionClassName, props.className) },
-      createElement(
-        NavigationTreeHeader,
-        { className: labelClassName },
-        props.label,
-      ),
-      props.children,
-    ),
+
+  return (
+    <NavigationTreeSection
+      className={joinClassNames(sectionClassName, props.className)}
+    >
+      <NavigationTreeHeader className={labelClassName}>
+        {props.label}
+      </NavigationTreeHeader>
+      {props.children}
+    </NavigationTreeSection>
   );
 }
 

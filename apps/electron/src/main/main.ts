@@ -8,7 +8,6 @@ import {
   type IpcMainEvent,
 } from "electron";
 import { dirname, join } from "node:path";
-import { cp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { registerSessionResourceCleanup } from "@earendil-works/pi-ai";
 import {
@@ -25,7 +24,6 @@ import type { HaloRpcConnection } from "../shared/rpc.js";
 import { HaloServer } from "@get-halo/server";
 import { resolveHaloCliEntry } from "@get-halo/server/cli";
 import { FilesystemService } from "@get-halo/server/filesystem";
-import { PluginDependencyInstallError } from "@get-halo/server/plugins";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import {
   ApplicationLaunchMode,
@@ -112,19 +110,6 @@ const haloServer = new HaloServer({
   cliElectronRunAsNode: !isDevelopment,
   extensionRuntime: { executable: process.execPath, electronRunAsNode: true },
   testingApiEnabled: applicationLaunchMode === ApplicationLaunchMode.Test,
-  pluginDependencyInstaller:
-    applicationLaunchMode === ApplicationLaunchMode.Test
-      ? (directory) =>
-          cp(
-            join(
-              applicationConfig.dataDir,
-              "plugin-dependencies",
-              "node_modules",
-            ),
-            join(directory, "node_modules"),
-            { recursive: true },
-          ).catch((cause) => new PluginDependencyInstallError({ cause }))
-      : undefined,
   ownerUserId,
   logger: rpcLogger,
   createCredentialVault: ({ filesystem, workspaceRoot }) =>

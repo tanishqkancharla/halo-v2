@@ -10,10 +10,6 @@ import {
   type ExtensionsRouterContext,
 } from "./extensions/extensionsRouter.js";
 import {
-  pluginsRouter,
-  type PluginsRouterContext,
-} from "./plugins/pluginsRouter.js";
-import {
   sessionsRouter,
   type SessionsRouterContext,
 } from "./sessions/sessionsRouter.js";
@@ -30,7 +26,6 @@ export type HaloContext = BrowserRouterContext &
   WorkspaceRouterContext &
   ExtensionsRouterContext &
   SessionsRouterContext &
-  PluginsRouterContext &
   TestingRouterContext;
 
 const server = implement(contract.server);
@@ -45,7 +40,6 @@ export const haloRpcRouter = {
   app: appRouter,
   workspace: workspaceRouter,
   sessions: sessionsRouter,
-  plugins: pluginsRouter,
   extensions: extensionsRouter,
   testHarness: testingRouter,
 };
