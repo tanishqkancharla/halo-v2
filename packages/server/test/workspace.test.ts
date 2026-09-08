@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { expect } from "vitest";
 import { serverTest } from "./serverTest.js";
@@ -15,12 +16,76 @@ serverTest("reads, writes, and lists workspace files", async ({ server }) => {
     path: path.join(server.harness.paths.workspace, ".hidden", "secret.txt"),
     content: "secret",
   });
+  await server.harness.files.write({
+    path: path.join(server.harness.paths.workspace, ".git", "config"),
+    content: "repository",
+  });
+  await server.harness.files.write({
+    path: path.join(server.harness.paths.workspace, "node_modules", "pkg.js"),
+    content: "dependency",
+  });
+  await server.harness.files.write({
+    path: path.join(server.harness.paths.workspace, "src", ".cache", "x"),
+    content: "cache",
+  });
 
   expect(await server.rpc.workspace.readFile({ path: "notes/today.md" })).toBe(
     "# Today",
   );
-  expect(await server.rpc.workspace.listPaths()).toEqual(["notes/today.md"]);
+  expect(await server.rpc.workspace.listPaths()).toEqual([
+    "notes/today.md",
+    "src/",
+  ]);
 });
+
+serverTest(
+  "publishes workspace file creates and deletes while ignoring updates and hidden files",
+  async ({ server }) => {
+    const events = await server.rpc.workspace.events();
+    const initial = events.next();
+    await server.harness.files.write({
+      path: path.join(server.harness.paths.workspace, "src", "existing.ts"),
+      content: "original",
+    });
+    await expect(initial).resolves.toEqual({
+      done: false,
+      value: [
+        { type: "create", path: "src/" },
+        { type: "create", path: "src/existing.ts" },
+      ],
+    });
+    await server.rpc.workspace.listPaths();
+
+    const created = events.next();
+    await server.harness.files.write({
+      path: path.join(server.harness.paths.workspace, "src", "created.ts"),
+      content: "created",
+    });
+    await expect(created).resolves.toEqual({
+      done: false,
+      value: [{ type: "create", path: "src/created.ts" }],
+    });
+
+    const deleted = events.next();
+    await server.harness.files.write({
+      path: path.join(server.harness.paths.workspace, "src", "created.ts"),
+      content: "updated",
+    });
+    await server.harness.files.write({
+      path: path.join(server.harness.paths.workspace, ".hidden", "ignored.ts"),
+      content: "ignored",
+    });
+    await fs.rm(
+      path.join(server.harness.paths.workspace, "src", "existing.ts"),
+    );
+    await expect(deleted).resolves.toEqual({
+      done: false,
+      value: [{ type: "delete", path: "src/existing.ts" }],
+    });
+
+    await events.return();
+  },
+);
 
 serverTest("rejects files outside the public workspace", async ({ server }) => {
   await expect(

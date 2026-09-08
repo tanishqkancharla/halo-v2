@@ -67,12 +67,12 @@ const workspacePreferenceSchema = Type.Object({
 const preferenceFileName = "workspace.json";
 
 /** Finder-hidden names (leading `.`) plus `node_modules` for walk cost. */
-export function shouldSkipEntryName(name: string): boolean {
+function shouldSkipEntryName(name: string): boolean {
   if (name.startsWith(".")) return true;
   return name === "node_modules";
 }
 
-export function isSkippedRelativePath(relativePath: string): boolean {
+function isSkippedRelativePath(relativePath: string): boolean {
   for (const segment of relativePath.split("/")) {
     if (segment.length === 0) continue;
     if (shouldSkipEntryName(segment)) return true;
@@ -80,7 +80,7 @@ export function isSkippedRelativePath(relativePath: string): boolean {
   return false;
 }
 
-export function toPosixRelative(
+function toPosixRelative(
   workspaceRoot: string,
   absolutePath: string,
 ): string | undefined {
@@ -91,7 +91,7 @@ export function toPosixRelative(
   return rel.split(sep).join("/");
 }
 
-export function mapFilesystemEventsToTreeEvents(
+function mapFilesystemEventsToTreeEvents(
   workspaceRoot: string,
   events: readonly FilesystemWatchEvent[],
   directoryPaths: Set<string>,
@@ -132,7 +132,7 @@ export function mapFilesystemEventsToTreeEvents(
   return mapped;
 }
 
-export function directoryPathsFromList(paths: readonly string[]): Set<string> {
+function directoryPathsFromList(paths: readonly string[]): Set<string> {
   const directories = new Set<string>();
   for (const path of paths) {
     if (path.endsWith("/")) directories.add(path);
