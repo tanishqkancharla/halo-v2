@@ -1,41 +1,21 @@
-import {
-  basename,
-  delimiter,
-  dirname,
-  join,
-  relative,
-  resolve,
-  sep,
-} from "node:path";
-import { Type } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import * as errore from "errore";
-import type { WorkspaceTreeEvent } from "@get-halo/shared/rpc";
+import type { WorkspaceInfo, WorkspaceTreeEvent } from "@get-halo/shared/rpc";
 import { type ReadonlyStream, Stream } from "../Stream.js";
 import {
   type FilesystemWatchBatch,
   type FilesystemWatchEvent,
   FilesystemService,
 } from "../filesystem/FilesystemService.js";
-import { haloCliBinDir, installHaloCli } from "./installHaloCli.js";
-import { seedPluginWorkspace } from "../plugins/seedPluginWorkspace.js";
+import { installHaloCli } from "./installHaloCli.js";
+import { seedExtensionWorkspace } from "../extensions/seedExtensionWorkspace.js";
 
 export type WorkspaceLayout = {
-  root: string;
-  agentDir: string;
-  sessionDir: string;
+  readonly root: string;
+  readonly agentDir: string;
+  readonly sessionDir: string;
   sessionLogPath(sessionId: string): string;
 };
-
-type WorkspaceInfo = {
-  name: string;
-  workspaceRoot: string;
-};
-
-export class WorkspaceNotReadyError extends errore.createTaggedError({
-  name: "WorkspaceNotReadyError",
-  message: "Choose a workspace first.",
-}) {}
 
 export class WorkspaceNotDirectoryError extends errore.createTaggedError({
   name: "WorkspaceNotDirectoryError",
@@ -52,27 +32,13 @@ export class WorkspaceInvalidPathError extends errore.createTaggedError({
   message: "'$path' is not a workspace file.",
 }) {}
 
-type WorkspaceState =
-  | { status: "notStarted" }
-  | { status: "ready"; layout: WorkspaceLayout };
-
-type WorkspacePreference = {
-  workspaceRoot: string;
-};
-
-const workspacePreferenceSchema = Type.Object({
-  workspaceRoot: Type.String({ minLength: 1 }),
-});
-
-const preferenceFileName = "workspace.json";
-
 /** Finder-hidden names (leading `.`) plus `node_modules` for walk cost. */
-export function shouldSkipEntryName(name: string): boolean {
+function shouldSkipEntryName(name: string): boolean {
   if (name.startsWith(".")) return true;
   return name === "node_modules";
 }
 
-export function isSkippedRelativePath(relativePath: string): boolean {
+function isSkippedRelativePath(relativePath: string): boolean {
   for (const segment of relativePath.split("/")) {
     if (segment.length === 0) continue;
     if (shouldSkipEntryName(segment)) return true;
@@ -80,7 +46,7 @@ export function isSkippedRelativePath(relativePath: string): boolean {
   return false;
 }
 
-export function toPosixRelative(
+function toPosixRelative(
   workspaceRoot: string,
   absolutePath: string,
 ): string | undefined {
@@ -91,7 +57,7 @@ export function toPosixRelative(
   return rel.split(sep).join("/");
 }
 
-export function mapFilesystemEventsToTreeEvents(
+function mapFilesystemEventsToTreeEvents(
   workspaceRoot: string,
   events: readonly FilesystemWatchEvent[],
   directoryPaths: Set<string>,
@@ -132,7 +98,7 @@ export function mapFilesystemEventsToTreeEvents(
   return mapped;
 }
 
-export function directoryPathsFromList(paths: readonly string[]): Set<string> {
+function directoryPathsFromList(paths: readonly string[]): Set<string> {
   const directories = new Set<string>();
   for (const path of paths) {
     if (path.endsWith("/")) directories.add(path);
@@ -152,28 +118,37 @@ function removeDirectoryAndDescendants(
 }
 
 type WorkspaceServiceOptions = {
+  workspaceRoot: string;
   appDataDir: string;
   filesystem: FilesystemService;
   appVersion: string;
   cliEntry?: string;
   cliNodeExecutable?: string;
   cliElectronRunAsNode?: boolean;
-  isDevelopment?: boolean;
 };
 
 export class WorkspaceService {
-  private state: WorkspaceState = { status: "notStarted" };
+  readonly layout: WorkspaceLayout;
   private readonly treeEventStream = new Stream<WorkspaceTreeEvent[]>();
   readonly treeEvents: ReadonlyStream<WorkspaceTreeEvent[]> =
     this.treeEventStream;
   private readonly unsubscribeFilesystemEvents: () => void;
   private directoryPaths = new Set<string>();
 
-  constructor(private readonly options: WorkspaceServiceOptions) {
+  static async create(options: WorkspaceServiceOptions) {
+    const root = resolve(options.workspaceRoot);
+    const metadata = await options.filesystem.stat(root);
+    if (metadata instanceof Error)
+      return new WorkspaceIoError({ cause: metadata });
+    if (!metadata.isDirectory()) return new WorkspaceNotDirectoryError();
+    return new WorkspaceService({ ...options, workspaceRoot: root });
+  }
+
+  private constructor(private readonly options: WorkspaceServiceOptions) {
+    this.layout = workspaceLayout(options.workspaceRoot);
     const watchEvents = this.options.filesystem.watchEvents.filter(
       (entry): entry is FilesystemWatchBatch => {
-        if (this.state.status === "notStarted") return false;
-        if (entry.watchedPath !== this.state.layout.root) return false;
+        if (entry.watchedPath !== this.layout.root) return false;
         if (entry instanceof Error) {
           console.warn("Workspace watch failed:", entry.message);
           return false;
@@ -186,23 +161,12 @@ export class WorkspaceService {
     });
   }
 
-  getWorkspace(): WorkspaceInfo | undefined {
-    if (this.state.status === "notStarted") return undefined;
-    return workspaceInfo(this.state.layout);
-  }
-
-  get appVersion() {
-    return this.options.appVersion;
-  }
-
-  getLayout() {
-    if (this.state.status === "notStarted") return new WorkspaceNotReadyError();
-    return this.state.layout;
+  getWorkspace(): WorkspaceInfo {
+    return workspaceInfo(this.layout);
   }
 
   async listPaths() {
-    const layout = this.getLayout();
-    if (layout instanceof Error) return layout;
+    const layout = this.layout;
     const paths = await listRelativeWorkspacePaths(
       this.options.filesystem,
       layout.root,
@@ -213,8 +177,7 @@ export class WorkspaceService {
   }
 
   async readFile(path: string) {
-    const layout = this.getLayout();
-    if (layout instanceof Error) return layout;
+    const layout = this.layout;
 
     const absolutePath = resolve(layout.root, path);
     const relativePath = toPosixRelative(layout.root, absolutePath);
@@ -232,8 +195,7 @@ export class WorkspaceService {
   }
 
   async writeFile(path: string, content: string) {
-    const layout = this.getLayout();
-    if (layout instanceof Error) return layout;
+    const layout = this.layout;
 
     const absolutePath = resolve(layout.root, path);
     const relativePath = toPosixRelative(layout.root, absolutePath);
@@ -259,51 +221,9 @@ export class WorkspaceService {
     return { path };
   }
 
-  async restore() {
-    const preference = await readWorkspacePreference(
-      this.options.filesystem,
-      this.options.appDataDir,
-    );
-    if (preference instanceof Error) {
-      console.warn("Workspace preference unreadable:", preference.message);
-      return undefined;
-    }
-    if (preference === undefined) return undefined;
-
-    // Saved path may have been deleted since the last launch.
-    const selected = await this.select(preference.workspaceRoot);
-    if (selected instanceof Error) {
-      console.warn("Saved workspace unavailable:", selected.message);
-      const cleared = await clearWorkspacePreference(
-        this.options.filesystem,
-        this.options.appDataDir,
-      );
-      if (cleared instanceof Error) {
-        console.warn("Could not clear workspace preference:", cleared.message);
-      }
-      return undefined;
-    }
-    return selected;
-  }
-
-  async select(directory: string) {
-    const root = await this.options.filesystem.realpath(directory);
-    if (root instanceof Error) return new WorkspaceIoError({ cause: root });
-
-    const metadata = await this.options.filesystem.stat(root);
-    if (metadata instanceof Error) {
-      return new WorkspaceIoError({ cause: metadata });
-    }
-    if (!metadata.isDirectory()) return new WorkspaceNotDirectoryError();
-
-    const layout = workspaceLayout(root);
-    if (
-      this.state.status === "ready" &&
-      this.state.layout.root === layout.root
-    ) {
-      return workspaceInfo(this.state.layout);
-    }
-
+  async initialize() {
+    const layout = this.layout;
+    const root = layout.root;
     const sessionDir = await this.options.filesystem.makeDirectory(
       layout.sessionDir,
       {
@@ -315,10 +235,10 @@ export class WorkspaceService {
       return new WorkspaceIoError({ cause: sessionDir });
     }
 
-    const seeded = await seedPluginWorkspace(this.options.filesystem, layout, {
-      appVersion: this.options.appVersion,
-      alwaysWrite: this.options.isDevelopment === true,
-    });
+    const seeded = await seedExtensionWorkspace(
+      this.options.filesystem,
+      layout,
+    );
     if (seeded instanceof Error) return seeded;
 
     if (this.options.cliEntry !== undefined) {
@@ -326,28 +246,17 @@ export class WorkspaceService {
         filesystem: this.options.filesystem,
         workspaceRoot: root,
         appVersion: this.options.appVersion,
+        appDataDir: this.options.appDataDir,
         cliEntry: this.options.cliEntry,
         nodeExecutable: this.options.cliNodeExecutable,
         electronRunAsNode: this.options.cliElectronRunAsNode,
       });
       if (installed instanceof Error) return installed;
     }
-    prependHaloCliPath(root);
-
-    const preference = await writeWorkspacePreference(
-      this.options.filesystem,
-      this.options.appDataDir,
-      root,
-    );
-    if (preference instanceof Error) return preference;
-
-    this.state = { status: "ready", layout };
-    this.directoryPaths = new Set();
     const watched = await this.options.filesystem.watch(layout.root);
     if (watched instanceof Error) {
       console.warn("Workspace watch failed to start:", watched.message);
     }
-    return workspaceInfo(layout);
   }
 
   close() {
@@ -360,8 +269,6 @@ export class WorkspaceService {
       batch.events,
       this.directoryPaths,
     );
-    if (this.state.status === "notStarted") return;
-    if (batch.watchedPath !== this.state.layout.root) return;
     if (mapped.length === 0) return;
     this.treeEventStream.append(mapped);
   }
@@ -432,85 +339,4 @@ function workspaceInfo(layout: WorkspaceLayout): WorkspaceInfo {
     name: basename(layout.root),
     workspaceRoot: layout.root,
   };
-}
-
-function preferencePath(appDataDir: string): string {
-  return join(appDataDir, preferenceFileName);
-}
-
-async function readWorkspacePreference(
-  filesystem: FilesystemService,
-  appDataDir: string,
-) {
-  const path = preferencePath(appDataDir);
-  if (!filesystem.exists(path)) return undefined;
-
-  const raw = await filesystem.readFile(path, "utf8");
-  if (raw instanceof Error) return new WorkspaceIoError({ cause: raw });
-
-  const parsed = errore.try({
-    try: () => {
-      // SAFETY: JSON.parse is untyped; workspacePreferenceSchema is the file contract.
-      return JSON.parse(raw) as unknown;
-    },
-    catch: (e) => new WorkspaceIoError({ cause: e }),
-  });
-  if (parsed instanceof Error) {
-    console.warn("Invalid workspace preference JSON:", parsed.message);
-    const cleared = await clearWorkspacePreference(filesystem, appDataDir);
-    if (cleared instanceof Error) {
-      console.warn("Could not clear workspace preference:", cleared.message);
-    }
-    return undefined;
-  }
-
-  if (!Value.Check(workspacePreferenceSchema, parsed)) {
-    const cleared = await clearWorkspacePreference(filesystem, appDataDir);
-    if (cleared instanceof Error) {
-      console.warn("Could not clear workspace preference:", cleared.message);
-    }
-    return undefined;
-  }
-  return { workspaceRoot: parsed.workspaceRoot };
-}
-
-async function writeWorkspacePreference(
-  filesystem: FilesystemService,
-  appDataDir: string,
-  workspaceRoot: string,
-) {
-  const created = await filesystem.makeDirectory(appDataDir, {
-    recursive: true,
-    mode: 0o700,
-  });
-  if (created instanceof Error) return new WorkspaceIoError({ cause: created });
-
-  const preference: WorkspacePreference = { workspaceRoot };
-  const written = await filesystem.writeFile(
-    preferencePath(appDataDir),
-    `${JSON.stringify(preference, undefined, 2)}\n`,
-    { mode: 0o600 },
-  );
-  if (written instanceof Error) return new WorkspaceIoError({ cause: written });
-}
-
-function prependHaloCliPath(workspaceRoot: string) {
-  const binDir = haloCliBinDir(workspaceRoot);
-  const path = process.env.PATH;
-  if (path === undefined) {
-    process.env.PATH = binDir;
-    return;
-  }
-  if (path.split(delimiter).includes(binDir)) return;
-  process.env.PATH = `${binDir}${delimiter}${path}`;
-}
-
-async function clearWorkspacePreference(
-  filesystem: FilesystemService,
-  appDataDir: string,
-) {
-  const path = preferencePath(appDataDir);
-  if (!filesystem.exists(path)) return;
-  const removed = await filesystem.remove(path);
-  if (removed instanceof Error) return new WorkspaceIoError({ cause: removed });
 }

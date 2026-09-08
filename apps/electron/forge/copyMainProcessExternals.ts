@@ -6,11 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
-import {
-  mainProcessDiskPackages,
-  mainProcessExternals,
-  pluginSdkJitiDependencies,
-} from "./mainExternals.js";
+import { mainProcessExternals } from "./mainExternals.js";
 
 const electronDir = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -35,19 +31,12 @@ class PackageJsonReadError extends errore.createTaggedError({
 /**
  * Copy Vite-external main-process packages (and their runtime closure) into
  * the packaged app so require() resolves after Forge Vite's `.vite`-only pack.
- * Also copy @halo/plugin-sdk for jiti; the host still bundles that package.
  */
 export async function copyMainProcessExternals(
   buildPath: string,
 ): Promise<void> {
   const copied = new Set<string>();
   for (const packageName of mainProcessExternals) {
-    await copyPackageClosure(buildPath, packageName, copied);
-  }
-  for (const packageName of mainProcessDiskPackages) {
-    await copyPackage(buildPath, packageName, copied);
-  }
-  for (const packageName of pluginSdkJitiDependencies) {
     await copyPackageClosure(buildPath, packageName, copied);
   }
 }

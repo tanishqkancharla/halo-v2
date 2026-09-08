@@ -20,14 +20,14 @@ describe("findDocumentSymbolPath", () => {
   test("returns the deepest symbol path at the selection", () => {
     const symbols = [
       {
-        name: "PluginService",
+        name: "ExtensionHost",
         range: range(10, 40),
         children: [{ name: "load", range: range(20, 30), children: [] }],
       },
     ];
 
     assert.deepEqual(findDocumentSymbolPath(symbols, { line: 25 }), [
-      "PluginService",
+      "ExtensionHost",
       "load",
     ]);
   });
@@ -45,19 +45,19 @@ describe("findSymbolInformationPath", () => {
   test("uses the smallest matching symbol and its container", () => {
     const symbols = [
       {
-        name: "PluginService",
+        name: "ExtensionHost",
         containerName: "",
         location: { range: range(10, 40) },
       },
       {
         name: "load",
-        containerName: "PluginService",
+        containerName: "ExtensionHost",
         location: { range: range(20, 30) },
       },
     ];
 
     assert.deepEqual(findSymbolInformationPath(symbols, { line: 25 }), [
-      "PluginService",
+      "ExtensionHost",
       "load",
     ]);
   });

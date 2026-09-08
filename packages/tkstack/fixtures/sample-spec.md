@@ -10,7 +10,7 @@ flowchart TD
 
 ## Problem overview
 
-Specs lived as markdown files with no local page, so mermaid, call stacks, and diff previews were hard to read. Prose may name paths such as `{workspace}/.halo/plugins/<id>/`.
+Specs lived as markdown files with no local page, so mermaid, call stacks, and diff previews were hard to read. Prose may name paths such as `{workspace}/.halo/extensions/<id>/`.
 
 ## Solution overview
 

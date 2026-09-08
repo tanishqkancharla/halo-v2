@@ -17,7 +17,7 @@ export async function handleOAuthCallback(options: {
   if (providerError !== null) {
     const state = options.url.searchParams.get("state");
     if (state !== null) {
-      const cancelled = await options.context.toolRuntime.cancelOAuth(state);
+      const cancelled = await options.context.connections.cancelOAuth(state);
       if (cancelled instanceof Error) {
         options.context.logger.warn({
           event: "oauth-cancel-failed",
@@ -38,7 +38,7 @@ export async function handleOAuthCallback(options: {
     return;
   }
 
-  const completed = await options.context.toolRuntime.completeOAuth({
+  const completed = await options.context.connections.completeOAuth({
     state,
     code,
   });

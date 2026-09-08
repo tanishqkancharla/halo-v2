@@ -29,10 +29,7 @@ export function ToolActivity({ part }: { part: ToolActivityPart }) {
   const [expanded, setExpanded] = useState(false);
   const calls = part.calls;
   const workspace = useWorkspaceQuery().data;
-  const workspaceRoot =
-    workspace?.status === "ready"
-      ? workspace.workspace.workspaceRoot
-      : undefined;
+  const workspaceRoot = workspace?.workspaceRoot;
   const summary = summarizeToolActivities({
     calls,
     workspaceRoot,

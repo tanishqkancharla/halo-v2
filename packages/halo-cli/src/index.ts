@@ -11,11 +11,6 @@ export {
   type FindHaloRpcFileArgs,
 } from "./findHaloRpcFile.js";
 export {
-  parsePluginArgv,
-  reservedPluginCommands,
-  type HaloPluginArgv,
-} from "./parsePluginArgv.js";
-export {
   HaloRpcFileError,
   haloRpcFileV1,
   readHaloRpcFile,

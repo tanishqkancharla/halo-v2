@@ -6,13 +6,13 @@ import {
   type ConnectionRequest,
 } from "@get-halo/shared/connectionRequests";
 import type { HaloAgentSession } from "../agent/HaloAgentSession.js";
-import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
+import type { ConnectionService } from "../agent/runtime/ConnectionService.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { SessionRegistry } from "./SessionRegistry.js";
 
 export type SessionsRouterContext = {
   sessions: SessionRegistry;
-  toolRuntime: ToolRuntimeService;
+  connections: ConnectionService;
   logger: Logger;
 };
 
@@ -76,7 +76,7 @@ export const sessionsRouter = os.router({
     });
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    const started = await context.toolRuntime.startConnection({
+    const started = await context.connections.startConnection({
       sessionId: input.sessionId,
       request: input.request,
       onEvent: async (event) => {
@@ -110,7 +110,7 @@ export const sessionsRouter = os.router({
       sessionId: input.sessionId,
       connectionId: input.connectionId,
     });
-    const cancelled = await context.toolRuntime.cancelConnection(input);
+    const cancelled = await context.connections.cancelConnection(input);
     if (cancelled instanceof Error) return orpcErrors.badRequest(cancelled);
   }),
   abort: os.abort.handler(async ({ input, context }) => {

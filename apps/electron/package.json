@@ -1,6 +1,6 @@
 {
   "name": "@halo/desktop",
-  "version": "0.1.33",
+  "version": "0.1.40",
   "private": true,
   "description": "Halo desktop app",
   "license": "MIT",
@@ -22,8 +22,9 @@
     "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src forge e2e forge.config.ts playwright.config.ts vitest.config.ts vite.main.config.ts vite.preload.config.ts vite.renderer.config.ts",
     "test": "pnpm run test:e2e",
     "test:e2e:build": "electron-forge package",
+    "test:e2e:run": "playwright test",
     "test:e2e": "pnpm run test:e2e:build && playwright test",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json"
+    "typecheck": "pnpm --filter @get-halo/extension-tools build && tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.83.0",
@@ -38,13 +39,10 @@
     "@get-halo/server": "workspace:*",
     "@get-halo/shared": "workspace:*",
     "@halo/cli": "workspace:*",
-    "@halo/plugin-sdk": "workspace:*",
     "@jitl/quickjs-singlefile-cjs-release-sync": "0.31.0",
     "@libsql/client": "0.17.3",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@orpc/client": "2.0.0-beta.29",
-    "@orpc/contract": "2.0.0-beta.29",
-    "@orpc/server": "2.0.0-beta.29",
     "@parcel/watcher": "^2.6.0",
     "@pierre/diffs": "^1.3.5",
     "@pierre/trees": "1.0.0-beta.6",
@@ -61,8 +59,9 @@
     "electron-squirrel-startup": "^1.0.1",
     "errore": "^0.14.1",
     "esbuild": "0.28.2",
-    "jiti": "2.7.0",
+    "libretto-browser-tools": "^0.1.2",
     "maui": "npm:@tanishqkancharla/maui@0.0.13",
+    "playwright": "1.62.1",
     "purse-styles": "^0.2.3",
     "quickjs-emscripten": "0.31.0",
     "react": "^19.2.8",
@@ -71,7 +70,6 @@
     "streamdown": "^2.5.0",
     "typebox": "1.3.7",
     "typescript": "7.0.2",
-    "typescript6": "npm:typescript@5.9.3",
     "update-electron-app": "^3.3.0",
     "wouter": "^3.10.0"
   },
@@ -86,6 +84,7 @@
     "@electron-forge/plugin-vite": "^7.11.2",
     "@electron-forge/publisher-github": "^7.11.2",
     "@electron-forge/shared-types": "^7.11.2",
+    "@get-halo/extension-tools": "workspace:*",
     "@playwright/test": "1.62.1",
     "@repo/typescript-config": "workspace:*",
     "@types/electron-squirrel-startup": "^1.0.2",
@@ -97,7 +96,7 @@
     "agentation": "^3.0.2",
     "agentation-mcp": "^1.2.0",
     "electron": "^44.0.0",
-    "playwright": "1.62.1",
+    "execa": "9.6.1",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"
   },

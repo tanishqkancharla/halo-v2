@@ -1,4 +1,3 @@
-import { SidebarItem, SidebarSection } from "@halo/plugin-sdk/view";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { File, Folder } from "maui/icons";
@@ -10,6 +9,8 @@ import {
   useWorkspaceQuery,
   workspacePathsQueryKey,
 } from "../api/ApiProvider.tsx";
+import { SidebarItem } from "./navigation/SidebarItem.js";
+import { SidebarSection } from "./navigation/SidebarSection.js";
 
 type FileNavigationNode = {
   path: string;
@@ -28,10 +29,7 @@ export function FilesystemSection() {
       pathsQuery.data === undefined ? [] : buildFileNavigation(pathsQuery.data),
     [pathsQuery.data],
   );
-  const workspaceRoot =
-    workspace?.status === "ready"
-      ? workspace.workspace.workspaceRoot
-      : undefined;
+  const workspaceRoot = workspace?.workspaceRoot;
 
   useEffect(() => {
     if (workspaceRoot === undefined) return;

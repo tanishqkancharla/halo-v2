@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { workspaceCliPath } from "../../../workspace/installHaloCli.js";
 import * as errore from "errore";
 
 export class BashRunError extends errore.createTaggedError({
@@ -27,6 +28,7 @@ export async function runBash(
   >((resolve) => {
     const child = spawn("bash", ["-lc", command], {
       cwd,
+      env: { ...process.env, PATH: workspaceCliPath(cwd) },
       detached: true,
       stdio: ["ignore", "pipe", "pipe"],
     });

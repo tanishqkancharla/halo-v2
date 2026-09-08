@@ -18,7 +18,6 @@
     "../../vite.main.config.ts",
     "../../vite.preload.config.ts",
     "../../vite.renderer.config.ts",
-    "../renderer/api/SystemApi.ts",
-    "../renderer/evaluatePluginView.ts"
+    "../renderer/api/SystemApi.ts"
   ]
 }
