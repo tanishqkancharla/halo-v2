@@ -79,7 +79,7 @@ Headless hosts (Xvfb/VNC) need `HALO_USE_SWIFTSHADER=1`, which the `halo-dev` te
 
 To chat with a model, set a provider key as an environment secret: `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`). The dev terminal inherits it and Pi picks that provider's default model with no extra step. Halo builds, tests, and launches without a key; you only need one to send a prompt.
 
-First launch shows a "Choose workspace" screen that opens a native folder dialog, which `halo app` cannot click. To reach the main UI in a headless run, pick the workspace before launching by writing the preference file, then start the app so `restore()` opens it:
+First launch shows a "Choose workspace" screen that opens a native folder dialog, which `halo app` cannot click. To reach the main UI in a headless run, pick the workspace before launching by writing the preference file, then start the app so Electron restores it and starts its workspace server:
 
 ```sh
 mkdir -p /home/ubuntu/halo-workspace /workspace/.halo

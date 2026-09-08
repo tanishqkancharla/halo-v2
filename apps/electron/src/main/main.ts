@@ -20,8 +20,7 @@ import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS } from "../shared/channels.js";
-import type { HaloRpcConnection } from "../shared/rpc.js";
-import { HaloServer } from "@get-halo/server";
+import { WorkspaceServer } from "./WorkspaceServer.js";
 import { resolveHaloCliEntry } from "@get-halo/server/cli";
 import { FilesystemService } from "@get-halo/server/filesystem";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
@@ -32,7 +31,6 @@ import {
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { registerDesktopApi } from "./DesktopApi.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
-import { removeHaloRpcFile, writeHaloRpcFile } from "./rpcFile.js";
 import { UserService } from "./UserService.js";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -96,71 +94,60 @@ const userService = new UserService({
 const ownerUserId = userService
   .getUser()
   .then((user) => (user instanceof Error ? user : user.id));
-const haloServer = new HaloServer({
-  appBrowserTarget: isDevelopment
-    ? {
-        cdpUrl: "http://127.0.0.1:4445",
-        pageUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
-      }
-    : undefined,
-  appDataDir: applicationConfig.dataDir,
-  appVersion: app.getVersion(),
-  cliEntry: resolveHaloCliEntry(filesystemService, import.meta.url),
-  cliNodeExecutable: isDevelopment ? "node" : process.execPath,
-  cliElectronRunAsNode: !isDevelopment,
-  extensionRuntime: { executable: process.execPath, electronRunAsNode: true },
-  testingApiEnabled: applicationLaunchMode === ApplicationLaunchMode.Test,
-  ownerUserId,
-  logger: rpcLogger,
-  createCredentialVault: ({ filesystem, workspaceRoot }) =>
-    createEncryptedFileCredentialVault({
-      filesystem,
-      workspaceRoot,
-    }),
+const workspaceServer = new WorkspaceServer({
+  filesystem: filesystemService,
+  corsOrigins: [getRendererOrigin()],
+  server: {
+    appBrowserTarget: isDevelopment
+      ? {
+          cdpUrl: "http://127.0.0.1:4445",
+          pageUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
+        }
+      : undefined,
+    appDataDir: applicationConfig.dataDir,
+    appVersion: app.getVersion(),
+    cliEntry: resolveHaloCliEntry(filesystemService, import.meta.url),
+    cliNodeExecutable: isDevelopment ? "node" : process.execPath,
+    cliElectronRunAsNode: !isDevelopment,
+    extensionRuntime: { executable: process.execPath, electronRunAsNode: true },
+    testingApiEnabled: applicationLaunchMode === ApplicationLaunchMode.Test,
+    ownerUserId,
+    logger: rpcLogger,
+    createCredentialVault: ({ filesystem, workspaceRoot }) =>
+      createEncryptedFileCredentialVault({
+        filesystem,
+        workspaceRoot,
+      }),
+  },
 });
 let mainWindow: BrowserWindow | undefined;
 const windows = new Set<BrowserWindow>();
-let rpcConnection: HaloRpcConnection | undefined;
 let shutdownStarted = false;
 
 // oxlint-disable-next-line typescript/no-floating-promises -- Electron owns the app-ready lifecycle and keeps the process alive for this work.
 app.whenReady().then(async () => {
   registerLogBridge();
   registerDesktopApi({
-    selectWorkspace: (directory) => haloServer.selectWorkspace(directory),
+    selectWorkspace: async (directory, sender) => {
+      const selected = await workspaceServer.select(directory);
+      if (selected instanceof Error) return selected;
+      reloadWindows(sender);
+      return selected;
+    },
+    getConnection: () => workspaceServer.getConnection(),
     ownsWindow: (window) => windows.has(window),
   });
-  const listening = await haloServer.listen({
-    host: "127.0.0.1",
-    port: 0,
-    corsOrigins: [getRendererOrigin()],
-  });
-  if (listening instanceof Error) {
-    logger.error({ event: "rpc-http-listen-failed", error: listening });
-    app.quit();
-    return;
+  const restored = await workspaceServer.restore();
+  if (restored instanceof Error) {
+    logger.warn({ event: "workspace-restore-failed", error: restored });
   }
-  const rpcFile = await writeHaloRpcFile({
-    userDataDir: applicationConfig.dataDir,
-    connection: listening.cli,
-  });
-  if (rpcFile instanceof Error) {
-    logger.error({ event: "rpc-file-write-failed", error: rpcFile });
-    app.quit();
-    return;
-  }
-  rpcConnection = {
-    origin: `http://${listening.renderer.host}:${listening.renderer.port}`,
-    token: listening.renderer.token,
-  };
   installMenu();
-  await openMainWindow(rpcConnection);
+  await openMainWindow();
   if (applicationLaunchMode === ApplicationLaunchMode.Test) {
     const testEvents: NodeJS.EventEmitter = app;
-    const testConnection = rpcConnection;
     testEvents.on("halo:e2e:open-window", () => {
       // oxlint-disable-next-line typescript/no-floating-promises -- The harness waits for Electron's window event.
-      void createWindow(testConnection);
+      void createWindow();
     });
   }
   startAppUpdates({
@@ -171,11 +158,8 @@ app.whenReady().then(async () => {
 
   app.on("activate", () => {
     if (mainWindow !== undefined) return;
-    if (rpcConnection === undefined) {
-      throw new Error("Halo RPC is unavailable after startup.");
-    }
     // oxlint-disable-next-line typescript/no-floating-promises -- Electron activate callbacks cannot await window loading.
-    void openMainWindow(rpcConnection);
+    void openMainWindow();
   });
 });
 
@@ -195,15 +179,9 @@ app.on("will-quit", (event) => {
 });
 
 async function closeAppServices() {
-  const serverClosed = await haloServer.close();
+  const serverClosed = await workspaceServer.close();
   if (serverClosed instanceof Error) {
     logger.error({ event: "halo-server-close-failed", error: serverClosed });
-  }
-  const rpcFileRemoved = await removeHaloRpcFile({
-    userDataDir: applicationConfig.dataDir,
-  });
-  if (rpcFileRemoved instanceof Error) {
-    logger.error({ event: "rpc-file-remove-failed", error: rpcFileRemoved });
   }
   const filesystemClosed = await filesystemService.close();
   if (filesystemClosed instanceof Error) {
@@ -211,17 +189,15 @@ async function closeAppServices() {
   }
 }
 
-async function openMainWindow(connection: HaloRpcConnection): Promise<void> {
-  const window = await createWindow(connection);
+async function openMainWindow(): Promise<void> {
+  const window = await createWindow();
   mainWindow = window;
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = undefined;
   });
 }
 
-async function createWindow(
-  connection: HaloRpcConnection,
-): Promise<BrowserWindow> {
+async function createWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     show: shouldShowMainWindow(applicationLaunchMode),
     title: "Halo",
@@ -237,10 +213,6 @@ async function createWindow(
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
-      additionalArguments: [
-        `--halo-rpc-origin=${connection.origin}`,
-        `--halo-rpc-token=${connection.token}`,
-      ],
     },
   });
   windows.add(window);
@@ -390,8 +362,8 @@ async function switchWorkspace(): Promise<void> {
   const directory = selection.filePaths[0];
   if (directory === undefined) return;
 
-  const previous = haloServer.getWorkspace();
-  const workspace = await haloServer.selectWorkspace(directory);
+  const previous = workspaceServer.getConnection();
+  const workspace = await workspaceServer.select(directory);
   if (workspace instanceof Error) {
     await dialog.showMessageBox(mainWindow, {
       type: "error",
@@ -401,14 +373,14 @@ async function switchWorkspace(): Promise<void> {
     });
     return;
   }
-  if (
-    previous !== undefined &&
-    previous.workspaceRoot === workspace.workspaceRoot
-  ) {
-    return;
-  }
+  if (previous === workspaceServer.getConnection()) return;
+  reloadWindows();
+}
 
-  mainWindow.reload();
+function reloadWindows(except?: BrowserWindow) {
+  for (const window of windows) {
+    if (window !== except) window.reload();
+  }
 }
 
 function getRendererOrigin() {

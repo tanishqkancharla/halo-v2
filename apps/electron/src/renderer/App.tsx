@@ -7,11 +7,10 @@ import type { SessionSummary } from "@get-halo/shared/rpc";
 import type { AppInfo } from "../shared/desktop.js";
 import { LoadingPage } from "./LoadingPage.tsx";
 import { MainPane } from "./main/MainPane.tsx";
-import { Onboarding } from "./Onboarding.tsx";
+import { ConnectionPage } from "./ConnectionPage.tsx";
 import { Sidebar } from "./sidebar/Sidebar.tsx";
 import {
   useSessionsQuery,
-  useChooseWorkspaceMutation,
   useWorkspaceQuery,
   useAppInfoQuery,
 } from "./api/ApiProvider.tsx";
@@ -19,27 +18,14 @@ import {
 export function App() {
   const workspaceQuery = useWorkspaceQuery();
   const workspace = workspaceQuery.data;
-  const chooseWorkspace = useChooseWorkspaceMutation();
   const sessionsQuery = useSessionsQuery(workspace);
   const appInfoQuery = useAppInfoQuery();
   const sessions = sessionsQuery.data === undefined ? [] : sessionsQuery.data;
 
+  if (workspaceQuery.isError) return <ConnectionPage status="disconnected" />;
+
   if (workspaceQuery.isPending || workspace === undefined) {
     return <LoadingPage />;
-  }
-
-  if (workspace.status !== "ready") {
-    return (
-      <Onboarding
-        message={
-          chooseWorkspace.error
-            ? String(chooseWorkspace.error)
-            : workspace.message
-        }
-        isChoosing={chooseWorkspace.isPending}
-        onChoose={() => chooseWorkspace.mutate()}
-      />
-    );
   }
 
   if (!sessionsQuery.isFetched) {
@@ -48,7 +34,6 @@ export function App() {
 
   return (
     <WorkspaceShell
-      key={workspace.workspace.workspaceRoot}
       sessions={sessions}
       alertMessage={
         sessionsQuery.error ? String(sessionsQuery.error) : undefined

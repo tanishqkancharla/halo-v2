@@ -4,12 +4,7 @@ import * as errore from "errore";
 import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type { ConnectionStarted } from "@get-halo/shared/contract";
 import type { HaloConnectionEvent } from "@get-halo/shared/sessionLog";
-import type { FilesystemService } from "../../filesystem/FilesystemService.js";
-import type { WorkspaceService } from "../../workspace/WorkspaceService.js";
-import type { HaloToolPlugin } from "../tools/HaloToolPlugin.js";
-import type { AgentAuthority } from "./AgentAuthority.js";
-import type { CredentialVault } from "./CredentialVault.js";
-import { ToolRuntime, ToolRuntimeError } from "./ToolRuntime.js";
+import type { ToolRuntime } from "./ToolRuntime.js";
 
 export class ConnectionSessionMismatchError extends errore.createTaggedError({
   name: "ConnectionSessionMismatchError",
@@ -31,98 +26,23 @@ type StartConnectionInput = {
   sessionId: string;
 };
 
-type ToolRuntimeServiceOptions = {
-  filesystem: FilesystemService;
-  workspace: WorkspaceService;
-  ownerUserId: Promise<string | Error>;
-  createCredentialVault: (input: { workspaceRoot: string }) => CredentialVault;
-  toolPlugins: readonly HaloToolPlugin[];
-  authority: AgentAuthority;
-};
-
-export class ToolRuntimeService {
-  private runtime: ToolRuntime | undefined;
-  private lifecycle = Promise.resolve();
-  private workspaceRoot: string | undefined;
-  private oauthRedirectUri: string | undefined;
+export class ConnectionService {
   private readonly pendingConnections = new Map<string, PendingConnection>();
   private readonly connectionIdsByState = new Map<string, string>();
 
-  constructor(private readonly options: ToolRuntimeServiceOptions) {}
-
-  setOAuthRedirectUri(oauthRedirectUri: string) {
-    this.oauthRedirectUri = oauthRedirectUri;
-  }
-
-  get() {
-    return this.serial(() => this.openRuntime());
-  }
+  constructor(private readonly runtime: ToolRuntime) {}
 
   close() {
-    return this.serial(() => this.closeRuntime());
-  }
-
-  private serial<T>(operation: () => Promise<T>) {
-    const result = this.lifecycle.then(operation);
-    this.lifecycle = result.then(() => undefined);
-    return result;
-  }
-
-  private async openRuntime() {
-    const layout = this.options.workspace.getLayout();
-    if (layout instanceof Error) return layout;
-    const ownerUserId = await this.options.ownerUserId;
-    if (ownerUserId instanceof Error) return ownerUserId;
-
-    if (this.runtime !== undefined && this.workspaceRoot === layout.root) {
-      return this.runtime;
-    }
-
-    const closed = await this.closeRuntime();
-    if (closed instanceof Error) return closed;
-
-    const credentialVault = this.options.createCredentialVault({
-      workspaceRoot: layout.root,
-    });
-
-    const runtime = await ToolRuntime.create({
-      filesystem: this.options.filesystem,
-      workspaceRoot: layout.root,
-      userId: ownerUserId,
-      credentialVault,
-      toolPlugins: this.options.toolPlugins,
-      authority: this.options.authority,
-      oauthRedirectUri: this.oauthRedirectUri,
-    });
-    if (runtime instanceof Error) return runtime;
-    this.runtime = runtime;
-    this.workspaceRoot = layout.root;
-    return runtime;
-  }
-
-  private async closeRuntime() {
-    const runtime = this.runtime;
-    this.runtime = undefined;
-    this.workspaceRoot = undefined;
     for (const pending of this.pendingConnections.values()) {
       clearTimeout(pending.expires);
     }
     this.pendingConnections.clear();
     this.connectionIdsByState.clear();
-    if (runtime === undefined) return;
-    return await runtime.close();
   }
 
   async startConnection(
     input: StartConnectionInput,
   ): Promise<ConnectionStarted | Error> {
-    if (this.runtime === undefined) {
-      return new ToolRuntimeError({
-        operation: "OAuth start",
-        cause: new Error("Executor runtime is not open"),
-      });
-    }
-
     const started = await this.runtime.startOAuth(input.request);
     if (started instanceof Error) return started;
     if (started.status === "connected") return { status: "connected" };
@@ -153,12 +73,6 @@ export class ToolRuntimeService {
   }
 
   async completeOAuth(input: { state: string; code: string }) {
-    if (this.runtime === undefined) {
-      return new ToolRuntimeError({
-        operation: "OAuth completion",
-        cause: new Error("Executor runtime is not open"),
-      });
-    }
     const pending = this.takeConnectionByState(input.state);
     const completed = await this.runtime.completeOAuth(input);
     if (completed instanceof Error) {
@@ -177,12 +91,6 @@ export class ToolRuntimeService {
   }
 
   async cancelOAuth(state: string) {
-    if (this.runtime === undefined) {
-      return new ToolRuntimeError({
-        operation: "OAuth cancellation",
-        cause: new Error("Executor runtime is not open"),
-      });
-    }
     const pending = this.takeConnectionByState(state);
     const cancelled = await this.runtime.cancelOAuth(state);
     const notified =
@@ -199,15 +107,8 @@ export class ToolRuntimeService {
     if (pending.sessionId !== input.sessionId) {
       return new ConnectionSessionMismatchError({ sessionId: input.sessionId });
     }
-    const runtime = this.runtime;
-    if (runtime === undefined) {
-      return new ToolRuntimeError({
-        operation: "OAuth cancellation",
-        cause: new Error("Executor runtime is not open"),
-      });
-    }
     this.takeConnection(input.connectionId);
-    const cancelled = await runtime.cancelOAuth(pending.state);
+    const cancelled = await this.runtime.cancelOAuth(pending.state);
     const notified = await pending.onEvent(
       this.connectionEvent(pending, "cancelled"),
     );
@@ -218,14 +119,7 @@ export class ToolRuntimeService {
   private async expireConnection(connectionId: string) {
     const pending = this.takeConnection(connectionId);
     if (pending === undefined) return;
-    const runtime = this.runtime;
-    if (runtime === undefined) {
-      return new ToolRuntimeError({
-        operation: "OAuth expiration",
-        cause: new Error("Executor runtime is not open"),
-      });
-    }
-    const cancelled = await runtime.cancelOAuth(pending.state);
+    const cancelled = await this.runtime.cancelOAuth(pending.state);
     const notified = await pending.onEvent(
       this.connectionEvent(pending, "expired"),
     );

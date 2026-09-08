@@ -17,7 +17,7 @@ import type {
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const haloProtocolVersion = 4 as const;
+export const haloProtocolVersion = 5 as const;
 
 export const RequestRejectedError = error("BAD_REQUEST", {
   message: "Halo could not complete the request.",
@@ -125,7 +125,7 @@ export const contract = publicProcedure.router({
     },
   },
   workspace: {
-    get: oc.output(type<WorkspaceInfo | undefined>()),
+    get: oc.output(type<WorkspaceInfo>()),
     listPaths: oc.output(type<string[]>()),
     readFile: oc.input(type<{ path: string }>()).output(type<string>()),
     writeFile: oc

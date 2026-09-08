@@ -8,8 +8,6 @@ import {
   FilesystemPathNotFoundError,
   type FilesystemService,
 } from "../filesystem/FilesystemService.js";
-import type { WorkspaceService } from "../workspace/WorkspaceService.js";
-import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import type { ToolRuntime } from "../agent/runtime/ToolRuntime.js";
 import { readExtensionManifest } from "./ExtensionManifest.js";
 
@@ -34,15 +32,13 @@ export class ExtensionTools {
   constructor(
     private readonly options: {
       filesystem: FilesystemService;
-      workspace: WorkspaceService;
-      toolRuntime: ToolRuntimeService;
+      workspaceRoot: string;
+      toolRuntime: ToolRuntime;
     },
   ) {}
 
   add(id: string, paths: string[]) {
     return this.serial(async () => {
-      const layout = this.options.workspace.getLayout();
-      if (layout instanceof Error) return layout;
       const manifest = await this.readManifest(id);
       if (manifest instanceof Error) return manifest;
       const declared =
@@ -54,7 +50,13 @@ export class ExtensionTools {
         capabilities: [...new Set([...declared, ...paths])].toSorted(),
       };
       const written = await this.options.filesystem.writeFile(
-        join(layout.root, ".halo", "extensions", id, "package.json"),
+        join(
+          this.options.workspaceRoot,
+          ".halo",
+          "extensions",
+          id,
+          "package.json",
+        ),
         `${JSON.stringify(manifest, undefined, 2)}\n`,
       );
       if (written instanceof Error) return written;
@@ -109,9 +111,7 @@ export class ExtensionTools {
         },
       };
     }
-    const runtime = await this.options.toolRuntime.get();
-    if (runtime instanceof Error) return runtime;
-    return runtime.invokePath(invocation);
+    return this.options.toolRuntime.invokePath(invocation);
   }
 
   async *requests(signal: AbortSignal | undefined) {
@@ -173,16 +173,17 @@ export class ExtensionTools {
       previous === undefined ? { granted: [], pending: [] } : previous;
     grant.granted = grant.granted.filter((path) => requested.includes(path));
     grant.pending = grant.pending.filter((path) => requested.includes(path));
-    const catalog = requested.length === 0 ? [] : await this.toolPaths();
+    const catalog =
+      requested.length === 0
+        ? []
+        : await this.options.toolRuntime.listToolPaths();
     if (catalog instanceof Error) return catalog;
     const existing = requested.filter((path) => catalog.includes(path));
     change?.(grant, existing);
     state[id] = grant;
     if (before !== JSON.stringify(state)) {
-      const layout = this.options.workspace.getLayout();
-      if (layout instanceof Error) return layout;
       const written = await this.options.filesystem.writeFile(
-        join(layout.root, ".halo", "extensionGrants.json"),
+        join(this.options.workspaceRoot, ".halo", "extensionGrants.json"),
         `${JSON.stringify(state, undefined, 2)}\n`,
         { mode: 0o600 },
       );
@@ -205,26 +206,17 @@ export class ExtensionTools {
   private async readManifest(id: string) {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id))
       return new ExtensionToolsError({ detail: "invalid extension id" });
-    const layout = this.options.workspace.getLayout();
-    if (layout instanceof Error) return layout;
+
     return readExtensionManifest({
       filesystem: this.options.filesystem,
-      workspaceRoot: layout.root,
+      workspaceRoot: this.options.workspaceRoot,
       id,
     });
   }
 
-  private async toolPaths() {
-    const runtime = await this.options.toolRuntime.get();
-    if (runtime instanceof Error) return runtime;
-    return runtime.listToolPaths();
-  }
-
   private async readGrants() {
-    const layout = this.options.workspace.getLayout();
-    if (layout instanceof Error) return layout;
     const source = await this.options.filesystem.readFile(
-      join(layout.root, ".halo", "extensionGrants.json"),
+      join(this.options.workspaceRoot, ".halo", "extensionGrants.json"),
       "utf8",
     );
     if (source instanceof FilesystemPathNotFoundError)

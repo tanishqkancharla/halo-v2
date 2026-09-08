@@ -1,3 +1,4 @@
+import { workspaceCliPath } from "../../workspace/installHaloCli.js";
 import { createBashTool } from "@earendil-works/pi-coding-agent";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { type TSchema, Type } from "typebox";
@@ -63,7 +64,15 @@ export function createAuthorizedCodingTools(input: {
       authorization("files", "patch", "workspace.files.write"),
     ),
     withAuthority(
-      createBashTool(input.cwd),
+      createBashTool(input.cwd, {
+        spawnHook: (context) => ({
+          ...context,
+          env: {
+            ...context.env,
+            PATH: workspaceCliPath(input.cwd, context.env.PATH),
+          },
+        }),
+      }),
       input.authority,
       authorization("bash", "run", "workspace.shell.execute"),
     ),

@@ -21,10 +21,6 @@ const os = implement(contract)
         }),
       );
     const workspace = context.workspace.getWorkspace();
-    if (workspace === undefined)
-      throw orpcErrors.badRequest(
-        new BrowserError({ detail: "Open a workspace first" }),
-      );
     return next({ context: { workspaceRoot: workspace.workspaceRoot } });
   });
 

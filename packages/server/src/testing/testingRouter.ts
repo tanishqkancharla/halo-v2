@@ -3,7 +3,7 @@ import * as errore from "errore";
 import { contract } from "@get-halo/shared/contract";
 import { orpcErrors } from "../orpcErrors.js";
 import type { SessionRegistry } from "../sessions/SessionRegistry.js";
-import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
+import type { ToolRuntime } from "../agent/runtime/ToolRuntime.js";
 
 class TestingApiUnavailableError extends errore.createTaggedError({
   name: "TestingApiUnavailableError",
@@ -22,7 +22,7 @@ class TestingToolInvocationError extends errore.createTaggedError({
 
 export type TestingRouterContext = {
   sessions: SessionRegistry;
-  toolRuntime: ToolRuntimeService;
+  toolRuntime: ToolRuntime;
   testingApiEnabled: boolean;
 };
 
@@ -33,8 +33,7 @@ export const testingRouter = os.router({
     if (!context.testingApiEnabled) {
       return orpcErrors.badRequest(new TestingApiUnavailableError());
     }
-    const runtime = await context.toolRuntime.get();
-    if (runtime instanceof Error) return orpcErrors.badRequest(runtime);
+    const runtime = context.toolRuntime;
     const result = await runtime.invokePath({
       path: input.path,
       args: input.input,
@@ -66,8 +65,7 @@ export const testingRouter = os.router({
     if (!context.testingApiEnabled) {
       return orpcErrors.badRequest(new TestingApiUnavailableError());
     }
-    const runtime = await context.toolRuntime.get();
-    if (runtime instanceof Error) return orpcErrors.badRequest(runtime);
+    const runtime = context.toolRuntime;
     const identity = runtime.getToolIdentity(input.path);
     if (identity === undefined) {
       return orpcErrors.badRequest(

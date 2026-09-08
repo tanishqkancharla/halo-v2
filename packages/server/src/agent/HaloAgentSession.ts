@@ -20,12 +20,9 @@ import {
   type DurableStreamRecord,
 } from "../DurableStream.js";
 import { JsonlDurableStreamStorage } from "../JsonlDurableStreamStorage.js";
-import type {
-  WorkspaceLayout,
-  WorkspaceService,
-} from "../workspace/WorkspaceService.js";
+import type { WorkspaceLayout } from "../workspace/WorkspaceService.js";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
-import type { ToolRuntimeService } from "./runtime/ToolRuntimeService.js";
+import type { ToolRuntime } from "./runtime/ToolRuntime.js";
 import { createAuthorizedCodingTools } from "./tools/codingTools.js";
 import { createExecTool } from "./tools/execTool.js";
 import { WorkspaceResourceLoader } from "./WorkspaceResourceLoader.js";
@@ -87,8 +84,8 @@ type SessionNotification = {
 
 export type HaloAgentSessionOptions = {
   filesystem: FilesystemService;
-  workspace: WorkspaceService;
-  toolRuntime: ToolRuntimeService;
+  layout: WorkspaceLayout;
+  toolRuntime: ToolRuntime;
 };
 
 export class HaloAgentSession {
@@ -118,8 +115,8 @@ export class HaloAgentSession {
   }
 
   static async create(options: HaloAgentSessionOptions) {
-    const layout = options.workspace.getLayout();
-    if (layout instanceof Error) return layout;
+    const layout = options.layout;
+
     const manager = errore.try({
       try: () => SessionManager.create(layout.root, layout.sessionDir),
       catch: (e) => new CreateAgentSessionError({ cause: e }),
@@ -129,8 +126,8 @@ export class HaloAgentSession {
   }
 
   static async open(options: HaloAgentSessionOptions & { sessionId: string }) {
-    const layout = options.workspace.getLayout();
-    if (layout instanceof Error) return layout;
+    const layout = options.layout;
+
     const sessions = await SessionManager.list(
       layout.root,
       layout.sessionDir,
@@ -154,9 +151,9 @@ export class HaloAgentSession {
     return await HaloAgentSession.createFromManager(options, layout, manager);
   }
 
-  static async list(options: Pick<HaloAgentSessionOptions, "workspace">) {
-    const layout = options.workspace.getLayout();
-    if (layout instanceof Error) return layout;
+  static async list(options: Pick<HaloAgentSessionOptions, "layout">) {
+    const layout = options.layout;
+
     const sessions = await SessionManager.list(
       layout.root,
       layout.sessionDir,
@@ -172,8 +169,7 @@ export class HaloAgentSession {
     layout: WorkspaceLayout,
     manager: SessionManager,
   ) {
-    const runtime = await options.toolRuntime.get();
-    if (runtime instanceof Error) return runtime;
+    const runtime = options.toolRuntime;
     const runtimeDescription = await runtime.getAgentDescription();
     if (runtimeDescription instanceof Error) return runtimeDescription;
 

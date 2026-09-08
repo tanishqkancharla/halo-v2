@@ -16,13 +16,13 @@ type RunningExtension = Exclude<
 
 export class ExtensionHost {
   private readonly processes = new Map<string, RunningExtension>();
-  private workspaceRoot: string | undefined;
   private lifecycle = Promise.resolve();
-  private toolsOrigin: string | undefined;
   private readonly toolTokens = new Map<string, string>();
 
   constructor(
     private readonly options: {
+      workspaceRoot: string;
+      toolsOrigin: string;
       filesystem: FilesystemService;
       logger: Logger;
       runtime: ExtensionRuntime;
@@ -30,8 +30,7 @@ export class ExtensionHost {
   ) {}
 
   async list() {
-    const workspaceRoot = this.workspaceRoot;
-    if (workspaceRoot === undefined) return [];
+    const workspaceRoot = this.options.workspaceRoot;
     const extensions: ExtensionSummary[] = [];
     for (const { id, url, isRunning } of this.processes.values()) {
       if (!isRunning()) continue;
@@ -54,50 +53,26 @@ export class ExtensionHost {
     return extensions;
   }
 
-  setToolsOrigin(origin: string) {
-    this.toolsOrigin = origin;
-  }
-
-  identifyToolConnection(
-    authorization: string | undefined,
-    workspaceRoot: string | undefined,
-  ) {
-    if (authorization === undefined || workspaceRoot !== this.workspaceRoot)
-      return undefined;
+  identifyToolConnection(authorization: string | undefined) {
+    if (authorization === undefined) return undefined;
     const id = this.toolTokens.get(authorization);
     if (id === undefined || !this.processes.get(id)?.isRunning())
       return undefined;
     return id;
   }
 
-  start(workspaceRoot: string) {
-    this.lifecycle = this.lifecycle.then(() =>
-      this.startWorkspace(workspaceRoot),
-    );
-    return this.lifecycle;
-  }
-
   stop() {
-    this.lifecycle = this.lifecycle.then(() => this.stopWorkspace());
+    this.lifecycle = this.lifecycle.then(() => this.stopProcesses());
     return this.lifecycle;
   }
 
   reload() {
-    this.lifecycle = this.lifecycle.then(() => {
-      if (this.workspaceRoot === undefined) return;
-      return this.discover(this.workspaceRoot);
-    });
+    this.lifecycle = this.lifecycle.then(() => this.discover());
     return this.lifecycle;
   }
 
-  private async startWorkspace(workspaceRoot: string) {
-    if (this.workspaceRoot === workspaceRoot) return;
-    await this.stopWorkspace();
-    this.workspaceRoot = workspaceRoot;
-    await this.discover(workspaceRoot);
-  }
-
-  private async discover(workspaceRoot: string) {
+  private async discover() {
+    const workspaceRoot = this.options.workspaceRoot;
     const directory = join(workspaceRoot, ".halo", "extensions");
     const entries = await this.options.filesystem.listDirectory(directory);
     if (
@@ -137,15 +112,12 @@ export class ExtensionHost {
       a.name.localeCompare(b.name),
     )) {
       if (this.processes.get(entry.name)?.isRunning()) continue;
-      if (this.toolsOrigin === undefined)
-        throw new Error(
-          "Extension tool endpoint must be configured before starting extensions",
-        );
       this.removeToolConnection(entry.name);
       const token = randomUUID();
       this.toolTokens.set(`Bearer ${token}`, entry.name);
       const extension = await startExtension({
         id: entry.name,
+        workspaceRoot,
         directory: join(directory, entry.name),
         dataDirectory: join(
           workspaceRoot,
@@ -155,7 +127,7 @@ export class ExtensionHost {
         ),
         runtime: this.options.runtime,
         logger: this.options.logger,
-        tools: { origin: this.toolsOrigin, token },
+        tools: { origin: this.options.toolsOrigin, token },
       });
       if (extension instanceof Error) {
         this.removeToolConnection(entry.name);
@@ -169,11 +141,10 @@ export class ExtensionHost {
     }
   }
 
-  private async stopWorkspace() {
+  private async stopProcesses() {
     const processes = [...this.processes.values()];
     this.processes.clear();
     this.toolTokens.clear();
-    this.workspaceRoot = undefined;
     for (const result of await Promise.all(
       processes.map((extension) => extension.stop()),
     )) {

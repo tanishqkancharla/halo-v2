@@ -1,6 +1,6 @@
 import * as errore from "errore";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
@@ -11,6 +11,14 @@ export class InstallHaloCliError extends errore.createTaggedError({
 
 export function haloCliBinDir(workspaceRoot: string) {
   return join(workspaceRoot, ".halo", "bin");
+}
+
+export function workspaceCliPath(
+  workspaceRoot: string,
+  path = process.env.PATH,
+) {
+  const binDir = haloCliBinDir(workspaceRoot);
+  return path === undefined ? binDir : `${binDir}${delimiter}${path}`;
 }
 
 function haloCliBinPath(workspaceRoot: string) {

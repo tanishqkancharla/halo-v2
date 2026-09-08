@@ -29,10 +29,7 @@ export function FilesystemSection() {
       pathsQuery.data === undefined ? [] : buildFileNavigation(pathsQuery.data),
     [pathsQuery.data],
   );
-  const workspaceRoot =
-    workspace?.status === "ready"
-      ? workspace.workspace.workspaceRoot
-      : undefined;
+  const workspaceRoot = workspace?.workspaceRoot;
 
   useEffect(() => {
     if (workspaceRoot === undefined) return;

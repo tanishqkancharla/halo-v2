@@ -113,3 +113,84 @@ serverTest("disables the tool bridge outside E2E runs", async ({ server }) => {
     }),
   ).rejects.toThrow("The testing API is unavailable outside an E2E run.");
 });
+
+serverTest(
+  "serves each workspace independently in the same process",
+  { timeout: 20_000 },
+  async ({ server, startServer }) => {
+    const otherRoot = path.join(server.harness.paths.root, "other-workspace");
+    await fs.mkdir(otherRoot);
+    const originalPath = process.env.PATH;
+    const other = await startServer(otherRoot);
+
+    await server.rpc.workspace.writeFile({
+      path: "notes.md",
+      content: "First workspace",
+    });
+    await other.rpc.workspace.writeFile({
+      path: "notes.md",
+      content: "Second workspace",
+    });
+
+    expect(await server.rpc.workspace.get()).toMatchObject({
+      workspaceRoot: server.harness.paths.workspace,
+    });
+    expect(await other.rpc.workspace.get()).toMatchObject({
+      workspaceRoot: otherRoot,
+    });
+    expect(await server.rpc.workspace.readFile({ path: "notes.md" })).toBe(
+      "First workspace",
+    );
+    expect(await other.rpc.workspace.readFile({ path: "notes.md" })).toBe(
+      "Second workspace",
+    );
+    expect(process.env.PATH).toBe(originalPath);
+    expect(await fs.readdir(server.harness.paths.userData)).not.toContain(
+      "workspace.json",
+    );
+  },
+);
+
+for (const failure of [
+  {
+    name: "tool runtime",
+    path: ".halo/executor/metadata.sqlite",
+    error: "Tool runtime failed during startup",
+  },
+  {
+    name: "workspace preparation",
+    path: ".agents",
+    error: "Failed to seed workspace extension guidance",
+  },
+]) {
+  serverTest(
+    `releases startup resources after ${failure.name} fails`,
+    { timeout: 20_000 },
+    async ({ server, startServer }) => {
+      const workspaceRoot = path.join(
+        server.harness.paths.root,
+        "startup-workspace",
+      );
+      const blockedPath = path.join(workspaceRoot, failure.path);
+      await server.harness.files.write({
+        path: blockedPath,
+        content: "invalid",
+      });
+      await server.close();
+
+      await expect(startServer(workspaceRoot, server.port)).rejects.toThrow(
+        failure.error,
+      );
+
+      await fs.rm(blockedPath);
+      const restarted = await startServer(workspaceRoot, server.port);
+      await restarted.rpc.workspace.writeFile({
+        path: "notes.md",
+        content: "Ready after repair",
+      });
+      expect(await restarted.rpc.workspace.readFile({ path: "notes.md" })).toBe(
+        "Ready after repair",
+      );
+    },
+  );
+}

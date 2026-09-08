@@ -4,9 +4,10 @@ import { Value } from "@sinclair/typebox/value";
 import { contextBridge, ipcRenderer } from "electron";
 import { LOG_CHANNELS } from "../shared/channels.js";
 import { DESKTOP_CHANNEL, type DesktopApi } from "../shared/desktop.js";
-import type { HaloRpcConnection } from "../shared/rpc.js";
 
 const desktopApi: DesktopApi = {
+  getConnection: () =>
+    ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getConnection" }),
   chooseWorkspace: () =>
     ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "chooseWorkspace" }),
   getAppInfo: () => ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getAppInfo" }),
@@ -20,7 +21,6 @@ const desktopApi: DesktopApi = {
 };
 
 contextBridge.exposeInMainWorld("haloDesktop", desktopApi);
-contextBridge.exposeInMainWorld("haloRpc", readHaloRpcConnection());
 
 const logMessageSchema = Type.Object({
   channel: Type.Literal(LOG_CHANNELS.log),
@@ -44,21 +44,6 @@ window.addEventListener("message", (event) => {
     ipcRenderer.send(LOG_CHANNELS.log, log.payload);
   }
 });
-
-function readHaloRpcConnection(): HaloRpcConnection {
-  return {
-    origin: readArgument("--halo-rpc-origin="),
-    token: readArgument("--halo-rpc-token="),
-  };
-}
-
-function readArgument(prefix: string) {
-  const argument = process.argv.find((value) => value.startsWith(prefix));
-  if (argument === undefined) {
-    throw new Error(`Halo preload is missing ${prefix.slice(2, -1)}.`);
-  }
-  return argument.slice(prefix.length);
-}
 
 type LogMessage = {
   channel: typeof LOG_CHANNELS.log;
