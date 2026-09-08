@@ -70,6 +70,7 @@ export function FilesystemSection() {
   const [location, navigate] = useLocation();
   const [action, setAction] = useState<FileAction>();
   const [dragged, setDragged] = useState<string>();
+  const [dropTarget, setDropTarget] = useState<string>();
   const rootLabel = useStyles(styles.rootLabel);
   const feedback = useStyles(styles.feedback);
   const controls = useStyles(styles.controls);
@@ -163,6 +164,10 @@ export function FilesystemSection() {
       folder !== parent
     );
   }
+  function drag(path: string | undefined) {
+    setDragged(path);
+    setDropTarget(undefined);
+  }
   function drop(event: DragEvent, folder: string) {
     if (
       !canDrop(folder) ||
@@ -228,14 +233,21 @@ export function FilesystemSection() {
       label={
         <span
           className={rootLabel}
-          data-drop-target={canDrop("") ? "true" : undefined}
+          data-drop-target={
+            canDrop("") && dropTarget === "" ? "true" : undefined
+          }
           onDragOver={(event) => {
             if (canDrop("")) {
               event.preventDefault();
               event.dataTransfer.dropEffect = "move";
+              setDropTarget("");
             }
           }}
-          onDrop={(event) => drop(event, "")}
+          onDragLeave={() => setDropTarget(undefined)}
+          onDrop={(event) => {
+            setDropTarget(undefined);
+            drop(event, "");
+          }}
         >
           Files
           {action === undefined && mutation.isError && (
@@ -301,7 +313,9 @@ export function FilesystemSection() {
           key={node.path}
           node={node}
           onAction={openAction}
-          onDrag={setDragged}
+          onDrag={drag}
+          dropTarget={dropTarget}
+          onDropTarget={setDropTarget}
           canDrop={canDrop}
           onDrop={drop}
           pending={mutation.isPending || action !== undefined}
@@ -316,6 +330,8 @@ function FileNavigationItem({
   node,
   onAction,
   onDrag,
+  dropTarget,
+  onDropTarget,
   canDrop,
   onDrop,
   pending,
@@ -324,14 +340,16 @@ function FileNavigationItem({
   node: FileNavigationNode;
   onAction(action: FileAction): void;
   onDrag(path: string | undefined): void;
+  dropTarget: string | undefined;
+  onDropTarget(path: string | undefined): void;
   canDrop(folder: string): boolean;
   onDrop(event: DragEvent, folder: string): void;
   pending: boolean;
   creation: FileCreationRow | undefined;
 }) {
   const path = node.isDirectory ? node.path.slice(0, -1) : node.path;
-  const [over, setOver] = useState(false);
   const label = useStyles(styles.fileLabel);
+  const row = useStyles(styles.fileRow);
   const droppable = node.isDirectory && canDrop(path);
   return (
     <SidebarItem
@@ -340,6 +358,33 @@ function FileNavigationItem({
       pageTitle={node.name}
       hasChildItems={node.isDirectory}
       icon={node.isDirectory ? Folder : File}
+      className={row}
+      render={(props) => (
+        <div
+          {...props}
+          data-drop-target={
+            droppable && dropTarget === path ? "true" : undefined
+          }
+          onDragOver={(event) => {
+            if (droppable) {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              onDropTarget(path);
+            }
+          }}
+          onDragLeave={(event) => {
+            if (
+              !(event.relatedTarget instanceof Node) ||
+              !event.currentTarget.contains(event.relatedTarget)
+            )
+              onDropTarget(undefined);
+          }}
+          onDrop={(event) => {
+            onDropTarget(undefined);
+            if (node.isDirectory) onDrop(event, path);
+          }}
+        />
+      )}
       trailing={
         <FileMenu
           label={`Actions for ${node.name}`}
@@ -357,6 +402,8 @@ function FileNavigationItem({
               node={child}
               onAction={onAction}
               onDrag={onDrag}
+              dropTarget={dropTarget}
+              onDropTarget={onDropTarget}
               canDrop={canDrop}
               onDrop={onDrop}
               pending={pending}
@@ -370,7 +417,6 @@ function FileNavigationItem({
         className={label}
         draggable={!pending}
         data-file-path={path}
-        data-drop-target={droppable && over ? "true" : undefined}
         onDragStart={(event) => {
           event.stopPropagation();
           event.dataTransfer.setData(fileDragType, path);
@@ -378,18 +424,6 @@ function FileNavigationItem({
           onDrag(path);
         }}
         onDragEnd={() => onDrag(undefined)}
-        onDragOver={(event) => {
-          if (droppable) {
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "move";
-            setOver(true);
-          }
-        }}
-        onDragLeave={() => setOver(false)}
-        onDrop={(event) => {
-          setOver(false);
-          if (node.isDirectory) onDrop(event, path);
-        }}
       >
         {node.name}
       </span>
@@ -529,13 +563,17 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+    userSelect: "none",
+  }),
+  fileRow: style({
     "&[data-drop-target='true']": {
       backgroundColor: colors.accent[4],
-      outline: `1px solid ${colors.accent[8]}`,
+      boxShadow: `inset 0 0 0 1px ${colors.accent[8]}`,
     },
   }),
   rootLabel: style({
     display: "block",
+    userSelect: "none",
     "&[data-drop-target='true']": { backgroundColor: colors.accent[4] },
   }),
   feedback: style(text({ size: "xs", color: "lowContrast" }), {

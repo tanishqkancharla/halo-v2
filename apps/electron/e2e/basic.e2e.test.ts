@@ -149,7 +149,7 @@ e2eTest(
   "moves folders by dragging and keeps the open note selected",
   async ({ renderer, server }) => {
     await server.rpc.workspace.writeFile({
-      path: "Notes/Today.md",
+      path: "Inbox/Notes/Today.md",
       content: "A note to move",
     });
     await server.rpc.workspace.createEntry({
@@ -158,16 +158,39 @@ e2eTest(
     });
     const page = renderer.page;
     await page
+      .getByRole("button", { name: "Expand Inbox", exact: true })
+      .click();
+    await page
       .getByRole("button", { name: "Expand Notes", exact: true })
       .click();
     await page.getByRole("link", { name: "Today.md", exact: true }).click();
     await page
-      .getByRole("main", { name: "Notes/Today.md", exact: true })
-      .getByLabel("Notes/Today.md", { exact: true })
+      .getByRole("main", { name: "Inbox/Notes/Today.md", exact: true })
+      .getByLabel("Inbox/Notes/Today.md", { exact: true })
       .fill("Edited before dragging");
-    await page
-      .locator('[data-file-path="Notes"]')
-      .dragTo(page.locator('[data-file-path="Archive"]'));
+    const source = page.locator('[data-file-path="Inbox/Notes"]');
+    const target = page.getByRole("row", { name: "Archive", exact: true });
+    const root = page.getByText("Files", { exact: true });
+    const transfer = await page.evaluateHandle(() => new DataTransfer());
+    await source.dispatchEvent("dragstart", { dataTransfer: transfer });
+    await target
+      .getByRole("button", { name: "Expand Archive", exact: true })
+      .dispatchEvent("dragover", { dataTransfer: transfer });
+    await expect(target).toHaveAttribute("data-drop-target", "true");
+    await expect(root).not.toHaveAttribute("data-drop-target", "true");
+    const menu = target.getByRole("button", {
+      name: "Actions for Archive",
+      exact: true,
+    });
+    await menu.dispatchEvent("dragover", { dataTransfer: transfer });
+    await expect(target).toHaveAttribute("data-drop-target", "true");
+    await root.dispatchEvent("dragover", { dataTransfer: transfer });
+    await expect(root).toHaveAttribute("data-drop-target", "true");
+    await expect(target).not.toHaveAttribute("data-drop-target", "true");
+    await source.dispatchEvent("dragend", { dataTransfer: transfer });
+    await expect(page.locator('[data-drop-target="true"]')).toHaveCount(0);
+    await transfer.dispose();
+    await source.dragTo(menu);
     await expect(
       page.getByRole("main", { name: "Archive/Notes/Today.md", exact: true }),
     ).toContainText("Edited before dragging");
@@ -176,6 +199,7 @@ e2eTest(
     ).toBeVisible();
     expect(await server.rpc.workspace.listPaths()).toEqual([
       "Archive/Notes/Today.md",
+      "Inbox/",
     ]);
     await page.reload();
     await expect(
