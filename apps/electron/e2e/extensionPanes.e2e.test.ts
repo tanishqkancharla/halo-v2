@@ -78,3 +78,36 @@ extensionE2eTest(
     ).rejects.toThrow(/ECONNREFUSED/);
   },
 );
+
+extensionE2eTest(
+  "updates an extension's name and icon on renderer reload without changing its URL",
+  async ({ renderer, loadExtension, harness, server }) => {
+    await loadExtension("./fixtures/greeting");
+    const [before] = await server.rpc.extensions.list();
+
+    await harness.tools.bash.run({
+      command:
+        'cd .halo/extensions/greeting && npm pkg set halo.displayName="Welcome" halo.icon="Calendar"',
+    });
+    await renderer.page.reload();
+    const entry = renderer.page.getByRole("link", {
+      name: "Welcome",
+      exact: true,
+    });
+    const icon = entry.locator("..").locator("svg");
+    await expect(icon).toBeVisible();
+    await expect(icon).toHaveAttribute("aria-hidden", "true");
+    await entry.click();
+    await expect(
+      renderer.page.getByRole("main", { name: "Welcome", exact: true }),
+    ).toBeVisible();
+    await renderer.page
+      .getByRole("button", { name: "Permissions", exact: true })
+      .click();
+    await expect(
+      renderer.page.getByRole("dialog", { name: "Permissions for Welcome" }),
+    ).toBeVisible();
+    const [after] = await server.rpc.extensions.list();
+    expect(after?.url).toBe(before?.url);
+  },
+);

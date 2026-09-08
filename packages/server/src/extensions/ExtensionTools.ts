@@ -11,18 +11,13 @@ import {
 import type { WorkspaceService } from "../workspace/WorkspaceService.js";
 import type { ToolRuntimeService } from "../agent/runtime/ToolRuntimeService.js";
 import type { ToolRuntime } from "../agent/runtime/ToolRuntime.js";
+import { readExtensionManifest } from "./ExtensionManifest.js";
 
 export class ExtensionToolsError extends errore.createTaggedError({
   name: "ExtensionToolsError",
   message: "Extension tools: $detail",
 }) {}
 
-const manifestSchema = Type.Object({
-  name: Type.String(),
-  halo: Type.Optional(
-    Type.Object({ capabilities: Type.Optional(Type.Array(Type.String())) }),
-  ),
-});
 const grantsSchema = Type.Record(
   Type.String(),
   Type.Object({
@@ -130,8 +125,20 @@ export class ExtensionTools {
       if (state instanceof Error) throw state;
       const requests: ExtensionPermissionRequest[] = [];
       for (const [id, grant] of Object.entries(state)) {
-        if (grant.pending.length > 0)
-          requests.push({ id, paths: grant.pending });
+        if (grant.pending.length === 0) continue;
+        const manifest = await this.readManifest(id);
+        if (manifest instanceof Error) {
+          console.warn(manifest);
+          continue;
+        }
+        requests.push({
+          id,
+          displayName:
+            manifest.halo?.displayName === undefined
+              ? id
+              : manifest.halo.displayName,
+          paths: grant.pending,
+        });
       }
       yield requests;
       const next = await events
@@ -183,6 +190,10 @@ export class ExtensionTools {
       this.changes.emit("change");
     }
     return {
+      displayName:
+        manifest.halo?.displayName === undefined
+          ? id
+          : manifest.halo.displayName,
       requested,
       existing,
       granted: grant.granted,
@@ -196,12 +207,11 @@ export class ExtensionTools {
       return new ExtensionToolsError({ detail: "invalid extension id" });
     const layout = this.options.workspace.getLayout();
     if (layout instanceof Error) return layout;
-    const source = await this.options.filesystem.readFile(
-      join(layout.root, ".halo", "extensions", id, "package.json"),
-      "utf8",
-    );
-    if (source instanceof Error) return source;
-    return parse(manifestSchema, source);
+    return readExtensionManifest({
+      filesystem: this.options.filesystem,
+      workspaceRoot: layout.root,
+      id,
+    });
   }
 
   private async toolPaths() {

@@ -37,6 +37,32 @@ npm run build
 
 One build compiles the view, API, and schema together. It writes `dist/start.mjs` and selects a complete build through `dist/current.json`. Use the generated build configuration; do not compile panes separately or edit generated output.
 
+## Sidebar name and icon
+
+Set optional presentation fields in `package.json`:
+
+```json
+{
+  "name": "calendar-day-view",
+  "halo": {
+    "displayName": "Calendar",
+    "icon": "Calendar"
+  }
+}
+```
+
+`displayName` appears in the sidebar, pane header, and permission UI. If omitted, Halo uses the extension ID. The directory ID still identifies commands, routes, storage, and grants. Keep existing `halo.capabilities` when editing these fields.
+
+`icon` is an exact, case-sensitive Maui icon export name. Search the installed package from the extension directory:
+
+```sh
+rg -i 'calendar|clock' node_modules/maui/src/icons/index.ts
+```
+
+The matching exports give the names to use. Inspect the corresponding source file, such as `node_modules/maui/src/icons/Calendar.tsx`, if needed. With no icon, or a name unavailable in Halo's Maui version, the sidebar shows only the label.
+
+Reload Halo's renderer to pick up name and icon edits. No extension rebuild or server restart is needed for those fields.
+
 ## API and shared data
 
 The view receives `{ api, storage }`, typed with `ExtensionViewProps<typeof router, typeof schema>` from `@get-halo/extension-sdk/view`. Import the router and schema as types in the view. A handler such as `hello: os.handler(() => "Hello")` in `api.ts` is called as `await api.hello()`.

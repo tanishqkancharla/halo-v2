@@ -12,7 +12,11 @@ export type ExtensionsRouterContext = {
 const os = implement(contract.extensions).$context<ExtensionsRouterContext>();
 
 export const extensionsRouter = os.router({
-  list: os.list.handler(({ context }) => context.extensions.list()),
+  list: os.list.handler(async ({ context }) => {
+    const extensions = await context.extensions.list();
+    if (extensions instanceof Error) return orpcErrors.badRequest(extensions);
+    return extensions;
+  }),
   reload: os.reload.handler(({ context }) => context.extensions.reload()),
   tools: {
     add: os.tools.add.handler(async ({ context, input }) => {

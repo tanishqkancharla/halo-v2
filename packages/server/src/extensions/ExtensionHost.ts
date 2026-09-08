@@ -5,6 +5,8 @@ import {
   FilesystemPathNotFoundError,
   type FilesystemService,
 } from "../filesystem/FilesystemService.js";
+import type { ExtensionSummary } from "@get-halo/shared/contract";
+import { readExtensionManifest } from "./ExtensionManifest.js";
 import { startExtension, type ExtensionRuntime } from "./ExtensionProcess.js";
 
 type RunningExtension = Exclude<
@@ -27,10 +29,29 @@ export class ExtensionHost {
     },
   ) {}
 
-  list() {
-    return [...this.processes.values()]
-      .filter((extension) => extension.isRunning())
-      .map(({ id, url }) => ({ id, url }));
+  async list() {
+    const workspaceRoot = this.workspaceRoot;
+    if (workspaceRoot === undefined) return [];
+    const extensions: ExtensionSummary[] = [];
+    for (const { id, url, isRunning } of this.processes.values()) {
+      if (!isRunning()) continue;
+      const manifest = await readExtensionManifest({
+        filesystem: this.options.filesystem,
+        workspaceRoot,
+        id,
+      });
+      if (manifest instanceof Error) return manifest;
+      extensions.push({
+        id,
+        url,
+        displayName:
+          manifest.halo?.displayName === undefined
+            ? id
+            : manifest.halo.displayName,
+        icon: manifest.halo?.icon,
+      });
+    }
+    return extensions;
   }
 
   setToolsOrigin(origin: string) {

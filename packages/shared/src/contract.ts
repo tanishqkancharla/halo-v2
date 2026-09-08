@@ -69,8 +69,19 @@ export type ConnectionStarted =
       expiresInMs: number;
     };
 
-export type ExtensionPermissionRequest = { id: string; paths: string[] };
+export type ExtensionSummary = {
+  id: string;
+  url: string;
+  displayName: string;
+  icon?: string;
+};
+export type ExtensionPermissionRequest = {
+  id: string;
+  displayName: string;
+  paths: string[];
+};
 export type ExtensionPermissionReport = {
+  displayName: string;
   requested: string[];
   existing: string[];
   granted: string[];
@@ -122,7 +133,7 @@ export const contract = publicProcedure.router({
     screenshot: oc.output(type<{ path: string }>()),
   },
   extensions: {
-    list: oc.output(type<Array<{ id: string; url: string }>>()),
+    list: oc.output(type<ExtensionSummary[]>()),
     reload: oc.output(type<void>()),
     tools: {
       add: oc

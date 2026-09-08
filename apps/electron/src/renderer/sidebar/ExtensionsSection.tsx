@@ -1,6 +1,10 @@
 import { SidebarItem, SidebarSection } from "@halo/plugin-sdk/view";
 import { Text } from "maui";
+import * as MauiIcons from "maui/icons";
+
 import { useExtensionsQuery, useWorkspaceQuery } from "../api/ApiProvider.tsx";
+
+const icons = new Map(Object.entries(MauiIcons));
 
 export function ExtensionsSection() {
   const workspace = useWorkspaceQuery().data;
@@ -23,9 +27,12 @@ export function ExtensionsSection() {
           key={extension.id}
           id={`extension:${extension.id}`}
           href={`/extensions/${encodeURIComponent(extension.id)}`}
-          pageTitle={extension.id}
+          pageTitle={extension.displayName}
+          icon={
+            extension.icon === undefined ? undefined : icons.get(extension.icon)
+          }
         >
-          {extension.id}
+          {extension.displayName}
         </SidebarItem>
       ))}
     </SidebarSection>

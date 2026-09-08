@@ -12,17 +12,23 @@ export function ExtensionPane({ extensionId }: { extensionId: string }) {
   const workspace = useWorkspaceQuery().data;
   const extensions = useExtensionsQuery(workspace);
   const extension = extensions.data?.find((entry) => entry.id === extensionId);
+  const displayName =
+    extension === undefined ? extensionId : extension.displayName;
   const pane = useStyles(styles.pane);
   const frame = useStyles(styles.frame);
 
   return (
-    <main className={pane} aria-label={extensionId}>
+    <main className={pane} aria-label={displayName}>
       <PaneHeader
         section="Extensions"
-        title={extensionId}
+        title={displayName}
         actions={
           extension === undefined ? undefined : (
-            <ExtensionPermissionsButton key={extensionId} id={extensionId} />
+            <ExtensionPermissionsButton
+              key={extensionId}
+              id={extensionId}
+              displayName={displayName}
+            />
           )
         }
       />
@@ -46,7 +52,7 @@ export function ExtensionPane({ extensionId }: { extensionId: string }) {
         <iframe
           key={extension.id}
           className={frame}
-          title={extension.id}
+          title={extension.displayName}
           src={extension.url}
           sandbox="allow-scripts allow-same-origin allow-forms"
         />

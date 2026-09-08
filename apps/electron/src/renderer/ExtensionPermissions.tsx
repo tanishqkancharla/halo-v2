@@ -89,14 +89,17 @@ function ExtensionPermissionCard({
       console.warn("Extension permission decision failed:", cause),
   });
   return (
-    <section aria-label={`Permissions for ${request.id}`} className={card}>
+    <section
+      aria-label={`Permissions for ${request.displayName}`}
+      className={card}
+    >
       <Flex column gap={6} p={6}>
         <Flex column gap={1}>
           <Text size="md" fontWeight={600}>
             Permissions
           </Text>
           <Text size="sm" color="lowContrast">
-            {request.id} wants to use these tools:
+            {request.displayName} wants to use these tools:
           </Text>
         </Flex>
         <Flex column gap={2}>
@@ -142,7 +145,13 @@ const permissionCard = style(background.element, radius.lg, shadow.subtle, {
   overflowWrap: "anywhere",
 });
 
-export function ExtensionPermissionsButton({ id }: { id: string }) {
+export function ExtensionPermissionsButton({
+  id,
+  displayName,
+}: {
+  id: string;
+  displayName: string;
+}) {
   const [open, setOpen] = useState(false);
   const api = useApi();
   const queryClient = useQueryClient();
@@ -177,14 +186,14 @@ export function ExtensionPermissionsButton({ id }: { id: string }) {
           <section
             role="dialog"
             aria-modal="true"
-            aria-label={`Permissions for ${id}`}
+            aria-label={`Permissions for ${displayName}`}
             onKeyDown={(event) => {
               if (event.key === "Escape") setOpen(false);
             }}
           >
             <Flex column gap={6}>
               <H2>Permissions</H2>
-              <Text color="lowContrast">{id}</Text>
+              <Text color="lowContrast">{displayName}</Text>
               {permissions.isPending ? (
                 <Text role="status">Loading permissions…</Text>
               ) : undefined}
