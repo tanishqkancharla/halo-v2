@@ -34,9 +34,11 @@ type E2ETestHarness = {
 export async function createTestArtifacts(testInfo: TestInfo) {
   const parent = path.resolve(import.meta.dirname, "../../../tmp/e2e");
   await fsPromises.mkdir(parent, { recursive: true });
+  // Keep nested executable paths below Windows process-spawning limits.
   const testName = testInfo.titlePath
     .join("-")
-    .replaceAll(/[^a-zA-Z0-9._-]/g, "-");
+    .replaceAll(/[^a-zA-Z0-9._-]/g, "-")
+    .slice(0, 40);
   const root = await fsPromises.mkdtemp(path.join(parent, `${testName}-`));
   const paths = {
     root,
