@@ -18,6 +18,60 @@ e2eTest("starts a new session", async ({ harness, renderer }) => {
   await expect(newSession.getByLabel("Message")).toBeFocused();
 });
 
+e2eTest(
+  "keeps the selected session and draft pages after reload",
+  async ({ harness, renderer }) => {
+    for (const title of ["Earlier conversation", "Latest conversation"]) {
+      await harness.loadSession({
+        title,
+        messages: [m.user(title), m.assistant("Saved reply")],
+      });
+    }
+    await renderer.page
+      .getByRole("link", { name: "Earlier conversation", exact: true })
+      .click();
+    await renderer.page.reload();
+    await expect(
+      renderer.page.getByRole("main", { name: "Earlier conversation" }),
+    ).toBeVisible();
+
+    await renderer.page.getByRole("button", { name: "New session" }).click();
+    const draft = renderer.page.getByRole("main", { name: "New session" });
+    await expect(draft).toBeVisible();
+    await renderer.page.reload();
+    await expect(draft).toBeVisible();
+  },
+);
+
+e2eTest(
+  "keeps the first message and shows the error when authentication is missing",
+  async ({ renderer }) => {
+    await renderer.page.getByRole("button", { name: "New session" }).click();
+    const draft = renderer.page.getByRole("main", { name: "New session" });
+    const message = draft.getByLabel("Message");
+
+    for (const text of [
+      "Keep my original question",
+      "Keep my edited question",
+    ]) {
+      await message.fill(text);
+      await draft.getByRole("button", { name: "Send", exact: true }).click();
+
+      await expect(draft.getByRole("alert")).toContainText(
+        "No API key found for openai-codex",
+      );
+      await expect(message).toHaveText(text);
+      await expect(
+        draft.getByRole("button", { name: "Send", exact: true }),
+      ).toBeEnabled();
+    }
+
+    await renderer.page.getByRole("button", { name: "New session" }).click();
+    await expect(message).toHaveText("");
+    await expect(draft.getByRole("alert")).not.toBeVisible();
+  },
+);
+
 e2eTest("shows a connection request", async ({ harness, renderer }) => {
   await harness.loadSession({
     title: "Drive search",
