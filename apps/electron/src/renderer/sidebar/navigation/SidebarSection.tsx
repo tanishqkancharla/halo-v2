@@ -33,7 +33,8 @@ const sidebarSection = style(
 );
 
 type SidebarSectionProps = {
-  label: string;
+  label: ReactNode;
+  actions?: ReactNode;
   children: ReactNode;
   className?: string;
 };
@@ -47,7 +48,8 @@ export function SidebarSection(props: SidebarSectionProps) {
       className={joinClassNames(sectionClassName, props.className)}
     >
       <NavigationTreeHeader className={labelClassName}>
-        {props.label}
+        <span>{props.label}</span>
+        {props.actions}
       </NavigationTreeHeader>
       {props.children}
     </NavigationTreeSection>
@@ -57,7 +59,13 @@ export function SidebarSection(props: SidebarSectionProps) {
 const sectionLabel = style(
   text({ size: "xs", fontWeight: 500, color: "lowContrast" }),
   sidebarPadding,
-  { marginBottom: spacing.value(3) },
+  {
+    marginBottom: spacing.value(3),
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: "28px",
+  },
 );
 
 function joinClassNames(...classNames: Array<string | undefined>) {
