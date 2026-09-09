@@ -34,7 +34,25 @@ type E2ETestHarness = {
   paths: TestPaths;
 };
 
-export async function createTestArtifacts(testInfo: TestInfo) {
+export type TestArtifacts = {
+  harness: E2ETestHarness;
+  paths: TestPaths;
+  createLaunch(): LaunchArtifacts;
+  captureProcess(
+    mainProcess: ChildProcess,
+    launch: LaunchArtifacts,
+  ): void | TestArtifactError;
+  captureRenderer(page: Page): Promise<void | TestArtifactError>;
+  captureScreenshot(
+    page: Page,
+    launch: LaunchArtifacts,
+  ): Promise<void | TestArtifactError>;
+  finish(): Promise<void | TestArtifactError>;
+};
+
+export async function createTestArtifacts(
+  testInfo: TestInfo,
+): Promise<TestArtifacts> {
   const parent = path.resolve(import.meta.dirname, "../../../tmp/e2e");
   await fsPromises.mkdir(parent, { recursive: true });
   // Keep nested executable paths below Windows process-spawning limits.
@@ -199,8 +217,6 @@ export async function createTestArtifacts(testInfo: TestInfo) {
     },
   };
 }
-
-export type TestArtifacts = Awaited<ReturnType<typeof createTestArtifacts>>;
 
 async function removeDependencyDirectories(
   directory: string,

@@ -5,6 +5,7 @@ import path from "node:path";
 import * as errore from "errore";
 import { test as baseTest } from "vitest";
 import { TemporaryCredentialVault } from "./TemporaryCredentialVault.js";
+import { ScriptedLLMApi } from "@get-halo/server/testing";
 import {
   createTestArtifacts,
   type TestArtifacts,
@@ -23,11 +24,14 @@ type TestServer = {
 };
 
 export const serverTest = baseTest.extend<{
+  llm: ScriptedLLMApi;
   server: TestServer;
   startServer: (workspaceRoot?: string, port?: number) => Promise<TestServer>;
 }>({
+  // oxlint-disable-next-line eslint/no-empty-pattern -- Vitest fixture callbacks require destructured parameters.
+  llm: async ({}, use) => use(new ScriptedLLMApi()),
   server: async ({ startServer }, use) => use(await startServer()),
-  startServer: async ({ task }, use) => {
+  startServer: async ({ task, llm }, use) => {
     await using cleanup = new errore.AsyncDisposableStack();
     const artifacts = await createTestArtifacts(task.id);
     const outcome = { passed: false };
@@ -38,6 +42,7 @@ export const serverTest = baseTest.extend<{
       cleanup.defer(() => resources.disposeAsync());
       const halo = await HaloServer.start({
         ...createServerOptions(artifacts),
+        llmApi: llm,
         workspaceRoot,
         host: "127.0.0.1",
         port,
@@ -74,7 +79,7 @@ export const serverTest = baseTest.extend<{
 
 function createServerOptions(
   artifacts: TestArtifacts,
-): Omit<HaloServerOptions, "workspaceRoot"> {
+): Omit<HaloServerOptions, "workspaceRoot" | "llmApi"> {
   return {
     appDataDir: artifacts.paths.userData,
     appVersion: testAppVersion,

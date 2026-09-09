@@ -85,7 +85,7 @@ export type SessionDescriptionItem =
   | ({ type: "tool.start"; nested: boolean; path: string } & ToolStartOptions)
   | ({ type: "tool.end"; nested: boolean } & ToolEndOptions);
 
-function toolLifecycle(nested: boolean) {
+function toolLifecycle<Nested extends boolean>(nested: Nested) {
   return {
     start(toolPath: string, options: ToolStartOptions) {
       return {
@@ -116,6 +116,9 @@ export const m = {
   },
   assistant(text: string) {
     return { type: "assistant" as const, text };
+  },
+  error(message: string) {
+    return { type: "error" as const, message };
   },
   read(input: { path: string; result: string }) {
     return {

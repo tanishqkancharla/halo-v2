@@ -1,4 +1,3 @@
-import nodePath from "node:path";
 import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
@@ -9,6 +8,7 @@ import {
 } from "playwright";
 import type { TestArtifacts } from "./TestArtifacts.js";
 import { resolveUnpackedExecutable } from "./resolveUnpackedExecutable.js";
+import type { OpenAILLMApiOptions } from "@get-halo/server/llm";
 
 type RunningApp = {
   electron: ElectronApplication;
@@ -19,8 +19,10 @@ type RunningApp = {
 
 export class ElectronTestApp {
   private current: RunningApp | undefined;
-
-  constructor(private readonly artifacts: TestArtifacts) {}
+  constructor(
+    private readonly artifacts: TestArtifacts,
+    private readonly llmConfiguration: OpenAILLMApiOptions,
+  ) {}
 
   get page() {
     return this.running.page;
@@ -47,11 +49,7 @@ export class ElectronTestApp {
       env: {
         ...processEnvironment(),
         HALO_E2E: "1",
-        PI_CODING_AGENT_DIR: nodePath.join(
-          this.artifacts.paths.workspace,
-          ".pi",
-          "agent",
-        ),
+        HALO_LLM_CONFIG: JSON.stringify(this.llmConfiguration),
       },
     });
     resources.defer(() => electronApp.close());

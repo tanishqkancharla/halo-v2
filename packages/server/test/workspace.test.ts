@@ -1,7 +1,35 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect } from "vitest";
+import { contentText, fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { serverTest } from "./serverTest.js";
+
+serverTest(
+  "answers through the LLM supplied by the server host",
+  async ({ server, llm }) => {
+    const { sessionId } = await server.rpc.sessions.create();
+    const prompted = server.rpc.sessions.prompt({
+      sessionId,
+      text: "Hello from the API",
+    });
+    const request = await llm.nextRequest();
+    if (request instanceof Error) throw request;
+    const responded = llm.respond({
+      id: request.id,
+      message: fauxAssistantMessage("Hello from the supplied LLM."),
+    });
+    if (responded instanceof Error) throw responded;
+    await prompted;
+
+    const session = await server.rpc.sessions.open({ sessionId });
+    const answers = session.records.flatMap(({ value }) =>
+      value.type === "message.committed" && value.message.role === "assistant"
+        ? [contentText(value.message.content)]
+        : [],
+    );
+    expect(answers).toEqual(["Hello from the supplied LLM."]);
+  },
+);
 
 serverTest("reads, writes, and lists workspace files", async ({ server }) => {
   expect(await server.rpc.workspace.get()).toMatchObject({

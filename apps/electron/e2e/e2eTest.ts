@@ -3,6 +3,7 @@ import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import { createTestArtifacts, type TestArtifacts } from "./TestArtifacts.js";
 import { ElectronTestApp } from "./ElectronTestApp.js";
+import { LLMDriver } from "./LLMDriver.js";
 import { createHarnessTools } from "./tools.js";
 import {
   loadSessionDescription,
@@ -24,12 +25,21 @@ type E2ETestHarness = TestArtifacts["harness"] & {
 };
 
 type E2EFixtures = {
+  llm: LLMDriver;
   app: ElectronTestApp;
   testArtifacts: TestArtifacts;
   harness: E2ETestHarness;
 };
 
 export const e2eTest = baseTest.extend<E2EFixtures>({
+  // oxlint-disable-next-line eslint/no-empty-pattern -- Playwright fixture callbacks require an object-destructured first parameter.
+  llm: async ({}, use) => {
+    const llm = await LLMDriver.start();
+    if (llm instanceof Error) throw llm;
+    await using cleanup = new errore.AsyncDisposableStack();
+    cleanup.defer(() => llm.close());
+    await use(llm);
+  },
   // oxlint-disable-next-line eslint/no-empty-pattern -- Playwright fixture callbacks require an object-destructured first parameter.
   testArtifacts: async ({}, use, testInfo) => {
     const artifacts = await createTestArtifacts(testInfo);
@@ -38,9 +48,9 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
     if (finished instanceof Error) throw finished;
   },
   app: [
-    async ({ testArtifacts }, use) => {
+    async ({ testArtifacts, llm }, use) => {
       await using cleanup = new errore.AsyncDisposableStack();
-      const app = new ElectronTestApp(testArtifacts);
+      const app = new ElectronTestApp(testArtifacts, llm.configuration);
       cleanup.defer(() => app.quit());
       await app.open();
       await use(app);

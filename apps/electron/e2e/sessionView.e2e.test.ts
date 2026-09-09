@@ -1,6 +1,7 @@
 import { expect, type Locator } from "@playwright/test";
 import { e2eTest } from "./e2eTest.js";
 import { m } from "./SessionDescription.js";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 e2eTest("starts a new session", async ({ harness, app }) => {
   await harness.loadSession({
@@ -15,7 +16,7 @@ e2eTest("starts a new session", async ({ harness, app }) => {
 
   const newSession = app.page.getByRole("main", { name: "New session" });
   await expect(newSession).toBeVisible();
-  await expect(newSession.getByLabel("Message")).toBeFocused();
+  await expect(newSession.getByLabel("Message", { exact: true })).toBeFocused();
 });
 
 e2eTest(
@@ -44,63 +45,162 @@ e2eTest(
 );
 
 e2eTest(
-  "reopens saved history and receives new activity after quitting Halo",
-  async ({ app, harness }) => {
-    const session = await harness.loadSession({
-      title: "Saved conversation",
-      messages: [
-        m.user("Remember the project notes"),
-        m.assistant("The notes are saved."),
-      ],
+  "continues with saved messages and tool results after quitting Halo",
+  async ({ app, harness, llm }) => {
+    await harness.tools.files.write({
+      path: "notes.md",
+      content: "The project mascot is a blue bicycle.",
     });
+    await app.page.getByRole("button", { name: "New session" }).click();
+    await app.page
+      .getByLabel("Message", { exact: true })
+      .fill("Read the project notes");
+    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await llm.respond([
+      m.assistant("I will read the notes."),
+      m.tool.start("read", {
+        id: "read-notes",
+        arguments: { path: "notes.md" },
+      }),
+    ]);
+    await llm.respond(m.assistant("The notes are saved."));
+    await expect(app.page.getByRole("main")).toContainText(
+      "The notes are saved.",
+    );
+    await expect(
+      app.page.getByRole("button", { name: "Stop", exact: true }),
+    ).not.toBeVisible();
 
     await app.quit();
     await app.open();
 
-    const pane = app.page.getByRole("main", { name: "Saved conversation" });
+    const pane = app.page.getByRole("main");
+    const transcript = pane.getByRole("log", { name: "Session transcript" });
     await expect(
-      pane.getByText("Remember the project notes", { exact: true }),
+      transcript.getByText("Read the project notes", { exact: true }),
     ).toBeVisible();
     await expect(
-      pane.getByText("The notes are saved.", { exact: true }),
+      transcript.getByText("The notes are saved.", {
+        exact: true,
+      }),
     ).toBeVisible();
 
-    await session.append([
-      m.user("Continue the conversation"),
-      m.assistant("Continuing after reopening."),
-    ]);
+    await pane
+      .getByLabel("Message", { exact: true })
+      .fill("Continue the conversation");
+    await pane.getByRole("button", { name: "Send", exact: true }).click();
+    await llm.respond(({ messages }) =>
+      m.assistant(
+        [
+          `Earlier prompts: ${messages
+            .filter((message) => message.role === "user")
+            .map((message) => messageText(message))
+            .join(" → ")}`,
+          `Earlier answers: ${messages
+            .filter((message) => message.role === "assistant")
+            .map((message) => messageText(message))
+            .join(" → ")}`,
+          `Earlier tool results: ${messages
+            .filter((message) => message.role === "tool")
+            .map((message) => messageText(message))
+            .join("\n")}`,
+        ].join("\n\n"),
+      ),
+    );
     await expect(
-      pane.getByText("Continuing after reopening.", { exact: true }),
+      transcript.getByText(
+        "Earlier prompts: Read the project notes → Continue the conversation",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      transcript.getByText(
+        "Earlier answers: I will read the notes. → The notes are saved.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      transcript.getByText(
+        "Earlier tool results: The project mascot is a blue bicycle.",
+        { exact: true },
+      ),
     ).toBeVisible();
   },
 );
 
 e2eTest(
-  "keeps the first message and shows the error when authentication is missing",
-  async ({ app }) => {
+  "answers a new message after stopping a pending model response",
+  async ({ app, llm }) => {
     await app.page.getByRole("button", { name: "New session" }).click();
-    const draft = app.page.getByRole("main", { name: "New session" });
-    const message = draft.getByLabel("Message");
+    await app.page
+      .getByLabel("Message", { exact: true })
+      .fill("Start a long answer");
+    await app.page.getByRole("button", { name: "Send", exact: true }).click();
 
-    for (const text of [
-      "Keep my original question",
-      "Keep my edited question",
-    ]) {
-      await message.fill(text);
-      await draft.getByRole("button", { name: "Send", exact: true }).click();
+    await app.page.getByRole("button", { name: "Stop", exact: true }).click();
+    await app.page
+      .getByLabel("Message", { exact: true })
+      .fill("Answer this instead");
+    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await llm.respond(m.assistant("Here is the new answer."));
 
-      await expect(draft.getByRole("alert")).toContainText(
-        "No API key found for openai-codex",
-      );
-      await expect(message).toHaveText(text);
-      await expect(
-        draft.getByRole("button", { name: "Send", exact: true }),
-      ).toBeEnabled();
-    }
+    await expect(app.page.getByRole("main")).toContainText(
+      "Here is the new answer.",
+    );
+  },
+);
 
+e2eTest(
+  "answers after quitting Halo during a pending response",
+  async ({ app, llm }) => {
     await app.page.getByRole("button", { name: "New session" }).click();
-    await expect(message).toHaveText("");
-    await expect(draft.getByRole("alert")).not.toBeVisible();
+    await app.page
+      .getByLabel("Message", { exact: true })
+      .fill("Start an answer");
+    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(
+      app.page.getByRole("article", { name: "You message" }),
+    ).toContainText("Start an answer");
+
+    await app.quit();
+    await app.open();
+
+    await app.page
+      .getByLabel("Message", { exact: true })
+      .fill("Answer after reopening");
+    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await llm.respond(m.assistant("Here is the answer after reopening."));
+
+    await expect(app.page.getByRole("main")).toContainText(
+      "Here is the answer after reopening.",
+    );
+  },
+);
+
+e2eTest(
+  "keeps the first message and shows the error when inference is denied",
+  async ({ app, llm }) => {
+    await app.page.getByRole("button", { name: "New session" }).click();
+    const pane = app.page.getByRole("main");
+    await pane
+      .getByLabel("Message", { exact: true })
+      .fill("Keep my original question");
+    await pane.getByRole("button", { name: "Send", exact: true }).click();
+    await llm.respond(m.error("Model access denied"));
+
+    await expect(pane.getByRole("alert")).toContainText("Model access denied");
+    await expect(
+      pane.getByRole("article", { name: "You message" }),
+    ).toContainText("Keep my original question");
+
+    await pane.getByLabel("Message", { exact: true }).fill("Try again");
+    await pane.getByRole("button", { name: "Send", exact: true }).click();
+    await llm.respond(m.assistant("Ready to continue."));
+
+    await expect(
+      pane.getByRole("log", { name: "Session transcript" }),
+    ).toContainText("Ready to continue.");
+    await expect(pane.getByRole("alert")).not.toBeVisible();
   },
 );
 
@@ -695,3 +795,12 @@ e2eTest(
     ).toBeVisible();
   },
 );
+
+function messageText(message: ChatCompletionMessageParam): string {
+  if (message.content === null || message.content === undefined) return "";
+  if (!Array.isArray(message.content)) return message.content;
+  return message.content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n");
+}

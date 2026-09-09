@@ -15,6 +15,30 @@ e2eTest("keeps saved data after reopening", async ({ app }) => {
 
 `quit()` closes Electron and its owned server/windows. `open()` launches a fresh process using the same test workspace and user-data directory. Read `app.page` and `app.server` again after reopening; saved pages, locators and RPC clients belong to the previous launch. Harness tool and session helpers resolve the current connection when called. Teardown quits any remaining app, including when the test has already quit it. If setup must happen while Halo is closed, call `app.quit()`, prepare the workspace, then `app.open()`.
 
+The ordinary `e2eTest` fixture owns a scripted OpenAI-compatible HTTP endpoint on a random loopback port. The app fixture passes its URL, model metadata and test API key through `HALO_LLM_CONFIG` on each Electron launch. Main constructs an HTTP-backed `LLMApi` and supplies it to `HaloServer`; Pi's `ModelRuntime` is built on top. The endpoint lives in the harness and stays running across app restarts. Electron has no LLM test event handlers.
+
+Responses follow the timeline of the test:
+
+```ts
+e2eTest("answers a message", async ({ app, llm }) => {
+  await app.page.getByRole("button", { name: "New session" }).click();
+  await app.page.getByLabel("Message", { exact: true }).fill("Hello");
+  await app.page.getByRole("button", { name: "Send", exact: true }).click();
+
+  await llm.respond(m.assistant("Hello back."));
+
+  await expect(app.page.getByRole("main")).toContainText("Hello back.");
+});
+```
+
+`respond()` answers one pending inference request, waiting up to ten seconds if it has not arrived. It releases the scripted response; use UI assertions to wait for Halo to process it. Client disconnection removes pending requests, including when a run stops or Electron quits. Reopening connects to the same endpoint with a fresh app runtime.
+
+Use `m.assistant(...)`, `m.tool.start(...)`, or an array combining text and tool calls. Tool results come from Halo's real tool execution; `m.tool.end(...)` and the seeded-history helpers that include fabricated results are not accepted. `m.error("Model access denied")` returns HTTP 403 with an OpenAI-shaped error body. Successful replies use Chat Completions server-sent events, including tool-call deltas and a finish reason.
+
+Use static replies unless the response needs to depend on the request. A response callback receives the actual OpenAI Chat Completions request and can return a description asynchronously. For history coverage, derive an answer from those messages and assert the visible reply. Message content may be text or content parts; tool results have role `tool`. Avoid request snapshots, call-count assertions, or answers that contain the expected history regardless of what Halo sends.
+
+These tests exercise the real Pi agent loop, tools, and persistence through Pi's real HTTP inference client and a scripted endpoint. They do not verify local Pi authentication, a commercial provider, or a future control-plane transport. The restart scenario in `sessionView.e2e.test.ts` creates its history through actual prompts and tool execution, then proves that restored messages and tool results support the next answer. Separate scenarios cover stopping or quitting during a pending response, and preserving the submitted message while recovering from an inference error.
+
 Extension tests use `extensionE2eTest` and `loadExtension("./fixtures/name")`. The fixture scaffolds an independent package, copies the extension's source files, installs the SDK, typechecks and builds the package, and reloads Halo. Extension source is checked against its installed dependencies, separately from the harness TypeScript project.
 
 `extensionTools.e2e.test.ts` loads a real extension, requests `files.read` through `halo extension tools add`, navigates from the conversation to the extension while its Permissions card is pending, approves access, and clicks Refresh notes to display a workspace file through `context.tools.files.read`. Its source declares the types of the tool it consumes. Separate tests verify revocation in an open pane and approval persistence after restarting Halo. These cover a real workspace tool; they do not establish OAuth or external-service behavior.

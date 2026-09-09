@@ -19,8 +19,11 @@ import { ToolRuntime } from "./agent/runtime/ToolRuntime.js";
 import { workspaceBashPlugin } from "./agent/tools/bash/WorkspaceBashPlugin.js";
 import { createWorkspaceFilesPlugin } from "./agent/tools/files/WorkspaceFilesPlugin.js";
 import { parallelSearchPlugin } from "./agent/tools/web/ParallelSearchPlugin.js";
+import type { LLMApi } from "./llm/LLMApi.js";
+import { createPiModelRuntime } from "./llm/createPiModelRuntime.js";
 
 export type HaloServerOptions = {
+  llmApi: LLMApi;
   workspaceRoot: string;
   appBrowserTarget?: AppBrowserTarget;
   appDataDir: string;
@@ -57,6 +60,8 @@ export class HaloServer {
     },
   ): Promise<HaloServer | Error> {
     await using cleanup = new errore.AsyncDisposableStack();
+    const modelRuntime = await createPiModelRuntime(options.llmApi);
+    if (modelRuntime instanceof Error) return modelRuntime;
     const filesystem = new FilesystemService();
     cleanup.defer(async () => {
       const closed = await filesystem.close();
@@ -151,6 +156,8 @@ export class HaloServer {
       extensions,
       workspace,
       sessions: new SessionRegistry({
+        modelRuntime,
+        model: options.llmApi.model,
         filesystem,
         layout: workspace.layout,
         toolRuntime,

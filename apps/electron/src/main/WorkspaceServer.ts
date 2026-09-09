@@ -1,5 +1,6 @@
 import { HaloServer, type HaloServerOptions } from "@get-halo/server";
 import type { FilesystemService } from "@get-halo/server/filesystem";
+import type { LLMApi } from "@get-halo/server/llm";
 import * as errore from "errore";
 import type { HaloRpcConnection } from "../shared/rpc.js";
 import {
@@ -17,7 +18,8 @@ export class WorkspaceServer {
   constructor(
     private readonly options: {
       filesystem: FilesystemService;
-      server: Omit<HaloServerOptions, "workspaceRoot">;
+      server: Omit<HaloServerOptions, "workspaceRoot" | "llmApi">;
+      createLLMApi(workspaceRoot: string): Promise<LLMApi | Error>;
       corsOrigins: readonly string[];
     },
   ) {}
@@ -66,9 +68,12 @@ export class WorkspaceServer {
     }
 
     await using cleanup = new errore.AsyncDisposableStack();
+    const llmApi = await this.options.createLLMApi(workspaceRoot);
+    if (llmApi instanceof Error) return llmApi;
     const server = await HaloServer.start({
       ...this.options.server,
       workspaceRoot,
+      llmApi,
       host: "127.0.0.1",
       port: 0,
       corsOrigins: this.options.corsOrigins,

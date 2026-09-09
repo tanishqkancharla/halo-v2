@@ -32,6 +32,17 @@ import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { registerDesktopApi } from "./DesktopApi.js";
 import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
 import { UserService } from "./UserService.js";
+import {
+  createPiLLMApi,
+  createOpenAILLMApi,
+  type OpenAILLMApiOptions,
+} from "@get-halo/server/llm";
+import * as errore from "errore";
+
+class LLMConfigurationError extends errore.createTaggedError({
+  name: "LLMConfigurationError",
+  message: "Could not parse HALO_LLM_CONFIG",
+}) {}
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -96,6 +107,23 @@ const ownerUserId = userService
   .then((user) => (user instanceof Error ? user : user.id));
 const workspaceServer = new WorkspaceServer({
   filesystem: filesystemService,
+  createLLMApi: async (workspaceRoot) => {
+    const configuration = process.env.HALO_LLM_CONFIG;
+    if (configuration !== undefined) {
+      const options = errore.try({
+        // SAFETY: The host supplies serialized OpenAILLMApiOptions as launch configuration.
+        try: () => JSON.parse(configuration) as OpenAILLMApiOptions,
+        catch: (cause) => new LLMConfigurationError({ cause }),
+      });
+      if (options instanceof Error) return options;
+      return createOpenAILLMApi(options);
+    }
+    return await createPiLLMApi({
+      agentDir: join(workspaceRoot, ".pi", "agent"),
+      provider: "openai-codex",
+      modelId: "gpt-5.6-terra",
+    });
+  },
   corsOrigins: [getRendererOrigin()],
   server: {
     appBrowserTarget: isDevelopment

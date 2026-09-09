@@ -8,6 +8,8 @@
     "./agent": "./src/agent.ts",
     "./cli": "./src/cli.ts",
     "./filesystem": "./src/filesystem.ts",
+    "./llm": "./src/llm.ts",
+    "./testing": "./src/testing.ts",
     "./router": "./src/router.ts",
     "./sessions": "./src/sessions.ts",
     "./workspace": "./src/workspace.ts"
