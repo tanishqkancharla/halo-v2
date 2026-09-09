@@ -44,11 +44,29 @@ e2eTest(
 );
 
 e2eTest(
-  "keeps the first message and shows the error when authentication is missing",
-  async ({ renderer }) => {
+  "titles a session from its first message and preserves failed prompts",
+  async ({ renderer, server }) => {
     await renderer.page.getByRole("button", { name: "New session" }).click();
     const draft = renderer.page.getByRole("main", { name: "New session" });
     const message = draft.getByLabel("Message");
+    const observed = await renderer.page.evaluateHandle(() => {
+      const titles: string[] = [];
+      const observer = new MutationObserver(() => {
+        const title = document
+          .querySelector("main > header")
+          ?.getAttribute("aria-label");
+        if (title !== undefined && title !== null) titles.push(title);
+      });
+      observer.observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+      });
+      return { titles, observer };
+    });
+    const created = renderer.page.waitForResponse((response) =>
+      response.url().endsWith("/rpc/sessions/create"),
+    );
 
     for (const text of [
       "Keep my original question",
@@ -65,6 +83,43 @@ e2eTest(
         draft.getByRole("button", { name: "Send", exact: true }),
       ).toBeEnabled();
     }
+
+    const {
+      json: { sessionId },
+    }: {
+      json: { sessionId: string };
+    } = await (await created).json();
+    expect(await server.rpc.sessions.list()).toEqual([]);
+    await server.rpc.testHarness.appendSessionEvents({
+      sessionId,
+      events: [
+        {
+          type: "message.committed",
+          message: {
+            role: "user",
+            content: "Keep my edited question",
+            timestamp: Date.now(),
+          },
+        },
+      ],
+    });
+    await expect(
+      renderer.page.getByRole("main", {
+        name: "Keep my edited question",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(renderer.page.locator("main > header")).toHaveText(
+      "Keep my edited question",
+    );
+    const observedTitles = await observed.evaluate(({ titles, observer }) => {
+      observer.disconnect();
+      return titles;
+    });
+    await observed.dispose();
+    expect(observedTitles).toContain("Keep my original question");
+    expect(observedTitles).toContain("Keep my edited question");
+    expect(observedTitles).not.toContain(sessionId);
 
     await renderer.page.getByRole("button", { name: "New session" }).click();
     await expect(message).toHaveText("");
