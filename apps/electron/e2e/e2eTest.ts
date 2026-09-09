@@ -1,3 +1,7 @@
+import type {
+  SessionDescription,
+  SessionDescriptionItem,
+} from "@get-halo/shared/testing";
 import { test as baseTest } from "@playwright/test";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
@@ -8,8 +12,6 @@ import { createHarnessTools } from "./tools.js";
 import {
   loadSessionDescription,
   sessionDescriptionEvents,
-  type SessionDescription,
-  type SessionDescriptionItem,
 } from "./SessionDescription.js";
 
 type E2ESession = {

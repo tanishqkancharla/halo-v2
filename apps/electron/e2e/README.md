@@ -17,7 +17,7 @@ e2eTest("keeps saved data after reopening", async ({ app }) => {
 
 The ordinary `e2eTest` fixture owns a scripted OpenAI-compatible HTTP endpoint on a random loopback port. The app fixture passes its URL, model metadata and test API key through `HALO_LLM_CONFIG` on each Electron launch. Main constructs an HTTP-backed `LLMApi` and supplies it to `HaloServer`; Pi's `ModelRuntime` is built on top. The endpoint lives in the harness and stays running across app restarts. Electron has no LLM test event handlers.
 
-Responses follow the timeline of the test:
+Import `m` from `@get-halo/shared/testing`; server and Electron tests share this response vocabulary. Responses follow the timeline of the test:
 
 ```ts
 e2eTest("answers a message", async ({ app, llm }) => {

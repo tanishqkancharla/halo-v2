@@ -1,94 +1,76 @@
-import { createHaloRpcClient } from "@halo/cli";
-import { HaloServer, type HaloServerOptions } from "@get-halo/server";
-import type { HaloClient } from "@get-halo/shared/contract";
-import path from "node:path";
 import * as errore from "errore";
 import { test as baseTest } from "vitest";
-import { TemporaryCredentialVault } from "./TemporaryCredentialVault.js";
+import { createTestArtifacts } from "./TestArtifacts.js";
+import { fauxAssistantMessage, type Context } from "@earendil-works/pi-ai";
+import type { MessageDialect } from "@get-halo/shared/testing";
 import { ScriptedLLMApi } from "@get-halo/server/testing";
-import {
-  createTestArtifacts,
-  type TestArtifacts,
-  type TestHarness,
-} from "./TestArtifacts.js";
+import { TestServer } from "./TestServer.js";
 
-const testAppVersion = "0.0.0-test";
+type ResponseDescription = ReturnType<MessageDialect["assistant"]>;
+type Responder = (
+  context: Context,
+) => ResponseDescription | Promise<ResponseDescription>;
 
-type TestServer = {
-  host: string;
-  port: number;
-  rpc: HaloClient;
-  rendererRpc: HaloClient;
-  harness: TestHarness;
-  close(): Promise<void>;
-};
+type ServerOptions = { workspaceRoot?: string };
 
 export const serverTest = baseTest.extend<{
-  llm: ScriptedLLMApi;
+  llm: {
+    api: ScriptedLLMApi;
+    waitForRequest(): Promise<void>;
+    respond(description: ResponseDescription | Responder): Promise<void>;
+  };
   server: TestServer;
-  startServer: (workspaceRoot?: string, port?: number) => Promise<TestServer>;
+  createServer: (options?: ServerOptions) => TestServer;
 }>({
   // oxlint-disable-next-line eslint/no-empty-pattern -- Vitest fixture callbacks require destructured parameters.
-  llm: async ({}, use) => use(new ScriptedLLMApi()),
-  server: async ({ startServer }, use) => use(await startServer()),
-  startServer: async ({ task, llm }, use) => {
-    await using cleanup = new errore.AsyncDisposableStack();
+  llm: async ({}, use) => {
+    const api = new ScriptedLLMApi();
+    await use({
+      api,
+      async waitForRequest() {
+        const received = await api.waitForRequest();
+        if (received instanceof Error) throw received;
+      },
+      async respond(description) {
+        const request = await api.nextRequest();
+        if (request instanceof Error) throw request;
+        const response =
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Accept a static reply or a response callback.
+          typeof description === "function"
+            ? await description(request.context)
+            : description;
+        const responded = api.respond({
+          id: request.id,
+          message: fauxAssistantMessage(response.text),
+        });
+        if (responded instanceof Error) throw responded;
+      },
+    });
+  },
+  server: async ({ createServer }, use) => {
+    const server = createServer();
+    await server.start();
+    await use(server);
+  },
+  createServer: async ({ task, llm }, use) => {
+    await using artifactsCleanup = new errore.AsyncDisposableStack();
     const artifacts = await createTestArtifacts(task.id);
     const outcome = { passed: false };
-    cleanup.defer(() => artifacts.finish(outcome));
-
-    await use(async (workspaceRoot = artifacts.paths.workspace, port = 0) => {
-      const resources = new errore.AsyncDisposableStack();
-      cleanup.defer(() => resources.disposeAsync());
-      const halo = await HaloServer.start({
-        ...createServerOptions(artifacts),
-        llmApi: llm,
-        workspaceRoot,
-        host: "127.0.0.1",
-        port,
-        corsOrigins: [],
+    artifactsCleanup.defer(() => artifacts.finish(outcome));
+    await using cleanup = new errore.AsyncDisposableStack();
+    await use((options = {}) => {
+      const server = new TestServer({
+        artifacts,
+        llmApi: llm.api,
+        workspaceRoot:
+          options.workspaceRoot === undefined
+            ? artifacts.paths.workspace
+            : options.workspaceRoot,
       });
-      if (halo instanceof Error) throw halo;
-      resources.defer(async () => {
-        const closed = await halo.close();
-        if (!(closed instanceof Error)) return;
-        outcome.passed = false;
-        throw closed;
-      });
-      const connection = halo.connections;
-      return {
-        host: connection.cli.host,
-        port: connection.cli.port,
-        rpc: createHaloRpcClient<HaloClient>({
-          version: 1,
-          ...connection.cli,
-          host: "127.0.0.1",
-        }),
-        rendererRpc: createHaloRpcClient<HaloClient>({
-          version: 1,
-          ...connection.renderer,
-          host: "127.0.0.1",
-        }),
-        harness: artifacts.harness,
-        close: () => resources.disposeAsync(),
-      };
+      cleanup.defer(() => server.stop());
+      return server;
     });
+    await cleanup.disposeAsync();
     outcome.passed = task.result?.state === "pass";
   },
 });
-
-function createServerOptions(
-  artifacts: TestArtifacts,
-): Omit<HaloServerOptions, "workspaceRoot" | "llmApi"> {
-  return {
-    appDataDir: artifacts.paths.userData,
-    appVersion: testAppVersion,
-    ownerUserId: Promise.resolve("server-test-user"),
-    logger: artifacts.logger,
-    createCredentialVault: ({ filesystem, workspaceRoot }) =>
-      new TemporaryCredentialVault({
-        filesystem,
-        directory: path.join(workspaceRoot, ".halo", "executor", "credentials"),
-      }),
-  };
-}

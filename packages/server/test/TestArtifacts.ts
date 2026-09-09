@@ -1,8 +1,5 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
-import type { HaloClient } from "@get-halo/shared/contract";
 import { Logger } from "@repo/logger";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 
@@ -18,12 +15,6 @@ type TestPaths = {
   logs: string;
 };
 
-export type TestHarness = {
-  createClient(serverHost: string, serverPort: number): HaloClient;
-  files: TestFiles;
-  paths: TestPaths;
-};
-
 type TestOutcome = {
   passed: boolean;
 };
@@ -33,7 +24,7 @@ export async function createTestArtifacts(taskId: string) {
   await fs.mkdir(parent, { recursive: true });
   const taskName = taskId.replaceAll(/[^a-zA-Z0-9._-]/g, "-");
   const root = await fs.mkdtemp(path.join(parent, `${taskName}-`));
-  const paths = {
+  const paths: TestPaths = {
     root,
     workspace: path.join(root, "workspace"),
     userData: path.join(root, "user-data"),
@@ -75,14 +66,6 @@ export async function createTestArtifacts(taskId: string) {
     },
   };
   const harness = {
-    createClient(serverHost: string, serverPort: number) {
-      const link = new RPCLink({
-        origin: `http://${serverHost}:${serverPort}`,
-        url: "/rpc",
-      });
-      // SAFETY: the server host and port point to the Halo RPC contract.
-      return createORPCClient(link) as HaloClient;
-    },
     files,
     paths,
   };

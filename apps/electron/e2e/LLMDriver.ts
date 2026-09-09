@@ -10,15 +10,15 @@ import type {
 } from "openai/resources/chat/completions";
 import { test } from "@playwright/test";
 import * as errore from "errore";
-import type { m } from "./SessionDescription.js";
+import type { MessageDialect } from "@get-halo/shared/testing";
 
 type ModelResponse =
-  | ReturnType<typeof m.assistant>
-  | ReturnType<typeof m.tool.start>;
+  | ReturnType<MessageDialect["assistant"]>
+  | ReturnType<MessageDialect["tool"]["start"]>;
 type ResponseDescription =
   | ModelResponse
   | ModelResponse[]
-  | ReturnType<typeof m.error>;
+  | ReturnType<MessageDialect["error"]>;
 type Responder = (
   request: ChatCompletionCreateParamsStreaming,
 ) => ResponseDescription | Promise<ResponseDescription>;

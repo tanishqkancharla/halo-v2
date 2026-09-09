@@ -66,13 +66,18 @@ export class ScriptedLLMApi implements LLMApi {
     return stream;
   }
 
-  async nextRequest(): Promise<LLMRequest | LLMRequestTimeoutError> {
+  async waitForRequest() {
     while (this.queued.length === 0) {
       const received = await once(this.incoming, "request", {
         signal: AbortSignal.timeout(10_000),
       }).catch((cause) => new LLMRequestTimeoutError({ cause }));
       if (received instanceof Error) return received;
     }
+  }
+
+  async nextRequest(): Promise<LLMRequest | LLMRequestTimeoutError> {
+    const received = await this.waitForRequest();
+    if (received instanceof Error) return received;
     const id = this.queued.shift()!;
     return this.pending.get(id)!.request;
   }

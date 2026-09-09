@@ -1,6 +1,6 @@
 import { expect, type Locator } from "@playwright/test";
 import { e2eTest } from "./e2eTest.js";
-import { m } from "./SessionDescription.js";
+import { m } from "@get-halo/shared/testing";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 e2eTest("starts a new session", async ({ harness, app }) => {
