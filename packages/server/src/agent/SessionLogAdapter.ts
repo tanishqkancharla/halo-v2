@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { HarnessEvent } from "@earendil-works/pi-agent-core";
 import { Value } from "@sinclair/typebox/value";
 import {
   execActivityUpdateSchema,
@@ -19,18 +18,18 @@ type AdaptedPiEvent = {
 
 export function adaptPiEvent(args: {
   state: PiEventAdapterState;
-  event: AgentSessionEvent;
+  event: HarnessEvent;
   toolIdentities: ReadonlyMap<string, ToolIdentity>;
 }): AdaptedPiEvent {
-  if (args.event.type === "agent_start") {
-    const runId = randomUUID();
+  if (args.event.type === "run_start") {
+    const runId = args.event.runId;
     return {
       state: { activeRunId: runId },
       events: [{ type: "run.started", runId }],
     };
   }
 
-  if (args.event.type === "agent_end") {
+  if (args.event.type === "run_end") {
     const runId = args.state.activeRunId;
     if (runId === undefined) return { state: args.state, events: [] };
     return {
@@ -55,13 +54,13 @@ export function adaptPiEvent(args: {
         {
           type: "assistant.updated",
           runId,
-          update: args.event.assistantMessageEvent,
+          update: args.event.event,
         },
       ],
     };
   }
 
-  if (args.event.type === "tool_execution_start") {
+  if (args.event.type === "tool_start") {
     const runId = args.state.activeRunId;
     if (runId === undefined) return { state: args.state, events: [] };
     // SAFETY: Pi only emits execution events for the registered session tools.
@@ -82,7 +81,7 @@ export function adaptPiEvent(args: {
     };
   }
 
-  if (args.event.type === "tool_execution_update") {
+  if (args.event.type === "tool_update") {
     const update = args.event.partialResult.details;
     if (
       args.event.toolName === "exec" &&
@@ -125,7 +124,7 @@ export function adaptPiEvent(args: {
     };
   }
 
-  if (args.event.type === "tool_execution_end") {
+  if (args.event.type === "tool_end") {
     return {
       state: args.state,
       events: [

@@ -31,6 +31,74 @@ serverTest(
   },
 );
 
+serverTest(
+  "lists conversations while reopening saved history and another answer is running",
+  async ({ server, llm }) => {
+    const first = await server.rpc.sessions.create();
+    const firstRun = server.rpc.sessions.prompt({
+      sessionId: first.sessionId,
+      text: "Saved conversation",
+    });
+    const firstRequest = await llm.nextRequest();
+    if (firstRequest instanceof Error) throw firstRequest;
+    const firstReply = llm.respond({
+      id: firstRequest.id,
+      message: fauxAssistantMessage("Saved answer."),
+    });
+    if (firstReply instanceof Error) throw firstReply;
+    await firstRun;
+    await server.rpc.sessions.close(first);
+
+    const second = await server.rpc.sessions.create();
+    const secondRun = server.rpc.sessions.prompt({
+      sessionId: second.sessionId,
+      text: "Active conversation",
+    });
+    const secondRequest = await llm.nextRequest();
+    if (secondRequest instanceof Error) throw secondRequest;
+
+    const [sidebar, otherWindow, reopened] = await Promise.all([
+      server.rpc.sessions.list(),
+      server.rpc.sessions.list(),
+      server.rpc.sessions.open(first),
+    ]);
+    for (const summaries of [sidebar, otherWindow]) {
+      expect(summaries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            sessionId: first.sessionId,
+            title: "Saved conversation",
+          }),
+          expect.objectContaining({
+            sessionId: second.sessionId,
+            title: "Active conversation",
+          }),
+        ]),
+      );
+    }
+    expect(reopened.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          value: expect.objectContaining({
+            type: "message.committed",
+            message: expect.objectContaining({
+              role: "assistant",
+              content: [{ type: "text", text: "Saved answer." }],
+            }),
+          }),
+        }),
+      ]),
+    );
+
+    const secondReply = llm.respond({
+      id: secondRequest.id,
+      message: fauxAssistantMessage("Active answer completed."),
+    });
+    if (secondReply instanceof Error) throw secondReply;
+    await secondRun;
+  },
+);
+
 serverTest("reads, writes, and lists workspace files", async ({ server }) => {
   expect(await server.rpc.workspace.get()).toMatchObject({
     workspaceRoot: server.harness.paths.workspace,

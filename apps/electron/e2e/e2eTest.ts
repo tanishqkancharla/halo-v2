@@ -65,7 +65,7 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
         await app.page.getByRole("main").waitFor();
         const loaded = await loadSessionDescription({
           description,
-          workspaceRoot: testArtifacts.paths.workspace,
+          load: (input) => app.server.rpc.testHarness.loadSession(input),
           getToolIdentity: (path) =>
             app.server.rpc.testHarness.getToolIdentity({ path }),
         });

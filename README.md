@@ -39,15 +39,17 @@ In Cursor cloud agents, add the key as an environment secret named `OPENAI_API_K
 
 Each new app process asks you to choose a workspace folder the first time. Halo saves that choice in app data and reopens it on the next launch. In development, app data lives at `<repo>/.halo/`. Packaged builds use Electron's default userData path.
 
-Halo uses the chosen folder as Pi's working directory and stores Pi data here:
+Halo runs Pi's `AgentHarness` with one `main` lane per conversation. Pi's built-in `JsonlSessionRepo` stores conversation state under the chosen workspace; a database backend is not implemented yet:
 
 ```text
 <workspace>/.pi/agent/
-├── auth.json
-├── models.json
 └── sessions/
-    └── *.jsonl
+    ├── <encoded-workspace>/
+    │   └── <timestamp>_<session-id>.jsonl
+    └── <session-id>.halo-events.jsonl
 ```
+
+The separate Halo event files still supply renderer snapshots and live event replay. The harness uses Pi's newer JSONL format; existing `SessionManager` conversation files are not imported.
 
 Pi's file and shell tools run on the host with the same rights as Halo. Halo does not import old AgentOS SQLite workspaces.
 

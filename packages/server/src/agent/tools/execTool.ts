@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { AgentHarnessTool } from "@earendil-works/pi-agent-core";
 import { formatExecuteResult } from "@executor-js/execution/core";
 import { Type } from "typebox";
 import {
@@ -13,24 +13,22 @@ const execParameters = Type.Object({
 export function createExecTool(input: {
   runtime: ToolRuntime;
   runtimeDescription: string;
-}): ToolDefinition {
+  modelId: string;
+}): AgentHarnessTool<object | undefined> {
   return {
     name: "exec",
     label: "Exec",
     description: input.runtimeDescription,
     parameters: execParameters,
-    async execute(id, params, signal, onUpdate, context) {
+    async execute(id, params, onUpdate, _toolContext, _invocation, context) {
       // SAFETY: execParameters schema guarantees params has a string `js` property.
       const { js } = params as { js: string };
       const result = await input.runtime.executeCode({
         code: js,
-        signal,
-        modelId: context.model?.id,
+        signal: context.abortSignal,
+        modelId: input.modelId,
         parentToolCallId: id,
-        onToolEvent:
-          onUpdate === undefined
-            ? undefined
-            : (event) => onUpdate({ content: [], details: event }),
+        onToolEvent: (event) => onUpdate({ content: [], details: event }),
       });
       if (result instanceof ConnectionRequiredError) {
         return {

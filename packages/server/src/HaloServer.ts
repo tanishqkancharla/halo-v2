@@ -1,3 +1,5 @@
+import { JsonlSessionRepo } from "@earendil-works/pi-agent-core";
+import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
 import {
   BrowserService,
   type AppBrowserTarget,
@@ -156,6 +158,10 @@ export class HaloServer {
       extensions,
       workspace,
       sessions: new SessionRegistry({
+        repo: new JsonlSessionRepo({
+          fileSystem: new NodeExecutionEnv({ cwd: workspaceRoot }),
+          sessionsRoot: workspace.layout.sessionDir,
+        }),
         modelRuntime,
         model: options.llmApi.model,
         filesystem,

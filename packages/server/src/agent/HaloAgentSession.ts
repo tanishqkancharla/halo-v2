@@ -1,18 +1,22 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import {
-  createAgentSession,
-  type ModelRuntime,
-  SessionManager,
-  type AgentSession,
-  type SessionInfo,
-} from "@earendil-works/pi-coding-agent";
+  AgentHarness,
+  type AgentLane,
+  type AgentTool,
+  type AgentMessage,
+  type AgentHarnessTool,
+  LaneBusy,
+  NoActiveOperation,
+} from "@earendil-works/pi-agent-core";
+import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core/harness/context";
+import type { Session } from "@earendil-works/pi-agent-core/harness/session";
+import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import * as errore from "errore";
 import {
   sessionLogEventSchema,
   type SessionLogEvent,
   type ToolIdentity,
 } from "@get-halo/shared/sessionLog";
-import type { SessionSummary } from "@get-halo/shared/rpc";
 import {
   createDurableStream,
   type DurableStream,
@@ -46,29 +50,9 @@ export class AbortFailedError extends errore.createTaggedError({
   message: "$reason",
 }) {}
 
-export class SessionNotFoundError extends errore.createTaggedError({
-  name: "SessionNotFoundError",
-  message: "Session '$sessionId' does not exist.",
-}) {}
-
 export class CreateAgentSessionError extends errore.createTaggedError({
   name: "CreateAgentSessionError",
   message: "Failed to create agent session",
-}) {}
-
-export class ListAgentSessionsError extends errore.createTaggedError({
-  name: "ListAgentSessionsError",
-  message: "Failed to list agent sessions",
-}) {}
-
-export class OpenAgentSessionError extends errore.createTaggedError({
-  name: "OpenAgentSessionError",
-  message: "Failed to open agent session '$sessionId'",
-}) {}
-
-export class NotifyIntegrationEventError extends errore.createTaggedError({
-  name: "NotifyIntegrationEventError",
-  message: "Failed to notify the agent after an integration change",
 }) {}
 
 export class SessionEventPersistenceError extends errore.createTaggedError({
@@ -99,116 +83,105 @@ export class HaloAgentSession {
   private eventWriteError: SessionEventPersistenceError | undefined;
 
   private constructor(
-    private readonly piSession: AgentSession,
+    private readonly piSession: Session,
+    private readonly harness: AgentHarness,
+    private readonly lane: AgentLane,
     events: DurableStream<SessionLogEvent>,
     toolIdentities: ReadonlyMap<string, ToolIdentity>,
   ) {
     this.events = events;
-    this.unsubscribePiEvents = this.piSession.subscribe((event) => {
-      const adapted = adaptPiEvent({
-        state: this.adapterState,
-        event,
-        toolIdentities,
-      });
-      this.adapterState = adapted.state;
-      this.queueEvents(adapted.events);
-    });
-  }
-
-  static async create(options: HaloAgentSessionOptions) {
-    const layout = options.layout;
-
-    const manager = errore.try({
-      try: () => SessionManager.create(layout.root, layout.sessionDir),
-      catch: (e) => new CreateAgentSessionError({ cause: e }),
-    });
-    if (manager instanceof Error) return manager;
-    return await HaloAgentSession.createFromManager(options, layout, manager);
-  }
-
-  static async open(options: HaloAgentSessionOptions & { sessionId: string }) {
-    const layout = options.layout;
-
-    const sessions = await SessionManager.list(
-      layout.root,
-      layout.sessionDir,
-    ).catch((e) => new ListAgentSessionsError({ cause: e }));
-    if (sessions instanceof Error) return sessions;
-    const session = sessions.find(
-      (candidate) => candidate.id === options.sessionId,
+    const subscriptions = (
+      [
+        "run_start",
+        "run_end",
+        "message_end",
+        "message_update",
+        "tool_start",
+        "tool_update",
+        "tool_end",
+      ] as const
+    ).map((type) =>
+      this.harness.events.on(type, (event) => {
+        const adapted = adaptPiEvent({
+          state: this.adapterState,
+          event,
+          toolIdentities,
+        });
+        this.adapterState = adapted.state;
+        this.queueEvents(adapted.events);
+      }),
     );
-    if (session === undefined) {
-      return new SessionNotFoundError({ sessionId: options.sessionId });
-    }
-    const manager = errore.try({
-      try: () => SessionManager.open(session.path, layout.sessionDir),
-      catch: (e) =>
-        new OpenAgentSessionError({
-          sessionId: options.sessionId,
-          cause: e,
-        }),
-    });
-    if (manager instanceof Error) return manager;
-    return await HaloAgentSession.createFromManager(options, layout, manager);
+    this.unsubscribePiEvents = () => {
+      for (const unsubscribe of subscriptions) unsubscribe();
+    };
   }
 
-  static async list(options: Pick<HaloAgentSessionOptions, "layout">) {
+  static async attach(options: HaloAgentSessionOptions, stored: Session) {
+    await using cleanup = new errore.AsyncDisposableStack();
+    cleanup.defer(() => stored.close(BACKGROUND_CONTEXT));
     const layout = options.layout;
-
-    const sessions = await SessionManager.list(
-      layout.root,
-      layout.sessionDir,
-    ).catch((e) => new ListAgentSessionsError({ cause: e }));
-    if (sessions instanceof Error) return sessions;
-    return sessions
-      .map((session) => sessionSummary(session))
-      .toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-  }
-
-  private static async createFromManager(
-    options: HaloAgentSessionOptions,
-    layout: WorkspaceLayout,
-    manager: SessionManager,
-  ) {
     const runtime = options.toolRuntime;
     const runtimeDescription = await runtime.getAgentDescription();
     if (runtimeDescription instanceof Error) return runtimeDescription;
 
     const resourceLoader = new WorkspaceResourceLoader(layout.root);
-    const reloaded = await resourceLoader
-      .reload()
-      .catch((e) => new CreateAgentSessionError({ cause: e }));
+    const reloaded = await resourceLoader.reload();
     if (reloaded instanceof Error) return reloaded;
-    const customTools = [
+    const customTools: AgentHarnessTool<object | undefined>[] = [
       ...createAuthorizedCodingTools({
         cwd: layout.root,
         filesystem: options.filesystem,
         authority: runtime,
+      }).map((tool: AgentTool): AgentHarnessTool<object | undefined> => ({
+        ...tool,
+        execute: (id, params, onUpdate, _toolContext, _invocation, context) =>
+          tool.execute(id, params, context.abortSignal, onUpdate),
+      })),
+      createExecTool({
+        runtime,
+        runtimeDescription,
+        modelId: options.model.id,
       }),
-      createExecTool({ runtime, runtimeDescription }),
     ];
-    const created = await createAgentSession({
-      cwd: layout.root,
-      agentDir: layout.agentDir,
-      sessionManager: manager,
-      model: options.model,
-      modelRuntime: options.modelRuntime,
-      noTools: "builtin",
-      customTools,
-      resourceLoader,
-    }).catch((e) => new CreateAgentSessionError({ cause: e }));
+    const created = await AgentHarness.create(
+      {
+        session: stored,
+        models: options.modelRuntime,
+        model: options.model,
+        tools: customTools,
+        systemPrompt: resourceLoader.getSystemPrompt(),
+        resources: resourceLoader.getResources(),
+      },
+      BACKGROUND_CONTEXT,
+    ).catch((cause) => new CreateAgentSessionError({ cause }));
     if (created instanceof Error) return created;
+    cleanup.defer(() => created.harness.close(BACKGROUND_CONTEXT));
+    // Attaching Pi restores unfinished operations without running them; Halo cancels them before accepting new work.
+    for (const operation of created.open) {
+      const recovering = await created.harness.lane(
+        operation.lane,
+        BACKGROUND_CONTEXT,
+      );
+      const aborted = await recovering.abort(BACKGROUND_CONTEXT);
+      if (!aborted.ok)
+        return new CreateAgentSessionError({ cause: aborted.error });
+    }
+    const lane = await created.harness.lane(
+      "main",
+      // oxlint-disable-next-line unicorn/no-null -- Pi uses null for an empty branch tip.
+      { createAt: null },
+      BACKGROUND_CONTEXT,
+    );
     const events = await createDurableStream({
       storage: new JsonlDurableStreamStorage({
         filesystem: options.filesystem,
-        path: layout.sessionLogPath(manager.getSessionId()),
+        path: layout.sessionLogPath(stored.metadata.id),
         valueSchema: sessionLogEventSchema,
       }),
     });
     if (events instanceof Error) {
-      created.session.dispose();
       return new SessionEventPersistenceError({
-        sessionId: manager.getSessionId(),
+        sessionId: stored.metadata.id,
         cause: events,
       });
     }
@@ -219,21 +192,23 @@ export class HaloAgentSession {
       ]),
     );
     const session = new HaloAgentSession(
-      created.session,
+      stored,
+      created.harness,
+      lane,
       events,
       toolIdentities,
     );
     const recovered = await session.recoverInterruptedActivity();
     if (recovered instanceof Error) {
       session.unsubscribePiEvents();
-      created.session.dispose();
       return recovered;
     }
+    cleanup.move();
     return session;
   }
 
   get sessionId() {
-    return this.piSession.sessionId;
+    return this.piSession.metadata.id;
   }
 
   getSnapshot() {
@@ -246,62 +221,109 @@ export class HaloAgentSession {
   }
 
   async appendEvents(events: readonly SessionLogEvent[]) {
-    this.queueEvents(events);
+    for (const event of events) {
+      if (event.type !== "message.committed") {
+        this.queueEvents([event]);
+        continue;
+      }
+      const appended = await this.lane
+        .appendMessage(
+          event.message.role === "bashExecution"
+            ? { ...event.message, exitCode: event.message.exitCode }
+            : event.message,
+          BACKGROUND_CONTEXT,
+        )
+        .catch(
+          (cause) =>
+            new SessionEventPersistenceError({
+              sessionId: this.sessionId,
+              cause,
+            }),
+        );
+      if (appended instanceof Error) return appended;
+    }
     return await this.drainEventWrites();
+  }
+
+  async setName(name: string) {
+    return this.harness.setName(name, BACKGROUND_CONTEXT).catch(
+      (cause) =>
+        new SessionEventPersistenceError({
+          sessionId: this.sessionId,
+          cause,
+        }),
+    );
   }
 
   async prompt(text: string) {
     if (text.trim().length === 0) return new EmptyPromptError();
-    const prompted = await this.piSession
-      .prompt(text, { streamingBehavior: "steer" })
+    return this.send({ role: "user", content: text, timestamp: Date.now() });
+  }
+
+  private async send(message: AgentMessage) {
+    const prompted = await this.lane
+      .prompt(message, BACKGROUND_CONTEXT)
       .catch(
-        (e) =>
-          new PromptFailedError({
-            reason: e instanceof Error ? e.message : String(e),
-            cause: e,
-          }),
+        (cause) => new PromptFailedError({ reason: "Prompt failed", cause }),
       );
-    const persisted = await this.drainEventWrites();
-    if (persisted instanceof Error) return persisted;
     if (prompted instanceof Error) return prompted;
+    if (!prompted.ok) {
+      if (!(prompted.error instanceof LaneBusy))
+        return new PromptFailedError({
+          reason: prompted.error.message,
+          cause: prompted.error,
+        });
+      const queued = await this.lane
+        .steer(message, undefined, BACKGROUND_CONTEXT)
+        .catch(
+          (cause) =>
+            new PromptFailedError({ reason: "Could not queue message", cause }),
+        );
+      if (queued instanceof Error) return queued;
+      if (!queued.ok)
+        return new PromptFailedError({
+          reason: queued.error.message,
+          cause: queued.error,
+        });
+    }
+    return this.drainEventWrites();
   }
 
   async abort() {
-    const aborted = await this.piSession.abort().catch(
-      (e) =>
-        new AbortFailedError({
-          reason: e instanceof Error ? e.message : String(e),
-          cause: e,
-        }),
-    );
-    const persisted = await this.drainEventWrites();
-    if (persisted instanceof Error) return persisted;
+    const aborted = await this.lane
+      .abort(BACKGROUND_CONTEXT)
+      .catch(
+        (cause) => new AbortFailedError({ reason: "Abort failed", cause }),
+      );
     if (aborted instanceof Error) return aborted;
+    if (!aborted.ok && !(aborted.error instanceof NoActiveOperation))
+      return new AbortFailedError({
+        reason: aborted.error.message,
+        cause: aborted.error,
+      });
+    return this.drainEventWrites();
   }
 
   async notify(input: SessionNotification) {
-    const sent = await this.piSession
-      .sendCustomMessage(
-        {
-          customType: input.customType,
-          content: input.content,
-          display: false,
-        },
-        { triggerTurn: true, deliverAs: "steer" },
-      )
-      .catch((e) => new NotifyIntegrationEventError({ cause: e }));
-    const persisted = await this.drainEventWrites();
-    if (persisted instanceof Error) return persisted;
-    if (sent instanceof Error) return sent;
+    return this.send({
+      role: "custom",
+      ...input,
+      display: false,
+      timestamp: Date.now(),
+    });
   }
 
   async close() {
-    const aborted = await this.abort();
+    const closed = await this.harness
+      .close(BACKGROUND_CONTEXT)
+      .catch(
+        (cause) =>
+          new AbortFailedError({ reason: "Session close failed", cause }),
+      );
     this.unsubscribePiEvents();
-    this.piSession.dispose();
     const persisted = await this.drainEventWrites();
-    if (persisted instanceof Error) return persisted;
-    if (aborted instanceof Error) return aborted;
+    if (closed instanceof Error) return closed;
+    return persisted;
   }
 
   private queueEvents(events: readonly SessionLogEvent[]): void {
@@ -331,17 +353,4 @@ export class HaloAgentSession {
     this.queueEvents(recoveryEvents);
     return await this.drainEventWrites();
   }
-}
-
-function sessionSummary(session: SessionInfo): SessionSummary {
-  const title =
-    session.name === undefined ? session.firstMessage : session.name;
-  return {
-    sessionId: session.id,
-    agent: "pi",
-    cwd: session.cwd,
-    title: title.trim().length === 0 ? undefined : title,
-    createdAt: session.created.toISOString(),
-    updatedAt: session.modified.toISOString(),
-  };
 }

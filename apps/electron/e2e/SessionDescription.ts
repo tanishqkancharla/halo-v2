@@ -1,13 +1,9 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type { AgentMessage } from "@get-halo/shared/rpc";
 import {
   projectSession,
   type SessionLogEvent,
-  type SessionLogRecord,
   type ToolIdentity,
 } from "@get-halo/shared/sessionLog";
 import * as errore from "errore";
@@ -226,7 +222,10 @@ const emptyUsage = {
 
 export async function loadSessionDescription(args: {
   description: SessionDescription;
-  workspaceRoot: string;
+  load(input: {
+    title: string;
+    events: SessionLogEvent[];
+  }): Promise<{ sessionId: string }>;
   getToolIdentity(path: string): Promise<ToolIdentity>;
 }) {
   const events = await sessionDescriptionEvents({
@@ -237,54 +236,9 @@ export async function loadSessionDescription(args: {
   });
   if (events instanceof Error) return events;
 
-  return errore.try({
-    try: () => {
-      const manager = SessionManager.create(
-        args.workspaceRoot,
-        path.join(args.workspaceRoot, ".pi", "agent", "sessions"),
-      );
-      manager.appendSessionInfo(args.description.title);
-      for (const event of events) {
-        if (event.type !== "message.committed") continue;
-        manager.appendMessage(event.message);
-      }
-      if (
-        !events.some(
-          (event) =>
-            event.type === "message.committed" &&
-            event.message.role === "assistant",
-        )
-      ) {
-        // Pi delays creating a session file until its first assistant message.
-        manager.appendMessage(
-          assistantMessage({
-            content: [],
-            stopReason: "stop",
-            timestamp: Date.now(),
-          }),
-        );
-      }
-      const sessionId = manager.getSessionId();
-      const records: SessionLogRecord[] = events.map((value, index) => ({
-        sequence: index + 1,
-        value,
-      }));
-      fs.writeFileSync(
-        path.join(
-          args.workspaceRoot,
-          ".pi",
-          "agent",
-          "sessions",
-          `${sessionId}.halo-events.jsonl`,
-        ),
-        records.length === 0
-          ? ""
-          : `${records.map((record) => JSON.stringify(record)).join("\n")}\n`,
-      );
-      return { sessionId };
-    },
-    catch: (cause) => new LoadSessionError({ cause }),
-  });
+  return args
+    .load({ title: args.description.title, events })
+    .catch((cause) => new LoadSessionError({ cause }));
 }
 
 export async function sessionDescriptionEvents(args: {
