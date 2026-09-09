@@ -66,6 +66,8 @@ When a phase involves runtime behavior, prefer success criteria that verify end-
 
 ## Write an effective spec
 
+For user-flow Mermaid diagrams, put the flow name in a Markdown heading immediately before each Mermaid fence, such as `### Create a conversation`.
+
 Specs should always have the following form:
 
 ```markdown
@@ -179,4 +181,4 @@ After the spec file exists, serve it from the repo root with tkstack:
 pnpm spec specs/<name>.md
 ```
 
-Or `pnpm exec tkstack specs/<name>.md`. Tell the user the spec path and the printed URL.
+Or `pnpm exec tkstack specs/<name>.md`. Tell the user the spec path and the printed URL. Do not open the URL in a browser unless the user explicitly asks.

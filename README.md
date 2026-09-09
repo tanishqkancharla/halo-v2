@@ -39,17 +39,19 @@ In Cursor cloud agents, add the key as an environment secret named `OPENAI_API_K
 
 Each new app process asks you to choose a workspace folder the first time. Halo saves that choice in app data and reopens it on the next launch. In development, app data lives at `<repo>/.halo/`. Packaged builds use Electron's default userData path.
 
-Halo runs Pi's `AgentHarness` with one `main` lane per conversation. Pi's built-in `JsonlSessionRepo` stores conversation state under the chosen workspace; a database backend is not implemented yet:
+Halo runs Pi's `AgentHarness` with one `main` lane per conversation. Pi's official `SqliteSessionRepo` stores conversation state in one embedded Turso database per workspace, using synchronous database access:
 
 ```text
-<workspace>/.pi/agent/
-└── sessions/
-    ├── <encoded-workspace>/
-    │   └── <timestamp>_<session-id>.jsonl
+<workspace>/
+├── .halo/
+│   └── sessions.db
+└── .pi/agent/sessions/
     └── <session-id>.halo-events.jsonl
 ```
 
-The separate Halo event files still supply renderer snapshots and live event replay. The harness uses Pi's newer JSONL format; existing `SessionManager` conversation files are not imported.
+Pi owns the database schema, conversation entries, and execution state. Halo supplies `TursoDatabaseFactory` through `@tursodatabase/database/compat`. A package patch uses ordinary tables because Turso 0.7.2 does not support the indexes Pi needs on `WITHOUT ROWID` tables. The Electron package includes Pi's SQL schema and Turso's native library.
+
+The separate Halo event files still supply renderer snapshots and live event replay. Existing JSONL conversation files are not imported into the database.
 
 Pi's file and shell tools run on the host with the same rights as Halo. Halo does not import old AgentOS SQLite workspaces.
 
@@ -74,10 +76,10 @@ Pass `--stdin` or `--file checks.js` for longer scripts. Output uses TOON by def
 
 Cloudflare is the cloud target. Alchemy owns the stack under `infra/`.
 
-| Need | Cloudflare product | Alchemy resource |
-| --- | --- | --- |
-| Secrets manager | [Secrets Store](https://developers.cloudflare.com/secrets-store/) | `Cloudflare.SecretsStore.Store` |
-| App release artifacts (unused by publish CI; kept for later) | [R2](https://developers.cloudflare.com/r2/) object storage | `Cloudflare.R2.Bucket` (`Releases`) |
+| Need                                                         | Cloudflare product                                                | Alchemy resource                    |
+| ------------------------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------- |
+| Secrets manager                                              | [Secrets Store](https://developers.cloudflare.com/secrets-store/) | `Cloudflare.SecretsStore.Store`     |
+| App release artifacts (unused by publish CI; kept for later) | [R2](https://developers.cloudflare.com/r2/) object storage        | `Cloudflare.R2.Bucket` (`Releases`) |
 
 ```sh
 pnpm infra:login

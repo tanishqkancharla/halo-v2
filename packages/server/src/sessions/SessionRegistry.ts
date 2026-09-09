@@ -2,10 +2,9 @@ import { contentText } from "@earendil-works/pi-ai";
 import * as errore from "errore";
 import {
   BACKGROUND_CONTEXT,
-  type JsonlSessionRepo,
-  type JsonlSessionMetadata,
   type Session,
 } from "@earendil-works/pi-agent-core";
+import type { SqliteSessionRepo } from "@earendil-works/pi-session-backend-sqlite-node";
 import type { SessionSummary } from "@get-halo/shared/rpc";
 import {
   HaloAgentSession,
@@ -38,8 +37,10 @@ class CloseSessionRepositoryError extends errore.createTaggedError({
   message: "Could not close the session repository",
 }) {}
 
+type SqliteSessionMetadata = Parameters<SqliteSessionRepo["open"]>[0];
+
 type SessionRegistryOptions = HaloAgentSessionOptions & {
-  repo: JsonlSessionRepo;
+  repo: SqliteSessionRepo;
 };
 
 export class SessionRegistry {
@@ -74,7 +75,7 @@ export class SessionRegistry {
 
   async create() {
     const stored = await this.options.repo
-      .create({ cwd: this.options.layout.root }, BACKGROUND_CONTEXT)
+      .create(undefined, BACKGROUND_CONTEXT)
       .catch((cause) => new CreateAgentSessionError({ cause }));
     if (stored instanceof Error) return stored;
     this.stored.set(stored.metadata.id, Promise.resolve(stored));
@@ -147,7 +148,7 @@ export class SessionRegistry {
     return this.openStored(item);
   }
 
-  private async openStored(metadata: JsonlSessionMetadata) {
+  private async openStored(metadata: SqliteSessionMetadata) {
     const existing = this.stored.get(metadata.id);
     if (existing !== undefined) return existing;
     const opening = this.options.repo

@@ -99,6 +99,61 @@ serverTest(
   },
 );
 
+serverTest(
+  "continues separate conversation histories after restarting the workspace server",
+  async ({ server, startServer, llm }) => {
+    const conversations: { sessionId: string; subject: string }[] = [];
+    for (const subject of ["Blue notebook", "Red bicycle"]) {
+      const session = await server.rpc.sessions.create();
+      const pending = server.rpc.sessions.prompt({ ...session, text: subject });
+      const request = await llm.nextRequest();
+      if (request instanceof Error) throw request;
+      const response = llm.respond({
+        id: request.id,
+        message: fauxAssistantMessage("Saved."),
+      });
+      if (response instanceof Error) throw response;
+      await pending;
+      conversations.push({ ...session, subject });
+    }
+    const workspace = server.harness.paths.workspace;
+    await server.close();
+
+    const reopened = await startServer(workspace);
+    expect(await reopened.rpc.sessions.list()).toEqual(
+      expect.arrayContaining(
+        conversations.map(({ sessionId, subject }) =>
+          expect.objectContaining({ sessionId, title: subject }),
+        ),
+      ),
+    );
+    for (const { sessionId, subject } of conversations) {
+      const pending = reopened.rpc.sessions.prompt({
+        sessionId,
+        text: "Continue",
+      });
+      const request = await llm.nextRequest();
+      if (request instanceof Error) throw request;
+      const prompts = request.context.messages
+        .filter((message) => message.role === "user")
+        .map((message) => contentText(message.content));
+      const response = llm.respond({
+        id: request.id,
+        message: fauxAssistantMessage(prompts.join(" → ")),
+      });
+      if (response instanceof Error) throw response;
+      await pending;
+      const session = await reopened.rpc.sessions.open({ sessionId });
+      const answers = session.records.flatMap(({ value }) =>
+        value.type === "message.committed" && value.message.role === "assistant"
+          ? [contentText(value.message.content)]
+          : [],
+      );
+      expect(answers).toEqual(["Saved.", `${subject} → Continue`]);
+    }
+  },
+);
+
 serverTest("reads, writes, and lists workspace files", async ({ server }) => {
   expect(await server.rpc.workspace.get()).toMatchObject({
     workspaceRoot: server.harness.paths.workspace,

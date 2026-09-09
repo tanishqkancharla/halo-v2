@@ -2,6 +2,7 @@
 // packs `/.vite`, so packaging must copy these and their runtime closure.
 export const mainProcessExternals = [
   "@libsql/client",
+  "@tursodatabase/database",
   // Playwright loads its driver, registry, and browser installer from disk.
   "playwright",
   "@parcel/watcher",
@@ -16,5 +17,6 @@ export function viteMainExternals(): Array<string | RegExp> {
     /^@parcel\/watcher-/,
     // libsql loads `@libsql/<os>-<arch>` at runtime.
     /^@libsql\//,
+    /^@tursodatabase\//,
   ];
 }

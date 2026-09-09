@@ -16,6 +16,7 @@ export type WorkspaceLayout = {
   readonly root: string;
   readonly agentDir: string;
   readonly sessionDir: string;
+  readonly sessionsDatabasePath: string;
   sessionLogPath(sessionId: string): string;
 };
 
@@ -435,6 +436,7 @@ function workspaceLayout(root: string): WorkspaceLayout {
     root,
     agentDir,
     sessionDir,
+    sessionsDatabasePath: join(root, ".halo", "sessions.db"),
     sessionLogPath: (sessionId) =>
       join(sessionDir, `${sessionId}.halo-events.jsonl`),
   };

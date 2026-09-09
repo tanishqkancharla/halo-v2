@@ -32,7 +32,7 @@ pnpm spec specs/<name>.md
 # or: pnpm exec tkstack specs/<name>.md
 ```
 
-Keep the server running and give the user the spec path and local URL. Do not write the spec to a temporary directory.
+Keep the server running and give the user the spec path and local URL. Do not open the URL in a browser unless the user explicitly asks. Do not write the spec to a temporary directory.
 
 ## Spec format
 
@@ -41,13 +41,17 @@ Keep the server running and give the user the spec path and local URL. Do not wr
 
 ## System flow
 
-Put the main Mermaid flowcharts and sequence diagrams here, immediately after the title. Show current and proposed paths, boundaries, state changes, and important failure paths. Use multiple diagrams when they make the design easier to follow.
+Put the main Mermaid flowcharts and sequence diagrams here, immediately after the title. Show current and proposed paths, boundaries, state changes, and important failure paths. Use multiple diagrams when they make the design easier to follow. Put the flow name in a Markdown heading immediately before each Mermaid fence, such as `### Create a conversation`.
+
+### Request processing
 
 ```mermaid
 flowchart TD
     A[Entry point] --> B[Service]
     B --> C[Observable result]
 ```
+
+### Send a request
 
 ```mermaid
 sequenceDiagram
