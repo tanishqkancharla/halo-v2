@@ -71,7 +71,7 @@ export function FilesystemSection() {
   const [action, setAction] = useState<FileAction>();
   const [dragged, setDragged] = useState<string>();
   const [dropTarget, setDropTarget] = useState<string>();
-  const rootLabel = useStyles(styles.rootLabel);
+  const dropRow = useStyles(styles.dropRow);
   const feedback = useStyles(styles.feedback);
   const controls = useStyles(styles.controls);
   const iconButton = useStyles(styles.menuButton);
@@ -230,9 +230,10 @@ export function FilesystemSection() {
 
   return (
     <SidebarSection
-      label={
-        <span
-          className={rootLabel}
+      headerClassName={dropRow}
+      headerRender={(props) => (
+        <div
+          {...props}
           data-drop-target={
             canDrop("") && dropTarget === "" ? "true" : undefined
           }
@@ -243,12 +244,21 @@ export function FilesystemSection() {
               setDropTarget("");
             }
           }}
-          onDragLeave={() => setDropTarget(undefined)}
+          onDragLeave={(event) => {
+            if (
+              !(event.relatedTarget instanceof Node) ||
+              !event.currentTarget.contains(event.relatedTarget)
+            )
+              setDropTarget(undefined);
+          }}
           onDrop={(event) => {
             setDropTarget(undefined);
             drop(event, "");
           }}
-        >
+        />
+      )}
+      label={
+        <span>
           Files
           {action === undefined && mutation.isError && (
             <span role="alert" className={feedback}>
@@ -349,7 +359,7 @@ function FileNavigationItem({
 }) {
   const path = node.isDirectory ? node.path.slice(0, -1) : node.path;
   const label = useStyles(styles.fileLabel);
-  const row = useStyles(styles.fileRow);
+  const row = useStyles(styles.dropRow);
   const droppable = node.isDirectory && canDrop(path);
   return (
     <SidebarItem
@@ -565,16 +575,12 @@ const styles = {
     whiteSpace: "nowrap",
     userSelect: "none",
   }),
-  fileRow: style({
+  dropRow: style({
+    userSelect: "none",
     "&[data-drop-target='true']": {
       backgroundColor: colors.accent[4],
       boxShadow: `inset 0 0 0 1px ${colors.accent[8]}`,
     },
-  }),
-  rootLabel: style({
-    display: "block",
-    userSelect: "none",
-    "&[data-drop-target='true']": { backgroundColor: colors.accent[4] },
   }),
   feedback: style(text({ size: "xs", color: "lowContrast" }), {
     display: "block",
