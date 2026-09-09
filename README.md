@@ -136,6 +136,8 @@ Artifacts appear on the GitHub Release for that tag.
 
 ## Checks
 
+Pull requests and pushes to `main` run `pnpm run check-affected` on GitHub Actions (`Check / check-affected`).
+
 ```sh
 pnpm run check-affected
 ```

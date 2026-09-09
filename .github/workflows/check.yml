@@ -1,0 +1,69 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check-affected
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HALO_USE_SWIFTSHADER: "1"
+      TURBO_UI: "0"
+      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+        with:
+          runtime: node@22
+          cache: true
+          install: false
+
+      - name: Install Linux display server
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
+      - name: Allow private Maui git dependency
+        env:
+          MAUI_READ_TOKEN: ${{ secrets.MAUI_READ_TOKEN }}
+        shell: bash
+        run: |
+          git config --global url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --global --add url."https://x-access-token:${MAUI_READ_TOKEN}@github.com/".insteadOf "git@github.com:"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @get-halo/extension-tools exec playwright install --with-deps chromium
+
+      - name: Run check-affected
+        run: xvfb-run --auto-servernum pnpm run check-affected
+
+      - name: Upload failed test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-artifacts
+          path: |
+            tmp/e2e
+            tmp/extension-prototype/results
+          if-no-files-found: ignore
+          retention-days: 7
