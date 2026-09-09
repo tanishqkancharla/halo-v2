@@ -1,17 +1,9 @@
-# Copy Path to Symbol
+# Copy Path to Selection
 
-Place the cursor inside a symbol, then run **Copy Path to Symbol** from the Command Palette or editor context menu.
-
-The extension copies a workspace-relative reference such as:
-
-```text
-packages/server/src/extensions/ExtensionHost.ts#ExtensionHost.list
-```
-
-When text is selected, the command becomes **Copy Path to Range** and copies the selected lines instead:
+Run **Copy Path to Selection** from the Command Palette or editor context menu to copy a workspace-relative file path with the selected line numbers:
 
 ```text
 packages/server/src/extensions/ExtensionHost.ts:12-18
 ```
 
-A selection within one line copies `path:12`. Line numbers are one-based; a selection ending at the start of a line excludes that line. Range copying also works in files without symbols.
+A selection within one line copies `path:12`. With no text selected, the command copies the cursor’s line. Line numbers are one-based; a selection ending at the start of another line excludes that line. The command works in files without symbols.
