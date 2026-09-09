@@ -1,9 +1,9 @@
 {
   "name": "halo-copy-path-to-symbol",
-  "displayName": "Copy Path to Symbol",
-  "version": "0.1.1",
+  "displayName": "Copy Path to Selection",
+  "version": "0.1.2",
   "private": true,
-  "description": "Copy a workspace-relative file path with the current symbol or selected line range.",
+  "description": "Copy a workspace-relative file path with the selected line numbers.",
   "categories": [
     "Other"
   ],
@@ -11,47 +11,27 @@
   "publisher": "halo",
   "main": "./extension.js",
   "scripts": {
-    "test": "node --test symbolPath.test.js"
+    "test": "node --test rangePath.test.js"
   },
   "contributes": {
     "commands": [
       {
-        "command": "halo.copyPathToSymbol",
-        "title": "Copy Path to Symbol"
-      },
-      {
-        "command": "halo.copyPathToRange",
-        "title": "Copy Path to Range"
+        "command": "halo.copyPathToSelection",
+        "title": "Copy Path to Selection"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "halo.copyPathToSymbol",
+          "command": "halo.copyPathToSelection",
           "group": "navigation@20",
-          "when": "editorTextFocus && !editorHasSelection"
-        },
-        {
-          "command": "halo.copyPathToRange",
-          "group": "navigation@20",
-          "when": "editorTextFocus && editorHasSelection"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "halo.copyPathToSymbol",
-          "when": "!editorHasSelection"
-        },
-        {
-          "command": "halo.copyPathToRange",
-          "when": "editorHasSelection"
+          "when": "editorTextFocus"
         }
       ]
     }
   },
   "activationEvents": [
-    "onCommand:halo.copyPathToRange",
-    "onCommand:halo.copyPathToSymbol"
+    "onCommand:halo.copyPathToSelection"
   ],
   "engines": {
     "vscode": "^1.85.0"

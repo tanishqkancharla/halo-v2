@@ -29,6 +29,19 @@ export type TestingRouterContext = {
 const os = implement(contract.testHarness).$context<TestingRouterContext>();
 
 export const testingRouter = os.router({
+  loadSession: os.loadSession.handler(async ({ input, context }) => {
+    if (!context.testingApiEnabled)
+      return orpcErrors.badRequest(new TestingApiUnavailableError());
+    const session = await context.sessions.create();
+    if (session instanceof Error) return orpcErrors.badRequest(session);
+    const named = await session.setName(input.title);
+    if (named instanceof Error) return orpcErrors.badRequest(named);
+    const appended = await session.appendEvents(input.events);
+    if (appended instanceof Error) return orpcErrors.badRequest(appended);
+    const closed = await context.sessions.close(session.sessionId);
+    if (closed instanceof Error) return orpcErrors.badRequest(closed);
+    return { sessionId: session.sessionId };
+  }),
   invokeTool: os.invokeTool.handler(async ({ input, context, signal }) => {
     if (!context.testingApiEnabled) {
       return orpcErrors.badRequest(new TestingApiUnavailableError());

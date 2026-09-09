@@ -57,7 +57,9 @@ flowchart TD
 
 ## User flows
 
-After Solution, add a Mermaid `sequenceDiagram` for each main user-visible flow (happy path and the other paths a user actually takes). Name participants that exist in the landed design. Keep node text short. Skip this section only when the change has no user-facing sequence.
+After Solution, add a Mermaid `sequenceDiagram` for each main user-visible flow (happy path and the other paths a user actually takes). Put the flow name in a Markdown heading immediately before each Mermaid fence, such as `### Create a conversation`. Name participants that exist in the landed design. Keep node text short. Skip this section only when the change has no user-facing sequence.
+
+### Send a request
 
 ```mermaid
 sequenceDiagram
@@ -136,10 +138,10 @@ Options:
 - `--port <n>` — listen port (default `4177`)
 - `--root <dir>` — workspace root for file excerpts (default cwd)
 
-The command prints a local URL and keeps running. Open that URL. **Done** in the top right posts `/__tkstack/shutdown` and stops the server.
+The command prints a local URL and keeps running. **Done** in the top right posts `/__tkstack/shutdown` and stops the server.
 The server also stops after 24 hours without a page or file-excerpt request. Loading or refreshing the page resets that timer.
 
-Tell the user the markdown path and the URL.
+Tell the user the markdown path and the URL. Do not open the URL in a browser unless the user explicitly asks.
 
 ## Chapter rules
 

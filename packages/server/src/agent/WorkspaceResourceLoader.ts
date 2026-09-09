@@ -1,13 +1,11 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { loadSkillsFromDir } from "@earendil-works/pi-coding-agent";
 import {
-  createExtensionRuntime,
-  loadSkillsFromDir,
-  type LoadExtensionsResult,
-  type LoadSkillsResult,
-  type ResourceLoader,
-} from "@earendil-works/pi-coding-agent";
+  formatSkillsForSystemPrompt,
+  type Skill,
+} from "@earendil-works/pi-agent-core";
 import * as errore from "errore";
 import { haloSystemPrompt } from "./workspacePrompt.js";
 
@@ -16,60 +14,46 @@ class WorkspaceInstructionsError extends errore.createTaggedError({
   message: "Could not read workspace instructions at '$path'",
 }) {}
 
-export class WorkspaceResourceLoader implements ResourceLoader {
-  private skills: LoadSkillsResult = { skills: [], diagnostics: [] };
-  private agentsFiles: { path: string; content: string }[] = [];
-  private readonly extensions: LoadExtensionsResult = {
-    extensions: [],
-    errors: [],
-    runtime: createExtensionRuntime(),
-  };
-
+export class WorkspaceResourceLoader {
+  private skills: Skill[] = [];
+  private instructions = "";
   constructor(private readonly workspaceRoot: string) {}
 
   async reload() {
-    this.skills = loadSkillsFromDir({
+    const loaded = loadSkillsFromDir({
       dir: join(this.workspaceRoot, ".agents", "skills"),
       source: "workspace",
     });
-    this.agentsFiles = [];
+    const skills: Skill[] = [];
+    for (const skill of loaded.skills) {
+      const content = await readInstructions(skill.filePath);
+      if (content instanceof Error) return content;
+      skills.push({ ...skill, content });
+    }
+    this.skills = skills;
+    this.instructions = "";
     const path = join(this.workspaceRoot, "AGENTS.md");
     if (!existsSync(path)) return;
-    const content = await readFile(path, "utf8").catch(
-      (cause) => new WorkspaceInstructionsError({ path, cause }),
-    );
-    if (content instanceof Error) throw content;
-    this.agentsFiles = [{ path, content }];
+    const content = await readInstructions(path);
+    if (content instanceof Error) return content;
+    this.instructions = `<project_context>\n<project_instructions path="${path}">\n${content}\n</project_instructions>\n</project_context>`;
   }
 
-  getSkills() {
-    return this.skills;
-  }
-  getAgentsFiles() {
-    return { agentsFiles: this.agentsFiles };
+  getResources() {
+    return { skills: this.skills };
   }
   getSystemPrompt() {
-    return haloSystemPrompt(this.workspaceRoot);
+    return [
+      haloSystemPrompt(this.workspaceRoot),
+      this.instructions,
+      formatSkillsForSystemPrompt(this.skills),
+      `Current working directory: ${this.workspaceRoot}`,
+    ].join("\n\n");
   }
-  getExtensions() {
-    return this.extensions;
-  }
-  getPrompts() {
-    return { prompts: [], diagnostics: [] };
-  }
-  getThemes() {
-    return { themes: [], diagnostics: [] };
-  }
-  getSystemPromptSource() {
-    return undefined;
-  }
-  getAppendSystemPrompt() {
-    return [];
-  }
-  getAppendSystemPromptSources() {
-    return [];
-  }
-  extendResources() {
-    // Halo does not load Pi extensions, so they cannot contribute resources.
-  }
+}
+
+function readInstructions(path: string) {
+  return readFile(path, "utf8").catch(
+    (cause) => new WorkspaceInstructionsError({ path, cause }),
+  );
 }

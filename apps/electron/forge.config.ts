@@ -15,7 +15,8 @@ const shouldNotarize =
 const packagerConfig: NonNullable<ForgeConfig["packagerConfig"]> = {
   asar: {
     // Native binaries cannot execute from inside the asar.
-    unpack: "**/node_modules/{esbuild,@esbuild,libsql,@libsql}/**/*",
+    unpack:
+      "**/node_modules/{esbuild,@esbuild,libsql,@libsql,@tursodatabase}/**/*",
   },
   appBundleId: "com.saffronhealth.halo",
   appCategoryType: "public.app-category.medical",

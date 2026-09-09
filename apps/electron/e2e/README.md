@@ -15,9 +15,9 @@ e2eTest("keeps saved data after reopening", async ({ app }) => {
 
 `quit()` closes Electron and its owned server/windows. `open()` launches a fresh process using the same test workspace and user-data directory. Read `app.page` and `app.server` again after reopening; saved pages, locators and RPC clients belong to the previous launch. Harness tool and session helpers resolve the current connection when called. Teardown quits any remaining app, including when the test has already quit it. If setup must happen while Halo is closed, call `app.quit()`, prepare the workspace, then `app.open()`.
 
-The ordinary `e2eTest` fixture owns a scripted OpenAI-compatible HTTP endpoint on a random loopback port. The app fixture passes its URL, model metadata and test API key through `HALO_LLM_CONFIG` on each Electron launch. Main constructs an HTTP-backed `LLMApi` and supplies it to `HaloServer`; Pi's `ModelRuntime` is built on top. The endpoint lives in the harness and stays running across app restarts. Electron has no LLM test event handlers.
+The ordinary `e2eTest` fixture uses `LLMDriver` from `@get-halo/server/testing`, shared with the server suite, to own a scripted OpenAI-compatible HTTP endpoint on a random loopback port. The app fixture passes its URL, model metadata and test API key through `HALO_LLM_CONFIG` on each Electron launch. Main constructs an HTTP-backed `LLMApi` and supplies it to `HaloServer`; Pi's `ModelRuntime` is built on top. The endpoint lives in the harness and stays running across app restarts. Electron has no LLM test event handlers.
 
-Responses follow the timeline of the test:
+Import `m` from `@get-halo/shared/testing`; server and Electron tests share this response vocabulary. Responses follow the timeline of the test:
 
 ```ts
 e2eTest("answers a message", async ({ app, llm }) => {
@@ -35,7 +35,7 @@ e2eTest("answers a message", async ({ app, llm }) => {
 
 Use `m.assistant(...)`, `m.tool.start(...)`, or an array combining text and tool calls. Tool results come from Halo's real tool execution; `m.tool.end(...)` and the seeded-history helpers that include fabricated results are not accepted. `m.error("Model access denied")` returns HTTP 403 with an OpenAI-shaped error body. Successful replies use Chat Completions server-sent events, including tool-call deltas and a finish reason.
 
-Use static replies unless the response needs to depend on the request. A response callback receives the actual OpenAI Chat Completions request and can return a description asynchronously. For history coverage, derive an answer from those messages and assert the visible reply. Message content may be text or content parts; tool results have role `tool`. Avoid request snapshots, call-count assertions, or answers that contain the expected history regardless of what Halo sends.
+Use static replies unless the response needs to depend on the request. A response callback receives the actual OpenAI Chat Completions request and can return a description asynchronously. This is the same callback format used by server tests; `messageText` from `@get-halo/server/testing` extracts text from its messages. For history coverage, derive an answer from those messages and assert the visible reply. Message content may be text or content parts; tool results have role `tool`. Avoid request snapshots, call-count assertions, or answers that contain the expected history regardless of what Halo sends.
 
 These tests exercise the real Pi agent loop, tools, and persistence through Pi's real HTTP inference client and a scripted endpoint. They do not verify local Pi authentication, a commercial provider, or a future control-plane transport. The restart scenario in `sessionView.e2e.test.ts` creates its history through actual prompts and tool execution, then proves that restored messages and tool results support the next answer. Separate scenarios cover stopping or quitting during a pending response, and preserving the submitted message while recovering from an inference error.
 

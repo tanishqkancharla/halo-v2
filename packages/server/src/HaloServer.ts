@@ -1,3 +1,5 @@
+import { SqliteSessionRepo } from "@earendil-works/pi-session-backend-sqlite-node";
+import { TursoDatabaseFactory } from "./storage/TursoDatabaseFactory.js";
 import {
   BrowserService,
   type AppBrowserTarget,
@@ -156,6 +158,11 @@ export class HaloServer {
       extensions,
       workspace,
       sessions: new SessionRegistry({
+        repo: new SqliteSessionRepo({
+          directory: workspace.layout.sessionDir,
+          databasePath: workspace.layout.sessionsDatabasePath,
+          databaseFactory: new TursoDatabaseFactory(),
+        }),
         modelRuntime,
         model: options.llmApi.model,
         filesystem,

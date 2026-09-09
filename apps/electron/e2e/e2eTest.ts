@@ -1,15 +1,17 @@
+import type {
+  SessionDescription,
+  SessionDescriptionItem,
+} from "@get-halo/shared/testing";
 import { test as baseTest } from "@playwright/test";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import { createTestArtifacts, type TestArtifacts } from "./TestArtifacts.js";
 import { ElectronTestApp } from "./ElectronTestApp.js";
-import { LLMDriver } from "./LLMDriver.js";
+import { LLMDriver } from "@get-halo/server/testing";
 import { createHarnessTools } from "./tools.js";
 import {
   loadSessionDescription,
   sessionDescriptionEvents,
-  type SessionDescription,
-  type SessionDescriptionItem,
 } from "./SessionDescription.js";
 
 type E2ESession = {
@@ -65,7 +67,7 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
         await app.page.getByRole("main").waitFor();
         const loaded = await loadSessionDescription({
           description,
-          workspaceRoot: testArtifacts.paths.workspace,
+          load: (input) => app.server.rpc.testHarness.loadSession(input),
           getToolIdentity: (path) =>
             app.server.rpc.testHarness.getToolIdentity({ path }),
         });

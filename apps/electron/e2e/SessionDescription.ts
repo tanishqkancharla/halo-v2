@@ -1,21 +1,16 @@
+import {
+  m,
+  type SessionDescription,
+  type SessionDescriptionItem,
+} from "@get-halo/shared/testing";
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
-import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type { AgentMessage } from "@get-halo/shared/rpc";
 import {
   projectSession,
   type SessionLogEvent,
-  type SessionLogRecord,
   type ToolIdentity,
 } from "@get-halo/shared/sessionLog";
 import * as errore from "errore";
-
-type ToolArguments = Extract<
-  Extract<AgentMessage, { role: "assistant" }>["content"][number],
-  { type: "toolCall" }
->["arguments"];
 
 type SessionDescriptionEvent =
   | Exclude<SessionLogEvent, { type: "message.committed" }>
@@ -26,178 +21,6 @@ type SessionDescriptionEvent =
         { role: "user" | "assistant" | "toolResult" }
       >;
     };
-
-type ToolResultDetails = {
-  connectionRequests?: ConnectionRequest[];
-};
-
-type ToolDescription = {
-  path: string;
-  arguments?: ToolArguments;
-  result?: string;
-  isError?: boolean;
-};
-
-type ExecDescription = {
-  type: "exec";
-  js: string;
-  tools?: ToolDescription[];
-  result?: string;
-  isError?: boolean;
-};
-
-type ToolStartOptions = {
-  id: string;
-  parentId?: string;
-  arguments?: ToolArguments;
-};
-
-type ToolEndOptions = {
-  id: string;
-  result?: string;
-  isError?: boolean;
-  details?: ToolResultDetails;
-};
-
-export type SessionDescription = {
-  title: string;
-  messages?: SessionDescriptionItem[];
-};
-
-export type SessionDescriptionItem =
-  | { type: "user"; text: string }
-  | { type: "assistant"; text: string }
-  | {
-      type: "tool";
-      name: string;
-      arguments: ToolArguments;
-      result: string;
-      details?: ToolResultDetails;
-    }
-  | { type: "connectionRequest"; request: ConnectionRequest }
-  | ExecDescription
-  | { type: "run.start"; id?: string }
-  | {
-      type: "run.end";
-      id?: string;
-      outcome?: "completed" | "interrupted";
-    }
-  | ({ type: "tool.start"; nested: boolean; path: string } & ToolStartOptions)
-  | ({ type: "tool.end"; nested: boolean } & ToolEndOptions);
-
-function toolLifecycle<Nested extends boolean>(nested: Nested) {
-  return {
-    start(toolPath: string, options: ToolStartOptions) {
-      return {
-        type: "tool.start" as const,
-        nested,
-        path: toolPath,
-        ...options,
-      };
-    },
-    end(options: ToolEndOptions) {
-      return { type: "tool.end" as const, nested, ...options };
-    },
-  };
-}
-
-export const m = {
-  run: {
-    start(options: { id?: string } = {}) {
-      return { type: "run.start" as const, ...options };
-    },
-    end(options: { id?: string; outcome?: "completed" | "interrupted" } = {}) {
-      return { type: "run.end" as const, ...options };
-    },
-  },
-  tool: toolLifecycle(false),
-  user(text: string) {
-    return { type: "user" as const, text };
-  },
-  assistant(text: string) {
-    return { type: "assistant" as const, text };
-  },
-  error(message: string) {
-    return { type: "error" as const, message };
-  },
-  read(input: { path: string; result: string }) {
-    return {
-      type: "tool" as const,
-      name: "read",
-      arguments: { path: input.path },
-      result: input.result,
-    };
-  },
-  edit(input: {
-    path: string;
-    oldText: string;
-    newText: string;
-    result: string;
-  }) {
-    return {
-      type: "tool" as const,
-      name: "edit",
-      arguments: {
-        path: input.path,
-        oldText: input.oldText,
-        newText: input.newText,
-      },
-      result: input.result,
-    };
-  },
-  write(input: { path: string; content: string; result: string }) {
-    return {
-      type: "tool" as const,
-      name: "write",
-      arguments: { path: input.path, content: input.content },
-      result: input.result,
-    };
-  },
-  patch(input: { patchText: string; result: string }) {
-    return {
-      type: "tool" as const,
-      name: "patch",
-      arguments: { patchText: input.patchText },
-      result: input.result,
-    };
-  },
-  bash(input: { command: string; result: string }) {
-    return {
-      type: "tool" as const,
-      name: "bash",
-      arguments: { command: input.command },
-      result: input.result,
-    };
-  },
-  exec: Object.assign(
-    (input: Omit<ExecDescription, "type">) => ({
-      type: "exec" as const,
-      ...input,
-    }),
-    {
-      start(input: { js: string; id: string }) {
-        return {
-          type: "tool.start" as const,
-          nested: false,
-          path: "exec",
-          id: input.id,
-          arguments: { js: input.js },
-        };
-      },
-      end(options: ToolEndOptions) {
-        return {
-          type: "tool.end" as const,
-          nested: false,
-          ...options,
-        };
-      },
-      tool: toolLifecycle(true),
-    },
-  ),
-  connectionRequest(request: ConnectionRequest) {
-    return { type: "connectionRequest" as const, request };
-  },
-};
 
 class LoadSessionError extends errore.createTaggedError({
   name: "LoadSessionError",
@@ -226,7 +49,10 @@ const emptyUsage = {
 
 export async function loadSessionDescription(args: {
   description: SessionDescription;
-  workspaceRoot: string;
+  load(input: {
+    title: string;
+    events: SessionLogEvent[];
+  }): Promise<{ sessionId: string }>;
   getToolIdentity(path: string): Promise<ToolIdentity>;
 }) {
   const events = await sessionDescriptionEvents({
@@ -237,54 +63,9 @@ export async function loadSessionDescription(args: {
   });
   if (events instanceof Error) return events;
 
-  return errore.try({
-    try: () => {
-      const manager = SessionManager.create(
-        args.workspaceRoot,
-        path.join(args.workspaceRoot, ".pi", "agent", "sessions"),
-      );
-      manager.appendSessionInfo(args.description.title);
-      for (const event of events) {
-        if (event.type !== "message.committed") continue;
-        manager.appendMessage(event.message);
-      }
-      if (
-        !events.some(
-          (event) =>
-            event.type === "message.committed" &&
-            event.message.role === "assistant",
-        )
-      ) {
-        // Pi delays creating a session file until its first assistant message.
-        manager.appendMessage(
-          assistantMessage({
-            content: [],
-            stopReason: "stop",
-            timestamp: Date.now(),
-          }),
-        );
-      }
-      const sessionId = manager.getSessionId();
-      const records: SessionLogRecord[] = events.map((value, index) => ({
-        sequence: index + 1,
-        value,
-      }));
-      fs.writeFileSync(
-        path.join(
-          args.workspaceRoot,
-          ".pi",
-          "agent",
-          "sessions",
-          `${sessionId}.halo-events.jsonl`,
-        ),
-        records.length === 0
-          ? ""
-          : `${records.map((record) => JSON.stringify(record)).join("\n")}\n`,
-      );
-      return { sessionId };
-    },
-    catch: (cause) => new LoadSessionError({ cause }),
-  });
+  return args
+    .load({ title: args.description.title, events })
+    .catch((cause) => new LoadSessionError({ cause }));
 }
 
 export async function sessionDescriptionEvents(args: {

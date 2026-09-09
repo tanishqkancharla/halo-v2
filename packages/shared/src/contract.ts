@@ -169,6 +169,9 @@ export const contract = publicProcedure.router({
     close: oc.input(type<{ sessionId: string }>()),
   },
   testHarness: {
+    loadSession: oc
+      .input(type<{ title: string; events: SessionLogEvent[] }>())
+      .output(type<{ sessionId: string }>()),
     invokeTool: oc
       .input(type<{ path: string; input: unknown }>())
       .output(type<unknown>()),

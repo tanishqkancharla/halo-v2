@@ -1,92 +1,176 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect } from "vitest";
-import { contentText, fauxAssistantMessage } from "@earendil-works/pi-ai";
+import { contentText } from "@earendil-works/pi-ai";
+import type { HaloClient } from "@get-halo/shared/contract";
+import { m } from "@get-halo/shared/testing";
+import { messageText } from "@get-halo/server/testing";
 import { serverTest } from "./serverTest.js";
 
 serverTest(
-  "answers through the LLM supplied by the server host",
+  "lists saved conversations during overlapping requests and a pending response",
   async ({ server, llm }) => {
-    const { sessionId } = await server.rpc.sessions.create();
-    const prompted = server.rpc.sessions.prompt({
-      sessionId,
-      text: "Hello from the API",
+    const saved = await server.rpc.sessions.create();
+    const save = server.rpc.sessions.prompt({
+      ...saved,
+      text: "Saved conversation",
     });
-    const request = await llm.nextRequest();
-    if (request instanceof Error) throw request;
-    const responded = llm.respond({
-      id: request.id,
-      message: fauxAssistantMessage("Hello from the supplied LLM."),
-    });
-    if (responded instanceof Error) throw responded;
-    await prompted;
+    await llm.respond(m.assistant("Saved answer."));
+    await save;
+    await server.rpc.sessions.close(saved);
 
-    const session = await server.rpc.sessions.open({ sessionId });
-    const answers = session.records.flatMap(({ value }) =>
-      value.type === "message.committed" && value.message.role === "assistant"
-        ? [contentText(value.message.content)]
-        : [],
+    const active = await server.rpc.sessions.create();
+    const answer = server.rpc.sessions.prompt({
+      ...active,
+      text: "Active conversation",
+    });
+    await llm.waitForRequest();
+
+    const [firstListing, secondListing] = await Promise.all([
+      server.rpc.sessions.list(),
+      server.rpc.sessions.list(),
+      server.rpc.sessions.open(saved),
+    ]);
+    for (const listing of [firstListing, secondListing]) {
+      expect(
+        listing.map(({ sessionId, title }) => ({ sessionId, title })),
+      ).toEqual(
+        expect.arrayContaining([
+          { ...saved, title: "Saved conversation" },
+          { ...active, title: "Active conversation" },
+        ]),
+      );
+    }
+
+    await llm.respond(m.assistant("Active answer completed."));
+    await answer;
+  },
+);
+
+serverTest(
+  "continues each conversation with its own history after restarting the server",
+  async ({ server, llm }) => {
+    const notebook = await server.rpc.sessions.create();
+    const saveNotebook = server.rpc.sessions.prompt({
+      ...notebook,
+      text: "Blue notebook",
+    });
+    await llm.respond(m.assistant("Saved the notebook."));
+    await saveNotebook;
+
+    const bicycle = await server.rpc.sessions.create();
+    const saveBicycle = server.rpc.sessions.prompt({
+      ...bicycle,
+      text: "Red bicycle",
+    });
+    await llm.respond(m.assistant("Saved the bicycle."));
+    await saveBicycle;
+
+    await server.stop();
+    await server.start();
+
+    const recallNotebook = server.rpc.sessions.prompt({
+      ...notebook,
+      text: "Continue",
+    });
+    await llm.respond(({ messages }) =>
+      m.assistant(
+        messages
+          .filter((message) => message.role === "user")
+          .map((message) => messageText(message))
+          .join(" → "),
+      ),
     );
-    expect(answers).toEqual(["Hello from the supplied LLM."]);
+    await recallNotebook;
+    expect(assistantReplies(await server.rpc.sessions.open(notebook))).toEqual([
+      "Saved the notebook.",
+      "Blue notebook → Continue",
+    ]);
+
+    const recallBicycle = server.rpc.sessions.prompt({
+      ...bicycle,
+      text: "Continue",
+    });
+    await llm.respond(({ messages }) =>
+      m.assistant(
+        messages
+          .filter((message) => message.role === "user")
+          .map((message) => messageText(message))
+          .join(" → "),
+      ),
+    );
+    await recallBicycle;
+    expect(assistantReplies(await server.rpc.sessions.open(bicycle))).toEqual([
+      "Saved the bicycle.",
+      "Red bicycle → Continue",
+    ]);
   },
 );
 
 serverTest("reads, writes, and lists workspace files", async ({ server }) => {
   expect(await server.rpc.workspace.get()).toMatchObject({
-    workspaceRoot: server.harness.paths.workspace,
+    workspaceRoot: server.workspaceRoot,
   });
 
   await server.rpc.workspace.writeFile({
     path: "notes/today.md",
     content: "# Today",
   });
-  await server.harness.files.write({
-    path: path.join(server.harness.paths.workspace, ".hidden", "secret.txt"),
-    content: "secret",
-  });
-  await server.harness.files.write({
-    path: path.join(server.harness.paths.workspace, ".git", "config"),
-    content: "repository",
-  });
-  await server.harness.files.write({
-    path: path.join(server.harness.paths.workspace, "node_modules", "pkg.js"),
-    content: "dependency",
-  });
-  await server.harness.files.write({
-    path: path.join(server.harness.paths.workspace, "src", ".cache", "x"),
-    content: "cache",
-  });
-
   expect(await server.rpc.workspace.readFile({ path: "notes/today.md" })).toBe(
     "# Today",
   );
-  expect(await server.rpc.workspace.listPaths()).toEqual([
-    "notes/today.md",
-    "src/",
-  ]);
+  expect(await server.rpc.workspace.listPaths()).toEqual(["notes/today.md"]);
 });
+
+serverTest(
+  "omits hidden and dependency files from workspace listings",
+  async ({ server }) => {
+    await server.harness.files.write({
+      path: path.join(server.workspaceRoot, ".hidden", "secret.txt"),
+      content: "secret",
+    });
+    await server.harness.files.write({
+      path: path.join(server.workspaceRoot, ".git", "config"),
+      content: "repository",
+    });
+    await server.harness.files.write({
+      path: path.join(server.workspaceRoot, "node_modules", "pkg.js"),
+      content: "dependency",
+    });
+    await server.harness.files.write({
+      path: path.join(server.workspaceRoot, "src", ".cache", "x"),
+      content: "cache",
+    });
+
+    expect(await server.rpc.workspace.listPaths()).toEqual(["src/"]);
+  },
+);
 
 serverTest(
   "publishes workspace file creates and deletes while ignoring updates and hidden files",
   async ({ server }) => {
     const events = await server.rpc.workspace.events();
+    const directoryCreated = events.next();
+    await fs.mkdir(path.join(server.workspaceRoot, "src"));
+    await expect(directoryCreated).resolves.toEqual({
+      done: false,
+      value: [{ type: "create", path: "src/" }],
+    });
+
     const initial = events.next();
     await server.harness.files.write({
-      path: path.join(server.harness.paths.workspace, "src", "existing.ts"),
+      path: path.join(server.workspaceRoot, "src", "existing.ts"),
       content: "original",
     });
     await expect(initial).resolves.toEqual({
       done: false,
-      value: [
-        { type: "create", path: "src/" },
-        { type: "create", path: "src/existing.ts" },
-      ],
+      value: [{ type: "create", path: "src/existing.ts" }],
     });
     await server.rpc.workspace.listPaths();
 
     const created = events.next();
     await server.harness.files.write({
-      path: path.join(server.harness.paths.workspace, "src", "created.ts"),
+      path: path.join(server.workspaceRoot, "src", "created.ts"),
       content: "created",
     });
     await expect(created).resolves.toEqual({
@@ -96,16 +180,14 @@ serverTest(
 
     const deleted = events.next();
     await server.harness.files.write({
-      path: path.join(server.harness.paths.workspace, "src", "created.ts"),
+      path: path.join(server.workspaceRoot, "src", "created.ts"),
       content: "updated",
     });
     await server.harness.files.write({
-      path: path.join(server.harness.paths.workspace, ".hidden", "ignored.ts"),
+      path: path.join(server.workspaceRoot, ".hidden", "ignored.ts"),
       content: "ignored",
     });
-    await fs.rm(
-      path.join(server.harness.paths.workspace, "src", "existing.ts"),
-    );
+    await fs.rm(path.join(server.workspaceRoot, "src", "existing.ts"));
     await expect(deleted).resolves.toEqual({
       done: false,
       value: [{ type: "delete", path: "src/existing.ts" }],
@@ -145,11 +227,11 @@ serverTest("disables the tool bridge outside E2E runs", async ({ server }) => {
 serverTest(
   "serves each workspace independently in the same process",
   { timeout: 20_000 },
-  async ({ server, startServer }) => {
+  async ({ server, createServer }) => {
     const otherRoot = path.join(server.harness.paths.root, "other-workspace");
     await fs.mkdir(otherRoot);
-    const originalPath = process.env.PATH;
-    const other = await startServer(otherRoot);
+    const other = createServer({ workspaceRoot: otherRoot });
+    await other.start();
 
     await server.rpc.workspace.writeFile({
       path: "notes.md",
@@ -161,7 +243,7 @@ serverTest(
     });
 
     expect(await server.rpc.workspace.get()).toMatchObject({
-      workspaceRoot: server.harness.paths.workspace,
+      workspaceRoot: server.workspaceRoot,
     });
     expect(await other.rpc.workspace.get()).toMatchObject({
       workspaceRoot: otherRoot,
@@ -172,59 +254,42 @@ serverTest(
     expect(await other.rpc.workspace.readFile({ path: "notes.md" })).toBe(
       "Second workspace",
     );
-    expect(process.env.PATH).toBe(originalPath);
-    expect(await fs.readdir(server.harness.paths.userData)).not.toContain(
-      "workspace.json",
+  },
+);
+
+serverTest(
+  "releases its port after the selected workspace fails to open",
+  async ({ server }) => {
+    await server.stop();
+    const savedWorkspace = path.join(
+      server.harness.paths.root,
+      "saved-workspace",
+    );
+    await fs.rename(server.workspaceRoot, savedWorkspace);
+    await fs.writeFile(
+      server.workspaceRoot,
+      "This is a file, not a workspace directory.",
+    );
+
+    await expect(server.start()).rejects.toThrow(
+      "The selected workspace must be a directory.",
+    );
+
+    await fs.rm(server.workspaceRoot);
+    await fs.rename(savedWorkspace, server.workspaceRoot);
+    await server.start();
+    await server.rpc.workspace.writeFile({
+      path: "notes.md",
+      content: "Ready after repair",
+    });
+    expect(await server.rpc.workspace.readFile({ path: "notes.md" })).toBe(
+      "Ready after repair",
     );
   },
 );
 
-for (const failure of [
-  {
-    name: "tool runtime",
-    path: ".halo/executor/metadata.sqlite",
-    error: "Tool runtime failed during startup",
-  },
-  {
-    name: "workspace preparation",
-    path: ".agents",
-    error: "Failed to seed workspace extension guidance",
-  },
-]) {
-  serverTest(
-    `releases startup resources after ${failure.name} fails`,
-    { timeout: 20_000 },
-    async ({ server, startServer }) => {
-      const workspaceRoot = path.join(
-        server.harness.paths.root,
-        "startup-workspace",
-      );
-      const blockedPath = path.join(workspaceRoot, failure.path);
-      await server.harness.files.write({
-        path: blockedPath,
-        content: "invalid",
-      });
-      await server.close();
-
-      await expect(startServer(workspaceRoot, server.port)).rejects.toThrow(
-        failure.error,
-      );
-
-      await fs.rm(blockedPath);
-      const restarted = await startServer(workspaceRoot, server.port);
-      await restarted.rpc.workspace.writeFile({
-        path: "notes.md",
-        content: "Ready after repair",
-      });
-      expect(await restarted.rpc.workspace.readFile({ path: "notes.md" })).toBe(
-        "Ready after repair",
-      );
-    },
-  );
-}
-
 serverTest(
-  "creates folders and moves their contents without overwriting files",
+  "moves a folder while preserving the contents of a renamed note",
   async ({ server }) => {
     await server.rpc.workspace.createEntry({
       path: "Notes",
@@ -256,7 +321,16 @@ serverTest(
     expect(await server.rpc.workspace.listPaths()).toEqual([
       "Archive/Notes/Plan.md",
     ]);
+  },
+);
 
+serverTest(
+  "refuses to overwrite an existing note when creating or moving files",
+  async ({ server }) => {
+    await server.rpc.workspace.writeFile({
+      path: "Archive/Notes/Plan.md",
+      content: "Keep this note",
+    });
     await expect(
       server.rpc.workspace.createEntry({
         path: "Archive/Notes/Plan.md",
@@ -273,17 +347,24 @@ serverTest(
     expect(
       await server.rpc.workspace.readFile({ path: "Archive/Notes/Plan.md" }),
     ).toBe("Keep this note");
-    await expect(
-      server.rpc.workspace.moveEntry({
-        source: "Archive",
-        destination: "Archive/Notes/Nested",
-      }),
-    ).rejects.toThrow("cannot be moved into itself");
   },
 );
 
+serverTest("refuses to move a folder into itself", async ({ server }) => {
+  await server.rpc.workspace.writeFile({
+    path: "Archive/Notes/Plan.md",
+    content: "Keep this note",
+  });
+  await expect(
+    server.rpc.workspace.moveEntry({
+      source: "Archive",
+      destination: "Archive/Notes/Nested",
+    }),
+  ).rejects.toThrow("cannot be moved into itself");
+});
+
 serverTest(
-  "keeps file management inside the visible workspace",
+  "rejects creating entries outside the visible workspace",
   async ({ server }) => {
     for (const invalid of [
       "../outside.md",
@@ -295,11 +376,17 @@ serverTest(
         server.rpc.workspace.createEntry({ path: invalid, kind: "file" }),
       ).rejects.toThrow("not a workspace file");
     }
+  },
+);
+
+serverTest(
+  "does not create files through a workspace symlink",
+  async ({ server }) => {
     const outside = path.join(server.harness.paths.root, "outside");
     await fs.mkdir(outside);
     await fs.symlink(
       outside,
-      path.join(server.harness.paths.workspace, "Shortcut"),
+      path.join(server.workspaceRoot, "Shortcut"),
       "junction",
     );
     await expect(
@@ -349,11 +436,6 @@ serverTest(
     });
     await server.rpc.workspace.deleteEntry({ path: "Notes" });
     expect(await server.rpc.workspace.listPaths()).toEqual(["Keep.txt"]);
-    for (const invalid of ["", "../outside", ".pi"]) {
-      await expect(
-        server.rpc.workspace.deleteEntry({ path: invalid }),
-      ).rejects.toThrow("not a workspace file");
-    }
     expect(await server.rpc.workspace.readFile({ path: "Keep.txt" })).toBe(
       "keep",
     );
@@ -361,43 +443,96 @@ serverTest(
 );
 
 serverTest(
-  "previews binary files without decoding them as text",
+  "rejects deleting entries outside the visible workspace",
+  async ({ server }) => {
+    for (const invalid of ["", "../outside", ".pi"]) {
+      await expect(
+        server.rpc.workspace.deleteEntry({ path: invalid }),
+      ).rejects.toThrow("not a workspace file");
+    }
+  },
+);
+
+serverTest(
+  "serves an image preview with its original bytes and media type",
   async ({ server }) => {
     const image =
       '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="blue"/></svg>';
     await server.rpc.workspace.writeFile({ path: "Image.SVG", content: image });
+
     const preview = await server.rpc.workspace.previewFile({
       path: "Image.SVG",
     });
+
     expect(preview.kind).toBe("image");
     if (preview.kind !== "image") throw new Error("Expected image preview");
     expect(preview.file.type).toBe("image/svg+xml");
     expect(await preview.file.text()).toBe(image);
-    await server.rpc.workspace.writeFile({
-      path: "notes.txt",
-      content: "Editable plain text",
-    });
-    expect(
-      await server.rpc.workspace.previewFile({ path: "notes.txt" }),
-    ).toEqual({ kind: "text" });
-    await fs.writeFile(nodeFile("archive.zip"), Buffer.from([80, 75, 0, 255]));
-    expect(
-      await server.rpc.workspace.previewFile({ path: "archive.zip" }),
-    ).toMatchObject({ kind: "unsupported" });
-    await fs.writeFile(nodeFile("large.txt"), "");
-    await fs.truncate(nodeFile("large.txt"), 101 * 1024 * 1024);
+  },
+);
+
+serverTest("marks plain-text notes as editable", async ({ server }) => {
+  await server.rpc.workspace.writeFile({
+    path: "notes.txt",
+    content: "Editable plain text",
+  });
+
+  expect(await server.rpc.workspace.previewFile({ path: "notes.txt" })).toEqual(
+    { kind: "text" },
+  );
+});
+
+serverTest("reports unsupported binary previews", async ({ server }) => {
+  await server.harness.files.write({
+    path: path.join(server.workspaceRoot, "archive.zip"),
+    content: Buffer.from([80, 75, 0, 255]),
+  });
+
+  expect(
+    await server.rpc.workspace.previewFile({ path: "archive.zip" }),
+  ).toMatchObject({ kind: "unsupported" });
+});
+
+serverTest(
+  "declines previews larger than the size limit",
+  async ({ server }) => {
+    const file = path.join(server.workspaceRoot, "large.txt");
+    await fs.writeFile(file, "");
+    await fs.truncate(file, 101 * 1024 * 1024);
+
     expect(
       await server.rpc.workspace.previewFile({ path: "large.txt" }),
     ).toMatchObject({ kind: "unsupported" });
-    await expect(
-      server.rpc.workspace.previewFile({ path: "../outside.txt" }),
-    ).rejects.toThrow("not a workspace file");
-    await fs.symlink(nodeFile("notes.txt"), nodeFile("link.txt"));
-    await expect(
-      server.rpc.workspace.previewFile({ path: "link.txt" }),
-    ).rejects.toThrow("not a workspace file");
-    function nodeFile(name: string) {
-      return path.join(server.harness.paths.workspace, name);
-    }
   },
 );
+
+serverTest("rejects previews outside the workspace", async ({ server }) => {
+  await expect(
+    server.rpc.workspace.previewFile({ path: "../outside.txt" }),
+  ).rejects.toThrow("not a workspace file");
+});
+
+serverTest("rejects previews through symlinks", async ({ server }) => {
+  await server.rpc.workspace.writeFile({
+    path: "notes.txt",
+    content: "A note",
+  });
+  await fs.symlink(
+    path.join(server.workspaceRoot, "notes.txt"),
+    path.join(server.workspaceRoot, "link.txt"),
+  );
+
+  await expect(
+    server.rpc.workspace.previewFile({ path: "link.txt" }),
+  ).rejects.toThrow("not a workspace file");
+});
+
+function assistantReplies(
+  session: Awaited<ReturnType<HaloClient["sessions"]["open"]>>,
+) {
+  return session.records.flatMap(({ value }) =>
+    value.type === "message.committed" && value.message.role === "assistant"
+      ? [contentText(value.message.content)]
+      : [],
+  );
+}

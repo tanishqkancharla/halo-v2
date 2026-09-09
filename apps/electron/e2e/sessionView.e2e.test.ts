@@ -1,7 +1,7 @@
 import { expect, type Locator } from "@playwright/test";
 import { e2eTest } from "./e2eTest.js";
-import { m } from "./SessionDescription.js";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { m } from "@get-halo/shared/testing";
+import { messageText } from "@get-halo/server/testing";
 
 e2eTest("starts a new session", async ({ harness, app }) => {
   await harness.loadSession({
@@ -825,12 +825,3 @@ e2eTest(
     ).toBeVisible();
   },
 );
-
-function messageText(message: ChatCompletionMessageParam): string {
-  if (message.content === null || message.content === undefined) return "";
-  if (!Array.isArray(message.content)) return message.content;
-  return message.content
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join("\n");
-}
