@@ -1,0 +1,36 @@
+diff --git a/dist/private/Tree.cjs b/dist/private/Tree.cjs
+index d0b54c432561418067fb0c6137eff7193971d227..88bd2af75f8056f9e20beda4fd7eba0235fea53c 100644
+--- a/dist/private/Tree.cjs
++++ b/dist/private/Tree.cjs
+@@ -434,6 +434,7 @@ const $8b1888e80597ea2d$export$53d36ab85dc89436 = /*#__PURE__*/ (0, $av2Q0$react
+     let { rowProps: rowProps, gridCellProps: gridCellProps, expandButtonProps: expandButtonProps, descriptionProps: descriptionProps, ...states } = (0, $av2Q0$reactariauseTree.useTreeItem)({
+         node: item,
+         shouldSelectOnPressUp: !!dragState,
++        hasChildItems: props.hasChildItems,
+         focusMode: props.focusMode,
+         allowsArrowNavigation: props.allowsArrowNavigation
+     }, state, ref);
+diff --git a/dist/private/Tree.js b/dist/private/Tree.js
+index 3c2b2d70c5e9f29d2bf998d9f46c2f809aee1e64..978a9c44d922c20423c79962a50ba80f2acabf02 100644
+--- a/dist/private/Tree.js
++++ b/dist/private/Tree.js
+@@ -417,6 +417,7 @@ const $414e00a610050f48$export$53d36ab85dc89436 = /*#__PURE__*/ (0, $fwoTU$creat
+     let { rowProps: rowProps, gridCellProps: gridCellProps, expandButtonProps: expandButtonProps, descriptionProps: descriptionProps, ...states } = (0, $fwoTU$useTreeItem)({
+         node: item,
+         shouldSelectOnPressUp: !!dragState,
++        hasChildItems: props.hasChildItems,
+         focusMode: props.focusMode,
+         allowsArrowNavigation: props.allowsArrowNavigation
+     }, state, ref);
+diff --git a/dist/private/Tree.mjs b/dist/private/Tree.mjs
+index 5d1ad64af635c666350bce84092598042a13df81..44e9c62778c8884e355d0ef7866d9dccc8665905 100644
+--- a/dist/private/Tree.mjs
++++ b/dist/private/Tree.mjs
+@@ -417,6 +417,7 @@ const $89d060d8eb451127$export$53d36ab85dc89436 = /*#__PURE__*/ (0, $YRtKP$creat
+     let { rowProps: rowProps, gridCellProps: gridCellProps, expandButtonProps: expandButtonProps, descriptionProps: descriptionProps, ...states } = (0, $YRtKP$useTreeItem)({
+         node: item,
+         shouldSelectOnPressUp: !!dragState,
++        hasChildItems: props.hasChildItems,
+         focusMode: props.focusMode,
+         allowsArrowNavigation: props.allowsArrowNavigation
+     }, state, ref);

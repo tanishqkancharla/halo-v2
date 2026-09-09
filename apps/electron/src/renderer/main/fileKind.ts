@@ -40,13 +40,6 @@ export function fileKind(path: string) {
   return "text";
 }
 
-export function fileLanguage(path: string) {
-  const extension = pathExtension(path);
-  if (extension === undefined) return "text";
-  if (!isCodeExtension(extension)) return "text";
-  return codeLanguages[extension];
-}
-
 function pathExtension(path: string) {
   const last = path.split("/").at(-1);
   if (last === undefined) return undefined;

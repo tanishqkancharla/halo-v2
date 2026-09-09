@@ -1,103 +1,105 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import * as errore from "errore";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/ApiProvider.tsx";
 import type { HaloClient } from "@get-halo/shared/contract";
 
 const autosaveDelayMs = 400;
+const fileSaves = new Set<FileAutosave>();
+
+export async function flushFileAutosaves() {
+  const results = await Promise.all([...fileSaves].map((save) => save.flush()));
+  return results.find((result) => result instanceof Error);
+}
 
 class WorkspaceFileWriteError extends errore.createTaggedError({
   name: "WorkspaceFileWriteError",
-  message: "Failed to write $path",
+  message:
+    "Failed to save $path. Please try again before changing its location or deleting it.",
 }) {}
 
-type AutosaveRefs = {
-  api: { current: HaloClient };
-  path: { current: string };
-  lastWritten: { current: string };
-  pending: { current: string | undefined };
-  timer: { current: ReturnType<typeof setTimeout> | undefined };
-  setCachedFile: { current: (path: string, content: string) => void };
-};
+class FileAutosave {
+  private mounted = false;
 
-function flushAutosave(refs: AutosaveRefs) {
-  if (refs.timer.current !== undefined) {
-    clearTimeout(refs.timer.current);
-    refs.timer.current = undefined;
+  mount() {
+    this.mounted = true;
   }
-  const pending = refs.pending.current;
-  refs.pending.current = undefined;
-  if (pending === undefined) return;
-  if (pending === refs.lastWritten.current) return;
-  const path = refs.path.current;
-  refs.lastWritten.current = pending;
-  refs.setCachedFile.current(path, pending);
-  void refs.api.current.workspace
-    .writeFile({ path, content: pending })
-    .catch((cause) => {
-      console.warn(new WorkspaceFileWriteError({ path, cause }));
-    });
+
+  async unmount() {
+    this.mounted = false;
+    await this.flush();
+    if (!this.mounted) fileSaves.delete(this);
+  }
+  private content: string;
+  private lastWritten: string;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private write: Promise<void | WorkspaceFileWriteError> = Promise.resolve();
+
+  constructor(
+    private readonly options: {
+      path: string;
+      loaded: string;
+      api: HaloClient;
+      cache(content: string): void;
+    },
+  ) {
+    this.content = options.loaded;
+    this.lastWritten = options.loaded;
+  }
+
+  onChange(content: string) {
+    this.content = content;
+    if (this.timer !== undefined) clearTimeout(this.timer);
+    this.timer = setTimeout(() => {
+      void this.flush().catch(console.error);
+    }, autosaveDelayMs);
+  }
+
+  flush() {
+    if (this.timer !== undefined) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+    this.write = this.write.then(() => this.save());
+    return this.write;
+  }
+
+  private async save() {
+    const content = this.content;
+    if (content === this.lastWritten) return;
+    const { path, api } = this.options;
+    const written = await api.workspace
+      .writeFile({ path, content })
+      .catch((cause) => new WorkspaceFileWriteError({ path, cause }));
+    if (written instanceof Error) {
+      console.warn(written);
+      return written;
+    }
+    this.lastWritten = content;
+    if (content === this.content) this.options.cache(content);
+  }
 }
 
 export function useAutosaveFile(args: { path: string; loaded: string }) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const apiRef = useRef(api);
-  const pathRef = useRef(args.path);
-  const lastWrittenRef = useRef(args.loaded);
-  const pendingRef = useRef<string | undefined>(undefined);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const setCachedFileRef = useRef((path: string, content: string) => {
-    queryClient.setQueryData(["workspace-file", path], content);
-  });
+  const [save] = useState(
+    () =>
+      new FileAutosave({
+        ...args,
+        api,
+        cache: (content) =>
+          queryClient.setQueryData(["workspace-file", args.path], content),
+      }),
+  );
 
   useEffect(() => {
-    apiRef.current = api;
-  }, [api]);
-
-  useEffect(() => {
-    setCachedFileRef.current = (path: string, content: string) => {
-      queryClient.setQueryData(["workspace-file", path], content);
-    };
-  }, [queryClient]);
-
-  useEffect(() => {
-    pathRef.current = args.path;
-    lastWrittenRef.current = args.loaded;
-    pendingRef.current = undefined;
-  }, [args.path, args.loaded]);
-
-  useEffect(() => {
+    save.mount();
+    fileSaves.add(save);
     return () => {
-      flushAutosave({
-        api: apiRef,
-        path: pathRef,
-        lastWritten: lastWrittenRef,
-        pending: pendingRef,
-        timer: timerRef,
-        setCachedFile: setCachedFileRef,
-      });
+      void save.unmount().catch(console.error);
     };
-  }, []);
+  }, [save]);
 
-  return {
-    onChange(markdown: string) {
-      if (markdown === lastWrittenRef.current) return;
-      pendingRef.current = markdown;
-      if (timerRef.current !== undefined) {
-        clearTimeout(timerRef.current);
-      }
-      timerRef.current = setTimeout(() => {
-        timerRef.current = undefined;
-        flushAutosave({
-          api: apiRef,
-          path: pathRef,
-          lastWritten: lastWrittenRef,
-          pending: pendingRef,
-          timer: timerRef,
-          setCachedFile: setCachedFileRef,
-        });
-      }, autosaveDelayMs);
-    },
-  };
+  return { onChange: (content: string) => save.onChange(content) };
 }

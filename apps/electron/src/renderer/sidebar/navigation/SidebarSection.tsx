@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   NavigationTreeHeader,
   NavigationTreeSection,
+  type NavigationTreeHeaderProps,
 } from "react-aria-components/NavigationTree";
 import {
   borderColor,
@@ -33,9 +34,12 @@ const sidebarSection = style(
 );
 
 type SidebarSectionProps = {
-  label: string;
+  label: ReactNode;
+  actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  headerClassName?: string;
+  renderHeader?: NavigationTreeHeaderProps["render"];
 };
 
 export function SidebarSection(props: SidebarSectionProps) {
@@ -46,8 +50,12 @@ export function SidebarSection(props: SidebarSectionProps) {
     <NavigationTreeSection
       className={joinClassNames(sectionClassName, props.className)}
     >
-      <NavigationTreeHeader className={labelClassName}>
-        {props.label}
+      <NavigationTreeHeader
+        className={joinClassNames(labelClassName, props.headerClassName)}
+        render={props.renderHeader}
+      >
+        <span>{props.label}</span>
+        {props.actions}
       </NavigationTreeHeader>
       {props.children}
     </NavigationTreeSection>
@@ -57,7 +65,13 @@ export function SidebarSection(props: SidebarSectionProps) {
 const sectionLabel = style(
   text({ size: "xs", fontWeight: 500, color: "lowContrast" }),
   sidebarPadding,
-  { marginBottom: spacing.value(3) },
+  {
+    marginBottom: spacing.value(3),
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: "28px",
+  },
 );
 
 function joinClassNames(...classNames: Array<string | undefined>) {

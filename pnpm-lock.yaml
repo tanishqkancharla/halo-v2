@@ -111,6 +111,9 @@ overrides:
   effect: 4.0.0-beta.103
   esbuild: 0.28.2
 
+patchedDependencies:
+  react-aria-components@1.21.0: fad70a611cdeb4465a9957f63d6c8c87d448a10e860cf6bfe0fed6dff4007105
+
 importers:
 
   .:
@@ -258,7 +261,7 @@ importers:
         version: 19.2.8
       react-aria-components:
         specifier: 1.21.0
-        version: 1.21.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 1.21.0(patch_hash=fad70a611cdeb4465a9957f63d6c8c87d448a10e860cf6bfe0fed6dff4007105)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-dom:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
@@ -10918,7 +10921,7 @@ snapshots:
       purse-styles: 0.2.3(react@19.2.8)
       react: 19.2.8
       react-aria: 3.52.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react-aria-components: 1.21.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react-aria-components: 1.21.0(patch_hash=fad70a611cdeb4465a9957f63d6c8c87d448a10e860cf6bfe0fed6dff4007105)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-dom: 19.2.8(react@19.2.8)
       react-stately: 3.50.0(react@19.2.8)
       shiki: 4.3.1
@@ -15146,7 +15149,7 @@ snapshots:
       minimist: 1.2.8
       strip-json-comments: 2.0.1
 
-  react-aria-components@1.21.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  react-aria-components@1.21.0(patch_hash=fad70a611cdeb4465a9957f63d6c8c87d448a10e860cf6bfe0fed6dff4007105)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
       '@internationalized/date': 3.12.4
       '@internationalized/string': 3.2.10

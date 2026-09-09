@@ -1,3 +1,5 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import {
   BrowserWindow,
   dialog,
@@ -33,6 +35,7 @@ export function registerDesktopApi(args: {
     sender: BrowserWindow,
   ) => Promise<WorkspaceInfo | Error>;
   getConnection: () => HaloRpcConnection | undefined;
+  getWorkspaceRoot: () => string | undefined;
   ownsWindow: (window: BrowserWindow) => boolean;
 }): void {
   ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
@@ -44,6 +47,7 @@ export function registerDesktopApi(args: {
       window,
       selectWorkspace: args.selectWorkspace,
       getConnection: args.getConnection,
+      getWorkspaceRoot: args.getWorkspaceRoot,
     });
     if (result instanceof Error) throw result;
     return result;
@@ -60,6 +64,7 @@ function validateDesktopRequest(
 async function handleDesktopRequest(args: {
   request: DesktopRequest;
   getConnection: () => HaloRpcConnection | undefined;
+  getWorkspaceRoot: () => string | undefined;
   window: BrowserWindow;
   selectWorkspace: (
     directory: string,
@@ -67,6 +72,8 @@ async function handleDesktopRequest(args: {
   ) => Promise<WorkspaceInfo | Error>;
 }) {
   switch (args.request.type) {
+    case "openWorkspaceFile":
+      return openWorkspaceFile(args.getWorkspaceRoot(), args.request.path);
     case "getConnection":
       return args.getConnection();
     case "chooseWorkspace":
@@ -141,4 +148,45 @@ function assertTrustedSender(args: {
     throw new Error("Halo rejected IPC from an unknown renderer.");
   }
   return senderWindow;
+}
+
+async function openWorkspaceFile(
+  root: string | undefined,
+  relativePath: string,
+) {
+  if (root === undefined)
+    return new DesktopOperationError({
+      operation: "open a file without a workspace",
+    });
+  const absolutePath = path.resolve(root, relativePath);
+  if (
+    path.relative(root, absolutePath).split(path.sep).join("/") !==
+      relativePath ||
+    relativePath
+      .split("/")
+      .some((part) => part.startsWith(".") || part === "node_modules")
+  ) {
+    return new DesktopRequestError({ operation: "workspace file" });
+  }
+  const resolved = await fs
+    .realpath(absolutePath)
+    .catch(
+      (cause) =>
+        new DesktopOperationError({ operation: "locate the file", cause }),
+    );
+  if (resolved instanceof Error) return resolved;
+  if (!resolved.startsWith(`${root}${path.sep}`))
+    return new DesktopRequestError({ operation: "workspace file" });
+  const error = await shell
+    .openPath(resolved)
+    .catch(
+      (cause) =>
+        new DesktopOperationError({ operation: "open the file", cause }),
+    );
+  if (error instanceof Error) return error;
+  if (error !== "")
+    return new DesktopOperationError({
+      operation: "open the file",
+      cause: new Error(error),
+    });
 }
