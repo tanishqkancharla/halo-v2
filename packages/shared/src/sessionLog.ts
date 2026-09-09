@@ -80,6 +80,7 @@ const assistantMessageSchema = Type.Object({
   usage: usageSchema,
   stopReason: Type.Union([
     Type.Literal("pending"),
+    Type.Literal("deferred"),
     Type.Literal("stop"),
     Type.Literal("length"),
     Type.Literal("toolUse"),
@@ -134,7 +135,7 @@ export const agentMessageSchema = Type.Union([
   Type.Object({
     role: Type.Literal("branchSummary"),
     summary: Type.String(),
-    fromId: Type.String(),
+    fromId: Type.Union([Type.String(), Type.Null()]),
     timestamp: Type.Number(),
   }),
   Type.Object({
@@ -206,6 +207,7 @@ const assistantMessageUpdateSchema = Type.Union([
       Type.Literal("stop"),
       Type.Literal("length"),
       Type.Literal("toolUse"),
+      Type.Literal("deferred"),
     ]),
     message: assistantMessageSchema,
   }),

@@ -21,7 +21,12 @@ export async function createPiModelRuntime(llmApi: LLMApi) {
     // Authentication belongs to LLMApi. Pi still requires a configured auth method.
     auth: { apiKey: { name: "LLMApi", resolve: async () => ({ auth: {} }) } },
     getModels: () => [llmApi.model],
-    stream: (_model, context, options) => llmApi.stream(context, options),
+    stream: (_model, context, options) =>
+      llmApi.stream(context, {
+        signal: options?.signal,
+        temperature: options?.temperature,
+        maxTokens: options?.maxTokens,
+      }),
     streamSimple: (_model, context, options) => llmApi.stream(context, options),
   });
   return runtime;

@@ -27,9 +27,9 @@
     "typecheck": "pnpm --filter @get-halo/extension-tools build && tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "0.83.0",
-    "@earendil-works/pi-ai": "0.83.0",
-    "@earendil-works/pi-coding-agent": "0.83.0",
+    "@earendil-works/pi-agent-core": "0.85.1",
+    "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-coding-agent": "0.85.1",
     "@executor-js/codemode-core": "1.6.0",
     "@executor-js/execution": "1.6.0",
     "@executor-js/fumadb": "1.5.7",
