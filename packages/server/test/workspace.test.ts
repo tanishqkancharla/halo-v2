@@ -150,6 +150,13 @@ serverTest(
   "publishes workspace file creates and deletes while ignoring updates and hidden files",
   async ({ server }) => {
     const events = await server.rpc.workspace.events();
+    const directoryCreated = events.next();
+    await fs.mkdir(path.join(server.workspaceRoot, "src"));
+    await expect(directoryCreated).resolves.toEqual({
+      done: false,
+      value: [{ type: "create", path: "src/" }],
+    });
+
     const initial = events.next();
     await server.harness.files.write({
       path: path.join(server.workspaceRoot, "src", "existing.ts"),
@@ -157,10 +164,7 @@ serverTest(
     });
     await expect(initial).resolves.toEqual({
       done: false,
-      value: [
-        { type: "create", path: "src/" },
-        { type: "create", path: "src/existing.ts" },
-      ],
+      value: [{ type: "create", path: "src/existing.ts" }],
     });
     await server.rpc.workspace.listPaths();
 

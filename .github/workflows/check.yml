@@ -64,6 +64,7 @@ jobs:
           name: check-artifacts
           path: |
             tmp/e2e
+            tmp/server
             tmp/extension-prototype/results
           if-no-files-found: ignore
           retention-days: 7
