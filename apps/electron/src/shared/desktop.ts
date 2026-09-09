@@ -19,6 +19,10 @@ export const DESKTOP_CHANNEL = "halo:desktop";
 
 export const desktopRequestSchema = Type.Union([
   Type.Object(
+    { type: Type.Literal("openWorkspaceFile"), path: Type.String() },
+    { additionalProperties: false },
+  ),
+  Type.Object(
     { type: Type.Literal("getConnection") },
     { additionalProperties: false },
   ),
@@ -50,6 +54,7 @@ export type OpenExternalRequest = Extract<
 >;
 
 export type DesktopApi = {
+  openWorkspaceFile: (path: string) => Promise<void>;
   getConnection: () => Promise<HaloRpcConnection | undefined>;
   chooseWorkspace: () => Promise<WorkspaceInfo | undefined>;
   getAppInfo: () => Promise<AppInfo>;

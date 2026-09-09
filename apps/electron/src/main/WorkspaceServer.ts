@@ -24,6 +24,10 @@ export class WorkspaceServer {
     },
   ) {}
 
+  getWorkspaceRoot() {
+    return this.active?.server.getWorkspace().workspaceRoot;
+  }
+
   getConnection() {
     return this.active?.connection;
   }

@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import type { Key } from "react-aria-components";
 import { RouterProvider } from "react-aria-components";
 import { NavigationTree } from "react-aria-components/NavigationTree";
 import { flex } from "maui";
@@ -11,21 +12,47 @@ type NavigationSidebarProps = {
   "aria-label"?: string;
 };
 
+const ExpandContext = createContext<(keys: string[]) => void>(() => {});
+
+export function useExpandSidebar() {
+  return useContext(ExpandContext);
+}
+
 export function NavigationSidebar(props: NavigationSidebarProps) {
   const [location, navigate] = useLocation();
+  const [expanded, setExpanded] = useState<Set<Key>>(() => {
+    if (!location.startsWith("/files/")) return new Set();
+    const segments = decodeURIComponent(location.slice("/files/".length)).split(
+      "/",
+    );
+    return new Set(
+      segments
+        .slice(0, -1)
+        .map(
+          (segment, index) =>
+            `file:${[...segments.slice(0, index), segment].join("/")}/`,
+        ),
+    );
+  });
+  function expand(keys: string[]) {
+    setExpanded((current) => new Set([...current, ...keys]));
+  }
   const treeClassName = useStyles(tree);
 
   return (
-    <RouterProvider navigate={navigate}>
-      <NavigationTree
-        aria-label={props["aria-label"]}
-        className={joinClassNames(treeClassName, props.className)}
-        selectedRoute={canonicalRoute(location)}
-        defaultExpandedKeys="all"
-      >
-        {props.children}
-      </NavigationTree>
-    </RouterProvider>
+    <ExpandContext value={expand}>
+      <RouterProvider navigate={navigate}>
+        <NavigationTree
+          aria-label={props["aria-label"]}
+          className={joinClassNames(treeClassName, props.className)}
+          selectedRoute={canonicalRoute(location)}
+          expandedKeys={expanded}
+          onExpandedChange={setExpanded}
+        >
+          {props.children}
+        </NavigationTree>
+      </RouterProvider>
+    </ExpandContext>
   );
 }
 

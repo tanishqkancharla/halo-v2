@@ -163,6 +163,7 @@ app.whenReady().then(async () => {
       return selected;
     },
     getConnection: () => workspaceServer.getConnection(),
+    getWorkspaceRoot: () => workspaceServer.getWorkspaceRoot(),
     ownsWindow: (window) => windows.has(window),
   });
   const restored = await workspaceServer.restore();

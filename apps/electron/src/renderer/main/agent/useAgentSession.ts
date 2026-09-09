@@ -155,9 +155,14 @@ export function useAgentSession(
 type UseDraftAgentSessionResult = {
   state: ProjectedSession;
   sessionId: string | undefined;
+  title: string | undefined;
   prompt: (text: string) => Promise<void | PromptFailedError>;
   abort: () => Promise<void | AbortFailedError>;
 };
+
+export function sessionTitleQueryKey(sessionId: string) {
+  return ["session-title", sessionId] as const;
+}
 
 export function useDraftAgentSession(
   onAccepted: (sessionId: string) => void,
@@ -166,6 +171,7 @@ export function useDraftAgentSession(
   const queryClient = useQueryClient();
   const [localError, setLocalError] = useState<string | undefined>(undefined);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const [title, setTitle] = useState<string>();
   const sessionIdRef = useRef<string | undefined>(undefined);
   const onAcceptedRef = useRef(onAccepted);
   const { state, abort } = useAgentSession(sessionId);
@@ -182,6 +188,7 @@ export function useDraftAgentSession(
 
   async function prompt(text: string) {
     setLocalError(undefined);
+    setTitle(text);
     if (sessionIdRef.current === undefined) {
       const created = await api.sessions.create().catch(
         (e) =>
@@ -192,12 +199,14 @@ export function useDraftAgentSession(
       );
       if (created instanceof Error) {
         setLocalError(created.message);
+        setTitle(undefined);
         return created;
       }
       sessionIdRef.current = created.sessionId;
       setSessionId(created.sessionId);
     }
 
+    queryClient.setQueryData(sessionTitleQueryKey(sessionIdRef.current), text);
     const result = await api.sessions
       .prompt({ sessionId: sessionIdRef.current, text })
       .then(() => undefined)
@@ -210,6 +219,7 @@ export function useDraftAgentSession(
       );
     if (result instanceof PromptFailedError) {
       setLocalError(result.message);
+      setTitle(undefined);
       return result;
     }
     await queryClient.invalidateQueries({
@@ -224,6 +234,7 @@ export function useDraftAgentSession(
         ? state
         : { ...state, error: localError, isWorking: false },
     sessionId,
+    title,
     prompt,
     abort,
   };

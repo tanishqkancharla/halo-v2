@@ -178,14 +178,32 @@ e2eTest(
 );
 
 e2eTest(
-  "keeps the first message and shows the error when inference is denied",
+  "titles a session immediately and keeps its first message when inference is denied",
   async ({ app, llm }) => {
     await app.page.getByRole("button", { name: "New session" }).click();
     const pane = app.page.getByRole("main");
+    const observed = await app.page.evaluateHandle(() => {
+      const titles: string[] = [];
+      const observer = new MutationObserver(() => {
+        const title = document
+          .querySelector("main > header")
+          ?.getAttribute("aria-label");
+        if (title !== undefined && title !== null) titles.push(title);
+      });
+      observer.observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+      });
+      return { titles, observer };
+    });
     await pane
       .getByLabel("Message", { exact: true })
       .fill("Keep my original question");
     await pane.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(app.page.locator("main > header")).toHaveText(
+      "Keep my original question",
+    );
     await llm.respond(m.error("Model access denied"));
 
     await expect(pane.getByRole("alert")).toContainText("Model access denied");
@@ -201,6 +219,18 @@ e2eTest(
       pane.getByRole("log", { name: "Session transcript" }),
     ).toContainText("Ready to continue.");
     await expect(pane.getByRole("alert")).not.toBeVisible();
+    await expect(app.page.locator("main > header")).toHaveText(
+      "Keep my original question",
+    );
+    const [session] = await app.server.rpc.sessions.list();
+    expect(session).toBeDefined();
+    const observedTitles = await observed.evaluate(({ titles, observer }) => {
+      observer.disconnect();
+      return titles;
+    });
+    await observed.dispose();
+    expect(observedTitles).toContain("Keep my original question");
+    expect(observedTitles).not.toContain(session!.sessionId);
   },
 );
 

@@ -94,7 +94,7 @@ export class FilesystemService {
   async writeFile(
     path: string,
     data: string | Uint8Array,
-    options?: BufferEncoding | { mode?: number },
+    options?: BufferEncoding | { mode?: number; flag?: string },
   ) {
     return await fsPromises
       .writeFile(path, data, options)
@@ -139,6 +139,20 @@ export class FilesystemService {
     return await fsPromises
       .stat(path)
       .catch((cause) => filesystemError({ operation: "stat", path, cause }));
+  }
+
+  async lstat(path: string) {
+    return await fsPromises
+      .lstat(path)
+      .catch((cause) => filesystemError({ operation: "stat", path, cause }));
+  }
+
+  async rename(source: string, destination: string) {
+    return await fsPromises
+      .rename(source, destination)
+      .catch((cause) =>
+        filesystemError({ operation: "move", path: source, cause }),
+      );
   }
 
   async remove(

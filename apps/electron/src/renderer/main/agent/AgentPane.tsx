@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Button,
@@ -13,7 +14,11 @@ import {
   text,
 } from "maui";
 import { style, useStyles } from "purse-styles";
-import { useAgentSession, useDraftAgentSession } from "./useAgentSession.ts";
+import {
+  sessionTitleQueryKey,
+  useAgentSession,
+  useDraftAgentSession,
+} from "./useAgentSession.ts";
 import { sessionViewItems, type SessionViewItem } from "./sessionView.ts";
 import {
   lastAssistantTurnWasAborted,
@@ -41,7 +46,12 @@ export function AgentPane({
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
   );
-  const title = sessionMeta?.title ? sessionMeta.title : sessionId;
+  const { data: submittedTitle } = useQuery<string>({
+    queryKey: sessionTitleQueryKey(sessionId),
+    queryFn: skipToken,
+  });
+  const title =
+    sessionMeta?.title === undefined ? submittedTitle : sessionMeta.title;
 
   return (
     <main className={pane} aria-label={title}>
@@ -66,7 +76,7 @@ export function AgentPane({
 
 export function DraftAgentPane({ draftId }: { draftId: string }) {
   const [, navigate] = useLocation();
-  const { state, sessionId, prompt, abort } = useDraftAgentSession(
+  const { state, sessionId, title, prompt, abort } = useDraftAgentSession(
     (createdSessionId) => {
       navigate(`/sessions/${createdSessionId}`);
     },
@@ -77,8 +87,12 @@ export function DraftAgentPane({ draftId }: { draftId: string }) {
   const hasMessages = sessionViewItems(state).length > 0;
 
   return (
-    <main className={pane} aria-label="New session" data-draft-id={draftId}>
-      <PaneHeader />
+    <main
+      className={pane}
+      aria-label={title === undefined ? "New session" : title}
+      data-draft-id={draftId}
+    >
+      <PaneHeader title={title} />
       <div className={body}>
         <div className={column}>
           {hasMessages ? (

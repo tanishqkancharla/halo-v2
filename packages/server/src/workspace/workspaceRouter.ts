@@ -22,11 +22,31 @@ export const workspaceRouter = os.router({
     if (paths instanceof Error) return orpcErrors.badRequest(paths);
     return paths;
   }),
+  previewFile: os.previewFile.handler(async ({ context, input }) => {
+    const preview = await context.workspace.previewFile(input.path);
+    if (preview instanceof Error) return orpcErrors.badRequest(preview);
+    return preview;
+  }),
   readFile: os.readFile.handler(async ({ context, input }) => {
     context.logger.info({ event: "readWorkspaceFile", path: input.path });
     const contents = await context.workspace.readFile(input.path);
     if (contents instanceof Error) return orpcErrors.badRequest(contents);
     return contents;
+  }),
+  createEntry: os.createEntry.handler(async ({ context, input }) => {
+    const created = await context.workspace.createEntry(input);
+    if (created instanceof Error) return orpcErrors.badRequest(created);
+    return created;
+  }),
+  moveEntry: os.moveEntry.handler(async ({ context, input }) => {
+    const moved = await context.workspace.moveEntry(input);
+    if (moved instanceof Error) return orpcErrors.badRequest(moved);
+    return moved;
+  }),
+  deleteEntry: os.deleteEntry.handler(async ({ context, input }) => {
+    const deleted = await context.workspace.deleteEntry(input);
+    if (deleted instanceof Error) return orpcErrors.badRequest(deleted);
+    return deleted;
   }),
   writeFile: os.writeFile.handler(async ({ context, input }) => {
     context.logger.info({ event: "writeWorkspaceFile", path: input.path });

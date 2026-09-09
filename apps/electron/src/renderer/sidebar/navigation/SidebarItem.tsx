@@ -4,6 +4,7 @@ import {
   Link,
   NavigationTreeItem,
   NavigationTreeItemContent,
+  type NavigationTreeItemProps,
 } from "react-aria-components/NavigationTree";
 import {
   backgroundColor,
@@ -27,9 +28,11 @@ type SidebarItemProps = {
   pageTitle: string;
   children: ReactNode;
   items?: ReactNode;
+  hasChildItems?: boolean;
   icon?: IconComponent;
   trailing?: ReactNode;
   className?: string;
+  render?: NavigationTreeItemProps["render"];
 };
 
 export function SidebarItem(props: SidebarItemProps) {
@@ -60,8 +63,10 @@ export function SidebarItem(props: SidebarItemProps) {
     <NavigationTreeItem
       id={props.id}
       href={href}
+      hasChildItems={props.hasChildItems}
       textValue={props.pageTitle}
       className={joinClassNames(itemClassName, props.className)}
+      render={props.render}
     >
       <NavigationTreeItemContent>
         {({ hasChildItems, isExpanded }) => (
