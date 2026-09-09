@@ -352,9 +352,6 @@ importers:
       execa:
         specifier: 9.6.1
         version: 9.6.1
-      openai:
-        specifier: 6.26.0
-        version: 6.26.0(ws@8.21.1)(zod@4.4.3)
       vite:
         specifier: ^8.2.2
         version: 8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.13)(yaml@2.9.0)
@@ -596,6 +593,9 @@ importers:
       '@types/node':
         specifier: ^22.20.1
         version: 22.20.1
+      openai:
+        specifier: 6.26.0
+        version: 6.26.0(ws@8.21.1)(zod@4.4.3)
       typescript:
         specifier: 7.0.2
         version: 7.0.2

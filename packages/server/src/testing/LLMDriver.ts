@@ -3,12 +3,12 @@ import type { AddressInfo } from "node:net";
 import { EventEmitter, once } from "node:events";
 import { text } from "node:stream/consumers";
 import crypto from "node:crypto";
-import type { OpenAILLMApiOptions } from "@get-halo/server/llm";
+import type { OpenAILLMApiOptions } from "../llm/OpenAILLMApi.js";
 import type {
   ChatCompletionChunk,
+  ChatCompletionMessageParam,
   ChatCompletionCreateParamsStreaming,
 } from "openai/resources/chat/completions";
-import { test } from "@playwright/test";
 import * as errore from "errore";
 import type { MessageDialect } from "@get-halo/shared/testing";
 
@@ -87,19 +87,17 @@ export class LLMDriver {
   }
 
   async respond(description: ResponseDescription | Responder) {
-    await test.step("LLM responds", async () => {
-      const request = await this.nextRequest();
-      if (request instanceof Error) throw request;
-      const result =
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The API accepts a statically typed description or callback.
-        typeof description === "function"
-          ? await description(request.body)
-          : description;
-      if (request.response.destroyed) {
-        throw new LLMEndpointError({ operation: "request was canceled" });
-      }
-      sendResponse(request, result);
-    });
+    await this.waitForRequest();
+    const request = this.pending.shift()!;
+    const result =
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The API accepts a statically typed description or callback.
+      typeof description === "function"
+        ? await description(request.body)
+        : description;
+    if (request.response.destroyed) {
+      throw new LLMEndpointError({ operation: "request was canceled" });
+    }
+    sendResponse(request, result);
   }
 
   private async receive(
@@ -131,7 +129,7 @@ export class LLMDriver {
     this.incoming.emit("request");
   }
 
-  private async nextRequest() {
+  async waitForRequest() {
     while (this.pending.length === 0) {
       const received = await once(this.incoming, "request", {
         signal: AbortSignal.timeout(10_000),
@@ -142,9 +140,8 @@ export class LLMDriver {
             cause,
           }),
       );
-      if (received instanceof Error) return received;
+      if (received instanceof Error) throw received;
     }
-    return this.pending.shift()!;
   }
 }
 
@@ -207,4 +204,13 @@ function sendResponse(
     finish_reason: toolIndex > 0 ? "tool_calls" : "stop",
   });
   response.end("data: [DONE]\n\n");
+}
+
+export function messageText(message: ChatCompletionMessageParam): string {
+  if (message.content === null || message.content === undefined) return "";
+  if (!Array.isArray(message.content)) return message.content;
+  return message.content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n");
 }

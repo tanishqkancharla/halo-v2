@@ -1,1 +1,1 @@
-export { ScriptedLLMApi, type LLMRequest } from "./testing/ScriptedLLMApi.js";
+export { LLMDriver, messageText } from "./testing/LLMDriver.js";

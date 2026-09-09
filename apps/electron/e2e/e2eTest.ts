@@ -7,7 +7,7 @@ import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import { createTestArtifacts, type TestArtifacts } from "./TestArtifacts.js";
 import { ElectronTestApp } from "./ElectronTestApp.js";
-import { LLMDriver } from "./LLMDriver.js";
+import { LLMDriver } from "@get-halo/server/testing";
 import { createHarnessTools } from "./tools.js";
 import {
   loadSessionDescription,

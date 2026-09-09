@@ -4,6 +4,7 @@ import { expect } from "vitest";
 import { contentText } from "@earendil-works/pi-ai";
 import type { HaloClient } from "@get-halo/shared/contract";
 import { m } from "@get-halo/shared/testing";
+import { messageText } from "@get-halo/server/testing";
 import { serverTest } from "./serverTest.js";
 
 serverTest(
@@ -76,7 +77,7 @@ serverTest(
       m.assistant(
         messages
           .filter((message) => message.role === "user")
-          .map((message) => contentText(message.content))
+          .map((message) => messageText(message))
           .join(" → "),
       ),
     );
@@ -94,7 +95,7 @@ serverTest(
       m.assistant(
         messages
           .filter((message) => message.role === "user")
-          .map((message) => contentText(message.content))
+          .map((message) => messageText(message))
           .join(" → "),
       ),
     );
