@@ -39,7 +39,7 @@ type SidebarSectionProps = {
   children: ReactNode;
   className?: string;
   headerClassName?: string;
-  headerRender?: NavigationTreeHeaderProps["render"];
+  renderHeader?: NavigationTreeHeaderProps["render"];
 };
 
 export function SidebarSection(props: SidebarSectionProps) {
@@ -52,7 +52,7 @@ export function SidebarSection(props: SidebarSectionProps) {
     >
       <NavigationTreeHeader
         className={joinClassNames(labelClassName, props.headerClassName)}
-        render={props.headerRender}
+        render={props.renderHeader}
       >
         <span>{props.label}</span>
         {props.actions}

@@ -231,7 +231,7 @@ export function FilesystemSection() {
   return (
     <SidebarSection
       headerClassName={dropRow}
-      headerRender={(props) => (
+      renderHeader={(props) => (
         <div
           {...props}
           data-drop-target={
