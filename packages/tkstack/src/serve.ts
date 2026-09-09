@@ -59,10 +59,12 @@ export async function startServer(input: StartServerInput) {
   let registryPath: string | undefined;
   const closedBarrier = createClosedBarrier();
   let shuttingDown = false;
+  let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function shutdown() {
     if (shuttingDown) return;
     shuttingDown = true;
+    clearTimeout(inactivityTimer);
     if (vite !== undefined) await vite.close();
     if (registryPath !== undefined) {
       const removed = await unregisterRunningTkstack(registryPath);
@@ -89,10 +91,19 @@ export async function startServer(input: StartServerInput) {
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
             const url = req.url;
+            const pathname =
+              url === undefined
+                ? undefined
+                : new URL(url, "http://127.0.0.1").pathname;
             if (
-              url !== undefined &&
               req.method === "GET" &&
-              new URL(url, "http://127.0.0.1").pathname === "/" &&
+              (pathname === "/" || pathname === "/__tkstack/file")
+            ) {
+              inactivityTimer?.refresh();
+            }
+            if (
+              req.method === "GET" &&
+              pathname === "/" &&
               acceptsMarkdown(req.headers.accept)
             ) {
               // oxlint-disable-next-line typescript/no-floating-promises -- Connect middleware callbacks cannot await response handling.
@@ -137,6 +148,13 @@ export async function startServer(input: StartServerInput) {
     return registered;
   }
   registryPath = registered;
+  inactivityTimer = setTimeout(
+    () => {
+      // oxlint-disable-next-line typescript/no-floating-promises -- Timer callbacks cannot await shutdown.
+      void shutdown();
+    },
+    24 * 60 * 60 * 1_000,
+  );
 
   process.once("SIGINT", () => {
     // oxlint-disable-next-line typescript/no-floating-promises -- Process signal callbacks cannot await shutdown.

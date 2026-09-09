@@ -15,6 +15,10 @@ Options:
 
 **Done** in the top right stops the server.
 
+The server also stops after 24 hours without a page or file-excerpt request.
+Loading or refreshing the page resets the timer; background health checks and
+Vite connections do not keep it alive.
+
 List every running viewer, including viewers using custom ports:
 
 ```sh

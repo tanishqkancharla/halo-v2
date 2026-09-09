@@ -1,35 +1,38 @@
 ---
 name: code-walkthrough
-description: Write a markdown walkthrough of code that already landed, store it in a temp directory, and serve it with tkstack.
+description: Explain implemented changes through annotated call stack diffs and prose, store the markdown in a temp directory, and serve it with tkstack.
 ---
 
 # Walk through landed code
 
 This skill is the counter-equivalent of `$generate-spec-v2`. That skill writes a spec for work that has not happened yet. This skill writes a walkthrough of work that already landed.
 
-Do not plan, spec, or phase future work. Read the diff and the current code, then explain what changed and how it runs now.
+Do not plan, spec, or phase future work. Explain what changed and how it runs now, including implemented but uncommitted changes when requested. Use annotated call stack diffs as the main explanation. Read source code to verify the explanation, but do not include source-code patches, excerpts, or type declarations in the walkthrough unless the user explicitly asks for them.
 
 ## Research the landed change
 
 1. Read the request and repository instructions.
 2. Collect the change: `git diff`, `git diff --cached`, `git log`, and the files those commands name. If the user points at a branch, PR, or commit range, use that range.
-3. Trace each changed runtime path far enough to show an accurate call stack and code diff. Name real files and symbols.
-4. Read external docs only when a dependency or API is part of the landed change. Record the links used.
+3. Use `calldiff` to research changed call paths. Read the calldiff skill and run `calldiff --help` for current usage. Compare the same refs as the requested change; use `tree` or `reach` to inspect a particular entry point when useful.
+4. Verify the old and new paths against their respective source versions, especially calls through interfaces, callbacks, events, and dependency boundaries that static analysis may miss. Condense the result around the behavior being explained. Name real files and symbols; do not paste raw tool output without checking it.
+5. Read external docs only when a dependency or API is part of the landed change. Record the links used.
 
 Use the amount of research the change needs. Do not impose a fixed research process.
 
 ## Write the markdown file
 
-Choose a short kebab-case name. Create a temp directory and write one markdown file there. Do not write walkthroughs into `specs/`.
+Choose a short kebab-case name. Create a named temp directory under the repo's `tmp/` directory and write one markdown file there. Do not write walkthroughs into `specs/`.
 
 ```sh
-mkdir -p /tmp/code-walkthrough-<name>
+mkdir -p tmp/code-walkthrough-<name>
 ```
 
-Write `/tmp/code-walkthrough-<name>/walkthrough.md`. Use this structure. In each chapter, put the call-stack fence first, then the code (diffs, types, excerpts). Do not title those blocks. Walk through them in prose. Do not dump every artifact into one section at the bottom.
+Write `tmp/code-walkthrough-<name>/walkthrough.md`. Use this structure. In each outcome chapter, put the call-stack diff first, then explain the behavior and its implications in short prose. Do not title the fence or follow it with source-code blocks.
 
 ````md
 # <Name of the landed change>
+
+Compared **<base> → <head or local working tree>**. State whether the change is committed. These are condensed, source-checked call flows, not recorded runtime traces. `-` marks removed steps; `+` marks added steps; unmarked lines provide unchanged context.
 
 ## Problem
 
@@ -80,41 +83,23 @@ Out of scope:
 
 No `Chapter:` prefix. The heading is the outcome name only.
 
-The handler now validates before it stores. The call path gained `validateInput`:
-
-Put a `#` comment on a stack line when the symbol name is not enough: why the call is there, what it returns, or a surprising side effect. Trailing `#` on the same line is the usual form. A line that is only `# …` is fine when the note covers the next step, not one symbol. Skip comments on lines that already read as the behavior.
-
 ```callstack
  requestHandler
--└── existingService
--    └── dataStore
-+└── validateInput  # tagged error, no throw
-+    └── existingService
-        └── dataStore
-# store write is unchanged
++├── validateInput  # return a tagged error if input is invalid
+ └── existingService
+     └── dataStore  # reached only after validation succeeds
 ```
 
-`validateInput` returns a tagged error. The handler returns that error. It does not throw.
+The handler now validates before it stores. If validation returns a tagged error, the handler returns that error and skips the write. The existing storage path is unchanged.
 
-```diff
---- a/path/to/handler.ts
-+++ b/path/to/handler.ts
-@@ -10,7 +10,9 @@
- async function requestHandler(input: ImportantInput) {
--  return existingService(input);
-+  const valid = validateInput(input);
-+  return existingService(valid);
- }
-```
+## Verification
 
-The input type is the current `ImportantInput`:
-
-```12:20:path/to/types.ts
-
-```
+Summarize checks actually run and their results. State material gaps or failures. Do not imply that a source-checked call flow was exercised at runtime.
 ````
 
-File excerpts use `start:end:repo-relative-path`. Line numbers are 1-based and inclusive. Leave the body empty to load the current file. Use a `callstack` fence, or a `diff` fence that contains `└──` / `├──`. Call stacks render without a Pierre file header. A complete `--- a/` / `+++ b/` patch is best for the code. You may also tag the path as `diff:path/to/handler.ts`. Diffs with a file path keep Pierre’s file header.
+Use `callstack` fences with tree branches (`└──` / `├──`) and unified diff signs. Call stacks render without a file header. Put a trailing `#` comment on a line when the symbol name does not explain its purpose, return value, condition, or side effect. A standalone `#` comment can explain the next step. Skip comments that merely repeat the symbol name.
+
+Show ownership and meaningful ordering accurately. Sibling calls stay siblings; do not nest a later call beneath an earlier one unless it actually calls it. Mark asynchronous handoffs and conditional alternatives instead of implying a single synchronous stack. Plain-language steps such as a database write are useful when clearly labeled as behavior rather than invented function names.
 
 Use an `html` fence, or write HTML in the markdown, for callouts. HTML from this file is trusted local content. tkstack does not sanitize it. Only use it for files you wrote.
 
@@ -122,32 +107,28 @@ Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter whe
 
 ## Fence reference
 
-See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md). Short copy:
+See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for rendering details. The walkthrough uses these fences:
 
 | Fence info string                              | Viewer                                                       |
 | ---------------------------------------------- | ------------------------------------------------------------ |
 | `mermaid`                                      | Beautiful Mermaid ([Craft](https://agents.craft.do/mermaid)) |
 | `callstack` or `diff` containing `└──` / `├──` | Pierre patch, no file header                                 |
-| `diff` or `diff:path` with a file path         | Pierre patch with Pierre’s file header                       |
-| `diff` with no path                            | Pierre patch, no file header                                 |
-| `start:end:path`                               | Pierre file excerpt with Pierre’s file header                |
 | `html`                                         | Trusted HTML from this file. tkstack does not sanitize it.   |
-| other langs                                    | Maui `CodeBlock`                                             |
 
-Walkthroughs are markdown. Curly braces in prose are plain text. See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for MDC `::file` / `::html` / `::diff` forms.
+Walkthroughs are markdown. Curly braces in prose are plain text. Use small tables for state ownership or data mappings when they clarify the call flows. Link to relevant source files in prose when useful, without embedding their contents.
 
 ## Serve it
 
 This skill’s CLI is tkstack. After the markdown file exists, run it from the repo root:
 
 ```sh
-pnpm exec tkstack /tmp/code-walkthrough-<name>/walkthrough.md
+pnpm exec tkstack tmp/code-walkthrough-<name>/walkthrough.md
 ```
 
 Halo alias:
 
 ```sh
-pnpm walkthrough /tmp/code-walkthrough-<name>/walkthrough.md
+pnpm walkthrough tmp/code-walkthrough-<name>/walkthrough.md
 ```
 
 Options:
@@ -156,6 +137,7 @@ Options:
 - `--root <dir>` — workspace root for file excerpts (default cwd)
 
 The command prints a local URL and keeps running. Open that URL. **Done** in the top right posts `/__tkstack/shutdown` and stops the server.
+The server also stops after 24 hours without a page or file-excerpt request. Loading or refreshing the page resets that timer.
 
 Tell the user the markdown path and the URL.
 
@@ -163,14 +145,12 @@ Tell the user the markdown path and the URL.
 
 - After Solution, add a `sequenceDiagram` for each main user-visible flow. Name participants that exist in the landed design.
 - Name exact files, symbols, behavior, and commands that exist in the tree.
-- In each code chapter, include a call-stack fence, then the code (diffs, types, excerpts). Put the call stack first. Do not title those blocks. Do not add a fixed set of subheadings.
-- Walk through the fences in prose. Put a sentence or two next to each one. Do not collect every artifact into one appendix.
+- In each runtime chapter, lead with an annotated call-stack diff and follow it with concise prose explaining the outcome, ownership, and important limits. Do not add a fixed set of subheadings.
+- Keep call-stack diffs central. Use Mermaid, tables, and source links only where they add information; omit source-code patches, excerpts, and type blocks unless explicitly requested.
 - Make the call-stack diff start from the previous path and mark the landed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
 - Annotate call-stack lines with `#` comments where the reader needs a reason, return, or side effect that the symbol name does not say. Do not comment every line.
-- Make the code a real excerpt of the landed edit or the current types. Include a file path and enough surrounding control flow to place it.
-- Use `Not applicable — no code path changed` only for a true docs, data, or config slice.
-- Do not invent types, call paths, or diffs. If a slice has no code path change, skip those fences.
+- Do not invent call paths or diffs. If behavior changed inside an unchanged call path, show the unchanged structure and explain the behavior in annotations and prose; do not invent added or removed calls. For docs, data, or config slices with no changed runtime path, use prose without a stack fence.
 
 ## Final check
 
-Confirm that the markdown lives in a temp directory; Problem and Solution match the landed change; User flows has a sequence diagram for each main user path; Mermaid appears only where it helps; each code chapter has a call stack and then the code, with prose between the fences and no titles on those blocks; call-stack lines that need a reason use a `#` comment; file excerpt paths and line numbers are real; tkstack is serving the page; and the walkthrough covers the change without turning into a plan for new work.
+Confirm that the markdown lives under `tmp/`; the comparison range and commit status are explicit; Problem and Solution match the implemented change; User flows covers each main user path; runtime chapters center on accurate, annotated call-stack diffs and prose; source-code blocks are absent unless requested; source links are real; verification claims match checks actually run; tkstack is serving the page; and the walkthrough explains existing work without turning into a plan.
