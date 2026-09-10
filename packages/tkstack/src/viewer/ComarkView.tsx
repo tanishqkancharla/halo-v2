@@ -1,22 +1,46 @@
 import { createElement, type ReactNode, useState } from "react";
-import { Checkbox, colors, monospace, radius, spacing } from "maui";
+import {
+  Checkbox,
+  colors,
+  monospace,
+  radius,
+  spacing,
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  type TableAlign,
+} from "maui";
 import { style, useStyles } from "purse-styles";
 import type {
   ViewerDocument,
   ViewerElement,
   ViewerNode,
 } from "../parseViewer.js";
+import type { StackNavigation } from "./CallStackDiff.js";
 import { Fence } from "./Fence.tsx";
 
 const voidTags = new Set(["img", "hr", "br"]);
 
-export function ComarkView(props: { document: ViewerDocument }) {
+export function ComarkView(
+  props: { document: ViewerDocument } & StackNavigation,
+) {
   return (
-    <>{props.document.nodes.map((node, index) => renderNode(node, index))}</>
+    <>
+      {props.document.nodes.map((node, index) =>
+        renderNode(node, index, props),
+      )}
+    </>
   );
 }
 
-function renderNode(node: ViewerNode, key: number): ReactNode {
+function renderNode(
+  node: ViewerNode,
+  key: number,
+  navigation: StackNavigation,
+): ReactNode {
   if (node.type === "text") return node.value;
   if (node.type === "html") {
     if (node.block) {
@@ -27,14 +51,19 @@ function renderNode(node: ViewerNode, key: number): ReactNode {
     return <span key={key} dangerouslySetInnerHTML={{ __html: node.source }} />;
   }
   if (node.type === "view") {
-    return <Fence key={key} fence={node.fence} />;
+    return <Fence key={key} fence={node.fence} {...navigation} />;
   }
-  return renderElement(node, key);
+  return renderElement(node, key, navigation);
 }
 
-function renderElement(node: ViewerElement, key: number): ReactNode {
+function renderElement(
+  node: ViewerElement,
+  key: number,
+  navigation: StackNavigation,
+): ReactNode {
+  if (node.tag === "table") return renderTable(node, key, navigation);
   const children = node.children.map((child, index) =>
-    renderNode(child, index),
+    renderNode(child, index, navigation),
   );
   if (node.tag === "alert") {
     return (
@@ -57,6 +86,64 @@ function renderElement(node: ViewerElement, key: number): ReactNode {
     return createElement(node.tag, { key, ...domAttrs(node) });
   }
   return createElement(node.tag, { key, ...domAttrs(node) }, children);
+}
+
+function tableElements(node: ViewerElement, tag: string): ViewerElement[] {
+  return node.children.filter(
+    (child): child is ViewerElement =>
+      child.type === "element" && child.tag === tag,
+  );
+}
+
+function tableAlign(node: ViewerElement): TableAlign | undefined {
+  if (node.attrs.align === "left") return "start";
+  if (node.attrs.align === "right") return "end";
+  if (node.attrs.align === "center") return "center";
+  return undefined;
+}
+
+function renderTable(
+  node: ViewerElement,
+  key: number,
+  navigation: StackNavigation,
+) {
+  const headers = tableElements(node, "thead")
+    .flatMap((head) => tableElements(head, "tr"))
+    .flatMap((row) => tableElements(row, "th"));
+  const rows = tableElements(node, "tbody").flatMap((body) =>
+    tableElements(body, "tr"),
+  );
+  return (
+    <Table key={key} aria-label={headers.map(nodeText).join(", ")}>
+      <TableHeader>
+        {headers.map((header, index) => (
+          <TableHead
+            key={index}
+            id={`column-${index}`}
+            isRowHeader={index === 0}
+            align={tableAlign(header)}
+          >
+            {header.children.map((child, i) =>
+              renderNode(child, i, navigation),
+            )}
+          </TableHead>
+        ))}
+      </TableHeader>
+      <TableBody>
+        {rows.map((row, index) => (
+          <TableRow key={index} id={`row-${index}`} textValue={nodeText(row)}>
+            {tableElements(row, "td").map((cell, i) => (
+              <TableCell key={i} align={tableAlign(cell)}>
+                {cell.children.map((child, j) =>
+                  renderNode(child, j, navigation),
+                )}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
 }
 
 function TaskListItem(props: { node: ViewerElement; children: ReactNode }) {

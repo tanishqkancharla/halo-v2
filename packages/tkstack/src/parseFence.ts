@@ -1,7 +1,10 @@
+import { parseCallStack, type CallStackLine } from "./annotations.js";
+
 export type Fence =
   | { kind: "mermaid"; source: string }
   | { kind: "html"; source: string }
-  | { kind: "callstack"; source: string }
+  | { kind: "callstack"; source: string; lines: CallStackLine[] }
+  | { kind: "source-diff"; id: string; path: string; source: string }
   | { kind: "file"; path: string; start: number; end: number; source: string }
   | { kind: "diff"; path: string | undefined; source: string }
   | { kind: "code"; lang: string; source: string };
@@ -27,7 +30,22 @@ export function parseFence(lang: string, source: string): Fence {
   const trimmed = source.replace(/\n$/, "");
   if (lang === "mermaid") return { kind: "mermaid", source: trimmed };
   if (lang === "html") return { kind: "html", source: trimmed };
-  if (lang === "callstack") return { kind: "callstack", source: trimmed };
+  if (lang === "callstack")
+    return {
+      kind: "callstack",
+      source: trimmed,
+      lines: parseCallStack(trimmed),
+    };
+
+  const sourceDiff = /^source-diff:([\w-]+):(.+)$/.exec(lang);
+  if (sourceDiff !== null) {
+    return {
+      kind: "source-diff",
+      id: sourceDiff[1]!,
+      path: sourceDiff[2]!,
+      source: trimmed,
+    };
+  }
 
   const fileRef = fileRefPattern.exec(lang);
   if (fileRef !== null) {
@@ -43,11 +61,15 @@ export function parseFence(lang: string, source: string): Fence {
   const diffPath = diffPathPattern.exec(lang);
   if (lang === "diff" || diffPath !== null) {
     if (isCallStackSource(trimmed)) {
-      return { kind: "callstack", source: trimmed };
+      return {
+        kind: "callstack",
+        source: trimmed,
+        lines: parseCallStack(trimmed),
+      };
     }
     return {
       kind: "diff",
-      path: diffPath?.[1] ?? pathFromDiffSource(trimmed),
+      path: diffPath === null ? pathFromDiffSource(trimmed) : diffPath[1],
       source: trimmed,
     };
   }
