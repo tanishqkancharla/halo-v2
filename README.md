@@ -39,15 +39,21 @@ In Cursor cloud agents, add the key as an environment secret named `OPENAI_API_K
 
 Each new app process asks you to choose a workspace folder the first time. Halo saves that choice in app data and reopens it on the next launch. In development, app data lives at `<repo>/.halo/`. Packaged builds use Electron's default userData path.
 
-Halo runs Pi's `AgentHarness` with one `main` lane per conversation. Pi's official `SqliteSessionRepo` stores conversation state in one embedded Turso database per workspace, using synchronous database access:
+Halo runs Pi's `AgentHarness` with one `main` lane per conversation. `HaloServer` owns a `DatabaseClient` that stores Pi conversations and Executor application data in one embedded Turso database. The file currently lives in the selected workspace:
 
 ```text
 <workspace>/
 └── .halo/
-    └── sessions.db
+    └── state.db
 ```
 
-Pi owns the database schema, conversation entries, and execution state. Halo supplies `TursoDatabaseFactory` through `@tursodatabase/database/compat`. A package patch uses ordinary tables because Turso 0.7.2 does not support the indexes Pi needs on `WITHOUT ROWID` tables. The Electron package includes Pi's SQL schema and Turso's native library.
+Halo's `TursoSessionRepo` implements Pi's repository contract, and `TursoStorage` implements its storage contract. Pi's `StorageBackedSession` still owns session and branch behavior. The adapter uses Pi's commit validation and fork helpers and stores data in `halo_sessions`, `halo_session_entries`, `halo_session_values`, `halo_session_lists`, and `halo_session_usage`.
+
+`DatabaseClient` owns one Turso connection and coordinates access to it. It has no Pi or Executor dependencies. `HaloServer` constructs the session repository; `ToolRuntime` builds Executor's Fuma/Drizzle adapter and supplies it to Executor. Both reads and writes wait for admitted transactions, so neither consumer can observe the other's uncommitted changes. Transaction callbacks must use their supplied connection/query and must not wait for tools, network calls, or model inference.
+
+The adapter uses Turso's synchronous compatibility driver and ordinary tables. Turso 0.7.2 does not support recursive CTEs, so branch scans follow indexed parent links without a separate branch-index table. The schema is bundled with Halo; there is no Pi SQLite backend dependency, package patch, or SQL asset-copy step. Existing JSONL and vendor SQLite tables are not imported.
+
+Shutdown stops HTTP admission, closes sessions, drains request handlers, stops tools, closes the repository, then closes the database. Server lifecycle changes are deferred. Executor retains its generated table/index names and independent schema version. Future Halo and extension tables must avoid existing names; use `halo_*` and `ext_<installation>_*`. Extension records, grants, and the credential vault have not moved into this database yet.
 
 The renderer consumes Halo session snapshots and events, adapted from Pi at the server boundary. The [session protocol](packages/shared/README.md) describes stable entries, run state, and first-class nested `exec` activity. It uses Pi's supplied transcript; loading older entries before compaction is deferred. `sessions.watch` sends an initial snapshot followed by ephemeral live events; disconnecting a viewer leaves its running session active. Nested `exec` tool details persist in Pi's tool results and progress checkpoints. Halo does not keep a separate event log or import existing JSONL conversation files.
 

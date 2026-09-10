@@ -3,8 +3,9 @@ import * as errore from "errore";
 import {
   BACKGROUND_CONTEXT,
   type Session,
+  type SessionRepo,
+  type SessionMetadata,
 } from "@earendil-works/pi-agent-core";
-import type { SqliteSessionRepo } from "@earendil-works/pi-session-backend-sqlite-node";
 import type { SessionSummary } from "@get-halo/shared/rpc";
 import {
   HaloAgentSession,
@@ -32,18 +33,18 @@ export class SessionNotOpenError extends errore.createTaggedError({
   message: "Agent session '$sessionId' is not open.",
 }) {}
 
-class CloseSessionRepositoryError extends errore.createTaggedError({
-  name: "CloseSessionRepositoryError",
-  message: "Could not close the session repository",
+class SessionRegistryClosedError extends errore.createTaggedError({
+  name: "SessionRegistryClosedError",
+  message: "The server is shutting down.",
 }) {}
 
-type SqliteSessionMetadata = Parameters<SqliteSessionRepo["open"]>[0];
-
 type SessionRegistryOptions = HaloAgentSessionOptions & {
-  repo: SqliteSessionRepo;
+  repo: SessionRepo;
 };
 
 export class SessionRegistry {
+  private closing = false;
+  private readonly pending = new Set<Promise<unknown>>();
   private readonly sessions = new Map<string, HaloAgentSession>();
   private readonly stored = new Map<string, Promise<Session | Error>>();
   private readonly opening = new Map<
@@ -52,7 +53,32 @@ export class SessionRegistry {
   >();
   constructor(private readonly options: SessionRegistryOptions) {}
 
-  async list() {
+  list() {
+    return this.track(() => this.listSessions());
+  }
+
+  create() {
+    return this.track(() => this.createSession());
+  }
+
+  open(sessionId: string) {
+    return this.track(() => this.openSession(sessionId));
+  }
+
+  close(sessionId: string) {
+    return this.track(() => this.closeSession(sessionId));
+  }
+
+  private async track<T>(operation: () => Promise<T>) {
+    if (this.closing) return new SessionRegistryClosedError();
+    const pending = operation();
+    this.pending.add(pending);
+    using cleanup = new errore.DisposableStack();
+    cleanup.defer(() => this.pending.delete(pending));
+    return await pending;
+  }
+
+  private async listSessions() {
     const metadata = await this.options.repo
       .list(undefined, BACKGROUND_CONTEXT)
       .catch((cause) => new ListAgentSessionsError({ cause }));
@@ -73,16 +99,16 @@ export class SessionRegistry {
     );
   }
 
-  async create() {
+  private async createSession() {
     const stored = await this.options.repo
-      .create(undefined, BACKGROUND_CONTEXT)
+      .create({}, BACKGROUND_CONTEXT)
       .catch((cause) => new CreateAgentSessionError({ cause }));
     if (stored instanceof Error) return stored;
     this.stored.set(stored.metadata.id, Promise.resolve(stored));
-    return this.open(stored.metadata.id);
+    return this.openSession(stored.metadata.id);
   }
 
-  async open(sessionId: string) {
+  private async openSession(sessionId: string) {
     const live = this.sessions.get(sessionId);
     if (live !== undefined) return live;
     const pending = this.opening.get(sessionId);
@@ -95,7 +121,7 @@ export class SessionRegistry {
     return session;
   }
 
-  async close(sessionId: string) {
+  private async closeSession(sessionId: string) {
     const session = this.sessions.get(sessionId);
     if (session === undefined) return new SessionNotOpenError({ sessionId });
     this.sessions.delete(sessionId);
@@ -104,9 +130,8 @@ export class SessionRegistry {
   }
 
   async shutdown() {
-    const opening = [...this.opening.values()];
-    await Promise.all(opening);
-    this.opening.clear();
+    this.closing = true;
+    await Promise.all(this.pending);
 
     const sessions = [...this.sessions.values()];
     this.sessions.clear();
@@ -114,12 +139,8 @@ export class SessionRegistry {
       sessions.map((session) => session.close()),
     );
     const sessionError = closed.find((result) => result instanceof Error);
-    const repoClosed = await this.options.repo
-      .close(BACKGROUND_CONTEXT)
-      .catch((cause) => new CloseSessionRepositoryError({ cause }));
     this.stored.clear();
     if (sessionError instanceof Error) return sessionError;
-    if (repoClosed instanceof Error) return repoClosed;
   }
 
   private async openAndRegister(sessionId: string) {
@@ -148,7 +169,7 @@ export class SessionRegistry {
     return this.openStored(item);
   }
 
-  private async openStored(metadata: SqliteSessionMetadata) {
+  private async openStored(metadata: SessionMetadata) {
     const existing = this.stored.get(metadata.id);
     if (existing !== undefined) return existing;
     const opening = this.options.repo

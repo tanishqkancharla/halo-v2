@@ -28,6 +28,7 @@ type ListeningHaloHttp = {
   connections: HaloHttpConnections;
   server: HttpServer;
   origin: string;
+  pendingRequests: Set<Promise<void>>;
 };
 
 export class HaloHttpError extends errore.createTaggedError({
@@ -46,6 +47,7 @@ export async function listenHaloHttp(options: {
   const address = server.address() as AddressInfo;
   return {
     server,
+    pendingRequests: new Set(),
     origin: `http://${options.host}:${address.port}`,
     connections: {
       cli: {
@@ -69,6 +71,7 @@ function startingResponse(_request: IncomingMessage, response: ServerResponse) {
 export function serveHaloHttp(options: {
   server: HttpServer;
   connections: HaloHttpConnections;
+  pendingRequests: Set<Promise<void>>;
   context: HaloContext;
   corsOrigins: readonly string[];
 }) {
@@ -91,8 +94,10 @@ export function serveHaloHttp(options: {
     ],
   });
   const extensionHandler = new RPCHandler(extensionToolRouter);
-  options.server.removeListener("request", startingResponse);
-  options.server.on("request", async (request, response) => {
+  const handleRequest = async (
+    request: IncomingMessage,
+    response: ServerResponse,
+  ) => {
     const url = new URL(
       request.url === undefined ? "/" : request.url,
       "http://localhost",
@@ -145,12 +150,20 @@ export function serveHaloHttp(options: {
     if (handled.matched) return;
     response.statusCode = 404;
     response.end();
+  };
+  options.server.removeListener("request", startingResponse);
+  options.server.on("request", async (request, response) => {
+    const pending = handleRequest(request, response);
+    options.pendingRequests.add(pending);
+    using cleanup = new errore.DisposableStack();
+    cleanup.defer(() => options.pendingRequests.delete(pending));
+    await pending;
   });
 }
 
-export function closeHaloHttp(server: HttpServer) {
-  server.closeAllConnections();
-  return new Promise<undefined | HaloHttpError>((resolve) => {
+export async function closeHaloHttp(http: ListeningHaloHttp) {
+  const { server } = http;
+  const closing = new Promise<undefined | HaloHttpError>((resolve) => {
     server.close((error) => {
       if (error !== undefined) {
         resolve(new HaloHttpError({ detail: "close failed", cause: error }));
@@ -159,6 +172,11 @@ export function closeHaloHttp(server: HttpServer) {
       resolve(undefined);
     });
   });
+  server.closeAllConnections();
+  const closed = await closing;
+  // Socket closure does not stop an already-running RPC or OAuth handler.
+  await Promise.all(http.pendingRequests);
+  return closed;
 }
 
 function listen(server: HttpServer, options: { host: string; port: number }) {

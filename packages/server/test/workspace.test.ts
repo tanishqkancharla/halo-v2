@@ -686,3 +686,55 @@ serverTest(
     expect(await server.rpc.sessions.snapshot(session)).toEqual(live);
   },
 );
+
+serverTest(
+  "reopens a conversation after shutting down with a tool and viewer still active",
+  { timeout: 20_000 },
+  async ({ server, llm, http }) => {
+    const session = await server.rpc.sessions.create();
+    const watch = await server.rpc.sessions.watch(session);
+    await watch.next();
+    const prompting = server.rpc.sessions.prompt({
+      ...session,
+      text: "Fetch the report",
+    });
+    const disconnected = expect(prompting).rejects.toThrow();
+    const command = `curl --silent --fail '${http.url("/pending-report")}'`;
+    await llm.respond(
+      m.tool.start("exec", {
+        id: "pending-report",
+        arguments: {
+          js: `return await tools.bash.run({ command: ${JSON.stringify(command)} });`,
+        },
+      }),
+    );
+    await http.request("/pending-report");
+
+    await server.stop();
+    await disconnected;
+    await server.start();
+
+    const restored = await server.rpc.sessions.snapshot(session);
+    expect(sessionMessages(restored)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: "user", content: "Fetch the report" }),
+      ]),
+    );
+    expect(restored.activeRun).toBeUndefined();
+    expect(sessionToolExecutions(restored)).toMatchObject([
+      { id: "pending-report", type: "exec", status: "failed" },
+    ]);
+
+    const continued = server.rpc.sessions.prompt({
+      ...session,
+      text: "Continue without the report",
+    });
+    await llm.respond(m.assistant("Continuing without it."));
+    await continued;
+    await expect
+      .poll(async () =>
+        assistantReplies(await server.rpc.sessions.snapshot(session)),
+      )
+      .toContain("Continuing without it.");
+  },
+);

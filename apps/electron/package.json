@@ -40,7 +40,6 @@
     "@get-halo/shared": "workspace:*",
     "@halo/cli": "workspace:*",
     "@jitl/quickjs-singlefile-cjs-release-sync": "0.31.0",
-    "@libsql/client": "0.17.3",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@orpc/client": "2.0.0-beta.29",
     "@parcel/watcher": "^2.6.0",

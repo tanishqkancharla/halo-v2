@@ -15,8 +15,6 @@ import { seedExtensionWorkspace } from "../extensions/seedExtensionWorkspace.js"
 export type WorkspaceLayout = {
   readonly root: string;
   readonly agentDir: string;
-  readonly sessionDir: string;
-  readonly sessionsDatabasePath: string;
 };
 
 export class WorkspaceNotDirectoryError extends errore.createTaggedError({
@@ -330,17 +328,6 @@ export class WorkspaceService {
   async initialize() {
     const layout = this.layout;
     const root = layout.root;
-    const sessionDir = await this.options.filesystem.makeDirectory(
-      layout.sessionDir,
-      {
-        recursive: true,
-        mode: 0o700,
-      },
-    );
-    if (sessionDir instanceof Error) {
-      return new WorkspaceIoError({ cause: sessionDir });
-    }
-
     const seeded = await seedExtensionWorkspace(
       this.options.filesystem,
       layout,
@@ -430,12 +417,9 @@ async function walkDirectory(
 
 function workspaceLayout(root: string): WorkspaceLayout {
   const agentDir = join(root, ".pi", "agent");
-  const sessionDir = join(agentDir, "sessions");
   return {
     root,
     agentDir,
-    sessionDir,
-    sessionsDatabasePath: join(root, ".halo", "sessions.db"),
   };
 }
 

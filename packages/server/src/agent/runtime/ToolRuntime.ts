@@ -60,7 +60,8 @@ import {
 import * as errore from "errore";
 import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type { ToolIdentity } from "@get-halo/shared/sessionState";
-import type { FilesystemService } from "../../filesystem/FilesystemService.js";
+import { createExecutorDatabase } from "./ExecutorDatabase.js";
+import type { DatabaseClient } from "../../storage/DatabaseClient.js";
 import type {
   HaloTool,
   HaloToolContext,
@@ -69,7 +70,6 @@ import type {
 import type { AgentAuthority } from "./AgentAuthority.js";
 import type { CredentialVault } from "./CredentialVault.js";
 import { createExecutorCredentialProvider } from "./ExecutorCredentialProvider.js";
-import { openExecutorDatabase } from "./ExecutorDatabase.js";
 
 export class ToolRuntimeError extends errore.createTaggedError({
   name: "ToolRuntimeError",
@@ -328,7 +328,7 @@ function toExecutorSchema(schema: TObject) {
 }
 
 type ToolRuntimeOptions = {
-  filesystem: FilesystemService;
+  database: DatabaseClient;
   workspaceRoot: string;
   userId: string;
   credentialVault: CredentialVault;
@@ -640,11 +640,7 @@ async function createToolRuntime(
       firstPartyOAuthClients: [googleOAuthClient],
       db: ({ tables }) =>
         Effect.promise(() =>
-          openExecutorDatabase({
-            filesystem: input.filesystem,
-            workspaceRoot: input.workspaceRoot,
-            tables,
-          }),
+          createExecutorDatabase(input.database, tables),
         ).pipe(
           Effect.flatMap((database) => {
             if (database instanceof Error) {

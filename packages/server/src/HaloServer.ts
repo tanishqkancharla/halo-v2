@@ -1,5 +1,6 @@
-import { SqliteSessionRepo } from "@earendil-works/pi-session-backend-sqlite-node";
-import { TursoDatabaseFactory } from "./storage/TursoDatabaseFactory.js";
+import path from "node:path";
+import { TursoSessionRepo } from "./storage/TursoSessionRepo.js";
+import { DatabaseClient } from "./storage/DatabaseClient.js";
 import {
   BrowserService,
   type AppBrowserTarget,
@@ -50,6 +51,8 @@ export class HaloServer {
     private readonly resources: {
       context: HaloContext;
       filesystem: FilesystemService;
+      database: DatabaseClient;
+      sessionRepo: TursoSessionRepo;
       http: ListeningHttp;
     },
   ) {}
@@ -90,7 +93,7 @@ export class HaloServer {
     if (!(workspace instanceof Error)) cleanup.defer(() => workspace.close());
     if (!(http instanceof Error))
       cleanup.defer(async () => {
-        const closed = await closeHaloHttp(http.server);
+        const closed = await closeHaloHttp(http);
         if (closed instanceof Error)
           options.logger.warn({ event: "http-cleanup-failed", error: closed });
       });
@@ -99,10 +102,33 @@ export class HaloServer {
     if (ownerUserId instanceof Error) return ownerUserId;
 
     const workspaceRoot = workspace.layout.root;
+    const database = await DatabaseClient.open({
+      directory: path.join(workspaceRoot, ".halo"),
+      filesystem,
+    });
+    if (database instanceof Error) return database;
+    cleanup.defer(async () => {
+      const closed = await database.close();
+      if (closed instanceof Error)
+        options.logger.warn({
+          event: "database-cleanup-failed",
+          error: closed,
+        });
+    });
+    const sessionRepo = await TursoSessionRepo.open(database);
+    if (sessionRepo instanceof Error) return sessionRepo;
+    cleanup.defer(async () => {
+      const closed = await sessionRepo.close();
+      if (closed instanceof Error)
+        options.logger.warn({
+          event: "session-repo-cleanup-failed",
+          error: closed,
+        });
+    });
     const [initialized, toolRuntime] = await Promise.all([
       workspace.initialize(),
       ToolRuntime.create({
-        filesystem,
+        database,
         workspaceRoot,
         userId: ownerUserId,
         credentialVault: options.createCredentialVault({
@@ -158,11 +184,7 @@ export class HaloServer {
       extensions,
       workspace,
       sessions: new SessionRegistry({
-        repo: new SqliteSessionRepo({
-          directory: workspace.layout.sessionDir,
-          databasePath: workspace.layout.sessionsDatabasePath,
-          databaseFactory: new TursoDatabaseFactory(),
-        }),
+        repo: sessionRepo,
         modelRuntime,
         model: options.llmApi.model,
         filesystem,
@@ -174,10 +196,18 @@ export class HaloServer {
       logger: options.logger,
       testingApiEnabled: options.testingApiEnabled === true,
     };
+    cleanup.defer(async () => {
+      const closed = await context.sessions.shutdown();
+      if (closed instanceof Error)
+        options.logger.warn({
+          event: "sessions-cleanup-failed",
+          error: closed,
+        });
+    });
     serveHaloHttp({ ...http, context, corsOrigins: options.corsOrigins });
     await extensions.reload();
     cleanup.move();
-    return new HaloServer({ context, filesystem, http });
+    return new HaloServer({ context, filesystem, database, sessionRepo, http });
   }
 
   get connections() {
@@ -189,19 +219,24 @@ export class HaloServer {
   }
 
   async close() {
-    const { context, filesystem, http } = this.resources;
-    const httpClosed = await closeHaloHttp(http.server);
+    const { context, filesystem, database, sessionRepo, http } = this.resources;
+    const httpClosing = closeHaloHttp(http);
     context.connections.close();
     await context.browsers.shutdown();
     const sessionsClosed = await context.sessions.shutdown();
+    const httpClosed = await httpClosing;
     await context.extensions.stop();
     const runtimeClosed = await context.toolRuntime.close();
+    const repoClosed = await sessionRepo.close();
+    const databaseClosed = await database.close();
     context.workspace.close();
     const filesystemClosed = await filesystem.close();
 
     if (httpClosed instanceof Error) return httpClosed;
     if (sessionsClosed instanceof Error) return sessionsClosed;
     if (runtimeClosed instanceof Error) return runtimeClosed;
+    if (repoClosed instanceof Error) return repoClosed;
+    if (databaseClosed instanceof Error) return databaseClosed;
     if (filesystemClosed instanceof Error) return filesystemClosed;
   }
 }

@@ -1,97 +1,73 @@
-import path from "node:path";
 import {
   createDrizzleRuntimeSchemaFromTables,
-  ensureDrizzleRuntimeSchemaFromTables,
+  createDrizzleRuntimeSchemaSqlFromTables,
 } from "@executor-js/fumadb/adapters/drizzle";
-import { createExecutorFumaDb } from "@executor-js/sdk/host-internal";
+import type { AbstractQuery } from "@executor-js/fumadb/query";
+import type { AnySchema } from "@executor-js/fumadb/schema";
 import type { FumaTables } from "@executor-js/sdk/core";
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import * as errore from "errore";
-import type { FilesystemService } from "../../filesystem/FilesystemService.js";
+import {
+  createExecutorFumaDb,
+  type ExecutorFumaDb,
+} from "@executor-js/sdk/host-internal";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import type {
+  DatabaseClient,
+  DatabaseError,
+} from "../../storage/DatabaseClient.js";
 
-class ExecutorDatabaseError extends errore.createTaggedError({
-  name: "ExecutorDatabaseError",
-  message: "Executor database failed during $operation",
-}) {}
-
-const namespace = "halo_executor";
-const version = "1.0.0";
-
-export async function openExecutorDatabase(input: {
-  filesystem: FilesystemService;
-  workspaceRoot: string;
-  tables: FumaTables;
-}) {
-  const directory = path.join(input.workspaceRoot, ".halo", "executor");
-  const created = await input.filesystem.makeDirectory(directory, {
-    recursive: true,
-    mode: 0o700,
-  });
-  if (created instanceof Error) {
-    return new ExecutorDatabaseError({
-      operation: "create directory",
-      cause: created,
+export function createExecutorDatabase<T extends FumaTables>(
+  client: DatabaseClient,
+  tables: T,
+): Promise<Pick<ExecutorFumaDb<T>, "db"> | DatabaseError> {
+  return client.access((connection) => {
+    const options = {
+      tables,
+      namespace: "halo_executor",
+      version: "1.0.0",
+      provider: "sqlite" as const,
+    };
+    // Fuma's async schema initializer cannot use Turso's synchronous transaction callback.
+    connection.transaction(() => {
+      for (const sql of createDrizzleRuntimeSchemaSqlFromTables(options))
+        connection.exec(sql);
+    })();
+    // Turso compat implements the synchronous statement API expected by this Drizzle driver.
+    const database = drizzle(connection, {
+      schema: createDrizzleRuntimeSchemaFromTables(options),
     });
-  }
-
-  const client = errore.try({
-    try: () =>
-      createClient({
-        url: `file:${path.join(directory, "metadata.sqlite")}`,
-      }),
-    catch: (cause) => new ExecutorDatabaseError({ operation: "open", cause }),
+    return {
+      db: coordinateExecutor(
+        client,
+        createExecutorFumaDb(database, options).db,
+      ),
+    };
   });
-  if (client instanceof Error) return client;
-  using cleanup = new errore.DisposableStack();
-  cleanup.defer(() => client.close());
+}
 
-  const foreignKeys = await client
-    .execute("PRAGMA foreign_keys = ON")
-    .catch(
-      (cause) => new ExecutorDatabaseError({ operation: "configure", cause }),
-    );
-  if (foreignKeys instanceof Error) return foreignKeys;
-  const journal = await client
-    .execute("PRAGMA journal_mode = WAL")
-    .catch(
-      (cause) => new ExecutorDatabaseError({ operation: "configure", cause }),
-    );
-  if (journal instanceof Error) return journal;
-
-  const options = {
-    tables: input.tables,
-    namespace,
-    version,
-    provider: "sqlite" as const,
+function coordinateExecutor<S extends AnySchema>(
+  client: DatabaseClient,
+  db: AbstractQuery<S>,
+): AbstractQuery<S> {
+  const access = async <T>(run: () => Promise<T>) => {
+    const result = await client.access(run);
+    // Fuma's adapter contract reports storage failures as rejected promises.
+    if (result instanceof Error) throw result;
+    return result;
   };
-  const database = errore.try({
-    try: () => {
-      const schema = createDrizzleRuntimeSchemaFromTables(options);
-      return drizzle({ client, schema });
-    },
-    catch: (cause) =>
-      new ExecutorDatabaseError({ operation: "create schema", cause }),
-  });
-  if (database instanceof Error) return database;
-  const ensured = await ensureDrizzleRuntimeSchemaFromTables(
-    database,
-    options,
-  ).catch(
-    (cause) =>
-      new ExecutorDatabaseError({ operation: "initialize schema", cause }),
-  );
-  if (ensured instanceof Error) return ensured;
-
-  const executorDatabase = errore.try({
-    try: () => createExecutorFumaDb(database, options),
-    catch: (cause) =>
-      new ExecutorDatabaseError({ operation: "create adapter", cause }),
-  });
-  if (executorDatabase instanceof Error) return executorDatabase;
-  cleanup.move();
   return {
-    db: executorDatabase.db,
-    close: () => client.close(),
+    internal: db.internal,
+    // Fuma supplies a non-enumerable withContext; decorators must preserve its policy context.
+    withContext: (context) =>
+      coordinateExecutor(client, db.withContext!(context)),
+    count: (table, options) => access(() => db.count(table, options)),
+    findFirst: (table, options) => access(() => db.findFirst(table, options)),
+    findMany: (table, options) => access(() => db.findMany(table, options)),
+    create: (table, values) => access(() => db.create(table, values)),
+    createMany: (table, values) => access(() => db.createMany(table, values)),
+    updateMany: (table, options) => access(() => db.updateMany(table, options)),
+    deleteMany: (table, options) => access(() => db.deleteMany(table, options)),
+    upsert: (table, options) => access(() => db.upsert(table, options)),
+    // The callback receives Fuma's transaction query, so its operations do not acquire the queue again.
+    transaction: (run) => access(() => db.transaction(run)),
   };
 }
