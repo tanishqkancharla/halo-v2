@@ -60,7 +60,7 @@
     "errore": "^0.14.1",
     "esbuild": "0.28.2",
     "libretto-browser-tools": "^0.1.2",
-    "maui": "npm:@tanishqkancharla/maui@0.0.13",
+    "maui": "npm:@tanishqkancharla/maui@0.0.16",
     "playwright": "1.62.1",
     "purse-styles": "^0.2.3",
     "quickjs-emscripten": "0.31.0",

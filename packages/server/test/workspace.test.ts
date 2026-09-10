@@ -226,7 +226,6 @@ serverTest("disables the tool bridge outside E2E runs", async ({ server }) => {
 
 serverTest(
   "serves each workspace independently in the same process",
-  { timeout: 20_000 },
   async ({ server, createServer }) => {
     const otherRoot = path.join(server.harness.paths.root, "other-workspace");
     await fs.mkdir(otherRoot);

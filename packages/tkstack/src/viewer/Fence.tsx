@@ -1,17 +1,24 @@
 import { CodeBlock } from "maui";
 import type { Fence as FenceModel } from "../parseFence.js";
-import { CallStackDiff } from "./CallStackDiff.tsx";
+import { CallStackDiff, type StackNavigation } from "./CallStackDiff.tsx";
 import { CodeDiff } from "./CodeDiff.tsx";
 import { FileExcerpt } from "./FileExcerpt.tsx";
 import { HtmlBlock } from "./HtmlBlock.tsx";
 import { MermaidBlock } from "./MermaidBlock.tsx";
 
-export function Fence(props: { fence: FenceModel }) {
+export function Fence(props: { fence: FenceModel } & StackNavigation) {
   const fence = props.fence;
   if (fence.kind === "mermaid") return <MermaidBlock source={fence.source} />;
   if (fence.kind === "html") return <HtmlBlock source={fence.source} />;
+  if (fence.kind === "source-diff") return undefined;
   if (fence.kind === "callstack")
-    return <CallStackDiff source={fence.source} />;
+    return (
+      <CallStackDiff
+        lines={fence.lines}
+        selectedLine={props.selectedLine}
+        onSelectLine={props.onSelectLine}
+      />
+    );
   if (fence.kind === "diff") {
     return <CodeDiff source={fence.source} path={fence.path} />;
   }

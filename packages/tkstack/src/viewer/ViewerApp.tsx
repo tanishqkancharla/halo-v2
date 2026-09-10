@@ -13,6 +13,7 @@ import {
 import { style, useStyles } from "purse-styles";
 import { viewerDocument } from "virtual:tkstack";
 import { ComarkView } from "./ComarkView.tsx";
+import { SourceDiffPanel, type SourceSelection } from "./SourceDiffPanel.js";
 import { DoneButton } from "./DoneButton.tsx";
 
 type ViewerMeta = {
@@ -21,6 +22,9 @@ type ViewerMeta = {
 
 export function ViewerApp() {
   const meta = useViewerMeta();
+  const [selection, setSelection] = useState<SourceSelection>();
+  const hasSourceDiffs = viewerDocument.sourceDiffs.length > 0;
+  const body = useStyles(styles.body);
   const [shutDown, setShutDown] = useState(false);
   const title = meta === undefined ? document.title : meta.title;
   const shell = useStyles(styles.shell);
@@ -54,11 +58,26 @@ export function ViewerApp() {
           }}
         />
       </header>
-      <article className={article}>
-        <div className={prose}>
-          <ComarkView document={viewerDocument} />
-        </div>
-      </article>
+      <div className={body} data-has-source-diffs={hasSourceDiffs}>
+        <article className={article}>
+          <div className={prose}>
+            <ComarkView
+              document={viewerDocument}
+              selectedLine={selection?.line}
+              onSelectLine={(line) =>
+                setSelection({ line, reference: line.references[0]! })
+              }
+            />
+          </div>
+        </article>
+        {hasSourceDiffs && (
+          <SourceDiffPanel
+            items={viewerDocument.sourceDiffs}
+            selection={selection}
+            onSelect={setSelection}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -108,6 +127,21 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  }),
+  body: style({
+    display: "grid",
+    gridTemplateColumns: "var(--tkstack-columns)",
+    "--tkstack-columns": "minmax(0, 1fr)",
+    flex: "1 1 auto",
+    minHeight: 0,
+    minWidth: 0,
+    "&[data-has-source-diffs='true']": {
+      "--tkstack-columns": "minmax(0, 1fr) minmax(0, 1fr)",
+    },
+    "@media (max-width: 900px)": {
+      gridTemplateColumns: "minmax(0, 1fr)",
+      gridTemplateRows: "minmax(0, 1fr) auto",
+    },
   }),
   article: style(spacing.padding({ x: 12, y: 12 }), {
     flex: "1 1 auto",

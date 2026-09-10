@@ -7,7 +7,7 @@ description: Explain implemented changes through annotated call stack diffs and 
 
 This skill is the counter-equivalent of `$generate-spec-v2`. That skill writes a spec for work that has not happened yet. This skill writes a walkthrough of work that already landed.
 
-Do not plan, spec, or phase future work. Explain what changed and how it runs now, including implemented but uncommitted changes when requested. Use annotated call stack diffs as the main explanation. Read source code to verify the explanation, but do not include source-code patches, excerpts, or type declarations in the walkthrough unless the user explicitly asks for them.
+Do not plan, spec, or phase future work. Explain what changed and how it runs now, including implemented but uncommitted changes when requested. Use annotated call stack diffs as the main explanation. Link meaningful changed steps to source patches in the shared source panel. Keep standalone source-code excerpts and type declarations out of the walkthrough unless the user explicitly asks for them.
 
 ## Research the landed change
 
@@ -27,7 +27,7 @@ Choose a short kebab-case name. Create a named temp directory under the repo's `
 mkdir -p tmp/code-walkthrough-<name>
 ```
 
-Write `tmp/code-walkthrough-<name>/walkthrough.md`. Use this structure. In each outcome chapter, put the call-stack diff first, then explain the behavior and its implications in short prose. Do not title the fence or follow it with source-code blocks.
+Write `tmp/code-walkthrough-<name>/walkthrough.md`. Use this structure. In each outcome chapter, put the call-stack diff first, then explain the behavior and its implications in short prose. Do not title the stack fence or follow it with inline source-code blocks. Put linked patches in `source-diff` fences, which render in the shared source panel.
 
 ````md
 # <Name of the landed change>
@@ -99,6 +99,12 @@ The handler now validates before it stores. If validation returns a tagged error
 Summarize checks actually run and their results. State material gaps or failures. Do not imply that a source-checked call flow was exercised at runtime.
 ````
 
+Append `[[id:old:start-end]]` or `[[id:new:start-end]]` to a stack line to link source changes. Use actual source line numbers from the compared versions; `[[id:new:12]]` links a single line. Keep references separate from the visible `#` explanation. Link removed steps with `old` references, including steps whose source file was deleted. Link unchanged steps when their implementation changed, and leave context-only steps unlinked. A line may reference several changes, including different files.
+
+Define each referenced ID once in a `source-diff:id:path` fence anywhere in the Markdown. Copy the real file patch from the same Git comparison, including `diff --git`, `---`, `+++`, and `@@` headers. Include surrounding context; each reference range must fit within one included hunk. Use the new path for renames and the old path for deletions. Do not invent patches or renumber hunks. For untracked files, obtain a patch with `git diff --no-index -- /dev/null <path>` (exit 1 means differences).
+
+TK Stack hides reference markers and renders source definitions in one shared panel. Clicking a stack line scrolls to and highlights its code. For full syntax, read the [TK Stack README](../../../packages/tkstack/README.md#link-call-stacks-to-source-changes) and [example](../../../packages/tkstack/fixtures/annotations.md).
+
 Use `callstack` fences with tree branches (`└──` / `├──`) and unified diff signs. Call stacks render without a file header. Put a trailing `#` comment on a line when the symbol name does not explain its purpose, return value, condition, or side effect. A standalone `#` comment can explain the next step. Skip comments that merely repeat the symbol name.
 
 Show ownership and meaningful ordering accurately. Sibling calls stay siblings; do not nest a later call beneath an earlier one unless it actually calls it. Mark asynchronous handoffs and conditional alternatives instead of implying a single synchronous stack. Plain-language steps such as a database write are useful when clearly labeled as behavior rather than invented function names.
@@ -114,10 +120,11 @@ See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for rend
 | Fence info string                              | Viewer                                                       |
 | ---------------------------------------------- | ------------------------------------------------------------ |
 | `mermaid`                                      | Beautiful Mermaid ([Craft](https://agents.craft.do/mermaid)) |
-| `callstack` or `diff` containing `└──` / `├──` | Pierre patch, no file header                                 |
+| `callstack` or `diff` containing `└──` / `├──` | Interactive stack rows, no file header                       |
+| `source-diff:id:path`                          | Named Git patch in the shared source panel                   |
 | `html`                                         | Trusted HTML from this file. tkstack does not sanitize it.   |
 
-Walkthroughs are markdown. Curly braces in prose are plain text. Use small tables for state ownership or data mappings when they clarify the call flows. Link to relevant source files in prose when useful, without embedding their contents.
+Walkthroughs are markdown. Curly braces in prose are plain text. Use small tables for state ownership or data mappings when they clarify the call flows. Link to relevant source files in prose when useful; use source-diff annotations to show the changes.
 
 ## Serve it
 
@@ -148,11 +155,11 @@ Tell the user the markdown path and the URL. Do not open the URL in a browser un
 - After Solution, add a `sequenceDiagram` for each main user-visible flow. Name participants that exist in the landed design.
 - Name exact files, symbols, behavior, and commands that exist in the tree.
 - In each runtime chapter, lead with an annotated call-stack diff and follow it with concise prose explaining the outcome, ownership, and important limits. Do not add a fixed set of subheadings.
-- Keep call-stack diffs central. Use Mermaid, tables, and source links only where they add information; omit source-code patches, excerpts, and type blocks unless explicitly requested.
+- Keep call-stack diffs central. Use Mermaid, tables, and source links only where they add information; use linked `source-diff` patches for code changes and omit standalone excerpts and type blocks unless explicitly requested.
 - Make the call-stack diff start from the previous path and mark the landed path with unified diff signs. For UI work, a component render or event-handler path counts as the call stack.
 - Annotate call-stack lines with `#` comments where the reader needs a reason, return, or side effect that the symbol name does not say. Do not comment every line.
 - Do not invent call paths or diffs. If behavior changed inside an unchanged call path, show the unchanged structure and explain the behavior in annotations and prose; do not invent added or removed calls. For docs, data, or config slices with no changed runtime path, use prose without a stack fence.
 
 ## Final check
 
-Confirm that the markdown lives under `tmp/`; the comparison range and commit status are explicit; Problem and Solution match the implemented change; User flows covers each main user path; runtime chapters center on accurate, annotated call-stack diffs and prose; source-code blocks are absent unless requested; source links are real; verification claims match checks actually run; tkstack is serving the page; and the walkthrough explains existing work without turning into a plan.
+Confirm that the markdown lives under `tmp/`; the comparison range and commit status are explicit; Problem and Solution match the implemented change; User flows covers each main user path; runtime chapters center on accurate, annotated call-stack diffs and prose; source-diff annotations point to real patches and valid old/new ranges; standalone source-code blocks are absent unless requested; source links are real; verification claims match checks actually run; tkstack is serving the page; and the walkthrough explains existing work without turning into a plan.

@@ -1,9 +1,22 @@
-import { radius, shadow } from "maui";
+import { colors, radius, shadow } from "maui";
 import { style } from "purse-styles";
 import { codeFontFamily } from "../codeFont.js";
 import { diffsTheme } from "./diffsTheme.ts";
 
 const pierreUnsafeCss = `:host { --diffs-font-family: ${codeFontFamily}; }`;
+
+export const sourceSelectionCss = `
+[data-selected-line] {
+  --diffs-computed-selected-line-bg: var(--diffs-computed-diff-line-bg);
+}
+[data-line][data-selected-line] {
+  box-shadow: inset 4px 0 ${colors.amber[9]};
+}
+[data-column-number][data-selected-line] {
+  background-color: ${colors.amber[3]};
+  color: ${colors.amber[12]};
+}
+`;
 
 export const pierreShell = style(radius.md, shadow.subtle, {
   overflow: "hidden",

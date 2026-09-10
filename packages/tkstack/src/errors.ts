@@ -24,3 +24,13 @@ export class TkstackParseError extends errore.createTaggedError({
   name: "TkstackParseError",
   message: "tkstack could not parse markdown",
 }) {}
+
+export class TkstackAnnotationError extends errore.createTaggedError({
+  name: "TkstackAnnotationError",
+  message: "tkstack source annotation: $reason",
+}) {}
+
+export class TkstackDefinitionError extends errore.createTaggedError({
+  name: "TkstackDefinitionError",
+  message: "$reason",
+}) {}

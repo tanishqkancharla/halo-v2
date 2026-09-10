@@ -114,14 +114,13 @@ import { Text as TextIcon } from "maui/icons"
 - `Avatar`
 - `Badge`
 - `Code`, `Kbd`, `CodeBlock`
-- `Table` / `TableHead` / `TableBody` / `TableRow` / `TableHeaderCell` / `TableCell`
-- `Panel` — gallery/demo surface
+- `Table` — React Aria table. `TableHeader` contains `TableHead` columns directly (no `TableRow`). Mark the identifying column with `isRowHeader` (required; usually the name/id column, not a leading checkbox or drag handle). `align` on `TableHead` / `TableCell` is `"start"` | `"center"` | `"end"`. `TableFooter` fills with `colors.gray[2]`. Place `TableCaption` after `Table`. `TableBody` renders “No results.” when empty; pass `renderEmptyState` to replace it.
 - `FuzzyString` — highlight segments; takes a match result, not a plain string
 - `Thinking` — 3×3 Game of Life indicator; reseeds when the board dies or loops
 
 ## Reference: patterns and apps
 
-Patterns and demo apps are not part of the `"maui"` package barrel. Use the closest one as a reference before inventing new layout (also available via `"maui/src/..."` when the package ships source):
+Patterns, demo apps, and the gallery `Panel` preview surface are not part of the `"maui"` package barrel. Use the closest one as a reference before inventing new layout (also available via `"maui/src/..."` when the package ships source):
 
 ### Patterns — `src/patterns/`
 
@@ -143,4 +142,4 @@ Patterns and demo apps are not part of the `"maui"` package barrel. Use the clos
 
 ## License
 
-Maui is source-available under the PolyForm Noncommercial License 1.0.0. Do not use it in commercial products except software Tanishq Kancharla personally creates, or another project the copyright holder grants in `NOTICE` or in writing.
+Maui is open source under the MIT License.

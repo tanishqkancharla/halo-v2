@@ -1,11 +1,13 @@
 import * as errore from "errore";
+import { parsePatchFiles, type CodeViewDiffItem } from "@pierre/diffs";
 import { parseAST } from "md4x/napi";
 import type { ComarkElement, ComarkNode } from "md4x/napi";
-import { TkstackParseError } from "./errors.js";
+import { TkstackAnnotationError, TkstackParseError } from "./errors.js";
 import { parseFence, type Fence } from "./parseFence.js";
 
 export type ViewerDocument = {
   nodes: ViewerNode[];
+  sourceDiffs: CodeViewDiffItem[];
 };
 
 export type ViewerNode = ViewerText | ViewerElement | ViewerHtml | ViewerView;
@@ -44,6 +46,7 @@ export type ViewerElementAttrs = {
   checked: boolean | undefined;
   task: boolean | undefined;
   alertType: string | undefined;
+  align: string | undefined;
 };
 
 export function parseViewerDocument(source: string) {
@@ -52,9 +55,87 @@ export function parseViewerDocument(source: string) {
     catch: (cause) => new TkstackParseError({ cause }),
   });
   if (tree instanceof Error) return tree;
-  return {
-    nodes: tree.nodes.flatMap(fromNode),
-  };
+  const nodes = tree.nodes.flatMap(fromNode);
+  const fences = collectFences(nodes);
+  const sourceDiffs: CodeViewDiffItem[] = [];
+  for (const fence of fences) {
+    if (fence.kind !== "source-diff") continue;
+    if (sourceDiffs.some((diff) => diff.id === fence.id)) {
+      return new TkstackAnnotationError({
+        reason: `Duplicate source diff ID "${fence.id}"`,
+      });
+    }
+    const patches = errore.try({
+      try: () => parsePatchFiles(fence.source, undefined, true),
+      catch: (cause) =>
+        new TkstackAnnotationError({
+          reason: `Invalid patch "${fence.id}"`,
+          cause,
+        }),
+    });
+    if (patches instanceof Error) return patches;
+    const files = patches.flatMap((patch) => patch.files);
+    const fileDiff = files[0];
+    if (
+      files.length !== 1 ||
+      fileDiff === undefined ||
+      fileDiff.hunks.length === 0
+    ) {
+      return new TkstackAnnotationError({
+        reason: `Source diff "${fence.id}" must contain one file with unified diff hunks`,
+      });
+    }
+    if (fileDiff.name !== fence.path) {
+      return new TkstackAnnotationError({
+        reason: `Source diff "${fence.id}" path does not match its patch (${fileDiff.name})`,
+      });
+    }
+    sourceDiffs.push({ id: fence.id, type: "diff", fileDiff });
+  }
+  for (const fence of fences) {
+    if (fence.kind !== "callstack") continue;
+    for (const line of fence.lines) {
+      if (line.text.includes("[[")) {
+        return new TkstackAnnotationError({
+          reason: `Invalid reference in "${line.text}". Use [[id:old|new:start-end]]`,
+        });
+      }
+      for (const ref of line.references) {
+        const diff = sourceDiffs.find((item) => item.id === ref.id);
+        if (diff === undefined) {
+          return new TkstackAnnotationError({
+            reason: `Unknown source diff "${ref.id}"`,
+          });
+        }
+        const inHunk = diff.fileDiff.hunks.some((hunk) => {
+          const start =
+            ref.side === "old" ? hunk.deletionStart : hunk.additionStart;
+          const count =
+            ref.side === "old" ? hunk.deletionCount : hunk.additionCount;
+          return ref.start >= start && ref.end < start + count;
+        });
+        if (
+          !Number.isSafeInteger(ref.start) ||
+          !Number.isSafeInteger(ref.end) ||
+          ref.end < ref.start ||
+          !inHunk
+        ) {
+          return new TkstackAnnotationError({
+            reason: `Range ${ref.side}:${ref.start}-${ref.end} is not in a hunk of "${ref.id}"`,
+          });
+        }
+      }
+    }
+  }
+  return { nodes, sourceDiffs };
+}
+
+function collectFences(nodes: ViewerNode[]): Fence[] {
+  return nodes.flatMap((node) => {
+    if (node.type === "view") return [node.fence];
+    if (node.type === "element") return collectFences(node.children);
+    return [];
+  });
 }
 
 function fromNode(node: ComarkNode): ViewerNode[] {
@@ -163,6 +244,7 @@ function elementAttrs(element: ComarkElement): ViewerElementAttrs {
     checked: checked === true ? true : checked === false ? false : undefined,
     task: element[1].task === true ? true : undefined,
     alertType: stringAttr(element, "type"),
+    align: stringAttr(element, "align"),
   };
 }
 

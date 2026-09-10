@@ -5,6 +5,7 @@ import { createServer, type ViteDevServer } from "vite";
 import { tkstackContentPlugin } from "./contentPlugin.js";
 import { TkstackFileError, TkstackServeError } from "./errors.js";
 import { extractTitle } from "./extractDocument.js";
+import { findDefinition } from "./definitions.js";
 import {
   registerRunningTkstack,
   unregisterRunningTkstack,
@@ -97,7 +98,9 @@ export async function startServer(input: StartServerInput) {
                 : new URL(url, "http://127.0.0.1").pathname;
             if (
               req.method === "GET" &&
-              (pathname === "/" || pathname === "/__tkstack/file")
+              (pathname === "/" ||
+                pathname === "/__tkstack/file" ||
+                pathname === "/__tkstack/definition")
             ) {
               inactivityTimer?.refresh();
             }
@@ -223,6 +226,19 @@ async function handleTkstackRequest(input: {
   res: TkstackResponse;
 }) {
   const parsed = new URL(input.url, "http://127.0.0.1");
+  if (parsed.pathname === "/__tkstack/definition" && input.method === "GET") {
+    const definition = findDefinition(input.workspaceRoot, parsed.searchParams);
+    input.res.statusCode = definition instanceof Error ? 400 : 200;
+    input.res.setHeader("content-type", "application/json; charset=utf-8");
+    input.res.end(
+      JSON.stringify(
+        definition instanceof Error
+          ? { error: definition.message }
+          : { definition },
+      ),
+    );
+    return;
+  }
   if (parsed.pathname === "/__tkstack/shutdown" && input.method === "POST") {
     input.res.statusCode = 200;
     input.res.setHeader("content-type", "text/plain; charset=utf-8");
