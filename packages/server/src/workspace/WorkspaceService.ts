@@ -1,7 +1,7 @@
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import * as errore from "errore";
 import type { WorkspaceInfo, WorkspaceTreeEvent } from "@get-halo/shared/rpc";
-import { type ReadonlyStream, Stream } from "../Stream.js";
+import { type ReadonlyStream, Stream } from "@get-halo/shared/Stream";
 import {
   type FilesystemWatchBatch,
   type FilesystemWatchEvent,
@@ -17,7 +17,6 @@ export type WorkspaceLayout = {
   readonly agentDir: string;
   readonly sessionDir: string;
   readonly sessionsDatabasePath: string;
-  sessionLogPath(sessionId: string): string;
 };
 
 export class WorkspaceNotDirectoryError extends errore.createTaggedError({
@@ -437,8 +436,6 @@ function workspaceLayout(root: string): WorkspaceLayout {
     agentDir,
     sessionDir,
     sessionsDatabasePath: join(root, ".halo", "sessions.db"),
-    sessionLogPath: (sessionId) =>
-      join(sessionDir, `${sessionId}.halo-events.jsonl`),
   };
 }
 

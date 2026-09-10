@@ -257,48 +257,6 @@ e2eTest("shows a connection request", async ({ harness, app }) => {
   await expect(card.getByRole("button", { name: "Connect" })).toBeVisible();
 });
 
-e2eTest(
-  "recovers interrupted activity from the durable session log",
-  async ({ harness, app }) => {
-    const loaded = await harness.loadSession({
-      title: "Interrupted session",
-      messages: [
-        m.user("Read the project notes"),
-        m.assistant("I’ll read the notes."),
-        m.run.start({ id: "run-1" }),
-        m.tool.start("read", {
-          id: "tool-1",
-          arguments: { path: "notes.md" },
-        }),
-      ],
-    });
-
-    const pane = app.page.getByRole("main", {
-      name: "Interrupted session",
-    });
-    await expect(pane.getByText("Read the project notes")).toBeVisible();
-    await expect(pane.getByText("Working", { exact: true })).not.toBeVisible();
-
-    const opened = await app.server.rpc.sessions.open({
-      sessionId: loaded.sessionId,
-    });
-    expect(
-      opened.records.slice(-2).map((record) => record.value),
-    ).toMatchObject([
-      {
-        type: "tool.finished",
-        invocationId: "tool-1",
-        isError: true,
-      },
-      {
-        type: "run.finished",
-        runId: "run-1",
-        outcome: "interrupted",
-      },
-    ]);
-  },
-);
-
 e2eTest("shows tools used inside exec", async ({ harness, app }) => {
   const descriptionJs =
     "return await tools.describe.tool({ path: 'google_calendar.events.list' })";
@@ -440,138 +398,86 @@ e2eTest(
 );
 
 e2eTest(
-  "streams tool activity labels as session events arrive",
-  async ({ harness, app }) => {
-    const session = await harness.loadSession({
-      title: "Live cross-tool lookup",
+  "restores nested tool activity while exec runs and after quitting",
+  async ({ harness, app, llm, http }) => {
+    await harness.tools.files.write({
+      path: "notes.md",
+      content: "Read before the request",
     });
-    const pane = app.page.getByRole("main", {
-      name: "Live cross-tool lookup",
+    await app.page.getByRole("button", { name: "New session" }).click();
+    await app.page
+      .getByLabel("Message", { exact: true })
+      .fill("Read the notes and fetch the report");
+    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    const command = `curl --silent --fail '${http.url("/report")}'`;
+    const js = `await tools.files.read({ path: "notes.md" }); return await tools.bash.run({ command: ${JSON.stringify(command)} });`;
+    await llm.respond(
+      m.tool.start("exec", { id: "report", arguments: { js } }),
+    );
+    const request = await http.request("/report");
+    await expect(
+      app.page.getByRole("button", { name: "Stop", exact: true }),
+    ).toBeVisible();
+
+    await app.page.reload();
+
+    const pane = app.page.getByRole("main");
+    const summary = pane.getByRole("button", {
+      name: "Running command",
+      exact: true,
     });
-
-    await session.append(m.run.start());
-    await expect(pane.getByText("Working", { exact: true })).toBeVisible();
-    await expectThinkingVisible(pane.getByRole("status", { name: "Working" }));
-
-    await session.append(
-      m.exec.start({
-        id: "lookup",
-        js: "await Promise.all([tools.google_calendar.events.list({}), tools.web.search({ query: 'Halo' })])",
+    await expect(summary).toBeVisible();
+    await expectThinkingVisible(
+      summary.getByRole("status", { name: "Working" }),
+    );
+    await summary.click();
+    await expect(
+      pane.getByRole("button", {
+        name: "Read notes.md (files.read)",
+        exact: true,
       }),
-    );
-    const execSummary = pane.getByRole("button", {
-      name: "Using tools",
+    ).toBeVisible();
+    const running = pane.getByRole("button", {
+      name: `${command} (bash.run)`,
       exact: true,
     });
-    await expect(execSummary).toBeVisible();
-    await expectThinkingVisible(
-      execSummary.getByRole("status", { name: "Working" }),
-    );
+    await running.click();
     await expect(
-      execSummary.getByRole("img", { name: "Expand tool activity" }),
-    ).toBeHidden();
+      pane
+        .getByRole("region", { name: "bash.run", exact: true })
+        .getByRole("code"),
+    ).toHaveText(js);
 
-    await session.append(
-      m.exec.tool.start("search", { id: "discovery", parentId: "lookup" }),
-    );
-    const discoverySummary = pane.getByRole("button", {
-      name: "Searching tools",
-      exact: true,
-    });
-    await expect(discoverySummary).toBeVisible();
-    await expectThinkingVisible(
-      discoverySummary.getByRole("status", { name: "Working" }),
-    );
+    request.respond("The report is ready.");
+    await llm.respond(m.assistant("Finished the report."));
     await expect(
-      discoverySummary.getByRole("img", { name: "Expand tool activity" }),
-    ).toBeHidden();
-
-    await discoverySummary.hover();
-    await expect(
-      discoverySummary.getByRole("status", { name: "Working" }),
-    ).toBeHidden();
-    await expect(
-      discoverySummary.getByRole("img", { name: "Expand tool activity" }),
-    ).toBeVisible();
-    await discoverySummary.click();
-    await expect(
-      pane.getByText("Searching tools", { exact: true }),
-    ).toHaveCount(2);
-    await pane.getByLabel("Message", { exact: true }).hover();
-    await expectThinkingVisible(
-      discoverySummary.getByRole("status", { name: "Working" }),
-    );
-    await expect(
-      discoverySummary.getByRole("img", { name: "Expand tool activity" }),
-    ).toBeHidden();
-
-    await session.append(m.exec.tool.end({ id: "discovery" }));
-    await expect(discoverySummary).toBeVisible();
-    await expect(
-      pane.getByText("Searching tools", { exact: true }),
-    ).toHaveCount(1);
-    await expect(pane.getByText("Searched tools", { exact: true })).toHaveCount(
-      1,
-    );
-
-    await session.append(
-      m.exec.tool.start("google_calendar.events.list", {
-        id: "calendar",
-        parentId: "lookup",
-      }),
-    );
-    await expect(
-      pane.getByRole("button", { name: "Using Google Calendar", exact: true }),
-    ).toBeVisible();
-    await expect(pane.getByText("Searched tools", { exact: true })).toHaveCount(
-      1,
-    );
-    await expect(
-      pane.getByText("Using Google Calendar", { exact: true }),
-    ).toHaveCount(2);
-
-    await session.append([
-      m.exec.tool.end({ id: "calendar" }),
-      m.exec.tool.start("web.search", { id: "web", parentId: "lookup" }),
-    ]);
-    await expect(
-      pane.getByText("Used Google Calendar", { exact: true }),
-    ).toHaveCount(1);
-    await expect(
-      pane.getByRole("button", { name: "Using Web Search", exact: true }),
+      pane.getByText("Finished the report.", { exact: true }),
     ).toBeVisible();
     await expect(
-      pane.getByText("Using Web Search", { exact: true }),
-    ).toHaveCount(2);
-
-    await session.append([
-      m.exec.tool.end({ id: "web" }),
-      m.exec.end({ id: "lookup" }),
-      m.run.end(),
-    ]);
-    const completedSummary = pane.getByRole("button", {
-      name: "Searched tools and used Google Calendar, Web Search",
-      exact: true,
-    });
-    await expect(completedSummary).toBeVisible();
-    await expect(
-      completedSummary.getByRole("status", { name: "Working" }),
-    ).toHaveCount(0);
-    await expect(
-      completedSummary.getByRole("img", { name: "Expand tool activity" }),
-    ).toBeVisible();
-    await expect(pane.getByText("Searched tools", { exact: true })).toHaveCount(
-      1,
-    );
-    await expect(
-      pane.getByText("Used Google Calendar", { exact: true }),
-    ).toHaveCount(1);
-    await expect(
-      pane.getByText("Used Web Search", { exact: true }),
-    ).toHaveCount(1);
-    await expect(
-      pane.getByText("Using Web Search", { exact: true }),
+      pane.getByRole("button", { name: "Stop", exact: true }),
     ).not.toBeVisible();
+    await app.quit();
+    await app.open();
+
+    const restored = app.page.getByRole("main");
+    await restored
+      .getByRole("button", {
+        name: "Ran 1 command and read 1 file",
+        exact: true,
+      })
+      .click();
+    await expect(
+      restored.getByRole("button", {
+        name: "Read notes.md (files.read)",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await restored
+      .getByRole("button", { name: `${command} (bash.run)`, exact: true })
+      .click();
+    await expect(
+      restored.getByRole("region", { name: "bash.run", exact: true }),
+    ).toContainText("The report is ready.");
   },
 );
 
@@ -619,137 +525,108 @@ const expansionScenarios: {
 
 for (const scenario of expansionScenarios) {
   e2eTest(
-    `expands ${scenario.name} tool calls while streaming and after reload`,
+    `expands saved ${scenario.name} tool details after reload`,
     async ({ harness, app }) => {
-      const session = await harness.loadSession({ title: "Expandable tools" });
-      const pane = app.page.getByRole("main", {
-        name: "Expandable tools",
+      const js = `return await tools.${scenario.path}(${JSON.stringify(scenario.args)});`;
+      await harness.loadSession({
+        title: "Expandable tools",
+        messages: [
+          m.user("Show the result"),
+          scenario.nested
+            ? m.exec({
+                js,
+                tools: [{ path: scenario.path, arguments: scenario.args }],
+                result: scenario.result,
+              })
+            : {
+                type: "tool",
+                name: scenario.path,
+                arguments: scenario.args,
+                result: scenario.result,
+              },
+        ],
       });
-      const lifecycle = scenario.nested ? m.exec.tool : m.tool;
-      const js = `const result = await tools.${scenario.path}(${JSON.stringify(scenario.args)}); return result;`;
-      const result = scenario.nested
-        ? `Exec returned: ${scenario.result}`
-        : scenario.result;
-      await session.append(m.run.start());
-      if (scenario.nested) {
-        await session.append(m.exec.start({ id: "exec", js }));
-      }
-      await session.append(
-        lifecycle.start(scenario.path, {
-          id: "tool",
-          parentId: scenario.nested ? "exec" : undefined,
-          arguments: scenario.args,
-        }),
-      );
-
-      const summary = pane.getByRole("button", {
-        name: scenario.active,
-        exact: true,
-      });
-      await summary.click();
-      const call = pane.getByRole("button", {
-        name: `${scenario.active} (${scenario.path})`,
-        exact: true,
-      });
-      await expect(call).toHaveAttribute("aria-expanded", "false");
-      await expect(call.locator("svg")).toHaveCount(0);
-      await call.click();
-      await expect(call).toHaveAttribute("aria-expanded", "true");
-      const details = pane.getByRole("region", {
-        name: scenario.path,
-        exact: true,
-      });
-      await expect(details).toBeVisible();
-      await expect(details.getByRole("code")).toHaveText(
-        scenario.nested ? js : JSON.stringify(scenario.args, undefined, 2),
-      );
-      await expectThinkingVisible(
-        summary.getByRole("status", { name: "Working" }),
-      );
-
-      await session.append(
-        lifecycle.end({ id: "tool", result: scenario.result }),
-      );
-      if (scenario.nested) {
-        await expect(
-          details.getByText(scenario.result, { exact: true }),
-        ).toHaveCount(0);
-        await session.append(m.exec.end({ id: "exec", result }));
-      }
-      await expect(details.getByText(result, { exact: true })).toBeVisible();
-      const completedCall = pane.getByRole("button", {
-        name: `${scenario.completed} (${scenario.path})`,
-        exact: true,
-      });
-      await expect(completedCall).toHaveAttribute("aria-expanded", "true");
-      await session.append(m.run.end());
-
-      await completedCall.click();
-      await expect(details).toBeHidden();
-      await completedCall.click();
-      await expect(details.getByText(result, { exact: true })).toBeVisible();
-
+      const pane = app.page.getByRole("main", { name: "Expandable tools" });
       await app.page.reload();
       await pane
         .getByRole("button", { name: scenario.aggregate, exact: true })
         .click();
-      await completedCall.click();
-      await expect(details.getByText(result, { exact: true })).toBeVisible();
+      const call = pane.getByRole("button", {
+        name: `${scenario.completed} (${scenario.path})`,
+        exact: true,
+      });
+      await expect(call).toHaveAttribute("aria-expanded", "false");
+      await call.click();
+      const details = pane.getByRole("region", {
+        name: scenario.path,
+        exact: true,
+      });
+      await expect(details.getByRole("code").first()).toHaveText(
+        scenario.nested ? js : JSON.stringify(scenario.args, undefined, 2),
+      );
+      await expect(
+        details.getByText(scenario.result, { exact: true }),
+      ).toBeVisible();
+      await call.click();
+      await expect(details).toBeHidden();
     },
   );
 }
 
 e2eTest(
   "keeps parallel tool activity visible when another tool finishes",
-  async ({ harness, app }) => {
-    const session = await harness.loadSession({ title: "Parallel tools" });
-    const pane = app.page.getByRole("main", { name: "Parallel tools" });
-    await session.append([
-      m.run.start({ id: "lookup" }),
-      m.exec.start({
-        js: "return await tools.google_calendar.events.list({})",
-        id: "calendar",
+  async ({ app, llm, http }) => {
+    await app.page.getByRole("button", { name: "New session" }).click();
+    await app.page
+      .getByLabel("Message", { exact: true })
+      .fill("Fetch both reports");
+    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    const firstCommand = `curl --silent --fail '${http.url("/first")}'`;
+    const secondCommand = `curl --silent --fail '${http.url("/second")}'`;
+    await llm.respond([
+      m.tool.start("bash", {
+        id: "first",
+        arguments: { command: firstCommand },
       }),
-      m.exec.tool.start("google_calendar.events.list", {
-        id: "events",
-        parentId: "calendar",
+      m.tool.start("bash", {
+        id: "second",
+        arguments: { command: secondCommand },
       }),
-      m.exec.start({
-        id: "web",
-        js: "return await tools.web.search({ query: 'Halo' })",
-      }),
-      m.exec.tool.start("web.search", { id: "search", parentId: "web" }),
     ]);
+    const [first, second] = await Promise.all([
+      http.request("/first"),
+      http.request("/second"),
+    ]);
+    const pane = app.page.getByRole("main");
     await pane
-      .getByRole("button", { name: "Using Web Search", exact: true })
+      .getByRole("button", { name: "Running command", exact: true })
       .click();
-
-    await session.append([
-      m.exec.tool.end({ id: "events" }),
-      m.exec.end({ id: "calendar" }),
-    ]);
+    first.respond("First report");
+    await pane
+      .getByRole("button", { name: `${firstCommand} (bash)`, exact: true })
+      .click();
+    await expect(
+      pane.getByRole("region", { name: "bash", exact: true }),
+    ).toContainText("First report");
+    await expect(
+      pane.getByRole("button", { name: "Running command", exact: true }),
+    ).toBeVisible();
     await expect(
       pane.getByRole("button", {
-        name: "Used Google Calendar (google_calendar.events.list)",
+        name: `${firstCommand} (bash)`,
         exact: true,
       }),
     ).toBeVisible();
     await expect(
       pane.getByRole("button", {
-        name: "Using Web Search (web.search)",
+        name: `${secondCommand} (bash)`,
         exact: true,
       }),
     ).toBeVisible();
-    await session.append([
-      m.exec.tool.end({ id: "search" }),
-      m.exec.end({ id: "web" }),
-      m.run.end({ id: "lookup" }),
-    ]);
+    second.respond("Second report");
+    await llm.respond(m.assistant("Both reports are ready."));
     await expect(
-      pane.getByRole("button", {
-        name: "Used Google Calendar, Web Search",
-        exact: true,
-      }),
+      pane.getByRole("button", { name: "Ran 2 commands", exact: true }),
     ).toBeVisible();
   },
 );
@@ -823,5 +700,41 @@ e2eTest(
         exact: true,
       }),
     ).toBeVisible();
+  },
+);
+
+e2eTest(
+  "restores partial assistant text on reload and continues the same response",
+  async ({ app, llm }) => {
+    await app.page.getByRole("button", { name: "New session" }).click();
+    await app.page
+      .getByLabel("Message", { exact: true })
+      .fill("Explain the plan");
+    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    const response = await llm.stream();
+    response.write(m.assistant("The first step"));
+    await expect(
+      app.page.getByRole("log", { name: "Session transcript" }),
+    ).toContainText("The first step");
+
+    await app.page.reload();
+
+    const transcript = app.page.getByRole("log", {
+      name: "Session transcript",
+    });
+    await expect(transcript).toContainText("The first step");
+    await expect(
+      app.page.getByRole("button", { name: "Stop", exact: true }),
+    ).toBeVisible();
+    response.write(m.assistant(" is to save the notes."));
+    response.end();
+    await expect(
+      transcript.getByText("The first step is to save the notes.", {
+        exact: true,
+      }),
+    ).toHaveCount(1);
+    await expect(
+      app.page.getByRole("button", { name: "Stop", exact: true }),
+    ).not.toBeVisible();
   },
 );

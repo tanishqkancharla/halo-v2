@@ -1,4 +1,4 @@
-import type { WorkspaceFilePreview } from "./rpc.js";
+import type { WorkspaceFilePreview, AgentMessage } from "./rpc.js";
 import {
   asyncIteratorObject,
   error,
@@ -8,17 +8,17 @@ import {
 } from "@orpc/contract";
 import type { ConnectionRequest } from "./connectionRequests.js";
 import type {
-  SessionLogEvent,
-  SessionLogRecord,
+  SessionWatchItem,
+  ProjectedSession,
   ToolIdentity,
-} from "./sessionLog.js";
+} from "./sessionState.js";
 import type {
   SessionSummary,
   WorkspaceInfo,
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const haloProtocolVersion = 5 as const;
+export const haloProtocolVersion = 6 as const;
 
 export const RequestRejectedError = error("BAD_REQUEST", {
   message: "Halo could not complete the request.",
@@ -149,16 +149,12 @@ export const contract = publicProcedure.router({
   sessions: {
     list: oc.output(type<SessionSummary[]>()),
     create: oc.output(type<{ sessionId: string }>()),
-    open: oc.input(type<{ sessionId: string }>()).output(
-      type<{
-        sessionId: string;
-        records: SessionLogRecord[];
-        cursor: number;
-      }>(),
-    ),
-    events: oc
-      .input(type<{ sessionId: string; afterSequence?: number }>())
-      .output(asyncIteratorObject(type<SessionLogRecord>())),
+    snapshot: oc
+      .input(type<{ sessionId: string }>())
+      .output(type<ProjectedSession>()),
+    watch: oc
+      .input(type<{ sessionId: string }>())
+      .output(asyncIteratorObject(type<SessionWatchItem>())),
     prompt: oc.input(type<{ sessionId: string; text: string }>()),
     startConnection: oc
       .input(type<{ sessionId: string; request: ConnectionRequest }>())
@@ -170,13 +166,11 @@ export const contract = publicProcedure.router({
   },
   testHarness: {
     loadSession: oc
-      .input(type<{ title: string; events: SessionLogEvent[] }>())
+      .input(type<{ title: string; messages: AgentMessage[] }>())
       .output(type<{ sessionId: string }>()),
     invokeTool: oc
       .input(type<{ path: string; input: unknown }>())
       .output(type<unknown>()),
-    appendSessionEvents:
-      oc.input(type<{ sessionId: string; events: SessionLogEvent[] }>()),
     getToolIdentity: oc
       .input(type<{ path: string }>())
       .output(type<ToolIdentity>()),

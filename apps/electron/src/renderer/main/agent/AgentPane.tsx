@@ -23,7 +23,7 @@ import { sessionViewItems, type SessionViewItem } from "./sessionView.ts";
 import {
   lastAssistantTurnWasAborted,
   type ProjectedSession,
-} from "@get-halo/shared/sessionLog";
+} from "@get-halo/shared/sessionState";
 import { AssistantMessage } from "./AssistantMessage.tsx";
 import { Editor } from "./Editor.tsx";
 import { ExtensionPermissionRequests } from "../../ExtensionPermissions.js";

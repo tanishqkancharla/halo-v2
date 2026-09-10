@@ -36,7 +36,7 @@ export const testingRouter = os.router({
     if (session instanceof Error) return orpcErrors.badRequest(session);
     const named = await session.setName(input.title);
     if (named instanceof Error) return orpcErrors.badRequest(named);
-    const appended = await session.appendEvents(input.events);
+    const appended = await session.appendMessages(input.messages);
     if (appended instanceof Error) return orpcErrors.badRequest(appended);
     const closed = await context.sessions.close(session.sessionId);
     if (closed instanceof Error) return orpcErrors.badRequest(closed);
@@ -63,17 +63,6 @@ export const testingRouter = os.router({
     }
     return result.data;
   }),
-  appendSessionEvents: os.appendSessionEvents.handler(
-    async ({ input, context }) => {
-      if (!context.testingApiEnabled) {
-        return orpcErrors.badRequest(new TestingApiUnavailableError());
-      }
-      const session = await context.sessions.open(input.sessionId);
-      if (session instanceof Error) return orpcErrors.badRequest(session);
-      const appended = await session.appendEvents(input.events);
-      if (appended instanceof Error) return orpcErrors.badRequest(appended);
-    },
-  ),
   getToolIdentity: os.getToolIdentity.handler(async ({ input, context }) => {
     if (!context.testingApiEnabled) {
       return orpcErrors.badRequest(new TestingApiUnavailableError());

@@ -2,11 +2,14 @@ import { describe, expect, test } from "vitest";
 import type { AgentMessage } from "./rpc.js";
 import {
   lastAssistantTurnWasAborted,
-  projectSession,
-  type SessionLogEvent,
+  applySessionEvent,
+  emptySessionState,
+  projectSavedMessages,
+  reduceSessionUpdate,
+  type SessionEvent,
   type ToolIdentity,
   type ToolInvocation,
-} from "./sessionLog.js";
+} from "./sessionState.js";
 
 const emptyUsage = {
   input: 0,
@@ -55,7 +58,7 @@ describe("projectSession", () => {
       content: [{ type: "text", text: "hi" }],
       timestamp: 2,
     });
-    const events: SessionLogEvent[] = [
+    const events: SessionEvent[] = [
       { type: "message.committed", message: user },
       { type: "message.committed", message: assistant },
     ];
@@ -72,7 +75,7 @@ describe("projectSession", () => {
       content: [{ type: "text", text: "Hello" }],
       timestamp: 2,
     });
-    const events: SessionLogEvent[] = [
+    const events: SessionEvent[] = [
       { type: "run.started", runId: "run-1" },
       {
         type: "assistant.updated",
@@ -135,7 +138,7 @@ describe("projectSession", () => {
       tool,
       arguments: { path: "README.md" },
     } satisfies ToolInvocation;
-    const events: SessionLogEvent[] = [
+    const events: SessionEvent[] = [
       { type: "run.started", runId: "run-1" },
       { type: "tool.started", invocation },
       {
@@ -182,7 +185,7 @@ describe("projectSession", () => {
       tool: { path: "bash", displayName: "Shell" },
       arguments: { command: "sleep 10" },
     };
-    const interrupted: SessionLogEvent[] = [
+    const interrupted: SessionEvent[] = [
       { type: "run.started", runId: "run-1" },
       { type: "tool.started", invocation },
       { type: "run.started", runId: "run-2" },
@@ -198,4 +201,51 @@ describe("projectSession", () => {
       ]).isWorking,
     ).toBe(false);
   });
+});
+
+function projectSession(events: readonly SessionEvent[]) {
+  return events.reduce(applySessionEvent, emptySessionState());
+}
+
+test("replaces a previous conversation with a snapshot and settles its partial reply", () => {
+  const previous = projectSavedMessages([
+    userMessage("Previous conversation", 1),
+  ]);
+  const current = projectSavedMessages([
+    userMessage("Current conversation", 2),
+  ]);
+  const partial = assistantMessage({
+    content: [{ type: "text", text: "Hello" }],
+    stopReason: "stop",
+    timestamp: 3,
+  });
+  const snapshot = {
+    ...current,
+    activeRunId: "current",
+    isWorking: true,
+    streamingMessage: partial,
+  };
+  const restored = reduceSessionUpdate(previous, {
+    type: "snapshot",
+    state: snapshot,
+  });
+  const completed = reduceSessionUpdate(restored, {
+    type: "event",
+    event: {
+      type: "message.committed",
+      message: { ...partial, content: [{ type: "text", text: "Hello again" }] },
+    },
+  });
+  const settled = reduceSessionUpdate(completed, {
+    type: "event",
+    event: { type: "run.finished", runId: "current", outcome: "completed" },
+  });
+  expect(settled.messages).toEqual([
+    current.messages[0],
+    { ...partial, content: [{ type: "text", text: "Hello again" }] },
+  ]);
+  expect(settled.streamingMessage).toBeUndefined();
+  expect(settled.isWorking).toBe(false);
+  expect(restored.streamingMessage).toEqual(partial);
+  expect(previous.messages).toEqual([userMessage("Previous conversation", 1)]);
 });

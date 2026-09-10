@@ -1,5 +1,5 @@
 import type { ConnectionRequest } from "./connectionRequests.js";
-import type { AgentMessage } from "./sessionLog.js";
+import type { AgentMessage } from "./sessionState.js";
 
 type ToolArguments = Extract<
   Extract<AgentMessage, { role: "assistant" }>["content"][number],
@@ -27,15 +27,7 @@ type ExecDescription = {
 
 type ToolStartOptions = {
   id: string;
-  parentId?: string;
   arguments?: ToolArguments;
-};
-
-type ToolEndOptions = {
-  id: string;
-  result?: string;
-  isError?: boolean;
-  details?: ToolResultDetails;
 };
 
 export type SessionDescription = {
@@ -54,39 +46,19 @@ export type SessionDescriptionItem =
       details?: ToolResultDetails;
     }
   | { type: "connectionRequest"; request: ConnectionRequest }
-  | ExecDescription
-  | { type: "run.start"; id?: string }
-  | {
-      type: "run.end";
-      id?: string;
-      outcome?: "completed" | "interrupted";
-    }
-  | ({ type: "tool.start"; nested: boolean; path: string } & ToolStartOptions)
-  | ({ type: "tool.end"; nested: boolean } & ToolEndOptions);
+  | ExecDescription;
 
-type ToolDialect = {
-  start(
-    toolPath: string,
-    options: ToolStartOptions,
-  ): Extract<SessionDescriptionItem, { type: "tool.start" }>;
-  end(
-    options: ToolEndOptions,
-  ): Extract<SessionDescriptionItem, { type: "tool.end" }>;
-};
+type ToolCallDescription = {
+  type: "tool.start";
+  path: string;
+} & ToolStartOptions;
 
 type ToolMessage = Extract<SessionDescriptionItem, { type: "tool" }>;
 
 export type MessageDialect = {
-  run: {
-    start(options?: {
-      id?: string;
-    }): Extract<SessionDescriptionItem, { type: "run.start" }>;
-    end(options?: {
-      id?: string;
-      outcome?: "completed" | "interrupted";
-    }): Extract<SessionDescriptionItem, { type: "run.end" }>;
+  tool: {
+    start(toolPath: string, options: ToolStartOptions): ToolCallDescription;
   };
-  tool: ToolDialect;
   user(text: string): Extract<SessionDescriptionItem, { type: "user" }>;
   assistant(
     text: string,
@@ -102,34 +74,16 @@ export type MessageDialect = {
   write(input: { path: string; content: string; result: string }): ToolMessage;
   patch(input: { patchText: string; result: string }): ToolMessage;
   bash(input: { command: string; result: string }): ToolMessage;
-  exec: ((input: Omit<ExecDescription, "type">) => ExecDescription) & {
-    start(input: {
-      js: string;
-      id: string;
-    }): Extract<SessionDescriptionItem, { type: "tool.start" }>;
-    end: ToolDialect["end"];
-    tool: ToolDialect;
-  };
+  exec(input: Omit<ExecDescription, "type">): ExecDescription;
   connectionRequest(
     request: ConnectionRequest,
   ): Extract<SessionDescriptionItem, { type: "connectionRequest" }>;
 };
 
 export const m: MessageDialect = {
-  run: {
-    start(options = {}) {
-      return { type: "run.start", ...options };
-    },
-    end(options = {}) {
-      return { type: "run.end", ...options };
-    },
-  },
   tool: {
     start(toolPath, options) {
-      return { type: "tool.start", nested: false, path: toolPath, ...options };
-    },
-    end(options) {
-      return { type: "tool.end", nested: false, ...options };
+      return { type: "tool.start", path: toolPath, ...options };
     },
   },
   user(text) {
@@ -185,43 +139,9 @@ export const m: MessageDialect = {
       result: input.result,
     };
   },
-  exec: Object.assign(
-    (input: Omit<ExecDescription, "type">) => ({
-      type: "exec" as const,
-      ...input,
-    }),
-    {
-      start(input: { js: string; id: string }) {
-        return {
-          type: "tool.start" as const,
-          nested: false,
-          path: "exec",
-          id: input.id,
-          arguments: { js: input.js },
-        };
-      },
-      end(options: ToolEndOptions) {
-        return {
-          type: "tool.end" as const,
-          nested: false,
-          ...options,
-        };
-      },
-      tool: {
-        start(toolPath: string, options: ToolStartOptions) {
-          return {
-            type: "tool.start" as const,
-            nested: true,
-            path: toolPath,
-            ...options,
-          };
-        },
-        end(options: ToolEndOptions) {
-          return { type: "tool.end" as const, nested: true, ...options };
-        },
-      },
-    },
-  ),
+  exec(input) {
+    return { type: "exec", ...input };
+  },
   connectionRequest(request) {
     return { type: "connectionRequest", request };
   },

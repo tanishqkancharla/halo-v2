@@ -9,7 +9,8 @@
     "./isCallable": "./src/isCallable.ts",
     "./mauiSkills": "./src/mauiSkills.ts",
     "./rpc": "./src/rpc.ts",
-    "./sessionLog": "./src/sessionLog.ts",
+    "./sessionState": "./src/sessionState.ts",
+    "./Stream": "./src/Stream.ts",
     "./testing": "./src/testing.ts"
   },
   "scripts": {

@@ -3,7 +3,7 @@ import { OAUTH2_SESSION_TTL_MS } from "@executor-js/sdk/core";
 import * as errore from "errore";
 import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type { ConnectionStarted } from "@get-halo/shared/contract";
-import type { HaloConnectionEvent } from "@get-halo/shared/sessionLog";
+import type { HaloConnectionEvent } from "@get-halo/shared/sessionState";
 import type { ToolRuntime } from "./ToolRuntime.js";
 
 export class ConnectionSessionMismatchError extends errore.createTaggedError({

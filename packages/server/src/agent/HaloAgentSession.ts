@@ -2,6 +2,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import {
   AgentHarness,
   type AgentLane,
+  type LaneSnapshot,
   type AgentTool,
   type AgentMessage,
   type AgentHarnessTool,
@@ -12,28 +13,24 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core/harness/contex
 import type { Session } from "@earendil-works/pi-agent-core/harness/session";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import * as errore from "errore";
+import { Stream } from "@get-halo/shared/Stream";
 import {
-  sessionLogEventSchema,
-  type SessionLogEvent,
-  type ToolIdentity,
-} from "@get-halo/shared/sessionLog";
-import {
-  createDurableStream,
-  type DurableStream,
-  type DurableStreamRecord,
-} from "../DurableStream.js";
-import { JsonlDurableStreamStorage } from "../JsonlDurableStreamStorage.js";
+  projectSavedMessages,
+  directToolIdentity,
+  withExecToolCalls,
+  type ProjectedSession,
+  type ProjectedToolInvocation,
+  type AgentMessage as StoredMessage,
+  type SessionWatchItem,
+  type HaloConnectionEvent,
+} from "@get-halo/shared/sessionState";
 import type { WorkspaceLayout } from "../workspace/WorkspaceService.js";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 import type { ToolRuntime } from "./runtime/ToolRuntime.js";
 import { createAuthorizedCodingTools } from "./tools/codingTools.js";
 import { createExecTool } from "./tools/execTool.js";
 import { WorkspaceResourceLoader } from "./WorkspaceResourceLoader.js";
-import {
-  adaptPiEvent,
-  interruptedSessionEvents,
-  type PiEventAdapterState,
-} from "./SessionLogAdapter.js";
+import { adaptPiEvent } from "./SessionEventAdapter.js";
 
 export class EmptyPromptError extends errore.createTaggedError({
   name: "EmptyPromptError",
@@ -55,9 +52,9 @@ export class CreateAgentSessionError extends errore.createTaggedError({
   message: "Failed to create agent session",
 }) {}
 
-export class SessionEventPersistenceError extends errore.createTaggedError({
-  name: "SessionEventPersistenceError",
-  message: "Could not persist events for session '$sessionId'",
+export class SessionStorageError extends errore.createTaggedError({
+  name: "SessionStorageError",
+  message: "Could not access storage for session '$sessionId'",
 }) {}
 
 type SessionNotification = {
@@ -74,47 +71,14 @@ export type HaloAgentSessionOptions = {
 };
 
 export class HaloAgentSession {
-  readonly events: DurableStream<SessionLogEvent>;
-  private readonly unsubscribePiEvents: () => void;
-  private adapterState: PiEventAdapterState = { activeRunId: undefined };
-  private readonly pendingEventWrites: Promise<
-    DurableStreamRecord<SessionLogEvent> | Error
-  >[] = [];
-  private eventWriteError: SessionEventPersistenceError | undefined;
+  private readonly connectionEvents = new Stream<HaloConnectionEvent>();
+  private readonly closed = new AbortController();
 
   private constructor(
-    private readonly piSession: Session,
+    readonly sessionId: string,
     private readonly harness: AgentHarness,
     private readonly lane: AgentLane,
-    events: DurableStream<SessionLogEvent>,
-    toolIdentities: ReadonlyMap<string, ToolIdentity>,
-  ) {
-    this.events = events;
-    const subscriptions = (
-      [
-        "run_start",
-        "run_end",
-        "message_end",
-        "message_update",
-        "tool_start",
-        "tool_update",
-        "tool_end",
-      ] as const
-    ).map((type) =>
-      this.harness.events.on(type, (event) => {
-        const adapted = adaptPiEvent({
-          state: this.adapterState,
-          event,
-          toolIdentities,
-        });
-        this.adapterState = adapted.state;
-        this.queueEvents(adapted.events);
-      }),
-    );
-    this.unsubscribePiEvents = () => {
-      for (const unsubscribe of subscriptions) unsubscribe();
-    };
-  }
+  ) {}
 
   static async attach(options: HaloAgentSessionOptions, stored: Session) {
     await using cleanup = new errore.AsyncDisposableStack();
@@ -172,83 +136,75 @@ export class HaloAgentSession {
       { createAt: null },
       BACKGROUND_CONTEXT,
     );
-    const events = await createDurableStream({
-      storage: new JsonlDurableStreamStorage({
-        filesystem: options.filesystem,
-        path: layout.sessionLogPath(stored.metadata.id),
-        valueSchema: sessionLogEventSchema,
-      }),
-    });
-    if (events instanceof Error) {
-      return new SessionEventPersistenceError({
-        sessionId: stored.metadata.id,
-        cause: events,
-      });
-    }
-    const toolIdentities = new Map(
-      customTools.map((tool) => [
-        tool.name,
-        { path: tool.name, displayName: tool.label },
-      ]),
-    );
     const session = new HaloAgentSession(
-      stored,
+      stored.metadata.id,
       created.harness,
       lane,
-      events,
-      toolIdentities,
     );
-    const recovered = await session.recoverInterruptedActivity();
-    if (recovered instanceof Error) {
-      session.unsubscribePiEvents();
-      return recovered;
-    }
     cleanup.move();
     return session;
   }
 
-  get sessionId() {
-    return this.piSession.metadata.id;
+  async readSnapshot() {
+    const watch = await this.lane
+      .watch(BACKGROUND_CONTEXT)
+      .catch(
+        (cause) =>
+          new SessionStorageError({ sessionId: this.sessionId, cause }),
+      );
+    if (watch instanceof Error) return watch;
+    watch.unsubscribe();
+    return projectSnapshot(watch.snapshot);
   }
 
-  getSnapshot() {
-    const records = [...this.events.snapshot()];
-    const last = records.at(-1);
-    return {
-      records,
-      cursor: last === undefined ? 0 : last.sequence,
-    };
+  async *watch(
+    signal: AbortSignal = this.closed.signal,
+  ): AsyncGenerator<SessionWatchItem, void, void> {
+    const abortSignal = AbortSignal.any([signal, this.closed.signal]);
+    const stream = new Stream<SessionWatchItem>();
+    using updates = stream.consume({ abortSignal });
+    using cleanup = new errore.DisposableStack();
+    cleanup.defer(
+      this.connectionEvents.subscribe((event) =>
+        stream.append({ type: "event", event }),
+      ),
+    );
+    const watch = await this.lane.watch(BACKGROUND_CONTEXT);
+    cleanup.defer(() => watch.unsubscribe());
+    if (abortSignal.aborted) return;
+    yield { type: "snapshot", state: projectSnapshot(watch.snapshot) };
+    watch.start((event) => {
+      for (const adapted of adaptPiEvent(event))
+        stream.append({ type: "event", event: adapted });
+    });
+    yield* updates;
   }
 
-  async appendEvents(events: readonly SessionLogEvent[]) {
-    for (const event of events) {
-      if (event.type !== "message.committed") {
-        this.queueEvents([event]);
-        continue;
-      }
+  publishConnectionEvent(event: HaloConnectionEvent) {
+    this.connectionEvents.append(event);
+  }
+
+  async appendMessages(messages: readonly StoredMessage[]) {
+    for (const message of messages) {
       const appended = await this.lane
         .appendMessage(
-          event.message.role === "bashExecution"
-            ? { ...event.message, exitCode: event.message.exitCode }
-            : event.message,
+          message.role === "bashExecution"
+            ? { ...message, exitCode: message.exitCode }
+            : message,
           BACKGROUND_CONTEXT,
         )
         .catch(
           (cause) =>
-            new SessionEventPersistenceError({
-              sessionId: this.sessionId,
-              cause,
-            }),
+            new SessionStorageError({ sessionId: this.sessionId, cause }),
         );
       if (appended instanceof Error) return appended;
     }
-    return await this.drainEventWrites();
   }
 
   async setName(name: string) {
     return this.harness.setName(name, BACKGROUND_CONTEXT).catch(
       (cause) =>
-        new SessionEventPersistenceError({
+        new SessionStorageError({
           sessionId: this.sessionId,
           cause,
         }),
@@ -286,7 +242,6 @@ export class HaloAgentSession {
           cause: queued.error,
         });
     }
-    return this.drainEventWrites();
   }
 
   async abort() {
@@ -301,7 +256,6 @@ export class HaloAgentSession {
         reason: aborted.error.message,
         cause: aborted.error,
       });
-    return this.drainEventWrites();
   }
 
   async notify(input: SessionNotification) {
@@ -314,43 +268,60 @@ export class HaloAgentSession {
   }
 
   async close() {
+    this.closed.abort();
     const closed = await this.harness
       .close(BACKGROUND_CONTEXT)
       .catch(
         (cause) =>
           new AbortFailedError({ reason: "Session close failed", cause }),
       );
-    this.unsubscribePiEvents();
-    const persisted = await this.drainEventWrites();
     if (closed instanceof Error) return closed;
-    return persisted;
   }
+}
 
-  private queueEvents(events: readonly SessionLogEvent[]): void {
-    for (const event of events) {
-      this.pendingEventWrites.push(this.events.append(event));
-    }
+function projectSnapshot(snapshot: LaneSnapshot): ProjectedSession {
+  const state = projectSavedMessages(
+    snapshot.transcript.flatMap((entry) =>
+      entry.type === "message" ? [entry.message] : [],
+    ),
+  );
+  if (snapshot.faulted)
+    return {
+      ...state,
+      error: "The session encountered a storage error.",
+      isWorking: false,
+    };
+  const operation = snapshot.operation;
+  if (operation === null) {
+    if (snapshot.lastResult?.status === "failed")
+      state.error = snapshot.lastResult.error?.message;
+    return state;
   }
-
-  private async drainEventWrites() {
-    while (this.pendingEventWrites.length > 0) {
-      const results = await Promise.all(this.pendingEventWrites.splice(0));
-      const error = results.find((result) => result instanceof Error);
-      if (error instanceof Error) {
-        this.eventWriteError = new SessionEventPersistenceError({
-          sessionId: this.sessionId,
-          cause: error,
-        });
-      }
-    }
-    return this.eventWriteError;
-  }
-
-  private async recoverInterruptedActivity() {
-    const recoveryEvents = interruptedSessionEvents(
-      this.events.snapshot().map((record) => record.value),
+  state.activeRunId = operation.id;
+  state.isWorking = true;
+  state.streamingMessage = operation.streamingMessage;
+  for (const tool of operation.runningTools) {
+    const activity: ProjectedToolInvocation = {
+      invocation: {
+        id: tool.toolCallId,
+        runId: operation.id,
+        tool: directToolIdentity(tool.toolName),
+        arguments: tool.args,
+      },
+      update: tool.result,
+    };
+    if (tool.status === "settled")
+      activity.completion = { result: tool.result, isError: tool.isError };
+    state.toolInvocations = state.toolInvocations.filter(
+      (current) => current.invocation.id !== tool.toolCallId,
     );
-    this.queueEvents(recoveryEvents);
-    return await this.drainEventWrites();
+    state.toolInvocations.push(activity);
+    if (tool.result !== undefined)
+      state.toolInvocations = withExecToolCalls(
+        state.toolInvocations,
+        tool.result,
+        operation.id,
+      );
   }
+  return state;
 }

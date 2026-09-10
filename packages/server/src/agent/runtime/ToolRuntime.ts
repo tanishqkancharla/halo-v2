@@ -62,7 +62,7 @@ import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
 import type {
   ExecActivityUpdate,
   ToolIdentity,
-} from "@get-halo/shared/sessionLog";
+} from "@get-halo/shared/sessionState";
 import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 import type {
   HaloTool,

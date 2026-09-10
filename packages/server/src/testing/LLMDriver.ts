@@ -100,6 +100,11 @@ export class LLMDriver {
     sendResponse(request, result);
   }
 
+  async stream() {
+    await this.waitForRequest();
+    return startResponse(this.pending.shift()!);
+  }
+
   private async receive(
     request: http.IncomingMessage,
     response: http.ServerResponse,
@@ -158,6 +163,13 @@ function sendResponse(
     );
     return;
   }
+  const streamed = startResponse({ body, response });
+  const items = Array.isArray(description) ? description : [description];
+  for (const item of items) streamed.write(item);
+  streamed.end();
+}
+
+function startResponse({ body, response }: PendingRequest) {
   response.writeHead(200, { "Content-Type": "text/event-stream" });
   const id = `chatcmpl-${crypto.randomUUID()}`;
   const created = Math.floor(Date.now() / 1000);
@@ -175,35 +187,38 @@ function sendResponse(
     // oxlint-disable-next-line unicorn/no-null -- OpenAI streaming chunks use a null finish_reason until completion.
     chunk({ index: 0, delta: value, finish_reason: null });
   delta({ role: "assistant" });
-  const items = Array.isArray(description) ? description : [description];
   let toolIndex = 0;
-  for (const item of items) {
-    if (item.type === "assistant") {
-      delta({ content: item.text });
-      continue;
-    }
-    delta({
-      tool_calls: [
-        {
-          index: toolIndex++,
-          id: item.id,
-          type: "function",
-          function: {
-            name: item.path,
-            arguments: JSON.stringify(
-              item.arguments === undefined ? {} : item.arguments,
-            ),
+  return {
+    write(item: ModelResponse) {
+      if (item.type === "assistant") {
+        delta({ content: item.text });
+        return;
+      }
+      delta({
+        tool_calls: [
+          {
+            index: toolIndex++,
+            id: item.id,
+            type: "function",
+            function: {
+              name: item.path,
+              arguments: JSON.stringify(
+                item.arguments === undefined ? {} : item.arguments,
+              ),
+            },
           },
-        },
-      ],
-    });
-  }
-  chunk({
-    index: 0,
-    delta: {},
-    finish_reason: toolIndex > 0 ? "tool_calls" : "stop",
-  });
-  response.end("data: [DONE]\n\n");
+        ],
+      });
+    },
+    end() {
+      chunk({
+        index: 0,
+        delta: {},
+        finish_reason: toolIndex > 0 ? "tool_calls" : "stop",
+      });
+      response.end("data: [DONE]\n\n");
+    },
+  };
 }
 
 export function messageText(message: ChatCompletionMessageParam): string {

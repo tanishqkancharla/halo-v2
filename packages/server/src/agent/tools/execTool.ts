@@ -1,3 +1,7 @@
+import {
+  updateExecToolCalls,
+  type ExecToolCall,
+} from "@get-halo/shared/sessionState";
 import type { AgentHarnessTool } from "@earendil-works/pi-agent-core";
 import { formatExecuteResult } from "@executor-js/execution/core";
 import { Type } from "typebox";
@@ -23,18 +27,30 @@ export function createExecTool(input: {
     async execute(id, params, onUpdate, _toolContext, _invocation, context) {
       // SAFETY: execParameters schema guarantees params has a string `js` property.
       const { js } = params as { js: string };
+      const toolCalls = new Map<string, ExecToolCall>();
       const result = await input.runtime.executeCode({
         code: js,
         signal: context.abortSignal,
         modelId: input.modelId,
         parentToolCallId: id,
-        onToolEvent: (event) => onUpdate({ content: [], details: event }),
+        onToolEvent: (event) => {
+          updateExecToolCalls(toolCalls, event);
+          // Pi persists progress only when the harness checkpoint option is set.
+          onUpdate(
+            {
+              content: [],
+              details: { ...event, toolCalls: [...toolCalls.values()] },
+            },
+            { checkpoint: true },
+          );
+        },
       });
       if (result instanceof ConnectionRequiredError) {
         return {
           content: [{ type: "text" as const, text: result.message }],
           details: {
             error: result.message,
+            toolCalls: [...toolCalls.values()],
             connectionRequests: result.connectionRequests,
           },
         };
@@ -42,14 +58,20 @@ export function createExecTool(input: {
       if (result instanceof Error) {
         return {
           content: [{ type: "text" as const, text: result.message }],
-          details: { error: result.message },
+          details: {
+            error: result.message,
+            toolCalls: [...toolCalls.values()],
+          },
           isError: true,
         };
       }
       const formatted = formatExecuteResult(result);
       return {
         content: [{ type: "text" as const, text: formatted.text }],
-        details: formatted.structured,
+        details: {
+          ...formatted.structured,
+          toolCalls: [...toolCalls.values()],
+        },
         isError: formatted.isError,
       };
     },

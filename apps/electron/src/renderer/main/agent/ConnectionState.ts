@@ -1,5 +1,5 @@
 import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
-import type { HaloConnectionEvent } from "@get-halo/shared/sessionLog";
+import type { HaloConnectionEvent } from "@get-halo/shared/sessionState";
 
 export type ConnectionState =
   | { status: "idle" | "connected" | "cancelled" | "expired" }

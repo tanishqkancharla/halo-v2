@@ -1,7 +1,7 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
 export type { AgentSessionEvent };
-export type { AgentMessage } from "./sessionLog.js";
+export type { AgentMessage } from "./sessionState.js";
 export type WorkspaceInfo = {
   name: string;
   workspaceRoot: string;

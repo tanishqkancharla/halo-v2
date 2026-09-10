@@ -5,7 +5,7 @@ import type {
   ProjectedSession,
   ProjectedToolInvocation,
   ToolIdentity,
-} from "@get-halo/shared/sessionLog";
+} from "@get-halo/shared/sessionState";
 import {
   connectionRequestSchema,
   type ConnectionRequest,
@@ -405,6 +405,7 @@ function reduceToolInvocations(
   return state.toolInvocations.flatMap((tool) => {
     const active =
       tool.completion === undefined &&
+      state.activeRunId !== undefined &&
       tool.invocation.runId === state.activeRunId;
     if (!active && tool.completion === undefined) return [];
     return [{ ...tool, active }];

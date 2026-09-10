@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import * as errore from "errore";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  projectSession,
+  emptySessionState,
+  reduceSessionUpdate,
   type ProjectedSession,
-  type SessionLogRecord,
-} from "@get-halo/shared/sessionLog";
+  type SessionWatchItem,
+} from "@get-halo/shared/sessionState";
 import { useApi } from "../../api/ApiProvider.tsx";
-import type { HaloClient } from "@get-halo/shared/contract";
+import { Stream } from "@get-halo/shared/Stream";
 import {
   applyConnectionEvent,
   connectionStateQueryKey,
@@ -30,9 +31,6 @@ type UseAgentSessionResult = {
   abort: () => Promise<void | AbortFailedError>;
 };
 
-/**
- * Opens a saved session and projects its durable event records.
- */
 export function useAgentSession(
   sessionId: string | undefined,
 ): UseAgentSessionResult {
@@ -42,65 +40,58 @@ export function useAgentSession(
   const [readySessionId, setReadySessionId] = useState<string | undefined>(
     undefined,
   );
-  const [records, setRecords] = useState<SessionLogRecord[]>([]);
+  const [state, setState] = useState<ProjectedSession>(emptySessionState);
   const [localError, setLocalError] = useState<string | undefined>(undefined);
   const [openedFor, setOpenedFor] = useState(sessionId);
 
   if (openedFor !== sessionId) {
     setOpenedFor(sessionId);
     setReadySessionId(undefined);
-    setRecords([]);
+    setState(emptySessionState());
     setLocalError(undefined);
   }
 
   useEffect(() => {
     if (sessionId === undefined) return;
-    let cancelled = false;
-    let iterator:
-      | Awaited<ReturnType<HaloClient["sessions"]["events"]>>
-      | undefined;
+    const controller = new AbortController();
 
+    const updates = new Stream<SessionWatchItem>();
+    const states = updates.project(emptySessionState(), reduceSessionUpdate);
+    const unsubscribe = states.subscribe(setState);
     void (async () => {
-      const opened = await api.sessions.open({ sessionId }).catch(
-        (e) =>
-          new PromptFailedError({
-            reason: e instanceof Error ? e.message : String(e),
-            cause: e,
-          }),
+      const source = await api.sessions.watch(
+        { sessionId },
+        { signal: controller.signal },
       );
-      if (opened instanceof Error) {
-        console.warn("Failed to open agent session:", opened);
-        return;
-      }
-      if (cancelled) return;
-      setRecords(opened.records);
-      setReadySessionId(opened.sessionId);
-      iterator = await api.sessions.events({
-        sessionId: opened.sessionId,
-        afterSequence: opened.cursor,
-      });
-      for await (const record of iterator) {
-        setRecords((current) => [...current, record]);
-        const event = record.value;
-        if (event.type === "halo.connection") {
+      for await (const item of source) {
+        if (controller.signal.aborted) return;
+        if (item.type === "snapshot") setReadySessionId(sessionId);
+        if (item.type === "event" && item.event.type === "halo.connection") {
+          const event = item.event;
           queryClientRef.current.setQueryData<ConnectionState>(
             connectionStateQueryKey(event.request),
             (current) => applyConnectionEvent(current, event),
           );
         }
+        updates.append(item);
       }
+      if (controller.signal.aborted) return;
+      setReadySessionId(undefined);
+      setLocalError(
+        "Live updates disconnected. Reopen this conversation to reconnect.",
+      );
     })().catch((cause) => {
-      if (cancelled && errore.isAbortError(cause)) return;
+      if (controller.signal.aborted) return;
       console.warn("Session event stream failed:", cause);
+      setReadySessionId(undefined);
+      setLocalError(
+        "Live updates disconnected. Reopen this conversation to reconnect.",
+      );
     });
 
     return () => {
-      cancelled = true;
-      if (iterator === undefined) return;
-      void iterator.return().catch((cause) => {
-        if (errore.isAbortError(cause)) return;
-        console.warn("Failed to close session event stream:", cause);
-      });
+      unsubscribe();
+      controller.abort();
     };
   }, [api, sessionId]);
 
@@ -149,7 +140,11 @@ export function useAgentSession(
     }
   }
 
-  return { state: projectRecords(records, localError), prompt, abort };
+  return {
+    state: localError === undefined ? state : { ...state, error: localError },
+    prompt,
+    abort,
+  };
 }
 
 type UseDraftAgentSessionResult = {
@@ -238,13 +233,4 @@ export function useDraftAgentSession(
     prompt,
     abort,
   };
-}
-
-function projectRecords(
-  records: readonly SessionLogRecord[],
-  localError: string | undefined,
-): ProjectedSession {
-  const projected = projectSession(records.map((record) => record.value));
-  if (localError === undefined) return projected;
-  return { ...projected, error: localError, isWorking: false };
 }

@@ -1,24 +1,14 @@
-import type {
-  SessionDescription,
-  SessionDescriptionItem,
-} from "@get-halo/shared/testing";
+import type { SessionDescription } from "@get-halo/shared/testing";
 import { test as baseTest } from "@playwright/test";
-import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
 import { createTestArtifacts, type TestArtifacts } from "./TestArtifacts.js";
 import { ElectronTestApp } from "./ElectronTestApp.js";
-import { LLMDriver } from "@get-halo/server/testing";
+import { LLMDriver, HttpService } from "@get-halo/server/testing";
 import { createHarnessTools } from "./tools.js";
-import {
-  loadSessionDescription,
-  sessionDescriptionEvents,
-} from "./SessionDescription.js";
+import { loadSessionDescription } from "./SessionDescription.js";
 
 type E2ESession = {
   sessionId: string;
-  append(
-    items: SessionDescriptionItem | SessionDescriptionItem[],
-  ): Promise<void>;
 };
 
 type E2ETestHarness = TestArtifacts["harness"] & {
@@ -28,12 +18,21 @@ type E2ETestHarness = TestArtifacts["harness"] & {
 
 type E2EFixtures = {
   llm: LLMDriver;
+  http: HttpService;
   app: ElectronTestApp;
   testArtifacts: TestArtifacts;
   harness: E2ETestHarness;
 };
 
 export const e2eTest = baseTest.extend<E2EFixtures>({
+  // oxlint-disable-next-line eslint/no-empty-pattern -- Fixture callbacks require destructured parameters.
+  http: async ({}, use) => {
+    const http = await HttpService.start();
+    if (http instanceof Error) throw http;
+    await using cleanup = new errore.AsyncDisposableStack();
+    cleanup.defer(() => http.close());
+    await use(http);
+  },
   // oxlint-disable-next-line eslint/no-empty-pattern -- Playwright fixture callbacks require an object-destructured first parameter.
   llm: async ({}, use) => {
     const llm = await LLMDriver.start();
@@ -79,36 +78,8 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
         await app.page
           .getByRole("main", { name: description.title, exact: true })
           .waitFor();
-        return createE2ESession({
-          sessionId: loaded.sessionId,
-          getServer: () => app.server.rpc,
-        });
+        return loaded;
       },
     });
   },
 });
-
-function createE2ESession(args: {
-  sessionId: string;
-  getServer(): HaloClient;
-}): E2ESession {
-  return {
-    sessionId: args.sessionId,
-    async append(items) {
-      const server = args.getServer();
-      const opened = await server.sessions.open({
-        sessionId: args.sessionId,
-      });
-      const events = await sessionDescriptionEvents({
-        items: Array.isArray(items) ? items : [items],
-        history: opened.records.map((record) => record.value),
-        getToolIdentity: (path) => server.testHarness.getToolIdentity({ path }),
-      });
-      if (events instanceof Error) throw events;
-      await server.testHarness.appendSessionEvents({
-        sessionId: args.sessionId,
-        events,
-      });
-    },
-  };
-}

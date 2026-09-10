@@ -1,3 +1,7 @@
+import {
+  emptySessionState,
+  reduceSessionUpdate,
+} from "@get-halo/shared/sessionState";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect } from "vitest";
@@ -29,7 +33,7 @@ serverTest(
     const [firstListing, secondListing] = await Promise.all([
       server.rpc.sessions.list(),
       server.rpc.sessions.list(),
-      server.rpc.sessions.open(saved),
+      server.rpc.sessions.snapshot(saved),
     ]);
     for (const listing of [firstListing, secondListing]) {
       expect(
@@ -82,10 +86,9 @@ serverTest(
       ),
     );
     await recallNotebook;
-    expect(assistantReplies(await server.rpc.sessions.open(notebook))).toEqual([
-      "Saved the notebook.",
-      "Blue notebook → Continue",
-    ]);
+    expect(
+      assistantReplies(await server.rpc.sessions.snapshot(notebook)),
+    ).toEqual(["Saved the notebook.", "Blue notebook → Continue"]);
 
     const recallBicycle = server.rpc.sessions.prompt({
       ...bicycle,
@@ -100,10 +103,9 @@ serverTest(
       ),
     );
     await recallBicycle;
-    expect(assistantReplies(await server.rpc.sessions.open(bicycle))).toEqual([
-      "Saved the bicycle.",
-      "Red bicycle → Continue",
-    ]);
+    expect(
+      assistantReplies(await server.rpc.sessions.snapshot(bicycle)),
+    ).toEqual(["Saved the bicycle.", "Red bicycle → Continue"]);
   },
 );
 
@@ -528,11 +530,67 @@ serverTest("rejects previews through symlinks", async ({ server }) => {
 });
 
 function assistantReplies(
-  session: Awaited<ReturnType<HaloClient["sessions"]["open"]>>,
+  session: Awaited<ReturnType<HaloClient["sessions"]["snapshot"]>>,
 ) {
-  return session.records.flatMap(({ value }) =>
-    value.type === "message.committed" && value.message.role === "assistant"
-      ? [contentText(value.message.content)]
-      : [],
+  return session.messages.flatMap((message) =>
+    message.role === "assistant" ? [contentText(message.content)] : [],
   );
 }
+
+serverTest(
+  "reconnects to a running conversation without losing or duplicating its answer",
+  async ({ server, llm }) => {
+    const session = await server.rpc.sessions.create();
+    const initial = new AbortController();
+    const watch = await server.rpc.sessions.watch(session, {
+      signal: initial.signal,
+    });
+    const first = await watch.next();
+    expect(first.value).toMatchObject({
+      type: "snapshot",
+      state: { messages: [], isWorking: false },
+    });
+
+    const prompted = server.rpc.sessions.prompt({
+      ...session,
+      text: "Keep going while I reconnect",
+    });
+    await llm.waitForRequest();
+    initial.abort();
+    await watch.return();
+
+    const reconnected = new AbortController();
+    const updates = await server.rpc.sessions.watch(session, {
+      signal: reconnected.signal,
+    });
+    const current = await updates.next();
+    expect(current.value).toMatchObject({
+      type: "snapshot",
+      state: {
+        isWorking: true,
+        messages: [{ role: "user", content: "Keep going while I reconnect" }],
+      },
+    });
+    await llm.respond(m.assistant("I kept going."));
+    await prompted;
+    let state = emptySessionState();
+    if (current.done) throw new Error("Expected a session snapshot");
+    state = reduceSessionUpdate(state, current.value);
+    for await (const item of updates) {
+      state = reduceSessionUpdate(state, item);
+      if (!state.isWorking) {
+        reconnected.abort();
+        break;
+      }
+    }
+    expect(
+      state.messages.flatMap((message) =>
+        "content" in message ? [contentText(message.content)] : [],
+      ),
+    ).toEqual(["Keep going while I reconnect", "I kept going."]);
+    expect(await server.rpc.sessions.snapshot(session)).toMatchObject({
+      messages: state.messages,
+      isWorking: false,
+    });
+  },
+);

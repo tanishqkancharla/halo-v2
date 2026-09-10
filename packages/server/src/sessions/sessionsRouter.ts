@@ -31,31 +31,17 @@ export const sessionsRouter = os.router({
     if (session instanceof Error) return orpcErrors.badRequest(session);
     return { sessionId: session.sessionId };
   }),
-  open: os.open.handler(async ({ input, context }) => {
-    context.logger.info({
-      event: "openAgentSession",
-      sessionId: input.sessionId,
-    });
+  snapshot: os.snapshot.handler(async ({ input, context }) => {
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    const snapshot = session.getSnapshot();
-    return {
-      sessionId: session.sessionId,
-      records: snapshot.records,
-      cursor: snapshot.cursor,
-    };
+    const snapshot = await session.readSnapshot();
+    if (snapshot instanceof Error) return orpcErrors.badRequest(snapshot);
+    return snapshot;
   }),
-  events: os.events.handler(async ({ input, context, signal }) => {
-    context.logger.info({
-      event: "agentSession.events",
-      sessionId: input.sessionId,
-    });
+  watch: os.watch.handler(async ({ input, context, signal }) => {
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    return session.events.consume({
-      abortSignal: signal,
-      afterSequence: input.afterSequence,
-    });
+    return session.watch(signal);
   }),
   prompt: os.prompt.handler(async ({ input, context }) => {
     context.logger.info({
@@ -80,8 +66,7 @@ export const sessionsRouter = os.router({
       sessionId: input.sessionId,
       request: input.request,
       onEvent: async (event) => {
-        const appended = await session.appendEvents([event]);
-        if (appended instanceof Error) return appended;
+        session.publishConnectionEvent(event);
         if (event.status !== "connected") return;
         const notified = await notifyConnectedSession({
           session,

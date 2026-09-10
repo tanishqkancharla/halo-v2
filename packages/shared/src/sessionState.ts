@@ -228,7 +228,7 @@ export type ToolIdentity = Static<typeof toolIdentitySchema>;
 
 const toolInvocationSchema = Type.Object({
   id: Type.String(),
-  runId: Type.String(),
+  runId: Type.Optional(Type.String()),
   parentId: Type.Optional(Type.String()),
   tool: toolIdentitySchema,
   arguments: Type.Unknown(),
@@ -255,6 +255,51 @@ export const execActivityUpdateSchema = Type.Union([
 
 export type ExecActivityUpdate = Static<typeof execActivityUpdateSchema>;
 
+export const execToolCallSchema = Type.Object({
+  id: Type.String(),
+  parentId: Type.String(),
+  tool: toolIdentitySchema,
+  arguments: Type.Unknown(),
+  status: Type.Union([
+    Type.Literal("running"),
+    Type.Literal("completed"),
+    Type.Literal("failed"),
+  ]),
+});
+export type ExecToolCall = Static<typeof execToolCallSchema>;
+const execDetailsSchema = Type.Object({
+  toolCalls: Type.Array(execToolCallSchema),
+});
+
+export function updateExecToolCalls(
+  calls: Map<string, ExecToolCall>,
+  event: ExecActivityUpdate,
+): void {
+  if (event.type === "tool.started") {
+    calls.set(event.invocation.id, { ...event.invocation, status: "running" });
+    return;
+  }
+  const call = calls.get(event.invocationId);
+  if (call === undefined) return;
+  calls.set(call.id, {
+    ...call,
+    status: event.isError ? "failed" : "completed",
+  });
+}
+
+export function directToolIdentity(name: string): ToolIdentity {
+  const labels = new Map([
+    ["bash", "Shell"],
+    ["edit", "Edit"],
+    ["exec", "Exec"],
+    ["patch", "Patch"],
+    ["read", "Read"],
+    ["write", "Write"],
+  ]);
+  const label = labels.get(name);
+  return { path: name, displayName: label === undefined ? name : label };
+}
+
 const haloConnectionEventSchema = Type.Object({
   type: Type.Literal("halo.connection"),
   connectionId: Type.String(),
@@ -278,15 +323,18 @@ const agentToolResultSchema = Type.Object({
 
 export type AgentToolResult = Static<typeof agentToolResultSchema>;
 
-export const sessionLogEventSchema = Type.Union([
+export const sessionEventSchema = Type.Union([
+  Type.Object({ type: Type.Literal("session.failed"), error: Type.String() }),
   Type.Object({ type: Type.Literal("run.started"), runId: Type.String() }),
   Type.Object({
     type: Type.Literal("run.finished"),
     runId: Type.String(),
     outcome: Type.Union([
       Type.Literal("completed"),
-      Type.Literal("interrupted"),
+      Type.Literal("aborted"),
+      Type.Literal("failed"),
     ]),
+    error: Type.Optional(Type.String()),
   }),
   Type.Object({
     type: Type.Literal("message.committed"),
@@ -315,14 +363,7 @@ export const sessionLogEventSchema = Type.Union([
   haloConnectionEventSchema,
 ]);
 
-export type SessionLogEvent = Static<typeof sessionLogEventSchema>;
-
-export const sessionLogRecordSchema = Type.Object({
-  sequence: Type.Integer({ minimum: 1 }),
-  value: sessionLogEventSchema,
-});
-
-export type SessionLogRecord = Static<typeof sessionLogRecordSchema>;
+export type SessionEvent = Static<typeof sessionEventSchema>;
 
 export type ProjectedToolInvocation = {
   invocation: ToolInvocation;
@@ -337,84 +378,184 @@ export type ProjectedSession = {
   messages: AgentMessage[];
   streamingMessage: AgentMessage | undefined;
   toolInvocations: ProjectedToolInvocation[];
-  connectionEvents: HaloConnectionEvent[];
   activeRunId: string | undefined;
   error: string | undefined;
   isWorking: boolean;
 };
 
-export function projectSession(
-  events: readonly SessionLogEvent[],
-): ProjectedSession {
-  const messages: AgentMessage[] = [];
-  const toolInvocations = new Map<string, ProjectedToolInvocation>();
-  const connectionEvents: HaloConnectionEvent[] = [];
-  let streamingMessage: AgentMessage | undefined;
-  let error: string | undefined;
-  let activeRunId: string | undefined;
+export type SessionWatchItem =
+  | { type: "snapshot"; state: ProjectedSession }
+  | { type: "event"; event: SessionEvent };
 
-  for (const event of events) {
-    switch (event.type) {
-      case "run.started":
-        activeRunId = event.runId;
-        break;
-      case "run.finished":
-        if (event.runId === activeRunId) activeRunId = undefined;
-        break;
-      case "message.committed": {
-        messages.push(event.message);
-        if (event.message.role === "user") error = undefined;
-        if (event.message.role !== "assistant") break;
-        streamingMessage = undefined;
-        const turnError = assistantTurnError(event.message);
-        if (turnError !== undefined) error = turnError;
-        break;
-      }
-      case "assistant.updated":
-        streamingMessage = assistantMessageFromUpdate(event.update);
-        error = undefined;
-        break;
-      case "tool.started":
-        toolInvocations.set(event.invocation.id, {
-          invocation: event.invocation,
-        });
-        break;
-      case "tool.updated": {
-        const tool = toolInvocations.get(event.invocationId);
-        if (tool === undefined) break;
-        toolInvocations.set(event.invocationId, {
-          ...tool,
-          update: event.update,
-        });
-        break;
-      }
-      case "tool.finished": {
-        const tool = toolInvocations.get(event.invocationId);
-        if (tool === undefined) break;
-        toolInvocations.set(event.invocationId, {
-          ...tool,
-          completion: {
-            result: event.result,
-            isError: event.isError,
-          },
-        });
-        break;
-      }
-      case "halo.connection":
-        connectionEvents.push(event);
-        break;
-    }
-  }
-
+export function emptySessionState(): ProjectedSession {
   return {
-    messages,
-    streamingMessage,
-    toolInvocations: [...toolInvocations.values()],
-    connectionEvents,
-    activeRunId,
-    error,
-    isWorking: activeRunId !== undefined,
+    messages: [],
+    streamingMessage: undefined,
+    toolInvocations: [],
+    activeRunId: undefined,
+    error: undefined,
+    isWorking: false,
   };
+}
+
+export function reduceSessionUpdate(
+  state: ProjectedSession,
+  item: SessionWatchItem,
+): ProjectedSession {
+  if (item.type === "snapshot") return item.state;
+  return applySessionEvent(state, item.event);
+}
+
+export function projectSavedMessages(
+  messages: readonly AgentMessage[],
+): ProjectedSession {
+  return messages.reduce(
+    (state, message) =>
+      applySessionEvent(state, { type: "message.committed", message }),
+    emptySessionState(),
+  );
+}
+
+export function applySessionEvent(
+  state: ProjectedSession,
+  event: SessionEvent,
+): ProjectedSession {
+  switch (event.type) {
+    case "session.failed":
+      return {
+        ...state,
+        error: event.error,
+        isWorking: false,
+        activeRunId: undefined,
+        streamingMessage: undefined,
+      };
+    case "run.started":
+      return {
+        ...state,
+        activeRunId: event.runId,
+        isWorking: true,
+        error: undefined,
+      };
+    case "run.finished":
+      if (event.runId !== state.activeRunId) return state;
+      return {
+        ...state,
+        activeRunId: undefined,
+        isWorking: false,
+        streamingMessage: undefined,
+        error: event.error === undefined ? state.error : event.error,
+      };
+    case "message.committed": {
+      const message = event.message;
+      const next = { ...state, messages: [...state.messages, message] };
+      if (message.role === "user") next.error = undefined;
+      if (message.role === "assistant") {
+        next.streamingMessage = undefined;
+        const error = assistantTurnError(message);
+        if (error !== undefined) next.error = error;
+        for (const part of message.content) {
+          if (part.type !== "toolCall") continue;
+          next.toolInvocations = upsertTool(next.toolInvocations, {
+            invocation: {
+              id: part.id,
+              tool: directToolIdentity(part.name),
+              arguments: part.arguments,
+            },
+          });
+        }
+      }
+      if (message.role === "toolResult") {
+        next.toolInvocations = next.toolInvocations.map((tool) =>
+          tool.invocation.id === message.toolCallId
+            ? {
+                ...tool,
+                completion: {
+                  result: {
+                    content: message.content,
+                    details: message.details,
+                  },
+                  isError: message.isError,
+                },
+              }
+            : tool,
+        );
+        next.toolInvocations = withExecToolCalls(next.toolInvocations, message);
+      }
+      return next;
+    }
+    case "assistant.updated":
+      return {
+        ...state,
+        streamingMessage: assistantMessageFromUpdate(event.update),
+        error: undefined,
+      };
+    case "tool.started":
+      return {
+        ...state,
+        toolInvocations: upsertTool(state.toolInvocations, {
+          invocation: event.invocation,
+        }),
+      };
+    case "tool.updated":
+      return {
+        ...state,
+        toolInvocations: state.toolInvocations.map((tool) =>
+          tool.invocation.id === event.invocationId
+            ? { ...tool, update: event.update }
+            : tool,
+        ),
+      };
+    case "tool.finished":
+      return {
+        ...state,
+        toolInvocations: state.toolInvocations.map((tool) =>
+          tool.invocation.id === event.invocationId
+            ? {
+                ...tool,
+                completion: { result: event.result, isError: event.isError },
+              }
+            : tool,
+        ),
+      };
+    case "halo.connection":
+      return state;
+  }
+}
+
+function upsertTool(
+  tools: ProjectedToolInvocation[],
+  next: ProjectedToolInvocation,
+): ProjectedToolInvocation[] {
+  if (!tools.some((tool) => tool.invocation.id === next.invocation.id))
+    return [...tools, next];
+  return tools.map((tool) =>
+    tool.invocation.id === next.invocation.id ? { ...tool, ...next } : tool,
+  );
+}
+
+export function withExecToolCalls(
+  tools: ProjectedToolInvocation[],
+  result: AgentToolResult,
+  runId?: string,
+): ProjectedToolInvocation[] {
+  if (!Value.Check(execDetailsSchema, result.details)) return tools;
+  return result.details.toolCalls.reduce((current, call) => {
+    const tool: ProjectedToolInvocation = {
+      invocation: {
+        id: call.id,
+        parentId: call.parentId,
+        tool: call.tool,
+        arguments: call.arguments,
+        runId,
+      },
+    };
+    if (call.status !== "running")
+      tool.completion = {
+        result: { content: [] },
+        isError: call.status === "failed",
+      };
+    return upsertTool(current, tool);
+  }, tools);
 }
 
 function assistantMessageFromUpdate(
