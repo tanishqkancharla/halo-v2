@@ -127,7 +127,7 @@ Walk through the call-stack change, then show short code previews of the main ed
 - Show the contracts that matter: inputs, outputs, state, events, and errors. Use `Not applicable — no code path changes` only for a true docs, data, or config phase.
 - Test through a public package export or end-user surface when practical. For internal steps, use a focused smoke check rather than low-value tests or mocks.
 
-Use `mermaid`, `callstack`, `diff:path`, `start:end:path`, and language fences supported by tkstack. Follow [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for fence details.
+Use `mermaid`, `callstack`, `diff:path`, `start:end:path`, and language fences supported by tkstack. Follow the [TK Stack README](https://github.com/tanishqkancharla/tkstack) for fence details.
 
 ## Final check
 

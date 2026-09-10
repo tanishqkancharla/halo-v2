@@ -99,11 +99,15 @@ The handler now validates before it stores. If validation returns a tagged error
 Summarize checks actually run and their results. State material gaps or failures. Do not imply that a source-checked call flow was exercised at runtime.
 ````
 
-Append `[[id:old:start-end]]` or `[[id:new:start-end]]` to a stack line to link source changes. Use actual source line numbers from the compared versions; `[[id:new:12]]` links a single line. Keep references separate from the visible `#` explanation. Link removed steps with `old` references, including steps whose source file was deleted. Link unchanged steps when their implementation changed, and leave context-only steps unlinked. A line may reference several changes, including different files.
+Prefer `[[path/to/file.ts#symbolName]]` on a stack line when linking a current TypeScript or JavaScript declaration. Use qualified names such as `[[src/store.ts#Store.save]]` when names are ambiguous. TK Stack highlights a matching included new-side patch when possible, otherwise the current file. A symbol reference does not require an embedded patch. Use `[[path/to/file]]` or `[[path/to/file#L12-L30]]` for files and ranges in other languages.
+
+Append `[[id:old:start-end]]` or `[[id:new:start-end]]` to a stack line to link an exact source change. Use actual source line numbers from the compared versions; `[[id:new:12]]` links a single line. Keep references separate from the visible `#` explanation. Link removed steps with `old` references, including steps whose source file was deleted. Link unchanged steps when their implementation changed, and leave context-only steps unlinked. A line may reference several changes, including different files.
 
 Define each referenced ID once in a `source-diff:id:path` fence anywhere in the Markdown. Copy the real file patch from the same Git comparison, including `diff --git`, `---`, `+++`, and `@@` headers. Include surrounding context; each reference range must fit within one included hunk. Use the new path for renames and the old path for deletions. Do not invent patches or renumber hunks. For untracked files, obtain a patch with `git diff --no-index -- /dev/null <path>` (exit 1 means differences).
 
-TK Stack hides reference markers and renders source definitions in one shared panel. Clicking a stack line scrolls to and highlights its code. For full syntax, read the [TK Stack README](../../../packages/tkstack/README.md#link-call-stacks-to-source-changes) and [example](../../../packages/tkstack/fixtures/annotations.md).
+Mermaid diagrams can use the same references. Inside the fence, add `%% ref node:<id> [[path#symbol]]` for a node or sequence participant, or `%% ref edge:<index> [[id:new:start-end]]` for an edge or sequence message. Edge indices start at zero in declaration order. Put multiple references on one directive rather than repeating its target. These are Mermaid comments and do not appear in labels.
+
+TK Stack hides reference markers and renders source definitions in one shared panel. Clicking a stack line, linked diagram node, or linked edge scrolls to and highlights its code. For full syntax, read the [TK Stack README](https://github.com/tanishqkancharla/tkstack#link-call-stacks-to-source-changes) and [example](https://github.com/tanishqkancharla/tkstack/blob/main/fixtures/annotations.md).
 
 Use `callstack` fences with tree branches (`└──` / `├──`) and unified diff signs. Call stacks render without a file header. Put a trailing `#` comment on a line when the symbol name does not explain its purpose, return value, condition, or side effect. A standalone `#` comment can explain the next step. Skip comments that merely repeat the symbol name.
 
@@ -115,7 +119,7 @@ Repeat `## <outcome>` for each slice of the change. Put Mermaid in a chapter whe
 
 ## Fence reference
 
-See [`packages/tkstack/README.md`](../../../packages/tkstack/README.md) for rendering details. The walkthrough uses these fences:
+See the [TK Stack README](https://github.com/tanishqkancharla/tkstack) for rendering details. The walkthrough uses these fences:
 
 | Fence info string                              | Viewer                                                       |
 | ---------------------------------------------- | ------------------------------------------------------------ |
@@ -131,13 +135,7 @@ Walkthroughs are markdown. Curly braces in prose are plain text. Use small table
 This skill’s CLI is tkstack. After the markdown file exists, run it from the repo root:
 
 ```sh
-pnpm exec tkstack tmp/code-walkthrough-<name>/walkthrough.md
-```
-
-Halo alias:
-
-```sh
-pnpm walkthrough tmp/code-walkthrough-<name>/walkthrough.md
+npx tkstack tmp/code-walkthrough-<name>/walkthrough.md
 ```
 
 Options:

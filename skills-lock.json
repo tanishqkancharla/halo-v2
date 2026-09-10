@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "code-walkthrough": {
+      "source": "tanishqkancharla/tkstack",
+      "sourceType": "github",
+      "skillPath": "skills/code-walkthrough/SKILL.md",
+      "computedHash": "17e97059ee4fe1455d82234c4f09cc797ffb405b14c6b59a2ca64c3a04731369"
+    },
     "errore": {
       "source": "remorses/errore",
       "sourceType": "github",
