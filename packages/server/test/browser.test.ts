@@ -1,7 +1,5 @@
-import { expect, vi } from "vitest";
+import { expect } from "vitest";
 import { serverTest } from "./serverTest.js";
-
-vi.setConfig({ testTimeout: 20_000 });
 
 const url = `data:text/html,${encodeURIComponent(`
   <!doctype html><title>Browser playground</title>
