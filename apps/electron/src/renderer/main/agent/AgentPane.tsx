@@ -1,3 +1,4 @@
+import { lastAssistantTurnWasAborted } from "./sessionView.js";
 import { useLayoutEffect, useRef, useState } from "react";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -21,8 +22,8 @@ import {
 } from "./useAgentSession.ts";
 import { sessionViewItems, type SessionViewItem } from "./sessionView.ts";
 import {
-  lastAssistantTurnWasAborted,
-  type ProjectedSession,
+  sessionMessages,
+  type SessionSnapshot,
 } from "@get-halo/shared/sessionState";
 import { AssistantMessage } from "./AssistantMessage.tsx";
 import { Editor } from "./Editor.tsx";
@@ -42,7 +43,7 @@ export function AgentPane({
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body);
   const column = useStyles(styles.column);
-  const { state, prompt, abort } = useAgentSession(sessionId);
+  const { state, error, prompt, abort } = useAgentSession(sessionId);
   const sessionMeta = sessions.find(
     ({ sessionId: candidate }) => candidate === sessionId,
   );
@@ -63,8 +64,8 @@ export function AgentPane({
           <Composer
             key={sessionId}
             autoFocus
-            error={state.error}
-            isWorking={state.isWorking}
+            error={error}
+            isWorking={state.activeRun !== undefined}
             onSubmit={prompt}
             onStop={abort}
           />
@@ -76,11 +77,10 @@ export function AgentPane({
 
 export function DraftAgentPane({ draftId }: { draftId: string }) {
   const [, navigate] = useLocation();
-  const { state, sessionId, title, prompt, abort } = useDraftAgentSession(
-    (createdSessionId) => {
+  const { state, error, sessionId, title, prompt, abort } =
+    useDraftAgentSession((createdSessionId) => {
       navigate(`/sessions/${createdSessionId}`);
-    },
-  );
+    });
   const pane = useStyles(styles.pane);
   const body = useStyles(styles.body, styles.bodyTop);
   const column = useStyles(styles.column);
@@ -101,8 +101,8 @@ export function DraftAgentPane({ draftId }: { draftId: string }) {
           <ExtensionPermissionRequests />
           <Composer
             autoFocus
-            error={state.error}
-            isWorking={state.isWorking}
+            error={error}
+            isWorking={state.activeRun !== undefined}
             onSubmit={prompt}
             onStop={abort}
           />
@@ -181,7 +181,7 @@ function SessionView({
   state,
   sessionId,
 }: {
-  state: ProjectedSession;
+  state: SessionSnapshot;
   sessionId: string | undefined;
 }) {
   const viewRef = useRef<HTMLDivElement>(null);
@@ -189,7 +189,8 @@ function SessionView({
   const stopped = useStyles(styles.stopped);
   const items = sessionViewItems(state);
   const showStopped =
-    !state.isWorking && lastAssistantTurnWasAborted(state.messages);
+    state.activeRun === undefined &&
+    lastAssistantTurnWasAborted(sessionMessages(state));
 
   useLayoutEffect(() => {
     const element = viewRef.current;

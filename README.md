@@ -49,7 +49,7 @@ Halo runs Pi's `AgentHarness` with one `main` lane per conversation. Pi's offici
 
 Pi owns the database schema, conversation entries, and execution state. Halo supplies `TursoDatabaseFactory` through `@tursodatabase/database/compat`. A package patch uses ordinary tables because Turso 0.7.2 does not support the indexes Pi needs on `WITHOUT ROWID` tables. The Electron package includes Pi's SQL schema and Turso's native library.
 
-The renderer restores conversation history from Pi's watch snapshot. It uses Pi's supplied transcript; loading older entries before compaction is deferred. `sessions.watch` sends an initial snapshot followed by ephemeral live events; disconnecting a viewer leaves its running session active. Nested `exec` tool details persist in Pi's tool results and progress checkpoints. Halo does not keep a separate event log or import existing JSONL conversation files.
+The renderer consumes Halo session snapshots and events, adapted from Pi at the server boundary. The [session protocol](packages/shared/README.md) describes stable entries, run state, and first-class nested `exec` activity. It uses Pi's supplied transcript; loading older entries before compaction is deferred. `sessions.watch` sends an initial snapshot followed by ephemeral live events; disconnecting a viewer leaves its running session active. Nested `exec` tool details persist in Pi's tool results and progress checkpoints. Halo does not keep a separate event log or import existing JSONL conversation files.
 
 Pi's file and shell tools run on the host with the same rights as Halo. Halo does not import old AgentOS SQLite workspaces.
 

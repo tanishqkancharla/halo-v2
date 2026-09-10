@@ -1,6 +1,4 @@
 import { type Static, Type } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
-import * as errore from "errore";
 import { connectionRequestSchema } from "./connectionRequests.js";
 
 const textContentSchema = Type.Object({
@@ -109,7 +107,7 @@ const customMessageContentSchema = Type.Union([
   Type.Array(Type.Union([textContentSchema, imageContentSchema])),
 ]);
 
-export const agentMessageSchema = Type.Union([
+export const haloMessageSchema = Type.Union([
   userMessageSchema,
   assistantMessageSchema,
   toolResultMessageSchema,
@@ -146,77 +144,7 @@ export const agentMessageSchema = Type.Union([
   }),
 ]);
 
-export type AgentMessage = Static<typeof agentMessageSchema>;
-
-const assistantMessageUpdateSchema = Type.Union([
-  Type.Object({ type: Type.Literal("start"), partial: assistantMessageSchema }),
-  Type.Object({
-    type: Type.Literal("text_start"),
-    contentIndex: Type.Number(),
-    partial: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("text_delta"),
-    contentIndex: Type.Number(),
-    delta: Type.String(),
-    partial: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("text_end"),
-    contentIndex: Type.Number(),
-    content: Type.String(),
-    partial: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("thinking_start"),
-    contentIndex: Type.Number(),
-    partial: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("thinking_delta"),
-    contentIndex: Type.Number(),
-    delta: Type.String(),
-    partial: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("thinking_end"),
-    contentIndex: Type.Number(),
-    content: Type.String(),
-    partial: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("toolcall_start"),
-    contentIndex: Type.Number(),
-    partial: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("toolcall_delta"),
-    contentIndex: Type.Number(),
-    delta: Type.String(),
-    partial: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("toolcall_end"),
-    contentIndex: Type.Number(),
-    toolCall: toolCallSchema,
-    partial: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("done"),
-    reason: Type.Union([
-      Type.Literal("stop"),
-      Type.Literal("length"),
-      Type.Literal("toolUse"),
-      Type.Literal("deferred"),
-    ]),
-    message: assistantMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("error"),
-    reason: Type.Union([Type.Literal("aborted"), Type.Literal("error")]),
-    error: assistantMessageSchema,
-  }),
-]);
+export type HaloMessage = Static<typeof haloMessageSchema>;
 
 const toolIdentitySchema = Type.Object({
   path: Type.String(),
@@ -225,35 +153,6 @@ const toolIdentitySchema = Type.Object({
 });
 
 export type ToolIdentity = Static<typeof toolIdentitySchema>;
-
-const toolInvocationSchema = Type.Object({
-  id: Type.String(),
-  runId: Type.Optional(Type.String()),
-  parentId: Type.Optional(Type.String()),
-  tool: toolIdentitySchema,
-  arguments: Type.Unknown(),
-});
-
-export type ToolInvocation = Static<typeof toolInvocationSchema>;
-
-export const execActivityUpdateSchema = Type.Union([
-  Type.Object({
-    type: Type.Literal("tool.started"),
-    invocation: Type.Object({
-      id: Type.String(),
-      parentId: Type.String(),
-      tool: toolIdentitySchema,
-      arguments: Type.Unknown(),
-    }),
-  }),
-  Type.Object({
-    type: Type.Literal("tool.finished"),
-    invocationId: Type.String(),
-    isError: Type.Boolean(),
-  }),
-]);
-
-export type ExecActivityUpdate = Static<typeof execActivityUpdateSchema>;
 
 export const execToolCallSchema = Type.Object({
   id: Type.String(),
@@ -267,26 +166,6 @@ export const execToolCallSchema = Type.Object({
   ]),
 });
 export type ExecToolCall = Static<typeof execToolCallSchema>;
-const execDetailsSchema = Type.Object({
-  toolCalls: Type.Array(execToolCallSchema),
-});
-
-export function updateExecToolCalls(
-  calls: Map<string, ExecToolCall>,
-  event: ExecActivityUpdate,
-): void {
-  if (event.type === "tool.started") {
-    calls.set(event.invocation.id, { ...event.invocation, status: "running" });
-    return;
-  }
-  const call = calls.get(event.invocationId);
-  if (call === undefined) return;
-  calls.set(call.id, {
-    ...call,
-    status: event.isError ? "failed" : "completed",
-  });
-}
-
 export function directToolIdentity(name: string): ToolIdentity {
   const labels = new Map([
     ["bash", "Shell"],
@@ -313,7 +192,7 @@ const haloConnectionEventSchema = Type.Object({
 
 export type HaloConnectionEvent = Static<typeof haloConnectionEventSchema>;
 
-const agentToolResultSchema = Type.Object({
+const toolResultSchema = Type.Object({
   content: Type.Array(Type.Union([textContentSchema, imageContentSchema])),
   details: Type.Optional(Type.Unknown()),
   usage: Type.Optional(usageSchema),
@@ -321,347 +200,198 @@ const agentToolResultSchema = Type.Object({
   terminate: Type.Optional(Type.Boolean()),
 });
 
-export type AgentToolResult = Static<typeof agentToolResultSchema>;
+export type ToolResult = Static<typeof toolResultSchema>;
 
-export const sessionEventSchema = Type.Union([
-  Type.Object({ type: Type.Literal("session.failed"), error: Type.String() }),
-  Type.Object({ type: Type.Literal("run.started"), runId: Type.String() }),
-  Type.Object({
-    type: Type.Literal("run.finished"),
-    runId: Type.String(),
-    outcome: Type.Union([
-      Type.Literal("completed"),
-      Type.Literal("aborted"),
-      Type.Literal("failed"),
-    ]),
-    error: Type.Optional(Type.String()),
-  }),
-  Type.Object({
-    type: Type.Literal("message.committed"),
-    message: agentMessageSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("assistant.updated"),
-    runId: Type.String(),
-    update: assistantMessageUpdateSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("tool.started"),
-    invocation: toolInvocationSchema,
-  }),
-  Type.Object({
-    type: Type.Literal("tool.updated"),
-    invocationId: Type.String(),
-    update: Type.Unknown(),
-  }),
-  Type.Object({
-    type: Type.Literal("tool.finished"),
-    invocationId: Type.String(),
-    result: agentToolResultSchema,
-    isError: Type.Boolean(),
-  }),
-  haloConnectionEventSchema,
-]);
+export type ToolOutput =
+  | { type: "tool"; result: ToolResult }
+  | { type: "exec"; result: ToolResult; calls: ExecToolCall[] };
 
-export type SessionEvent = Static<typeof sessionEventSchema>;
+export type ToolExecution = {
+  id: string;
+  tool: ToolIdentity;
+  arguments: unknown;
+  status: "running" | "completed" | "failed" | "aborted";
+} & (
+  | { type: "tool"; result?: ToolResult }
+  | { type: "exec"; result?: ToolResult; calls: ExecToolCall[] }
+);
 
-export type ProjectedToolInvocation = {
-  invocation: ToolInvocation;
-  update?: unknown;
-  completion?: {
-    result: AgentToolResult;
-    isError: boolean;
-  };
+export type HaloEntry =
+  | {
+      type: "message";
+      id: string;
+      message: Exclude<HaloMessage, { role: "toolResult" }>;
+    }
+  | {
+      type: "toolResult";
+      id: string;
+      toolCallId: string;
+      tool: ToolIdentity;
+      timestamp: number;
+      isError: boolean;
+      output: ToolOutput;
+    };
+
+export type ActiveRun = {
+  id: string;
+  message?: Extract<HaloMessage, { role: "assistant" }>;
+  tools: ToolExecution[];
 };
 
-export type ProjectedSession = {
-  messages: AgentMessage[];
-  streamingMessage: AgentMessage | undefined;
-  toolInvocations: ProjectedToolInvocation[];
-  activeRunId: string | undefined;
-  error: string | undefined;
-  isWorking: boolean;
+export type RunResult = {
+  id: string;
+  status: "completed" | "aborted" | "failed" | "declined";
+  error?: string;
 };
+
+export type SessionSnapshot = {
+  entries: HaloEntry[];
+  activeRun: ActiveRun | undefined;
+  lastRun: RunResult | undefined;
+  fault: string | undefined;
+};
+
+export type SessionEvent =
+  | { type: "session.failed"; error: string }
+  | { type: "run.started"; runId: string }
+  | { type: "run.finished"; run: RunResult }
+  | { type: "entry.committed"; entry: HaloEntry }
+  | {
+      type: "message.updated";
+      runId: string;
+      message: Extract<HaloMessage, { role: "assistant" }>;
+    }
+  | { type: "tool.started"; runId: string; execution: ToolExecution }
+  | {
+      type: "tool.updated";
+      runId: string;
+      toolCallId: string;
+      output: ToolOutput;
+      status: ToolExecution["status"];
+    }
+  | HaloConnectionEvent;
 
 export type SessionWatchItem =
-  | { type: "snapshot"; state: ProjectedSession }
+  | { type: "snapshot"; snapshot: SessionSnapshot }
   | { type: "event"; event: SessionEvent };
 
-export function emptySessionState(): ProjectedSession {
+export function emptySessionSnapshot(): SessionSnapshot {
   return {
-    messages: [],
-    streamingMessage: undefined,
-    toolInvocations: [],
-    activeRunId: undefined,
-    error: undefined,
-    isWorking: false,
+    entries: [],
+    activeRun: undefined,
+    lastRun: undefined,
+    fault: undefined,
   };
 }
 
 export function reduceSessionUpdate(
-  state: ProjectedSession,
+  snapshot: SessionSnapshot,
   item: SessionWatchItem,
-): ProjectedSession {
-  if (item.type === "snapshot") return item.state;
-  return applySessionEvent(state, item.event);
-}
-
-export function projectSavedMessages(
-  messages: readonly AgentMessage[],
-): ProjectedSession {
-  return messages.reduce(
-    (state, message) =>
-      applySessionEvent(state, { type: "message.committed", message }),
-    emptySessionState(),
-  );
+): SessionSnapshot {
+  if (item.type === "snapshot") return item.snapshot;
+  return applySessionEvent(snapshot, item.event);
 }
 
 export function applySessionEvent(
-  state: ProjectedSession,
+  snapshot: SessionSnapshot,
   event: SessionEvent,
-): ProjectedSession {
+): SessionSnapshot {
   switch (event.type) {
     case "session.failed":
-      return {
-        ...state,
-        error: event.error,
-        isWorking: false,
-        activeRunId: undefined,
-        streamingMessage: undefined,
-      };
+      return { ...snapshot, fault: event.error, activeRun: undefined };
     case "run.started":
-      return {
-        ...state,
-        activeRunId: event.runId,
-        isWorking: true,
-        error: undefined,
-      };
+      return { ...snapshot, activeRun: { id: event.runId, tools: [] } };
     case "run.finished":
-      if (event.runId !== state.activeRunId) return state;
-      return {
-        ...state,
-        activeRunId: undefined,
-        isWorking: false,
-        streamingMessage: undefined,
-        error: event.error === undefined ? state.error : event.error,
-      };
-    case "message.committed": {
-      const message = event.message;
-      const next = { ...state, messages: [...state.messages, message] };
-      if (message.role === "user") next.error = undefined;
-      if (message.role === "assistant") {
-        next.streamingMessage = undefined;
-        const error = assistantTurnError(message);
-        if (error !== undefined) next.error = error;
-        for (const part of message.content) {
-          if (part.type !== "toolCall") continue;
-          next.toolInvocations = upsertTool(next.toolInvocations, {
-            invocation: {
-              id: part.id,
-              tool: directToolIdentity(part.name),
-              arguments: part.arguments,
-            },
-          });
-        }
+      if (event.run.id !== snapshot.activeRun?.id) return snapshot;
+      return { ...snapshot, activeRun: undefined, lastRun: event.run };
+    case "entry.committed": {
+      const entry = event.entry;
+      let activeRun = snapshot.activeRun;
+      if (activeRun !== undefined) {
+        if (entry.type === "message" && entry.message.role === "assistant")
+          activeRun = { ...activeRun, message: undefined };
+        if (entry.type === "toolResult")
+          activeRun = {
+            ...activeRun,
+            tools: activeRun.tools.filter(
+              (tool) => tool.id !== entry.toolCallId,
+            ),
+          };
       }
-      if (message.role === "toolResult") {
-        next.toolInvocations = next.toolInvocations.map((tool) =>
-          tool.invocation.id === message.toolCallId
-            ? {
-                ...tool,
-                completion: {
-                  result: {
-                    content: message.content,
-                    details: message.details,
-                  },
-                  isError: message.isError,
-                },
-              }
-            : tool,
-        );
-        next.toolInvocations = withExecToolCalls(next.toolInvocations, message);
-      }
-      return next;
+      return { ...snapshot, entries: [...snapshot.entries, entry], activeRun };
     }
-    case "assistant.updated":
+    case "message.updated":
+      if (snapshot.activeRun?.id !== event.runId) return snapshot;
       return {
-        ...state,
-        streamingMessage: assistantMessageFromUpdate(event.update),
-        error: undefined,
+        ...snapshot,
+        activeRun: { ...snapshot.activeRun, message: event.message },
       };
     case "tool.started":
+      if (snapshot.activeRun?.id !== event.runId) return snapshot;
       return {
-        ...state,
-        toolInvocations: upsertTool(state.toolInvocations, {
-          invocation: event.invocation,
-        }),
+        ...snapshot,
+        activeRun: {
+          ...snapshot.activeRun,
+          tools: [...snapshot.activeRun.tools, event.execution],
+        },
       };
     case "tool.updated":
+      if (snapshot.activeRun?.id !== event.runId) return snapshot;
       return {
-        ...state,
-        toolInvocations: state.toolInvocations.map((tool) =>
-          tool.invocation.id === event.invocationId
-            ? { ...tool, update: event.update }
-            : tool,
-        ),
-      };
-    case "tool.finished":
-      return {
-        ...state,
-        toolInvocations: state.toolInvocations.map((tool) =>
-          tool.invocation.id === event.invocationId
-            ? {
-                ...tool,
-                completion: { result: event.result, isError: event.isError },
-              }
-            : tool,
-        ),
+        ...snapshot,
+        activeRun: {
+          ...snapshot.activeRun,
+          tools: snapshot.activeRun.tools.map((tool) =>
+            tool.id === event.toolCallId
+              ? executionWithOutput(tool, event.output, event.status)
+              : tool,
+          ),
+        },
       };
     case "halo.connection":
-      return state;
+      return snapshot;
   }
 }
 
-function upsertTool(
-  tools: ProjectedToolInvocation[],
-  next: ProjectedToolInvocation,
-): ProjectedToolInvocation[] {
-  if (!tools.some((tool) => tool.invocation.id === next.invocation.id))
-    return [...tools, next];
-  return tools.map((tool) =>
-    tool.invocation.id === next.invocation.id ? { ...tool, ...next } : tool,
+export function executionWithOutput(
+  execution: ToolExecution,
+  output: ToolOutput,
+  status: ToolExecution["status"],
+): ToolExecution {
+  return { ...execution, ...output, status };
+}
+
+/** Read committed messages without tool-result entries. */
+export function sessionMessages(snapshot: SessionSnapshot) {
+  return snapshot.entries.flatMap((entry) =>
+    entry.type === "message" ? [entry.message] : [],
   );
 }
 
-export function withExecToolCalls(
-  tools: ProjectedToolInvocation[],
-  result: AgentToolResult,
-  runId?: string,
-): ProjectedToolInvocation[] {
-  if (!Value.Check(execDetailsSchema, result.details)) return tools;
-  return result.details.toolCalls.reduce((current, call) => {
-    const tool: ProjectedToolInvocation = {
-      invocation: {
-        id: call.id,
-        parentId: call.parentId,
-        tool: call.tool,
-        arguments: call.arguments,
-        runId,
-      },
-    };
-    if (call.status !== "running")
-      tool.completion = {
-        result: { content: [] },
-        isError: call.status === "failed",
-      };
-    return upsertTool(current, tool);
-  }, tools);
-}
-
-function assistantMessageFromUpdate(
-  update: Static<typeof assistantMessageUpdateSchema>,
-): AgentMessage {
-  if (update.type === "done") return update.message;
-  if (update.type === "error") return update.error;
-  return update.partial;
-}
-
-/** True when the latest user turn ended in a user abort. */
-export function lastAssistantTurnWasAborted(messages: AgentMessage[]): boolean {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i];
-    if (message === undefined) continue;
-    if (message.role === "toolResult") continue;
-    if (message.role === "user") return false;
-    if (message.role === "assistant") return message.stopReason === "aborted";
-  }
-  return false;
-}
-
-/** Readable alert text when an assistant turn failed. */
-export function assistantTurnError(message: AgentMessage): string | undefined {
-  if (message.role !== "assistant") return undefined;
-  if (message.stopReason === "aborted") return undefined;
-
-  const errorMessage = message.errorMessage;
-  const hasErrorMessage = errorMessage !== undefined && errorMessage.length > 0;
-  if (message.stopReason !== "error" && !hasErrorMessage) return undefined;
-  if (!hasErrorMessage) return undefined;
-
-  return readableAgentErrorMessage(errorMessage);
-}
-
-class AgentErrorMessageParseError extends errore.createTaggedError({
-  name: "AgentErrorMessageParseError",
-  message: "Assistant errorMessage was not valid JSON",
-}) {}
-
-function readableAgentErrorMessage(errorMessage: string): string {
-  const trimmed = errorMessage.trim();
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
-    return errorMessage;
-  }
-
-  const parsed = errore.try({
-    try: () => {
-      // SAFETY: JSON.parse is untyped; humanMessageFromJson decodes the payload.
-      return JSON.parse(trimmed) as unknown;
-    },
-    catch: (e) => new AgentErrorMessageParseError({ cause: e }),
-  });
-  if (parsed instanceof Error) {
-    console.warn("Assistant errorMessage looked like JSON but failed to parse");
-    return errorMessage;
-  }
-
-  const extracted = humanMessageFromJson({ value: parsed });
-  if (extracted === undefined) return errorMessage;
-  return extracted;
-}
-
-const agentErrorJsonSchema = Type.Object({
-  error: Type.Optional(
-    Type.Union([
-      Type.String(),
-      Type.Object({
-        message: Type.String(),
-      }),
-    ]),
-  ),
-  message: Type.Optional(Type.String()),
-});
-
-function humanMessageFromJson(args: { value: unknown }): string | undefined {
-  if (Value.Check(Type.String(), args.value)) {
-    const value = args.value;
-    const nested = errore.try({
-      try: () => {
-        // SAFETY: JSON.parse is untyped; nested error JSON is decoded by this function.
-        return JSON.parse(value) as unknown;
-      },
-      catch: (e) => new AgentErrorMessageParseError({ cause: e }),
-    });
-    if (nested instanceof Error) {
-      if (value.length === 0) return undefined;
-      return value;
+/** Assemble tool executions from committed entries and the current run. */
+export function sessionToolExecutions(
+  snapshot: SessionSnapshot,
+): ToolExecution[] {
+  const requests = new Map<string, ToolExecution["arguments"]>();
+  const executions = new Map<string, ToolExecution>();
+  for (const entry of snapshot.entries) {
+    if (entry.type === "message") {
+      if (entry.message.role !== "assistant") continue;
+      for (const part of entry.message.content) {
+        if (part.type === "toolCall") requests.set(part.id, part.arguments);
+      }
+      continue;
     }
-    return humanMessageFromJson({ value: nested });
+    const request = requests.get(entry.toolCallId);
+    executions.set(entry.toolCallId, {
+      id: entry.toolCallId,
+      tool: entry.tool,
+      arguments: request,
+      status: entry.isError ? "failed" : "completed",
+      ...entry.output,
+    });
   }
-
-  if (!Value.Check(agentErrorJsonSchema, args.value)) return undefined;
-
-  const error = args.value.error;
-  if (Value.Check(Type.String(), error)) {
-    if (error.length === 0) return undefined;
-    return error;
-  }
-  if (
-    Value.Check(Type.Object({ message: Type.String({ minLength: 1 }) }), error)
-  ) {
-    return error.message;
-  }
-
-  const message = args.value.message;
-  if (message === undefined || message.length === 0) return undefined;
-  return message;
+  if (snapshot.activeRun !== undefined)
+    for (const tool of snapshot.activeRun.tools) executions.set(tool.id, tool);
+  return [...executions.values()];
 }

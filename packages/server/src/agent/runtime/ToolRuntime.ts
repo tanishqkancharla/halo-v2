@@ -59,10 +59,7 @@ import {
 } from "quickjs-emscripten";
 import * as errore from "errore";
 import type { ConnectionRequest } from "@get-halo/shared/connectionRequests";
-import type {
-  ExecActivityUpdate,
-  ToolIdentity,
-} from "@get-halo/shared/sessionState";
+import type { ToolIdentity } from "@get-halo/shared/sessionState";
 import type { FilesystemService } from "../../filesystem/FilesystemService.js";
 import type {
   HaloTool,
@@ -112,6 +109,18 @@ const showConnectionCardInputSchema = Type.Object({
     description: "The integration id returned by executor.integrations.list",
   }),
 });
+
+type ExecActivityUpdate =
+  | {
+      type: "tool.started";
+      invocation: {
+        id: string;
+        parentId: string;
+        tool: ToolIdentity;
+        arguments: unknown;
+      };
+    }
+  | { type: "tool.finished"; invocationId: string; isError: boolean };
 
 type ToolExecutionContext = Pick<
   HaloToolContext,

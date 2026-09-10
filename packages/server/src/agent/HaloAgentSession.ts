@@ -2,7 +2,6 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import {
   AgentHarness,
   type AgentLane,
-  type LaneSnapshot,
   type AgentTool,
   type AgentMessage,
   type AgentHarnessTool,
@@ -15,12 +14,7 @@ import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import * as errore from "errore";
 import { Stream } from "@get-halo/shared/Stream";
 import {
-  projectSavedMessages,
-  directToolIdentity,
-  withExecToolCalls,
-  type ProjectedSession,
-  type ProjectedToolInvocation,
-  type AgentMessage as StoredMessage,
+  type HaloMessage as StoredMessage,
   type SessionWatchItem,
   type HaloConnectionEvent,
 } from "@get-halo/shared/sessionState";
@@ -30,7 +24,7 @@ import type { ToolRuntime } from "./runtime/ToolRuntime.js";
 import { createAuthorizedCodingTools } from "./tools/codingTools.js";
 import { createExecTool } from "./tools/execTool.js";
 import { WorkspaceResourceLoader } from "./WorkspaceResourceLoader.js";
-import { adaptPiEvent } from "./SessionEventAdapter.js";
+import { adaptPiEvent, sessionSnapshot } from "./SessionEventAdapter.js";
 
 export class EmptyPromptError extends errore.createTaggedError({
   name: "EmptyPromptError",
@@ -154,7 +148,7 @@ export class HaloAgentSession {
       );
     if (watch instanceof Error) return watch;
     watch.unsubscribe();
-    return projectSnapshot(watch.snapshot);
+    return sessionSnapshot(watch.snapshot);
   }
 
   async *watch(
@@ -172,9 +166,10 @@ export class HaloAgentSession {
     const watch = await this.lane.watch(BACKGROUND_CONTEXT);
     cleanup.defer(() => watch.unsubscribe());
     if (abortSignal.aborted) return;
-    yield { type: "snapshot", state: projectSnapshot(watch.snapshot) };
+    yield { type: "snapshot", snapshot: sessionSnapshot(watch.snapshot) };
     watch.start((event) => {
-      for (const adapted of adaptPiEvent(event))
+      const adapted = adaptPiEvent(event);
+      if (adapted !== undefined)
         stream.append({ type: "event", event: adapted });
     });
     yield* updates;
@@ -277,51 +272,4 @@ export class HaloAgentSession {
       );
     if (closed instanceof Error) return closed;
   }
-}
-
-function projectSnapshot(snapshot: LaneSnapshot): ProjectedSession {
-  const state = projectSavedMessages(
-    snapshot.transcript.flatMap((entry) =>
-      entry.type === "message" ? [entry.message] : [],
-    ),
-  );
-  if (snapshot.faulted)
-    return {
-      ...state,
-      error: "The session encountered a storage error.",
-      isWorking: false,
-    };
-  const operation = snapshot.operation;
-  if (operation === null) {
-    if (snapshot.lastResult?.status === "failed")
-      state.error = snapshot.lastResult.error?.message;
-    return state;
-  }
-  state.activeRunId = operation.id;
-  state.isWorking = true;
-  state.streamingMessage = operation.streamingMessage;
-  for (const tool of operation.runningTools) {
-    const activity: ProjectedToolInvocation = {
-      invocation: {
-        id: tool.toolCallId,
-        runId: operation.id,
-        tool: directToolIdentity(tool.toolName),
-        arguments: tool.args,
-      },
-      update: tool.result,
-    };
-    if (tool.status === "settled")
-      activity.completion = { result: tool.result, isError: tool.isError };
-    state.toolInvocations = state.toolInvocations.filter(
-      (current) => current.invocation.id !== tool.toolCallId,
-    );
-    state.toolInvocations.push(activity);
-    if (tool.result !== undefined)
-      state.toolInvocations = withExecToolCalls(
-        state.toolInvocations,
-        tool.result,
-        operation.id,
-      );
-  }
-  return state;
 }

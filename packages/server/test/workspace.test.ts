@@ -1,6 +1,8 @@
 import {
-  emptySessionState,
+  emptySessionSnapshot,
   reduceSessionUpdate,
+  sessionMessages,
+  sessionToolExecutions,
 } from "@get-halo/shared/sessionState";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -532,7 +534,7 @@ serverTest("rejects previews through symlinks", async ({ server }) => {
 function assistantReplies(
   session: Awaited<ReturnType<HaloClient["sessions"]["snapshot"]>>,
 ) {
-  return session.messages.flatMap((message) =>
+  return sessionMessages(session).flatMap((message) =>
     message.role === "assistant" ? [contentText(message.content)] : [],
   );
 }
@@ -548,7 +550,7 @@ serverTest(
     const first = await watch.next();
     expect(first.value).toMatchObject({
       type: "snapshot",
-      state: { messages: [], isWorking: false },
+      snapshot: { entries: [] },
     });
 
     const prompted = server.rpc.sessions.prompt({
@@ -566,31 +568,121 @@ serverTest(
     const current = await updates.next();
     expect(current.value).toMatchObject({
       type: "snapshot",
-      state: {
-        isWorking: true,
-        messages: [{ role: "user", content: "Keep going while I reconnect" }],
+      snapshot: {
+        activeRun: { tools: [] },
+        entries: [
+          {
+            type: "message",
+            message: { role: "user", content: "Keep going while I reconnect" },
+          },
+        ],
       },
     });
     await llm.respond(m.assistant("I kept going."));
     await prompted;
-    let state = emptySessionState();
+    let state = emptySessionSnapshot();
     if (current.done) throw new Error("Expected a session snapshot");
     state = reduceSessionUpdate(state, current.value);
     for await (const item of updates) {
       state = reduceSessionUpdate(state, item);
-      if (!state.isWorking) {
+      if (state.activeRun === undefined) {
         reconnected.abort();
         break;
       }
     }
     expect(
-      state.messages.flatMap((message) =>
+      sessionMessages(state).flatMap((message) =>
         "content" in message ? [contentText(message.content)] : [],
       ),
     ).toEqual(["Keep going while I reconnect", "I kept going."]);
     expect(await server.rpc.sessions.snapshot(session)).toMatchObject({
-      messages: state.messages,
-      isWorking: false,
+      entries: state.entries,
+      lastRun: state.lastRun,
     });
+  },
+);
+
+serverTest(
+  "exposes the same exec activity through live updates, snapshots, and server restart",
+  async ({ server, llm, http }) => {
+    await server.rpc.workspace.writeFile({
+      path: "notes.md",
+      content: "Saved notes",
+    });
+    const session = await server.rpc.sessions.create();
+    const controller = new AbortController();
+    const watch = await server.rpc.sessions.watch(session, {
+      signal: controller.signal,
+    });
+    let live = emptySessionSnapshot();
+    const observed = (async () => {
+      for await (const item of watch) {
+        live = reduceSessionUpdate(live, item);
+        if (live.lastRun?.status === "completed") break;
+      }
+    })();
+
+    const prompt = server.rpc.sessions.prompt({
+      ...session,
+      text: "Read the notes and fetch the report",
+    });
+    const command = `curl --silent --fail '${http.url("/report")}'`;
+    const js = `await tools.files.read({ path: "notes.md" }); return await tools.bash.run({ command: ${JSON.stringify(command)} });`;
+    await llm.respond(
+      m.tool.start("exec", { id: "report", arguments: { js } }),
+    );
+    const request = await http.request("/report");
+    await expect
+      .poll(() => sessionToolExecutions(live))
+      .toMatchObject([
+        {
+          id: "report",
+          type: "exec",
+          status: "running",
+          arguments: { js },
+          calls: [
+            {
+              parentId: "report",
+              tool: { path: "files.read" },
+              arguments: { path: "notes.md" },
+              status: "completed",
+            },
+            {
+              parentId: "report",
+              tool: { path: "bash.run" },
+              arguments: { command },
+              status: "running",
+            },
+          ],
+        },
+      ]);
+    await expect
+      .poll(() => server.rpc.sessions.snapshot(session))
+      .toEqual(live);
+
+    request.respond("The report is ready.");
+    await llm.respond(m.assistant("Finished the report."));
+    await prompt;
+    await observed;
+    controller.abort();
+    expect(sessionToolExecutions(live)).toMatchObject([
+      {
+        id: "report",
+        type: "exec",
+        status: "completed",
+        calls: [
+          { tool: { path: "files.read" }, status: "completed" },
+          { tool: { path: "bash.run" }, status: "completed" },
+        ],
+      },
+    ]);
+    expect(await server.rpc.sessions.snapshot(session)).toEqual(live);
+    expect(new Set(live.entries.map((entry) => entry.id)).size).toBe(
+      live.entries.length,
+    );
+
+    await server.stop();
+    await server.start();
+    expect(await server.rpc.sessions.snapshot(session)).toEqual(live);
   },
 );

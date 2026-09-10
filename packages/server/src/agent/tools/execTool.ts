@@ -1,7 +1,4 @@
-import {
-  updateExecToolCalls,
-  type ExecToolCall,
-} from "@get-halo/shared/sessionState";
+import type { ExecToolCall } from "@get-halo/shared/sessionState";
 import type { AgentHarnessTool } from "@earendil-works/pi-agent-core";
 import { formatExecuteResult } from "@executor-js/execution/core";
 import { Type } from "typebox";
@@ -34,12 +31,23 @@ export function createExecTool(input: {
         modelId: input.modelId,
         parentToolCallId: id,
         onToolEvent: (event) => {
-          updateExecToolCalls(toolCalls, event);
+          if (event.type === "tool.started") {
+            toolCalls.set(event.invocation.id, {
+              ...event.invocation,
+              status: "running",
+            });
+          } else {
+            const call = toolCalls.get(event.invocationId)!;
+            toolCalls.set(call.id, {
+              ...call,
+              status: event.isError ? "failed" : "completed",
+            });
+          }
           // Pi persists progress only when the harness checkpoint option is set.
           onUpdate(
             {
               content: [],
-              details: { ...event, toolCalls: [...toolCalls.values()] },
+              details: { toolCalls: [...toolCalls.values()] },
             },
             { checkpoint: true },
           );

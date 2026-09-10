@@ -481,6 +481,85 @@ e2eTest(
   },
 );
 
+e2eTest(
+  "keeps tool details expanded through exec progress and assistant streaming",
+  async ({ app, llm, http }) => {
+    await app.page.getByRole("button", { name: "New session" }).click();
+    await app.page
+      .getByLabel("Message", { exact: true })
+      .fill("Fetch both reports and summarize them");
+    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    const firstCommand = `curl --silent --fail '${http.url("/first")}'`;
+    const secondCommand = `curl --silent --fail '${http.url("/second")}'`;
+    const js = `await tools.bash.run({ command: ${JSON.stringify(firstCommand)} }); return await tools.bash.run({ command: ${JSON.stringify(secondCommand)} });`;
+    await llm.respond(
+      m.tool.start("exec", { id: "reports", arguments: { js } }),
+    );
+    const first = await http.request("/first");
+    const pane = app.page.getByRole("main");
+    await pane
+      .getByRole("button", { name: "Running command", exact: true })
+      .click();
+    const call = pane.getByRole("button", {
+      name: `${firstCommand} (bash.run)`,
+      exact: true,
+    });
+    await call.click();
+    const details = pane.getByRole("region", {
+      name: "bash.run",
+      exact: true,
+    });
+    await expect(details.getByRole("code")).toHaveText(js);
+
+    first.respond("First report");
+    const second = await http.request("/second");
+    await expect(
+      pane.getByRole("button", {
+        name: `${secondCommand} (bash.run)`,
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(call).toHaveAttribute("aria-expanded", "true");
+    await expect(details).toBeVisible();
+
+    second.respond("Second report");
+    const verificationCommand = `curl --silent --fail '${http.url("/verify")}'`;
+    await llm.respond(
+      m.tool.start("bash", {
+        id: "verification",
+        arguments: { command: verificationCommand },
+      }),
+    );
+    const verification = await http.request("/verify");
+    await expect(
+      pane.getByRole("button", {
+        name: `${verificationCommand} (bash)`,
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(call).toHaveAttribute("aria-expanded", "true");
+    await expect(details).toContainText("Second report");
+
+    verification.respond("Verified");
+    const response = await llm.stream();
+    response.write(m.assistant("Both reports"));
+    await expect(pane.getByText("Both reports", { exact: true })).toBeVisible();
+    await expect(call).toHaveAttribute("aria-expanded", "true");
+    await expect(details).toBeVisible();
+
+    response.write(m.assistant(" are ready."));
+    response.end();
+    await expect(
+      pane.getByText("Both reports are ready.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      pane.getByRole("button", { name: "Stop", exact: true }),
+    ).not.toBeVisible();
+    await expect(call).toHaveAttribute("aria-expanded", "true");
+    await expect(details).toContainText("Second report");
+  },
+);
+
 const expansionScenarios: {
   name: string;
   path: string;

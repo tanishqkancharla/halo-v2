@@ -1,10 +1,13 @@
+import * as errore from "errore";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import type { AgentMessage } from "@get-halo/shared/rpc";
-import type {
-  ProjectedSession,
-  ProjectedToolInvocation,
-  ToolIdentity,
+import type { HaloMessage } from "@get-halo/shared/rpc";
+import {
+  sessionMessages,
+  sessionToolExecutions,
+  type SessionSnapshot,
+  type ToolExecution,
+  type ToolIdentity,
 } from "@get-halo/shared/sessionState";
 import {
   connectionRequestSchema,
@@ -50,7 +53,11 @@ type ToolActivitySummary = {
   current: string | undefined;
 };
 
-type ReducedToolInvocation = ProjectedToolInvocation & {
+type ReducedToolInvocation = Pick<
+  ToolExecution,
+  "id" | "tool" | "arguments" | "result"
+> & {
+  parentId?: string;
   active: boolean;
 };
 
@@ -67,7 +74,6 @@ type ToolPartLabel = {
 
 type CollectedTool = {
   id: string;
-  groupId: string;
   connectionRequests: ConnectionRequest[];
 };
 
@@ -80,7 +86,6 @@ type TextSegment = {
 
 type GroupSegment = {
   kind: "group";
-  groupId: string;
   tools: CollectedTool[];
 };
 
@@ -109,7 +114,7 @@ const bashArgsSchema = Type.Object({
  * Tool calls on one assistant message are one parallel group. Assistant text
  * splits groups; adjacent tool-only groups stay one activity.
  */
-export function sessionViewItems(state: ProjectedSession): SessionViewItem[] {
+export function sessionViewItems(state: SessionSnapshot): SessionViewItem[] {
   const items: SessionViewItem[] = [];
   const toolResults = toolResultsByCallId(state);
   const invocations = reduceToolInvocations(state);
@@ -134,25 +139,24 @@ export function sessionViewItems(state: ProjectedSession): SessionViewItem[] {
   }
 
   function openTurn(id: string): PendingTurn {
-    if (pending === undefined) {
-      pending = { id, segments: [] };
-      return pending;
-    }
-    pending.id = id;
+    if (pending === undefined) pending = { id, segments: [] };
     return pending;
   }
 
-  function pushAssistantMessage(message: AgentMessage, streaming: boolean) {
+  function pushAssistantMessage(
+    message: HaloMessage,
+    streaming: boolean,
+    id: string,
+  ) {
     if (message.role !== "assistant") return;
-    const turn = openTurn(`assistant-${message.timestamp}`);
-    const groupId = String(message.timestamp);
+    const turn = openTurn(`assistant-${id}`);
     let textIndex = 0;
     for (const part of message.content) {
       if (part.type === "text") {
         if (part.text.length === 0) continue;
         turn.segments.push({
           kind: "text",
-          id: `text-${message.timestamp}-${textIndex}`,
+          id: `text-${id}-${textIndex}`,
           text: part.text,
           streaming,
         });
@@ -165,51 +169,50 @@ export function sessionViewItems(state: ProjectedSession): SessionViewItem[] {
       const toolResult = toolResults.get(part.id);
       const collected: CollectedTool = {
         id: part.id,
-        groupId,
         connectionRequests:
           toolResult === undefined ? [] : toolResult.connectionRequests,
       };
       const last = turn.segments.at(-1);
-      if (
-        last !== undefined &&
-        last.kind === "group" &&
-        last.groupId === groupId
-      ) {
+      if (last?.kind === "group") {
         last.tools.push(collected);
         continue;
       }
       turn.segments.push({
         kind: "group",
-        groupId,
         tools: [collected],
       });
     }
   }
 
-  for (const message of state.messages) {
+  for (const entry of state.entries) {
+    if (entry.type !== "message") continue;
+    const message = entry.message;
     if (message.role === "user") {
       flush(false);
       items.push({
         kind: "user",
-        id: `user-${message.timestamp}`,
+        id: entry.id,
         text: userText(message),
       });
       continue;
     }
     if (message.role === "assistant") {
-      pushAssistantMessage(message, false);
+      pushAssistantMessage(message, false, entry.id);
       if (message.stopReason !== "toolUse") flush(false);
     }
   }
 
-  if (state.streamingMessage !== undefined) {
-    pushAssistantMessage(state.streamingMessage, true);
+  if (state.activeRun?.message !== undefined) {
+    pushAssistantMessage(state.activeRun.message, true, state.activeRun.id);
   }
 
-  flush(state.isWorking);
+  flush(state.activeRun !== undefined);
 
   const last = items.at(-1);
-  if (state.isWorking && (last === undefined || last.kind === "user")) {
+  if (
+    state.activeRun !== undefined &&
+    (last === undefined || last.kind === "user")
+  ) {
     items.push({
       kind: "assistantTurn",
       id: "assistant-working",
@@ -337,11 +340,8 @@ function projectTurn(args: {
   function flushGroups(active: boolean) {
     if (pendingGroups.length === 0) return;
     const tools = pendingGroups.flatMap((group) => group.tools);
-    const lastGroupId = pendingGroups.at(-1)?.groupId;
-    if (lastGroupId === undefined) return;
     const activity = groupActivity({
       tools,
-      lastGroupId,
       live: active,
       invocations,
     });
@@ -377,12 +377,12 @@ function projectTurn(args: {
 
 function groupActivity(args: {
   tools: CollectedTool[];
-  lastGroupId: string;
   live: boolean;
   invocations: readonly ReducedToolInvocation[];
 }): SessionViewPart | undefined {
-  const { tools, lastGroupId, live, invocations } = args;
-  if (tools.length === 0) return undefined;
+  const { tools, live, invocations } = args;
+  const firstTool = tools[0];
+  if (firstTool === undefined) return undefined;
 
   const visible = tools.filter((call) => call.connectionRequests.length === 0);
   const activities = activitiesForRoots(
@@ -393,22 +393,29 @@ function groupActivity(args: {
 
   return {
     kind: "toolActivity",
-    id: `assistant-${lastGroupId}-activity`,
+    id: `tool-${firstTool.id}-activity`,
     live,
     calls,
   };
 }
 
 function reduceToolInvocations(
-  state: ProjectedSession,
+  state: SessionSnapshot,
 ): ReducedToolInvocation[] {
-  return state.toolInvocations.flatMap((tool) => {
-    const active =
-      tool.completion === undefined &&
-      state.activeRunId !== undefined &&
-      tool.invocation.runId === state.activeRunId;
-    if (!active && tool.completion === undefined) return [];
-    return [{ ...tool, active }];
+  return sessionToolExecutions(state).flatMap((tool) => {
+    const active = tool.status === "running";
+    const root: ReducedToolInvocation = { ...tool, active };
+    if (tool.type !== "exec") return [root];
+    return [
+      root,
+      ...tool.calls.map((call) => ({
+        id: call.id,
+        parentId: call.parentId,
+        tool: call.tool,
+        arguments: call.arguments,
+        active: active && call.status === "running",
+      })),
+    ];
   });
 }
 
@@ -448,20 +455,18 @@ function visibleToolParts(
   activities: readonly ReducedToolInvocation[],
 ): ToolPart[] {
   const concreteAncestorIds = new Set<string>();
-  const byId = new Map(
-    activities.map((activity) => [activity.invocation.id, activity]),
-  );
+  const byId = new Map(activities.map((activity) => [activity.id, activity]));
   const parts: ToolPart[] = [];
   for (const activity of activities) {
     let detailSource = activity;
-    let parentId = activity.invocation.parentId;
+    let parentId = activity.parentId;
     while (parentId !== undefined) {
-      if (activity.invocation.tool.path !== "exec") {
+      if (activity.tool.path !== "exec") {
         concreteAncestorIds.add(parentId);
       }
       const parent = byId.get(parentId);
-      if (parent?.invocation.tool.path === "exec") detailSource = parent;
-      parentId = parent?.invocation.parentId;
+      if (parent?.tool.path === "exec") detailSource = parent;
+      parentId = parent?.parentId;
     }
     parts.push(toToolPart({ activity, detailSource }));
   }
@@ -474,14 +479,12 @@ function activitiesForRoots(
   activities: readonly ReducedToolInvocation[],
   rootIds: ReadonlySet<string>,
 ): ReducedToolInvocation[] {
-  const byId = new Map(
-    activities.map((activity) => [activity.invocation.id, activity]),
-  );
+  const byId = new Map(activities.map((activity) => [activity.id, activity]));
   return activities.filter((activity) => {
     let current: ReducedToolInvocation | undefined = activity;
     while (current !== undefined) {
-      if (rootIds.has(current.invocation.id)) return true;
-      const parentId: string | undefined = current.invocation.parentId;
+      if (rootIds.has(current.id)) return true;
+      const parentId: string | undefined = current.parentId;
       current = parentId === undefined ? undefined : byId.get(parentId);
     }
     return false;
@@ -640,19 +643,20 @@ function toToolPart(args: {
 }): ToolPart {
   const { activity, detailSource } = args;
   const part: ToolPart = {
-    id: activity.invocation.id,
-    tool: activity.invocation.tool,
-    args: activity.invocation.arguments,
+    id: activity.id,
+    tool: activity.tool,
+    args: activity.arguments,
     status: activity.active ? "active" : "completed",
     details: {
-      toolPath: detailSource.invocation.tool.path,
-      args: detailSource.invocation.arguments,
+      toolPath: detailSource.tool.path,
+      args: detailSource.arguments,
     },
   };
-  if (detailSource.completion !== undefined) {
-    part.details.resultText = detailSource.completion.result.content
+  if (detailSource.result !== undefined) {
+    const resultText = detailSource.result.content
       .flatMap((content) => (content.type === "text" ? [content.text] : []))
       .join("");
+    if (resultText.length > 0) part.details.resultText = resultText;
   }
   return part;
 }
@@ -675,24 +679,21 @@ function toPosixPath(value: string): string {
   return value.replaceAll("\\", "/");
 }
 
-function toolResultsByCallId(state: ProjectedSession) {
+function toolResultsByCallId(state: SessionSnapshot) {
   const map = new Map<string, { connectionRequests: ConnectionRequest[] }>();
-  for (const message of state.messages) {
-    if (message.role !== "toolResult") continue;
-    const connectionRequests = Value.Check(
-      connectionDetailsSchema,
-      message.details,
-    )
-      ? message.details.connectionRequests
-      : [];
-    map.set(message.toolCallId, {
-      connectionRequests,
+  for (const entry of state.entries) {
+    if (entry.type !== "toolResult") continue;
+    const details = entry.output.result.details;
+    map.set(entry.toolCallId, {
+      connectionRequests: Value.Check(connectionDetailsSchema, details)
+        ? details.connectionRequests
+        : [],
     });
   }
   return map;
 }
 
-function userText(message: AgentMessage): string {
+function userText(message: HaloMessage): string {
   if (message.role !== "user") return "";
   if (Array.isArray(message.content)) {
     return message.content
@@ -703,4 +704,120 @@ function userText(message: AgentMessage): string {
       .join("");
   }
   return message.content;
+}
+
+/** True when the latest user turn ended in a user abort. */
+export function lastAssistantTurnWasAborted(messages: HaloMessage[]): boolean {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message === undefined) continue;
+    if (message.role === "toolResult") continue;
+    if (message.role === "user") return false;
+    if (message.role === "assistant") return message.stopReason === "aborted";
+  }
+  return false;
+}
+
+/** Readable alert text when an assistant turn failed. */
+function assistantTurnError(message: HaloMessage): string | undefined {
+  if (message.role !== "assistant") return undefined;
+  if (message.stopReason === "aborted") return undefined;
+
+  const errorMessage = message.errorMessage;
+  const hasErrorMessage = errorMessage !== undefined && errorMessage.length > 0;
+  if (message.stopReason !== "error" && !hasErrorMessage) return undefined;
+  if (!hasErrorMessage) return undefined;
+
+  return readableAgentErrorMessage(errorMessage);
+}
+
+class AgentErrorMessageParseError extends errore.createTaggedError({
+  name: "AgentErrorMessageParseError",
+  message: "Assistant errorMessage was not valid JSON",
+}) {}
+
+function readableAgentErrorMessage(errorMessage: string): string {
+  const trimmed = errorMessage.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+    return errorMessage;
+  }
+
+  const parsed = errore.try({
+    try: () => {
+      // SAFETY: JSON.parse is untyped; humanMessageFromJson decodes the payload.
+      return JSON.parse(trimmed) as unknown;
+    },
+    catch: (e) => new AgentErrorMessageParseError({ cause: e }),
+  });
+  if (parsed instanceof Error) {
+    console.warn("Assistant errorMessage looked like JSON but failed to parse");
+    return errorMessage;
+  }
+
+  const extracted = humanMessageFromJson({ value: parsed });
+  if (extracted === undefined) return errorMessage;
+  return extracted;
+}
+
+const agentErrorJsonSchema = Type.Object({
+  error: Type.Optional(
+    Type.Union([
+      Type.String(),
+      Type.Object({
+        message: Type.String(),
+      }),
+    ]),
+  ),
+  message: Type.Optional(Type.String()),
+});
+
+function humanMessageFromJson(args: { value: unknown }): string | undefined {
+  if (Value.Check(Type.String(), args.value)) {
+    const value = args.value;
+    const nested = errore.try({
+      try: () => {
+        // SAFETY: JSON.parse is untyped; nested error JSON is decoded by this function.
+        return JSON.parse(value) as unknown;
+      },
+      catch: (e) => new AgentErrorMessageParseError({ cause: e }),
+    });
+    if (nested instanceof Error) {
+      if (value.length === 0) return undefined;
+      return value;
+    }
+    return humanMessageFromJson({ value: nested });
+  }
+
+  if (!Value.Check(agentErrorJsonSchema, args.value)) return undefined;
+
+  const error = args.value.error;
+  if (Value.Check(Type.String(), error)) {
+    if (error.length === 0) return undefined;
+    return error;
+  }
+  if (
+    Value.Check(Type.Object({ message: Type.String({ minLength: 1 }) }), error)
+  ) {
+    return error.message;
+  }
+
+  const message = args.value.message;
+  if (message === undefined || message.length === 0) return undefined;
+  return message;
+}
+
+export function sessionError(state: SessionSnapshot): string | undefined {
+  if (state.fault !== undefined) return state.fault;
+  if (state.activeRun !== undefined) return undefined;
+  const messages = sessionMessages(state);
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+    if (message.role === "user") return undefined;
+    if (message.role === "assistant") {
+      const error = assistantTurnError(message);
+      if (error !== undefined) return error;
+      break;
+    }
+  }
+  return state.lastRun?.error;
 }

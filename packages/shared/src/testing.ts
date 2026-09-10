@@ -1,8 +1,8 @@
 import type { ConnectionRequest } from "./connectionRequests.js";
-import type { AgentMessage } from "./sessionState.js";
+import type { HaloMessage } from "./sessionState.js";
 
 type ToolArguments = Extract<
-  Extract<AgentMessage, { role: "assistant" }>["content"][number],
+  Extract<HaloMessage, { role: "assistant" }>["content"][number],
   { type: "toolCall" }
 >["arguments"];
 

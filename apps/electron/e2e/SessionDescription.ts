@@ -1,7 +1,7 @@
 import type { SessionDescription } from "@get-halo/shared/testing";
 import crypto from "node:crypto";
 import type {
-  AgentMessage,
+  HaloMessage,
   ExecToolCall,
   ToolIdentity,
 } from "@get-halo/shared/sessionState";
@@ -31,11 +31,11 @@ export async function loadSessionDescription(args: {
   description: SessionDescription;
   load(input: {
     title: string;
-    messages: AgentMessage[];
+    messages: HaloMessage[];
   }): Promise<{ sessionId: string }>;
   getToolIdentity(path: string): Promise<ToolIdentity>;
 }) {
-  const messages: AgentMessage[] = [];
+  const messages: HaloMessage[] = [];
   const items =
     args.description.messages === undefined ? [] : args.description.messages;
   let timestamp = Date.now();
@@ -109,10 +109,10 @@ export async function loadSessionDescription(args: {
 }
 
 function assistantMessage(args: {
-  content: Extract<AgentMessage, { role: "assistant" }>["content"];
-  stopReason: Extract<AgentMessage, { role: "assistant" }>["stopReason"];
+  content: Extract<HaloMessage, { role: "assistant" }>["content"];
+  stopReason: Extract<HaloMessage, { role: "assistant" }>["stopReason"];
   timestamp: number;
-}): Extract<AgentMessage, { role: "assistant" }> {
+}): Extract<HaloMessage, { role: "assistant" }> {
   return {
     role: "assistant",
     content: args.content,

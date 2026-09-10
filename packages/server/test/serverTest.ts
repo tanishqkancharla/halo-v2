@@ -2,13 +2,14 @@ import * as errore from "errore";
 import { test as baseTest } from "vitest";
 import { createTestArtifacts } from "./TestArtifacts.js";
 import { createOpenAILLMApi } from "@get-halo/server/llm";
-import { LLMDriver } from "@get-halo/server/testing";
+import { HttpService, LLMDriver } from "@get-halo/server/testing";
 import { TestServer } from "./TestServer.js";
 
 type ServerOptions = { workspaceRoot?: string };
 
 export const serverTest = baseTest.extend<{
   llm: LLMDriver;
+  http: HttpService;
   server: TestServer;
   createServer: (options?: ServerOptions) => TestServer;
 }>({
@@ -19,6 +20,14 @@ export const serverTest = baseTest.extend<{
     await using cleanup = new errore.AsyncDisposableStack();
     cleanup.defer(() => llm.close());
     await use(llm);
+  },
+  // oxlint-disable-next-line eslint/no-empty-pattern -- Vitest fixture callbacks require destructured parameters.
+  http: async ({}, use) => {
+    const http = await HttpService.start();
+    if (http instanceof Error) throw http;
+    await using cleanup = new errore.AsyncDisposableStack();
+    cleanup.defer(() => http.close());
+    await use(http);
   },
   server: async ({ createServer }, use) => {
     const server = createServer();

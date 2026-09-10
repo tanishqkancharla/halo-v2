@@ -1,14 +1,14 @@
-import { describe, expect, test } from "vitest";
-import type { AgentMessage } from "./rpc.js";
+import { expect, test } from "vitest";
 import {
-  lastAssistantTurnWasAborted,
   applySessionEvent,
-  emptySessionState,
-  projectSavedMessages,
+  emptySessionSnapshot,
   reduceSessionUpdate,
-  type SessionEvent,
-  type ToolIdentity,
-  type ToolInvocation,
+  sessionMessages,
+  sessionToolExecutions,
+  type HaloEntry,
+  type HaloMessage,
+  type SessionSnapshot,
+  type ToolExecution,
 } from "./sessionState.js";
 
 const emptyUsage = {
@@ -27,9 +27,9 @@ const emptyUsage = {
 };
 
 function assistantMessage(
-  overrides: Partial<Extract<AgentMessage, { role: "assistant" }>> &
-    Pick<Extract<AgentMessage, { role: "assistant" }>, "stopReason">,
-): Extract<AgentMessage, { role: "assistant" }> {
+  overrides: Partial<Extract<HaloMessage, { role: "assistant" }>> &
+    Pick<Extract<HaloMessage, { role: "assistant" }>, "stopReason">,
+): Extract<HaloMessage, { role: "assistant" }> {
   return {
     role: "assistant",
     content: [],
@@ -42,7 +42,10 @@ function assistantMessage(
   };
 }
 
-function userMessage(text: string, timestamp: number): AgentMessage {
+function userMessage(
+  text: string,
+  timestamp: number,
+): Extract<HaloMessage, { role: "user" }> {
   return {
     role: "user",
     content: text,
@@ -50,202 +53,200 @@ function userMessage(text: string, timestamp: number): AgentMessage {
   };
 }
 
-describe("projectSession", () => {
-  test("projects every prefix of committed messages", () => {
-    const user = userMessage("hello", 1);
-    const assistant = assistantMessage({
-      stopReason: "stop",
-      content: [{ type: "text", text: "hi" }],
-      timestamp: 2,
-    });
-    const events: SessionEvent[] = [
-      { type: "message.committed", message: user },
-      { type: "message.committed", message: assistant },
-    ];
-
-    expect(projectSession(events.slice(0, 0)).messages).toEqual([]);
-    expect(projectSession(events.slice(0, 1)).messages).toEqual([user]);
-    expect(projectSession(events).messages).toEqual([user, assistant]);
+test("follows a partial response through its committed entry and completed run", () => {
+  let snapshot = emptySessionSnapshot();
+  snapshot = applySessionEvent(snapshot, {
+    type: "run.started",
+    runId: "run-1",
   });
-
-  test("reconstructs the latest assistant update from stream deltas", () => {
-    const started = assistantMessage({ stopReason: "stop", timestamp: 2 });
-    const updated = assistantMessage({
-      stopReason: "stop",
-      content: [{ type: "text", text: "Hello" }],
-      timestamp: 2,
-    });
-    const events: SessionEvent[] = [
-      { type: "run.started", runId: "run-1" },
-      {
-        type: "assistant.updated",
-        runId: "run-1",
-        update: { type: "start", partial: started },
-      },
-      {
-        type: "assistant.updated",
-        runId: "run-1",
-        update: {
-          type: "text_delta",
-          contentIndex: 0,
-          delta: "Hello",
-          partial: updated,
-        },
-      },
-    ];
-
-    expect(projectSession(events.slice(0, 2)).streamingMessage).toEqual(
-      started,
-    );
-    expect(projectSession(events).streamingMessage).toEqual(updated);
-    expect(projectSession(events).isWorking).toBe(true);
+  const user: HaloEntry = {
+    type: "message",
+    id: "user-1",
+    message: userMessage("Hello", 1),
+  };
+  snapshot = applySessionEvent(snapshot, {
+    type: "entry.committed",
+    entry: user,
   });
-
-  test("projects readable assistant errors", () => {
-    const failed = assistantMessage({
-      stopReason: "error",
-      errorMessage: JSON.stringify({
-        error: { message: "API keys are not supported by this API." },
-      }),
-    });
-
-    expect(
-      projectSession([{ type: "message.committed", message: failed }]).error,
-    ).toBe("API keys are not supported by this API.");
-  });
-
-  test("keeps aborted turns in the transcript without an error", () => {
-    const aborted = assistantMessage({
-      stopReason: "aborted",
-      errorMessage: "Request was aborted",
-    });
-    const state = projectSession([
-      { type: "message.committed", message: aborted },
-    ]);
-
-    expect(state.error).toBeUndefined();
-    expect(lastAssistantTurnWasAborted(state.messages)).toBe(true);
-  });
-
-  test("tracks direct tool lifecycle prefixes", () => {
-    const tool = {
-      path: "files.read",
-      displayName: "Read",
-    } satisfies ToolIdentity;
-    const invocation = {
-      id: "tool-1",
-      runId: "run-1",
-      tool,
-      arguments: { path: "README.md" },
-    } satisfies ToolInvocation;
-    const events: SessionEvent[] = [
-      { type: "run.started", runId: "run-1" },
-      { type: "tool.started", invocation },
-      {
-        type: "tool.updated",
-        invocationId: invocation.id,
-        update: { bytesRead: 10 },
-      },
-      {
-        type: "tool.finished",
-        invocationId: invocation.id,
-        result: {
-          content: [{ type: "text", text: "contents" }],
-          details: {},
-        },
-        isError: false,
-      },
-    ];
-
-    expect(projectSession(events.slice(0, 2)).toolInvocations).toEqual([
-      { invocation },
-    ]);
-    expect(projectSession(events.slice(0, 3)).toolInvocations).toEqual([
-      { invocation, update: { bytesRead: 10 } },
-    ]);
-    expect(projectSession(events).toolInvocations).toEqual([
-      {
-        invocation,
-        update: { bytesRead: 10 },
-        completion: {
-          result: {
-            content: [{ type: "text", text: "contents" }],
-            details: {},
-          },
-          isError: false,
-        },
-      },
-    ]);
-  });
-
-  test("a new run supersedes interrupted work", () => {
-    const invocation: ToolInvocation = {
-      id: "tool-1",
-      runId: "run-1",
-      tool: { path: "bash", displayName: "Shell" },
-      arguments: { command: "sleep 10" },
-    };
-    const interrupted: SessionEvent[] = [
-      { type: "run.started", runId: "run-1" },
-      { type: "tool.started", invocation },
-      { type: "run.started", runId: "run-2" },
-    ];
-
-    const restarted = projectSession(interrupted);
-    expect(restarted.isWorking).toBe(true);
-    expect(restarted.toolInvocations).toEqual([{ invocation }]);
-    expect(
-      projectSession([
-        ...interrupted,
-        { type: "run.finished", runId: "run-2", outcome: "completed" },
-      ]).isWorking,
-    ).toBe(false);
-  });
-});
-
-function projectSession(events: readonly SessionEvent[]) {
-  return events.reduce(applySessionEvent, emptySessionState());
-}
-
-test("replaces a previous conversation with a snapshot and settles its partial reply", () => {
-  const previous = projectSavedMessages([
-    userMessage("Previous conversation", 1),
-  ]);
-  const current = projectSavedMessages([
-    userMessage("Current conversation", 2),
-  ]);
   const partial = assistantMessage({
     content: [{ type: "text", text: "Hello" }],
-    stopReason: "stop",
-    timestamp: 3,
+    stopReason: "pending",
   });
-  const snapshot = {
-    ...current,
-    activeRunId: "current",
-    isWorking: true,
-    streamingMessage: partial,
+  snapshot = applySessionEvent(snapshot, {
+    type: "message.updated",
+    runId: "run-1",
+    message: partial,
+  });
+  const during = snapshot;
+  expect(sessionMessages(during)).toEqual([user.message]);
+  expect(during.activeRun?.message).toEqual(partial);
+
+  const reply: HaloEntry = {
+    type: "message",
+    id: "reply-1",
+    message: { ...partial, stopReason: "stop" },
+  };
+  snapshot = applySessionEvent(snapshot, {
+    type: "entry.committed",
+    entry: reply,
+  });
+  expect(snapshot.activeRun?.message).toBeUndefined();
+  snapshot = applySessionEvent(snapshot, {
+    type: "run.finished",
+    run: { id: "run-1", status: "completed" },
+  });
+  expect(snapshot.entries).toEqual([user, reply]);
+  expect(snapshot.activeRun).toBeUndefined();
+  expect(snapshot.lastRun).toEqual({ id: "run-1", status: "completed" });
+  expect(during.activeRun?.message).toEqual(partial);
+});
+
+test("exposes exec's nested calls during execution and from its committed result", () => {
+  const request = assistantMessage({
+    stopReason: "toolUse",
+    content: [
+      {
+        type: "toolCall",
+        id: "exec-1",
+        name: "exec",
+        arguments: { js: "await tools.read()" },
+      },
+    ],
+  });
+  let snapshot: SessionSnapshot = {
+    ...emptySessionSnapshot(),
+    entries: [{ type: "message", id: "request-1", message: request }],
+  };
+  snapshot = applySessionEvent(snapshot, {
+    type: "run.started",
+    runId: "run-1",
+  });
+  const execution: ToolExecution = {
+    type: "exec",
+    id: "exec-1",
+    tool: { path: "exec", displayName: "Exec" },
+    arguments: { js: "await tools.read()" },
+    status: "running",
+    calls: [],
+  };
+  snapshot = applySessionEvent(snapshot, {
+    type: "tool.started",
+    runId: "run-1",
+    execution,
+  });
+  const call = {
+    id: "read-1",
+    parentId: "exec-1",
+    tool: { path: "files.read", displayName: "Files" },
+    arguments: { path: "notes.md" },
+    status: "running" as const,
+  };
+  snapshot = applySessionEvent(snapshot, {
+    type: "tool.updated",
+    runId: "run-1",
+    toolCallId: "exec-1",
+    status: "running",
+    output: { type: "exec", result: { content: [] }, calls: [call] },
+  });
+  expect(sessionToolExecutions(snapshot)).toMatchObject([
+    { type: "exec", status: "running", calls: [call] },
+  ]);
+  const during = snapshot;
+  const entry: HaloEntry = {
+    type: "toolResult",
+    id: "result-1",
+    toolCallId: "exec-1",
+    tool: execution.tool,
+    timestamp: 3,
+    isError: false,
+    output: {
+      type: "exec",
+      result: { content: [{ type: "text", text: "Read notes" }] },
+      calls: [{ ...call, status: "completed" }],
+    },
+  };
+  snapshot = applySessionEvent(snapshot, { type: "entry.committed", entry });
+  expect(snapshot.activeRun?.tools).toEqual([]);
+  expect(sessionToolExecutions(snapshot)).toEqual([
+    {
+      ...execution,
+      status: "completed",
+      result: entry.output.result,
+      calls: [{ ...call, status: "completed" }],
+    },
+  ]);
+  const reopened = reduceSessionUpdate(during, { type: "snapshot", snapshot });
+  expect(sessionToolExecutions(reopened)).toEqual(
+    sessionToolExecutions(snapshot),
+  );
+  expect(sessionToolExecutions(during)).toMatchObject([
+    { calls: [{ status: "running" }] },
+  ]);
+});
+
+test("replaces a previous session and continues the snapshot's active run", () => {
+  const previous: SessionSnapshot = {
+    ...emptySessionSnapshot(),
+    entries: [
+      {
+        type: "message",
+        id: "old",
+        message: userMessage("Previous session", 1),
+      },
+    ],
+  };
+  const current: SessionSnapshot = {
+    ...emptySessionSnapshot(),
+    entries: [
+      {
+        type: "message",
+        id: "current",
+        message: userMessage("Current session", 2),
+      },
+    ],
+    activeRun: { id: "run-2", tools: [] },
   };
   const restored = reduceSessionUpdate(previous, {
     type: "snapshot",
-    state: snapshot,
+    snapshot: current,
   });
   const completed = reduceSessionUpdate(restored, {
     type: "event",
-    event: {
-      type: "message.committed",
-      message: { ...partial, content: [{ type: "text", text: "Hello again" }] },
-    },
+    event: { type: "run.finished", run: { id: "run-2", status: "completed" } },
   });
-  const settled = reduceSessionUpdate(completed, {
-    type: "event",
-    event: { type: "run.finished", runId: "current", outcome: "completed" },
+  expect(completed.entries).toEqual(current.entries);
+  expect(completed.activeRun).toBeUndefined();
+  expect(previous.entries[0]?.id).toBe("old");
+});
+
+test("keeps run outcomes without allowing late updates to replace a newer run", () => {
+  let snapshot = applySessionEvent(emptySessionSnapshot(), {
+    type: "run.started",
+    runId: "failed-run",
   });
-  expect(settled.messages).toEqual([
-    current.messages[0],
-    { ...partial, content: [{ type: "text", text: "Hello again" }] },
-  ]);
-  expect(settled.streamingMessage).toBeUndefined();
-  expect(settled.isWorking).toBe(false);
-  expect(restored.streamingMessage).toEqual(partial);
-  expect(previous.messages).toEqual([userMessage("Previous conversation", 1)]);
+  snapshot = applySessionEvent(snapshot, {
+    type: "run.finished",
+    run: { id: "failed-run", status: "failed", error: "Access denied" },
+  });
+  expect(snapshot.lastRun).toEqual({
+    id: "failed-run",
+    status: "failed",
+    error: "Access denied",
+  });
+  snapshot = applySessionEvent(snapshot, {
+    type: "run.started",
+    runId: "retry",
+  });
+  const late = applySessionEvent(snapshot, {
+    type: "message.updated",
+    runId: "failed-run",
+    message: assistantMessage({ stopReason: "pending" }),
+  });
+  expect(late.activeRun).toEqual({ id: "retry", tools: [] });
+  const aborted = applySessionEvent(late, {
+    type: "run.finished",
+    run: { id: "retry", status: "aborted" },
+  });
+  expect(aborted.lastRun).toEqual({ id: "retry", status: "aborted" });
+  expect(aborted.activeRun).toBeUndefined();
 });

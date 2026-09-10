@@ -1,4 +1,4 @@
-import type { WorkspaceFilePreview, AgentMessage } from "./rpc.js";
+import type { WorkspaceFilePreview, HaloMessage } from "./rpc.js";
 import {
   asyncIteratorObject,
   error,
@@ -9,7 +9,7 @@ import {
 import type { ConnectionRequest } from "./connectionRequests.js";
 import type {
   SessionWatchItem,
-  ProjectedSession,
+  SessionSnapshot,
   ToolIdentity,
 } from "./sessionState.js";
 import type {
@@ -18,7 +18,7 @@ import type {
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const haloProtocolVersion = 6 as const;
+export const haloProtocolVersion = 7 as const;
 
 export const RequestRejectedError = error("BAD_REQUEST", {
   message: "Halo could not complete the request.",
@@ -151,7 +151,7 @@ export const contract = publicProcedure.router({
     create: oc.output(type<{ sessionId: string }>()),
     snapshot: oc
       .input(type<{ sessionId: string }>())
-      .output(type<ProjectedSession>()),
+      .output(type<SessionSnapshot>()),
     watch: oc
       .input(type<{ sessionId: string }>())
       .output(asyncIteratorObject(type<SessionWatchItem>())),
@@ -166,7 +166,7 @@ export const contract = publicProcedure.router({
   },
   testHarness: {
     loadSession: oc
-      .input(type<{ title: string; messages: AgentMessage[] }>())
+      .input(type<{ title: string; messages: HaloMessage[] }>())
       .output(type<{ sessionId: string }>()),
     invokeTool: oc
       .input(type<{ path: string; input: unknown }>())

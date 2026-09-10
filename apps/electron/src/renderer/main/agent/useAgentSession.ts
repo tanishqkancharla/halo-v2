@@ -1,10 +1,11 @@
+import { sessionError } from "./sessionView.js";
 import { useEffect, useRef, useState } from "react";
 import * as errore from "errore";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  emptySessionState,
+  emptySessionSnapshot,
   reduceSessionUpdate,
-  type ProjectedSession,
+  type SessionSnapshot,
   type SessionWatchItem,
 } from "@get-halo/shared/sessionState";
 import { useApi } from "../../api/ApiProvider.tsx";
@@ -26,7 +27,8 @@ class AbortFailedError extends errore.createTaggedError({
 }) {}
 
 type UseAgentSessionResult = {
-  state: ProjectedSession;
+  state: SessionSnapshot;
+  error: string | undefined;
   prompt: (text: string) => Promise<void | PromptFailedError>;
   abort: () => Promise<void | AbortFailedError>;
 };
@@ -40,14 +42,14 @@ export function useAgentSession(
   const [readySessionId, setReadySessionId] = useState<string | undefined>(
     undefined,
   );
-  const [state, setState] = useState<ProjectedSession>(emptySessionState);
+  const [state, setState] = useState<SessionSnapshot>(emptySessionSnapshot);
   const [localError, setLocalError] = useState<string | undefined>(undefined);
   const [openedFor, setOpenedFor] = useState(sessionId);
 
   if (openedFor !== sessionId) {
     setOpenedFor(sessionId);
     setReadySessionId(undefined);
-    setState(emptySessionState());
+    setState(emptySessionSnapshot());
     setLocalError(undefined);
   }
 
@@ -56,7 +58,7 @@ export function useAgentSession(
     const controller = new AbortController();
 
     const updates = new Stream<SessionWatchItem>();
-    const states = updates.project(emptySessionState(), reduceSessionUpdate);
+    const states = updates.project(emptySessionSnapshot(), reduceSessionUpdate);
     const unsubscribe = states.subscribe(setState);
     void (async () => {
       const source = await api.sessions.watch(
@@ -141,14 +143,16 @@ export function useAgentSession(
   }
 
   return {
-    state: localError === undefined ? state : { ...state, error: localError },
+    state,
+    error: localError === undefined ? sessionError(state) : localError,
     prompt,
     abort,
   };
 }
 
 type UseDraftAgentSessionResult = {
-  state: ProjectedSession;
+  state: SessionSnapshot;
+  error: string | undefined;
   sessionId: string | undefined;
   title: string | undefined;
   prompt: (text: string) => Promise<void | PromptFailedError>;
@@ -169,8 +173,8 @@ export function useDraftAgentSession(
   const [title, setTitle] = useState<string>();
   const sessionIdRef = useRef<string | undefined>(undefined);
   const onAcceptedRef = useRef(onAccepted);
-  const { state, abort } = useAgentSession(sessionId);
-  const hasMessages = state.messages.length > 0;
+  const { state, error, abort } = useAgentSession(sessionId);
+  const hasMessages = state.entries.length > 0;
 
   useEffect(() => {
     onAcceptedRef.current = onAccepted;
@@ -224,10 +228,8 @@ export function useDraftAgentSession(
   }
 
   return {
-    state:
-      localError === undefined
-        ? state
-        : { ...state, error: localError, isWorking: false },
+    state,
+    error: localError === undefined ? error : localError,
     sessionId,
     title,
     prompt,
