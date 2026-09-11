@@ -32,7 +32,63 @@ extensionTest(
 );
 
 extensionTest(
-  "keeps previously declined tools out of a new request",
+  "restores each extension's approvals and pending requests after restart",
+  async ({ server, extensionId }) => {
+    await server.harness.files.write({
+      path: "workspace/.halo/extensions/calendar/package.json",
+      content: JSON.stringify({
+        name: "calendar",
+        private: true,
+        type: "module",
+      }),
+    });
+    await server.rpc.extensions.tools.add({
+      id: extensionId,
+      paths: ["files.read", "files.write"],
+    });
+    await server.rpc.extensions.tools.add({
+      id: "calendar",
+      paths: ["files.read"],
+    });
+    await server.rendererRpc.extensions.tools.decide({
+      id: extensionId,
+      paths: ["files.read"],
+      action: "allow",
+    });
+
+    await server.stop();
+    await server.start();
+
+    const notes = await server.rpc.extensions.tools.check({ id: extensionId });
+    expect(notes.granted).toEqual(["files.read"]);
+    expect(notes.pending).toEqual(["files.write"]);
+    const calendar = await server.rpc.extensions.tools.check({
+      id: "calendar",
+    });
+    expect(calendar.granted).toEqual([]);
+    expect(calendar.pending).toEqual(["files.read"]);
+
+    const requests = await server.rendererRpc.extensions.tools.requests();
+    expect((await requests.next()).value).toEqual([
+      { id: "calendar", displayName: "calendar", paths: ["files.read"] },
+      { id: extensionId, displayName: "notes", paths: ["files.write"] },
+    ]);
+
+    await server.rendererRpc.extensions.tools.decide({
+      id: extensionId,
+      paths: ["files.write"],
+      action: "allow",
+    });
+
+    expect((await requests.next()).value).toEqual([
+      { id: "calendar", displayName: "calendar", paths: ["files.read"] },
+    ]);
+    await requests.return();
+  },
+);
+
+extensionTest(
+  "keeps declined tools out of a new request after restart",
   async ({ server, extensionId }) => {
     await server.rpc.extensions.tools.add({
       id: extensionId,
@@ -43,6 +99,9 @@ extensionTest(
       paths: ["files.read"],
       action: "deny",
     });
+
+    await server.stop();
+    await server.start();
 
     const result = await server.rpc.extensions.tools.add({
       id: extensionId,
@@ -105,7 +164,7 @@ extensionTest(
 );
 
 extensionTest(
-  "keeps capability declarations when the user revokes access",
+  "preserves revocation and capability declarations after restart",
   async ({ server, extensionId }) => {
     await server.rpc.extensions.tools.add({
       id: extensionId,
@@ -117,12 +176,16 @@ extensionTest(
       action: "allow",
     });
 
-    const result = await server.rendererRpc.extensions.tools.decide({
+    await server.rendererRpc.extensions.tools.decide({
       id: extensionId,
       paths: ["files.read"],
       action: "revoke",
     });
 
+    await server.stop();
+    await server.start();
+
+    const result = await server.rpc.extensions.tools.check({ id: extensionId });
     expect(result.requested).toEqual(["files.read"]);
     expect(result.granted).toEqual([]);
     expect(result.pending).toEqual([]);
