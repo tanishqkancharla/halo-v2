@@ -5,6 +5,12 @@ import { expect, test } from "vitest";
 import { ControlPlane } from "../src/ControlPlane.js";
 import { readControlPlaneFile } from "../src/ControlPlaneFile.js";
 
+const testAuth = {
+  secret: "test-control-plane-auth-secret-key!",
+  googleClientId: "test-google-client-id.apps.googleusercontent.com",
+  googleClientSecret: "test-google-client-secret",
+};
+
 const controlPlaneTest = test.extend<{ appDataDir: string }>({
   appDataDir: async ({ task }, use) => {
     const parent = resolve(import.meta.dirname, "../../../tmp/control-plane");
@@ -19,7 +25,11 @@ controlPlaneTest(
   "stays reachable on loopback and removes the origin file on close",
   async ({ appDataDir }) => {
     await using cleanup = new errore.AsyncDisposableStack();
-    const plane = await ControlPlane.start({ appDataDir, port: 0 });
+    const plane = await ControlPlane.start({
+      appDataDir,
+      port: 0,
+      auth: testAuth,
+    });
     if (plane instanceof Error) throw plane;
     const lifetime = { open: true };
     cleanup.defer(async () => {
@@ -50,3 +60,21 @@ controlPlaneTest(
     expect(afterClose).toBe("gone");
   },
 );
+
+controlPlaneTest("serves Better Auth at /api/auth", async ({ appDataDir }) => {
+  await using cleanup = new errore.AsyncDisposableStack();
+  const plane = await ControlPlane.start({
+    appDataDir,
+    port: 0,
+    auth: testAuth,
+  });
+  if (plane instanceof Error) throw plane;
+  cleanup.defer(async () => {
+    const closed = await plane.close();
+    if (closed instanceof Error) console.warn(closed);
+  });
+
+  const ok = await fetch(`${plane.origin}/api/auth/ok`);
+  expect(ok.status).toBe(200);
+  expect(await ok.json()).toEqual({ ok: true });
+});
