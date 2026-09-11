@@ -33,6 +33,12 @@ new gcp.projects.IAMMember("runtime-logs", {
   role: "roles/logging.logWriter",
   member: pulumi.interpolate`serviceAccount:${identity.email}`,
 });
+new gcp.secretmanager.SecretIamMember("openai-api-key", {
+  project,
+  secretId: "halo-dev-local-openai-api-key",
+  role: "roles/secretmanager.secretAccessor",
+  member: pulumi.interpolate`serviceAccount:${identity.email}`,
+});
 const disk = new gcp.compute.Disk(
   "workspace",
   {

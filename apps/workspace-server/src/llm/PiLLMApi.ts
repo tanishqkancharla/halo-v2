@@ -13,12 +13,17 @@ export async function createPiLLMApi(options: {
   agentDir: string;
   provider: string;
   modelId: string;
+  apiKey: string;
 }): Promise<LLMApi | PiLLMApiError> {
   registerBunOAuthFlows();
   const runtime = await ModelRuntime.create({
     modelsPath: join(options.agentDir, "models.json"),
   }).catch((cause) => new PiLLMApiError({ ...options, cause }));
   if (runtime instanceof Error) return runtime;
+  const authenticated = await runtime
+    .setRuntimeApiKey(options.provider, options.apiKey)
+    .catch((cause) => new PiLLMApiError({ ...options, cause }));
+  if (authenticated instanceof Error) return authenticated;
   const model = runtime.getModel(options.provider, options.modelId);
   if (model === undefined) return new PiLLMApiError(options);
   return {

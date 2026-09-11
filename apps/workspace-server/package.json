@@ -36,6 +36,7 @@
     "@executor-js/plugin-openapi": "1.6.0",
     "@executor-js/runtime-quickjs": "1.6.0",
     "@executor-js/sdk": "1.6.0",
+    "@get-halo/gcp": "workspace:*",
     "@get-halo/shared": "workspace:*",
     "@halo/cli": "workspace:*",
     "@jitl/quickjs-singlefile-cjs-release-sync": "0.31.0",

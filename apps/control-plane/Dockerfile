@@ -6,6 +6,7 @@ WORKDIR /opt/halo
 RUN npm install --global pnpm@12.1.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
+COPY packages/gcp ./packages/gcp
 COPY packages/typescript-config ./packages/typescript-config
 COPY apps/control-plane ./apps/control-plane
 RUN pnpm install --frozen-lockfile --filter @get-halo/control-plane...

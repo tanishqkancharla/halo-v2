@@ -14,6 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@get-halo/gcp": "workspace:*",
     "@sinclair/typebox": "^0.34.52",
     "better-auth": "1.7.4",
     "errore": "^0.14.1",

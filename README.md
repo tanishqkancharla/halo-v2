@@ -29,16 +29,17 @@ export HALO_USE_SWIFTSHADER=1
 HALO_WORKSPACE_ROOT=/absolute/path/to/workspace pnpm dev
 ```
 
-Set a model provider key for the same process:
+Halo reads model and authentication credentials from GCP Secret Manager at
+runtime using Application Default Credentials. Follow the
+[infrastructure secret setup](infra/README.md#runtime-secrets) before starting
+development.
 
-```sh
-export OPENAI_API_KEY=your-key
-# or ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY
-```
-
-In Cursor cloud agents, add the key as an environment secret named `OPENAI_API_KEY` (or another provider key above) in the Secrets panel. The dev terminal inherits it, so Pi picks it up with no extra step. Halo builds, tests, and launches without a key; you only need one to chat with a model.
-
-Choose the workspace when launching the workspace server with `HALO_WORKSPACE_ROOT`, or set it in the repository `.env`. `pnpm dev` starts the server and Electron independently. Electron discovers the server through `<repo>/.halo/server.json`; closing Electron leaves the server running. Both services accept `HALO_USER_DATA` to select a different application-data directory. See [workspace-server configuration](apps/workspace-server/README.md).
+Choose the workspace when launching the workspace server with
+`HALO_WORKSPACE_ROOT`. `pnpm dev` starts the server and Electron independently.
+Electron discovers the server through `<repo>/.halo/server.json`; closing Electron
+leaves the server running. Both services accept `HALO_USER_DATA` to select a
+different application-data directory. See
+[workspace-server configuration](apps/workspace-server/README.md).
 
 Halo runs Pi's `AgentHarness` with one `main` lane per conversation. `HaloServer` owns a `DatabaseClient` that stores Pi conversations and Executor application data in one embedded Turso database. The file currently lives in the selected workspace:
 
@@ -60,7 +61,8 @@ The renderer consumes Halo session snapshots and events, adapted from Pi at the 
 
 Pi's file and shell tools run on the host with the same rights as Halo. Halo does not import old AgentOS SQLite workspaces.
 
-The workspace server reads the repository `.env`. The workspace server consumes provider configuration; it does not pass through renderer IPC.
+The workspace server reads required credentials from GCP Secret Manager. It does
+not pass them through renderer IPC or extension process environments.
 
 ## Debug UI control
 

@@ -3,12 +3,19 @@ import * as gcp from "@pulumi/gcp";
 import * as pulumi from "@pulumi/pulumi";
 import * as random from "@pulumi/random";
 
-const configuration = new pulumi.Config("gcp");
-const project = configuration.require("project");
-const region = configuration.require("region");
+const configuration = new pulumi.Config();
+const cloud = new pulumi.Config("gcp");
+const project = cloud.require("project");
+const region = cloud.require("region");
 const name = `halo-${pulumi.getStack()}`;
 const databaseName = "halo";
 const databaseUserName = "halo";
+const controlPlaneServiceName = `${name}-control-plane`;
+const controlPlaneImage = configuration.require("controlPlaneImage");
+const googleClientIdSecretId = `${name}-control-plane-google-client-id`;
+const googleClientSecretId = `${name}-control-plane-google-client-secret`;
+const projectInfo = gcp.organizations.getProjectOutput({ projectId: project });
+const controlPlaneOrigin = pulumi.interpolate`https://${controlPlaneServiceName}-${projectInfo.number}.${region}.run.app`;
 
 const network = new gcp.compute.Network("network", {
   name,
@@ -165,12 +172,15 @@ const databaseUrlVersion = new gcp.secretmanager.SecretVersion(
   },
   { protect: true, dependsOn: [appDatabase, appDatabaseUser] },
 );
-new gcp.secretmanager.SecretIamMember("database-url-access", {
-  project,
-  secretId: databaseUrlSecret.id,
-  role: "roles/secretmanager.secretAccessor",
-  member: pulumi.interpolate`serviceAccount:${runtime.email}`,
-});
+const databaseUrlAccess = new gcp.secretmanager.SecretIamMember(
+  "database-url-access",
+  {
+    project,
+    secretId: databaseUrlSecret.id,
+    role: "roles/secretmanager.secretAccessor",
+    member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+  },
+);
 
 const authSecret = new gcp.secretmanager.Secret(
   "auth-secret",
@@ -190,12 +200,125 @@ const authSecretVersion = new gcp.secretmanager.SecretVersion(
   },
   { protect: true },
 );
-new gcp.secretmanager.SecretIamMember("auth-secret-access", {
-  project,
-  secretId: authSecret.id,
-  role: "roles/secretmanager.secretAccessor",
-  member: pulumi.interpolate`serviceAccount:${runtime.email}`,
-});
+const authSecretAccess = new gcp.secretmanager.SecretIamMember(
+  "auth-secret-access",
+  {
+    project,
+    secretId: authSecret.id,
+    role: "roles/secretmanager.secretAccessor",
+    member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+  },
+);
+
+const googleClientIdAccess = new gcp.secretmanager.SecretIamMember(
+  "google-client-id-access",
+  {
+    project,
+    secretId: googleClientIdSecretId,
+    role: "roles/secretmanager.secretAccessor",
+    member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+  },
+);
+
+const googleClientSecretAccess = new gcp.secretmanager.SecretIamMember(
+  "google-client-secret-access",
+  {
+    project,
+    secretId: googleClientSecretId,
+    role: "roles/secretmanager.secretAccessor",
+    member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+  },
+);
+
+const controlPlane = new gcp.cloudrunv2.Service(
+  "control-plane-service",
+  {
+    project,
+    location: region,
+    name: controlPlaneServiceName,
+    description: "Halo control plane",
+    deletionProtection: true,
+    ingress: "INGRESS_TRAFFIC_ALL",
+    invokerIamDisabled: true,
+    template: {
+      executionEnvironment: "EXECUTION_ENVIRONMENT_GEN2",
+      serviceAccount: runtime.email,
+      timeout: "3600s",
+      maxInstanceRequestConcurrency: 80,
+      scaling: { minInstanceCount: 1, maxInstanceCount: 1 },
+      vpcAccess: {
+        egress: "PRIVATE_RANGES_ONLY",
+        networkInterfaces: [
+          {
+            network: network.name,
+            subnetwork: subnet.name,
+            tags: ["halo-control-plane"],
+          },
+        ],
+      },
+      volumes: [
+        {
+          name: "cloudsql",
+          cloudSqlInstance: { instances: [databaseInstance.connectionName] },
+        },
+      ],
+      containers: [
+        {
+          name: "control-plane",
+          image: controlPlaneImage,
+          ports: { name: "http1", containerPort: 8080 },
+          resources: {
+            limits: { cpu: "1", memory: "512Mi" },
+            cpuIdle: true,
+            startupCpuBoost: true,
+          },
+          startupProbe: {
+            httpGet: { path: "/health", port: 8080 },
+            periodSeconds: 2,
+            timeoutSeconds: 1,
+            failureThreshold: 30,
+          },
+          livenessProbe: {
+            httpGet: { path: "/health", port: 8080 },
+            initialDelaySeconds: 10,
+            periodSeconds: 30,
+            timeoutSeconds: 5,
+            failureThreshold: 3,
+          },
+          volumeMounts: [{ name: "cloudsql", mountPath: "/cloudsql" }],
+          envs: [
+            { name: "BETTER_AUTH_URL", value: controlPlaneOrigin },
+            {
+              name: "DATABASE_URL_SECRET_ID",
+              value: databaseUrlSecret.secretId,
+            },
+            {
+              name: "BETTER_AUTH_SECRET_ID",
+              value: authSecret.secretId,
+            },
+            {
+              name: "GOOGLE_CLIENT_ID_SECRET_ID",
+              value: googleClientIdSecretId,
+            },
+            {
+              name: "GOOGLE_CLIENT_SECRET_ID",
+              value: googleClientSecretId,
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    protect: true,
+    dependsOn: [
+      authSecretAccess,
+      databaseUrlAccess,
+      googleClientIdAccess,
+      googleClientSecretAccess,
+    ],
+  },
+);
 
 export const networkId = network.id;
 export const subnetId = subnet.id;
@@ -211,3 +334,5 @@ export const controlPlaneDatabaseUrlSecret = databaseUrlSecret.secretId;
 export const controlPlaneDatabaseUrlSecretVersion = databaseUrlVersion.version;
 export const controlPlaneAuthSecret = authSecret.secretId;
 export const controlPlaneAuthSecretVersion = authSecretVersion.version;
+export const controlPlaneName = controlPlane.name;
+export const controlPlaneUrl = controlPlaneOrigin;

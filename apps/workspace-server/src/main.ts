@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { readSecret } from "@get-halo/gcp/secrets";
 import { Value } from "@sinclair/typebox/value";
 import { Logger } from "@repo/logger";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
@@ -28,6 +29,9 @@ class WorkspaceServerStartupError extends errore.createTaggedError({
   name: "WorkspaceServerStartupError",
   message: "Workspace server startup failed: $detail",
 }) {}
+
+const openAiApiKeySecretId = "halo-dev-local-openai-api-key";
+const secretProjectId = "halo-relay";
 
 async function readConfiguration(): Promise<WorkspaceServerConfig | Error> {
   const configPath = process.argv[2];
@@ -62,11 +66,6 @@ async function developmentConfiguration(): Promise<
     const closed = await filesystem.close();
     if (closed instanceof Error) console.warn(closed);
   });
-  const environmentFile = join(repositoryRoot, ".env");
-  if (filesystem.exists(environmentFile)) {
-    const loaded = filesystem.loadEnvironmentFile(environmentFile);
-    if (loaded instanceof Error) return loaded;
-  }
   const workspaceRoot = process.env.HALO_WORKSPACE_ROOT;
   if (workspaceRoot === undefined)
     return new WorkspaceServerStartupError({
@@ -119,10 +118,16 @@ async function createLLMApi(workspaceRoot: string) {
     if (options instanceof Error) return options;
     return createOpenAILLMApi(options);
   }
+  const apiKey = await readSecret({
+    projectId: secretProjectId,
+    secretId: openAiApiKeySecretId,
+  });
+  if (apiKey instanceof Error) return apiKey;
   return await createPiLLMApi({
     agentDir: join(workspaceRoot, ".pi", "agent"),
     provider: "openai-codex",
     modelId: "gpt-5.6-terra",
+    apiKey,
   });
 }
 

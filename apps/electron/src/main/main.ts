@@ -38,7 +38,6 @@ const filesystemService = new FilesystemService();
 
 if (started) app.quit();
 
-loadDevelopmentEnvironment(filesystemService);
 configureUserDataPath();
 
 const applicationConfig = getApplicationConfig({
@@ -273,16 +272,4 @@ function configureUserDataPath(): void {
   if (!isDevelopment) return;
   const appDirectory = join(currentDirectory, "../..");
   app.setPath("userData", join(appDirectory, "../..", ".halo"));
-}
-
-function loadDevelopmentEnvironment(filesystem: FilesystemService): void {
-  if (!isDevelopment) return;
-  const appDirectory = join(currentDirectory, "../..");
-  const environmentFile = [
-    join(appDirectory, ".env"),
-    join(appDirectory, "../../.env"),
-  ].find((path) => filesystem.exists(path));
-  if (environmentFile === undefined) return;
-  const loaded = filesystem.loadEnvironmentFile(environmentFile);
-  if (loaded instanceof Error) throw loaded;
 }

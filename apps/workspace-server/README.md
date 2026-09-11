@@ -14,9 +14,9 @@ HALO_WORKSPACE_ROOT=/absolute/path/to/workspace pnpm dev
 
 Run this from the repository root. The workspace directory must already exist.
 Turbo starts the workspace server and Electron as separate development services.
-The server reads the repository's `.env`; `HALO_WORKSPACE_ROOT` can be set there.
-Both services use `<repo>/.halo` for local application data. Set `HALO_USER_DATA`
-to use a different shared directory.
+The server reads its OpenAI credential from GCP Secret Manager through Application
+Default Credentials. Both services use `<repo>/.halo` for local application data.
+Set `HALO_USER_DATA` to use a different shared directory.
 
 Electron waits for the server to publish its connection. Closing Electron
 leaves the server, active conversations, and extensions running. To change

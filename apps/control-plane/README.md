@@ -18,12 +18,12 @@ data defaults to `<repo>/.halo`; set `HALO_USER_DATA` to use a different directo
 Pass a JSON configuration file as the first argument to provide a configuration
 that matches `ControlPlaneConfig.ts` explicitly.
 
-Development reads `.env` from the repository root when that file exists, then
-requires:
+Development reads these secrets from GCP Secret Manager through Application
+Default Credentials:
 
-- `BETTER_AUTH_SECRET` (at least 32 characters)
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
+- `halo-dev-local-better-auth-secret`
+- `halo-dev-control-plane-google-client-id`
+- `halo-dev-control-plane-google-client-secret`
 
 Google Cloud Console redirect URI: `{origin}/api/auth/callback/google`. In
 development that is `http://127.0.0.1:8787/api/auth/callback/google`.
@@ -32,13 +32,16 @@ development that is `http://127.0.0.1:8787/api/auth/callback/google`.
 
 The production container listens on `0.0.0.0:$PORT`, uses PostgreSQL, and does
 not publish a local discovery file. Cloud Run provides `K_SERVICE` and `PORT`;
-configure these additional variables:
+configure these additional non-secret variables:
 
 - `BETTER_AUTH_URL`: the service's generated `https://*.run.app` URL
-- `DATABASE_URL`: PostgreSQL connection string
-- `BETTER_AUTH_SECRET`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
+- `DATABASE_URL_SECRET_ID`
+- `BETTER_AUTH_SECRET_ID`
+- `GOOGLE_CLIENT_ID_SECRET_ID`
+- `GOOGLE_CLIENT_SECRET_ID`
+
+The process calls GCP Secret Manager for each value at startup through its
+attached service account.
 
 Build `apps/control-plane/Dockerfile` from the repository root. The Google OAuth
 redirect URI is `${BETTER_AUTH_URL}/api/auth/callback/google`.

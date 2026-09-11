@@ -64,14 +64,6 @@ export class FilesystemService {
     return fs.existsSync(path);
   }
 
-  loadEnvironmentFile(path: string) {
-    return errore.try({
-      try: () => process.loadEnvFile(path),
-      catch: (cause) =>
-        filesystemError({ operation: "load environment", path, cause }),
-    });
-  }
-
   readFile(path: string): Promise<Buffer | FilesystemError>;
   readFile(
     path: string,
