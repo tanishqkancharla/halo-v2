@@ -1,0 +1,23 @@
+{
+  "name": "@get-halo/control-plane",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "tsx": "^4.23.13"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.20.1",
+    "typescript": "7.0.2"
+  }
+}

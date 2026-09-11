@@ -144,6 +144,22 @@ importers:
         specifier: npm:typescript@5.9.3
         version: typescript@5.9.3
 
+  apps/control-plane:
+    dependencies:
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   apps/electron:
     dependencies:
       '@get-halo/server':
