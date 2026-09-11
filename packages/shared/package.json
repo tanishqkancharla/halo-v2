@@ -10,6 +10,7 @@
     "./mauiSkills": "./src/mauiSkills.ts",
     "./rpc": "./src/rpc.ts",
     "./sessionState": "./src/sessionState.ts",
+    "./SerialQueue": "./src/SerialQueue.ts",
     "./Stream": "./src/Stream.ts",
     "./testing": "./src/testing.ts"
   },

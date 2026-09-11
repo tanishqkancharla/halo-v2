@@ -1,6 +1,7 @@
 import path from "node:path";
 import { Database } from "@tursodatabase/database/compat";
 import * as errore from "errore";
+import { SerialQueue } from "@get-halo/shared/SerialQueue";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 export class DatabaseError extends errore.createTaggedError({
@@ -9,9 +10,15 @@ export class DatabaseError extends errore.createTaggedError({
 }) {}
 
 export class DatabaseClient {
-  private pending: Promise<void> = Promise.resolve();
+  // Orders database access and closes the connection after earlier work.
+  private readonly actionQueue = new SerialQueue();
 
-  private constructor(private readonly connection: Database) {}
+  private readonly connection: Database;
+
+  private constructor(ctx: { connection: Database }) {
+    const { connection } = ctx;
+    this.connection = connection;
+  }
 
   static async open(input: {
     directory: string;
@@ -39,7 +46,7 @@ export class DatabaseClient {
       catch: (cause) => new DatabaseError({ operation: "configure", cause }),
     });
     if (configured instanceof Error) return configured;
-    const client = new DatabaseClient(connection);
+    const client = new DatabaseClient({ connection });
     cleanup.move();
     return client;
   }
@@ -47,18 +54,17 @@ export class DatabaseClient {
   access<T>(
     operation: (connection: Database) => T | Promise<T>,
   ): Promise<T | DatabaseError> {
-    const result = this.pending
-      .then(() => operation(this.connection))
+    return this.actionQueue
+      .run(() => operation(this.connection))
       .catch((cause) => new DatabaseError({ operation: "access", cause }));
-    this.pending = result.then(() => undefined);
-    return result;
   }
 
-  async close() {
-    await this.pending;
-    return errore.try({
-      try: () => this.connection.close(),
-      catch: (cause) => new DatabaseError({ operation: "close", cause }),
-    });
+  close() {
+    return this.actionQueue.run(() =>
+      errore.try({
+        try: () => this.connection.close(),
+        catch: (cause) => new DatabaseError({ operation: "close", cause }),
+      }),
+    );
   }
 }

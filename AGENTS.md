@@ -28,8 +28,23 @@ Bump `apps/electron/package.json` `version`, commit, then create and push a git 
 - ESM imports use `.js` extensions even for TypeScript files.
 - Workspace packages use the `@get-halo/*` naming convention.
 - File names: no hyphens. Name the file after the main abstraction it implements, in ClassNameCase (e.g. `MessagePortMainTransport.ts`). For a small bundle of related exports with no single primary type, use a lowercase single name (e.g. `rpc.ts`, `channels.ts`).
-- Generally, you should avoid adding comments and instead aim to make code readable. The only exception is when there is external context that is not easily traced back (e.g. external dependency behavior, or explicit business logic decisions).
+- Generally, avoid comments that restate the code. Add comments for class-owned state as described below, and for external context that is not easily traced back (e.g. external dependency behavior or explicit business logic decisions).
 - Ignore migrations or backwards-compatability - Halo is unreleased and pre-1.0 so we can break/rebuild anything as necessary.
+
+### Class layout
+
+- Declare internal state at the top of the class. Add a short comment to each state field explaining what it tracks or coordinates.
+- Declare constructor-supplied dependencies and configuration next, as explicit `private readonly` fields. These context fields do not need comments.
+- Constructors take one `ctx` object. Destructure it and explicitly assign its values to the instance fields; do not store the whole context object or use constructor parameter properties.
+
+### Operation serialization
+
+- Use `SerialQueue` from `@get-halo/shared/SerialQueue` for operations that must run sequentially. Keep a queue per state owner instead of hand-written Promise chains or a global server queue.
+- Name a class's single queue `actionQueue`. When a class has multiple queues, name each `<purpose>Queue`, such as `writeQueue` or `reloadQueue`.
+- Public methods that require serialization keep semantic names, such as `reload()` or `close()`. Inline the operation in the queue callback unless its implementation is shared. Name shared private operation implementations `*Unqueued`, such as `updateGrantsUnqueued()`, to show that they execute directly.
+- Queued operations and their helpers never enqueue on the same queue or call public methods that do. Call the shared `*Unqueued` implementation when composing work already inside the queue; awaiting a nested enqueue would deadlock.
+- Queue only the work that needs ordering. Long-running model calls, tool executions, and subscription lifetimes must not hold a queue needed to cancel or control them.
+- `SerialQueue.run()` preserves the operation's return value or rejection and allows later operations to run after a failure. Error conversion belongs at the service's external-library boundary.
 
 ### Testing
 

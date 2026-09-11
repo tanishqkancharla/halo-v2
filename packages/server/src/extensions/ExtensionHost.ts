@@ -6,6 +6,7 @@ import {
   type FilesystemService,
 } from "../filesystem/FilesystemService.js";
 import type { ExtensionSummary } from "@get-halo/shared/contract";
+import { SerialQueue } from "@get-halo/shared/SerialQueue";
 import { readExtensionManifest } from "./ExtensionManifest.js";
 import { startExtension, type ExtensionRuntime } from "./ExtensionProcess.js";
 
@@ -15,27 +16,41 @@ type RunningExtension = Exclude<
 >;
 
 export class ExtensionHost {
+  // Extension processes indexed by extension ID.
   private readonly processes = new Map<string, RunningExtension>();
-  private lifecycle = Promise.resolve();
+  // Orders discovery and shutdown so process changes do not overlap.
+  private readonly actionQueue = new SerialQueue();
+  // Maps bearer tokens to the extensions allowed to use them.
   private readonly toolTokens = new Map<string, string>();
 
-  constructor(
-    private readonly options: {
-      workspaceRoot: string;
-      toolsOrigin: string;
-      filesystem: FilesystemService;
-      logger: Logger;
-      runtime: ExtensionRuntime;
-    },
-  ) {}
+  private readonly workspaceRoot: string;
+  private readonly toolsOrigin: string;
+  private readonly filesystem: FilesystemService;
+  private readonly logger: Logger;
+  private readonly runtime: ExtensionRuntime;
+
+  constructor(ctx: {
+    workspaceRoot: string;
+    toolsOrigin: string;
+    filesystem: FilesystemService;
+    logger: Logger;
+    runtime: ExtensionRuntime;
+  }) {
+    const { workspaceRoot, toolsOrigin, filesystem, logger, runtime } = ctx;
+    this.workspaceRoot = workspaceRoot;
+    this.toolsOrigin = toolsOrigin;
+    this.filesystem = filesystem;
+    this.logger = logger;
+    this.runtime = runtime;
+  }
 
   async list() {
-    const workspaceRoot = this.options.workspaceRoot;
+    const workspaceRoot = this.workspaceRoot;
     const extensions: ExtensionSummary[] = [];
     for (const { id, url, isRunning } of this.processes.values()) {
       if (!isRunning()) continue;
       const manifest = await readExtensionManifest({
-        filesystem: this.options.filesystem,
+        filesystem: this.filesystem,
         workspaceRoot,
         id,
       });
@@ -62,98 +77,92 @@ export class ExtensionHost {
   }
 
   stop() {
-    this.lifecycle = this.lifecycle.then(() => this.stopProcesses());
-    return this.lifecycle;
+    return this.actionQueue.run(async () => {
+      const processes = [...this.processes.values()];
+      this.processes.clear();
+      this.toolTokens.clear();
+      for (const result of await Promise.all(
+        processes.map((extension) => extension.stop()),
+      )) {
+        if (result instanceof Error)
+          this.logger.warn({
+            event: "extension-stop-failed",
+            error: result,
+          });
+      }
+    });
   }
 
   reload() {
-    this.lifecycle = this.lifecycle.then(() => this.discover());
-    return this.lifecycle;
-  }
-
-  private async discover() {
-    const workspaceRoot = this.options.workspaceRoot;
-    const directory = join(workspaceRoot, ".halo", "extensions");
-    const entries = await this.options.filesystem.listDirectory(directory);
-    if (
-      entries instanceof Error &&
-      !(entries instanceof FilesystemPathNotFoundError)
-    ) {
-      this.options.logger.warn({
-        event: "extension-discovery-failed",
-        error: entries,
-      });
-      return;
-    }
-    const discovered =
-      entries instanceof FilesystemPathNotFoundError
-        ? []
-        : entries.filter(
-            (item) =>
-              item.isDirectory() &&
-              !item.name.startsWith(".") &&
-              this.options.filesystem.exists(
-                join(directory, item.name, "package.json"),
-              ),
-          );
-    const ids = new Set(discovered.map((entry) => entry.name));
-    for (const [id, extension] of this.processes) {
-      if (ids.has(id)) continue;
-      const stopped = await extension.stop();
-      this.processes.delete(id);
-      this.removeToolConnection(id);
-      if (stopped instanceof Error)
-        this.options.logger.warn({
-          event: "extension-stop-failed",
-          error: stopped,
+    return this.actionQueue.run(async () => {
+      const workspaceRoot = this.workspaceRoot;
+      const directory = join(workspaceRoot, ".halo", "extensions");
+      const entries = await this.filesystem.listDirectory(directory);
+      if (
+        entries instanceof Error &&
+        !(entries instanceof FilesystemPathNotFoundError)
+      ) {
+        this.logger.warn({
+          event: "extension-discovery-failed",
+          error: entries,
         });
-    }
-    for (const entry of discovered.toSorted((a, b) =>
-      a.name.localeCompare(b.name),
-    )) {
-      if (this.processes.get(entry.name)?.isRunning()) continue;
-      this.removeToolConnection(entry.name);
-      const token = randomUUID();
-      this.toolTokens.set(`Bearer ${token}`, entry.name);
-      const extension = await startExtension({
-        id: entry.name,
-        workspaceRoot,
-        directory: join(directory, entry.name),
-        dataDirectory: join(
-          workspaceRoot,
-          ".halo",
-          "extension-data",
-          entry.name,
-        ),
-        runtime: this.options.runtime,
-        logger: this.options.logger,
-        tools: { origin: this.options.toolsOrigin, token },
-      });
-      if (extension instanceof Error) {
-        this.removeToolConnection(entry.name);
-        this.options.logger.warn({
-          event: "extension-start-failed",
-          error: extension,
-        });
-        continue;
+        return;
       }
-      this.processes.set(entry.name, extension);
-    }
-  }
-
-  private async stopProcesses() {
-    const processes = [...this.processes.values()];
-    this.processes.clear();
-    this.toolTokens.clear();
-    for (const result of await Promise.all(
-      processes.map((extension) => extension.stop()),
-    )) {
-      if (result instanceof Error)
-        this.options.logger.warn({
-          event: "extension-stop-failed",
-          error: result,
+      const discovered =
+        entries instanceof FilesystemPathNotFoundError
+          ? []
+          : entries.filter(
+              (item) =>
+                item.isDirectory() &&
+                !item.name.startsWith(".") &&
+                this.filesystem.exists(
+                  join(directory, item.name, "package.json"),
+                ),
+            );
+      const ids = new Set(discovered.map((entry) => entry.name));
+      for (const [id, extension] of this.processes) {
+        if (ids.has(id)) continue;
+        const stopped = await extension.stop();
+        this.processes.delete(id);
+        this.removeToolConnection(id);
+        if (stopped instanceof Error)
+          this.logger.warn({
+            event: "extension-stop-failed",
+            error: stopped,
+          });
+      }
+      for (const entry of discovered.toSorted((a, b) =>
+        a.name.localeCompare(b.name),
+      )) {
+        if (this.processes.get(entry.name)?.isRunning()) continue;
+        this.removeToolConnection(entry.name);
+        const token = randomUUID();
+        this.toolTokens.set(`Bearer ${token}`, entry.name);
+        const extension = await startExtension({
+          id: entry.name,
+          workspaceRoot,
+          directory: join(directory, entry.name),
+          dataDirectory: join(
+            workspaceRoot,
+            ".halo",
+            "extension-data",
+            entry.name,
+          ),
+          runtime: this.runtime,
+          logger: this.logger,
+          tools: { origin: this.toolsOrigin, token },
         });
-    }
+        if (extension instanceof Error) {
+          this.removeToolConnection(entry.name);
+          this.logger.warn({
+            event: "extension-start-failed",
+            error: extension,
+          });
+          continue;
+        }
+        this.processes.set(entry.name, extension);
+      }
+    });
   }
 
   private removeToolConnection(id: string) {

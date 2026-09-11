@@ -12,6 +12,26 @@ const extensionTest = serverTest.extend<{ extensionId: string }>({
 });
 
 extensionTest(
+  "preserves both capability additions made at the same time",
+  async ({ server, extensionId }) => {
+    await Promise.all([
+      server.rpc.extensions.tools.add({
+        id: extensionId,
+        paths: ["files.read"],
+      }),
+      server.rpc.extensions.tools.add({
+        id: extensionId,
+        paths: ["files.write"],
+      }),
+    ]);
+
+    const result = await server.rpc.extensions.tools.check({ id: extensionId });
+    expect(result.requested).toEqual(["files.read", "files.write"]);
+    expect(result.pending).toEqual(["files.read", "files.write"]);
+  },
+);
+
+extensionTest(
   "keeps previously declined tools out of a new request",
   async ({ server, extensionId }) => {
     await server.rpc.extensions.tools.add({

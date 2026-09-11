@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { Type, type Static, type TSchema } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
+import { SerialQueue } from "@get-halo/shared/SerialQueue";
 import type { ExtensionPermissionRequest } from "@get-halo/shared/contract";
 import {
   FilesystemPathNotFoundError,
@@ -26,19 +27,28 @@ const grantsSchema = Type.Record(
 type Grants = Static<typeof grantsSchema>;
 
 export class ExtensionTools {
+  // Notifies request subscribers when persisted grants change.
   private readonly changes = new EventEmitter();
-  private operation = Promise.resolve();
+  // Orders permission reads and writes to prevent lost updates.
+  private readonly actionQueue = new SerialQueue();
 
-  constructor(
-    private readonly options: {
-      filesystem: FilesystemService;
-      workspaceRoot: string;
-      toolRuntime: ToolRuntime;
-    },
-  ) {}
+  private readonly filesystem: FilesystemService;
+  private readonly workspaceRoot: string;
+  private readonly toolRuntime: ToolRuntime;
+
+  constructor(ctx: {
+    filesystem: FilesystemService;
+    workspaceRoot: string;
+    toolRuntime: ToolRuntime;
+  }) {
+    const { filesystem, workspaceRoot, toolRuntime } = ctx;
+    this.filesystem = filesystem;
+    this.workspaceRoot = workspaceRoot;
+    this.toolRuntime = toolRuntime;
+  }
 
   add(id: string, paths: string[]) {
-    return this.serial(async () => {
+    return this.actionQueue.run(async () => {
       const manifest = await this.readManifest(id);
       if (manifest instanceof Error) return manifest;
       const declared =
@@ -49,35 +59,27 @@ export class ExtensionTools {
         ...manifest.halo,
         capabilities: [...new Set([...declared, ...paths])].toSorted(),
       };
-      const written = await this.options.filesystem.writeFile(
-        join(
-          this.options.workspaceRoot,
-          ".halo",
-          "extensions",
-          id,
-          "package.json",
-        ),
+      const written = await this.filesystem.writeFile(
+        join(this.workspaceRoot, ".halo", "extensions", id, "package.json"),
         `${JSON.stringify(manifest, undefined, 2)}\n`,
       );
       if (written instanceof Error) return written;
-      const report = await this.update(id, (grant, available) => {
+      return this.updateGrantsUnqueued(id, (grant, available) => {
         const added = paths.filter(
           (path) => available.includes(path) && !grant.granted.includes(path),
         );
         grant.pending = [...new Set([...grant.pending, ...added])].toSorted();
       });
-      if (report instanceof Error) return report;
-      return report;
     });
   }
 
   check(id: string) {
-    return this.serial(() => this.update(id));
+    return this.actionQueue.run(() => this.updateGrantsUnqueued(id));
   }
 
   decide(id: string, paths: string[], action: "allow" | "deny" | "revoke") {
-    return this.serial(async () => {
-      const report = await this.update(id, (grant, available) => {
+    return this.actionQueue.run(() => {
+      return this.updateGrantsUnqueued(id, (grant, available) => {
         if (action === "allow") {
           const allowed = paths.filter(
             (path) => grant.pending.includes(path) && available.includes(path),
@@ -90,8 +92,6 @@ export class ExtensionTools {
           grant.granted = grant.granted.filter((path) => !paths.includes(path));
         grant.pending = grant.pending.filter((path) => !paths.includes(path));
       });
-      if (report instanceof Error) return report;
-      return report;
     });
   }
 
@@ -111,7 +111,7 @@ export class ExtensionTools {
         },
       };
     }
-    return this.options.toolRuntime.invokePath(invocation);
+    return this.toolRuntime.invokePath(invocation);
   }
 
   async *requests(signal: AbortSignal | undefined) {
@@ -121,26 +121,30 @@ export class ExtensionTools {
       await events.return?.();
     });
     while (true) {
-      const state = await this.serial(() => this.readGrants());
-      if (state instanceof Error) throw state;
-      const requests: ExtensionPermissionRequest[] = [];
-      for (const [id, grant] of Object.entries(state)) {
-        if (grant.pending.length === 0) continue;
-        const manifest = await this.readManifest(id);
-        if (manifest instanceof Error) {
-          console.warn(manifest);
-          continue;
+      const snapshot = await this.actionQueue.run(async () => {
+        const state = await this.readGrants();
+        if (state instanceof Error) return state;
+        const requests: ExtensionPermissionRequest[] = [];
+        for (const [id, grant] of Object.entries(state)) {
+          if (grant.pending.length === 0) continue;
+          const manifest = await this.readManifest(id);
+          if (manifest instanceof Error) {
+            console.warn(manifest);
+            continue;
+          }
+          requests.push({
+            id,
+            displayName:
+              manifest.halo?.displayName === undefined
+                ? id
+                : manifest.halo.displayName,
+            paths: grant.pending,
+          });
         }
-        requests.push({
-          id,
-          displayName:
-            manifest.halo?.displayName === undefined
-              ? id
-              : manifest.halo.displayName,
-          paths: grant.pending,
-        });
-      }
-      yield requests;
+        return requests;
+      });
+      if (snapshot instanceof Error) throw snapshot;
+      yield snapshot;
       const next = await events
         .next()
         .catch(
@@ -155,7 +159,7 @@ export class ExtensionTools {
     }
   }
 
-  private async update(
+  private async updateGrantsUnqueued(
     id: string,
     change?: (grant: Grants[string], available: string[]) => void,
   ) {
@@ -174,16 +178,14 @@ export class ExtensionTools {
     grant.granted = grant.granted.filter((path) => requested.includes(path));
     grant.pending = grant.pending.filter((path) => requested.includes(path));
     const catalog =
-      requested.length === 0
-        ? []
-        : await this.options.toolRuntime.listToolPaths();
+      requested.length === 0 ? [] : await this.toolRuntime.listToolPaths();
     if (catalog instanceof Error) return catalog;
     const existing = requested.filter((path) => catalog.includes(path));
     change?.(grant, existing);
     state[id] = grant;
     if (before !== JSON.stringify(state)) {
-      const written = await this.options.filesystem.writeFile(
-        join(this.options.workspaceRoot, ".halo", "extensionGrants.json"),
+      const written = await this.filesystem.writeFile(
+        join(this.workspaceRoot, ".halo", "extensionGrants.json"),
         `${JSON.stringify(state, undefined, 2)}\n`,
         { mode: 0o600 },
       );
@@ -208,27 +210,21 @@ export class ExtensionTools {
       return new ExtensionToolsError({ detail: "invalid extension id" });
 
     return readExtensionManifest({
-      filesystem: this.options.filesystem,
-      workspaceRoot: this.options.workspaceRoot,
+      filesystem: this.filesystem,
+      workspaceRoot: this.workspaceRoot,
       id,
     });
   }
 
   private async readGrants() {
-    const source = await this.options.filesystem.readFile(
-      join(this.options.workspaceRoot, ".halo", "extensionGrants.json"),
+    const source = await this.filesystem.readFile(
+      join(this.workspaceRoot, ".halo", "extensionGrants.json"),
       "utf8",
     );
     if (source instanceof FilesystemPathNotFoundError)
       return {} satisfies Grants;
     if (source instanceof Error) return source;
     return parse(grantsSchema, source);
-  }
-
-  private serial<T>(operation: () => Promise<T>) {
-    const result = this.operation.then(operation);
-    this.operation = result.then(() => undefined);
-    return result;
   }
 }
 
