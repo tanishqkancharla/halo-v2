@@ -6,8 +6,9 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { RPCHandler } from "@orpc/server/node";
+import { RPCHandler, type RPCHandlerOptions } from "@orpc/server/node";
 import { CORSHandlerPlugin } from "@orpc/server/plugins";
+import { anyAbortSignal } from "@orpc/shared";
 import * as errore from "errore";
 import { handleOAuthCallback } from "./oauth.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
@@ -28,12 +29,17 @@ type ListeningHaloHttp = {
   connections: HaloHttpConnections;
   server: HttpServer;
   origin: string;
-  pendingRequests: Set<Promise<void>>;
 };
 
 export class HaloHttpError extends errore.createTaggedError({
   name: "HaloHttpError",
   message: "Halo HTTP server failed: $detail",
+}) {}
+
+class HaloRequestsClosedError extends errore.createTaggedError({
+  name: "HaloRequestsClosedError",
+  message: "Halo is shutting down.",
+  extends: errore.AbortError,
 }) {}
 
 export async function listenHaloHttp(options: {
@@ -47,7 +53,6 @@ export async function listenHaloHttp(options: {
   const address = server.address() as AddressInfo;
   return {
     server,
-    pendingRequests: new Set(),
     origin: `http://${options.host}:${address.port}`,
     connections: {
       cli: {
@@ -71,10 +76,11 @@ function startingResponse(_request: IncomingMessage, response: ServerResponse) {
 export function serveHaloHttp(options: {
   server: HttpServer;
   connections: HaloHttpConnections;
-  pendingRequests: Set<Promise<void>>;
   context: HaloContext;
   corsOrigins: readonly string[];
 }) {
+  const shutdown = new AbortController();
+  const pendingRequests = new Set<Promise<void>>();
   const cliToken = options.connections.cli.token;
   const rendererToken = options.connections.renderer.token;
   const authorizations = new Set([
@@ -85,7 +91,18 @@ export function serveHaloHttp(options: {
     if (authorization === undefined) return false;
     return authorizations.has(authorization);
   };
+  const interceptors: RPCHandlerOptions<object>["interceptors"] = [
+    ({ next, ...call }) =>
+      next({
+        ...call,
+        request: {
+          ...call.request,
+          signal: anyAbortSignal([call.request.signal, shutdown.signal]),
+        },
+      }),
+  ];
   const handler = new RPCHandler<HaloContext>(haloRpcRouter, {
+    interceptors,
     plugins: [
       new CORSHandlerPlugin({
         origin: options.corsOrigins,
@@ -93,7 +110,9 @@ export function serveHaloHttp(options: {
       }),
     ],
   });
-  const extensionHandler = new RPCHandler(extensionToolRouter);
+  const extensionHandler = new RPCHandler(extensionToolRouter, {
+    interceptors,
+  });
   const handleRequest = async (
     request: IncomingMessage,
     response: ServerResponse,
@@ -153,12 +172,22 @@ export function serveHaloHttp(options: {
   };
   options.server.removeListener("request", startingResponse);
   options.server.on("request", async (request, response) => {
+    if (shutdown.signal.aborted) {
+      response.writeHead(503).end("Halo is shutting down.");
+      return;
+    }
     const pending = handleRequest(request, response);
-    options.pendingRequests.add(pending);
+    pendingRequests.add(pending);
     using cleanup = new errore.DisposableStack();
-    cleanup.defer(() => options.pendingRequests.delete(pending));
+    cleanup.defer(() => pendingRequests.delete(pending));
     await pending;
   });
+  return {
+    async close() {
+      shutdown.abort(new HaloRequestsClosedError());
+      await Promise.all(pendingRequests);
+    },
+  };
 }
 
 export async function closeHaloHttp(http: ListeningHaloHttp) {
@@ -173,10 +202,7 @@ export async function closeHaloHttp(http: ListeningHaloHttp) {
     });
   });
   server.closeAllConnections();
-  const closed = await closing;
-  // Socket closure does not stop an already-running RPC or OAuth handler.
-  await Promise.all(http.pendingRequests);
-  return closed;
+  return await closing;
 }
 
 function listen(server: HttpServer, options: { host: string; port: number }) {

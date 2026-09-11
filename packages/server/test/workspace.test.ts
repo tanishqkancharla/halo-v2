@@ -539,6 +539,43 @@ function assistantReplies(
 }
 
 serverTest(
+  "finishes a conversation after the prompt request disconnects",
+  async ({ server, llm }) => {
+    const session = await server.rpc.sessions.create();
+    const controller = new AbortController();
+    const prompting = server.rpc.sessions.prompt(
+      { ...session, text: "Keep going after I disconnect" },
+      { signal: controller.signal },
+    );
+    const disconnected = expect(prompting).rejects.toThrow();
+    await llm.waitForRequest();
+
+    controller.abort();
+    await disconnected;
+    await llm.respond(m.assistant("I kept going."));
+
+    await expect
+      .poll(() => server.rpc.sessions.snapshot(session))
+      .toMatchObject({
+        lastRun: { status: "completed" },
+      });
+    expect(
+      assistantReplies(await server.rpc.sessions.snapshot(session)),
+    ).toEqual(["I kept going."]);
+
+    const continued = server.rpc.sessions.prompt({
+      ...session,
+      text: "Thanks",
+    });
+    await llm.respond(m.assistant("You're welcome."));
+    await continued;
+    expect(
+      assistantReplies(await server.rpc.sessions.snapshot(session)),
+    ).toEqual(["I kept going.", "You're welcome."]);
+  },
+);
+
+serverTest(
   "reconnects to a running conversation without losing or duplicating its answer",
   async ({ server, llm }) => {
     const session = await server.rpc.sessions.create();

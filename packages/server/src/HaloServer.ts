@@ -54,6 +54,7 @@ export class HaloServer {
       database: DatabaseClient;
       sessionRepo: TursoSessionRepo;
       http: ListeningHttp;
+      requests: ReturnType<typeof serveHaloHttp>;
     },
   ) {}
 
@@ -204,10 +205,22 @@ export class HaloServer {
           error: closed,
         });
     });
-    serveHaloHttp({ ...http, context, corsOrigins: options.corsOrigins });
+    const requests = serveHaloHttp({
+      ...http,
+      context,
+      corsOrigins: options.corsOrigins,
+    });
+    cleanup.defer(() => requests.close());
     await extensions.reload();
     cleanup.move();
-    return new HaloServer({ context, filesystem, database, sessionRepo, http });
+    return new HaloServer({
+      context,
+      filesystem,
+      database,
+      sessionRepo,
+      http,
+      requests,
+    });
   }
 
   get connections() {
@@ -219,16 +232,17 @@ export class HaloServer {
   }
 
   async close() {
-    const { context, filesystem, database, sessionRepo, http } = this.resources;
-    const httpClosing = closeHaloHttp(http);
+    const { context, filesystem, database, sessionRepo, http, requests } =
+      this.resources;
+    await requests.close();
     context.connections.close();
-    await context.browsers.shutdown();
     const sessionsClosed = await context.sessions.shutdown();
-    const httpClosed = await httpClosing;
+    await context.browsers.shutdown();
     await context.extensions.stop();
     const runtimeClosed = await context.toolRuntime.close();
     const repoClosed = await sessionRepo.close();
     const databaseClosed = await database.close();
+    const httpClosed = await closeHaloHttp(http);
     context.workspace.close();
     const filesystemClosed = await filesystem.close();
 

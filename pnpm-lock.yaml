@@ -534,6 +534,9 @@ importers:
       '@orpc/server':
         specifier: 2.0.0-beta.29
         version: 2.0.0-beta.29(@opentelemetry/api@1.9.0)
+      '@orpc/shared':
+        specifier: 2.0.0-beta.29
+        version: 2.0.0-beta.29(@opentelemetry/api@1.9.0)
       '@parcel/watcher':
         specifier: ^2.6.0
         version: 2.6.0

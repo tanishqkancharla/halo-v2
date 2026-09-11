@@ -1,11 +1,15 @@
 import { implement } from "@orpc/server";
+import { runWithSignal } from "@orpc/shared";
 import type { Logger } from "@repo/logger";
 import { contract } from "@get-halo/shared/contract";
 import {
   connectionRequestLabel,
   type ConnectionRequest,
 } from "@get-halo/shared/connectionRequests";
-import type { HaloAgentSession } from "../agent/HaloAgentSession.js";
+import {
+  PromptFailedError,
+  type HaloAgentSession,
+} from "../agent/HaloAgentSession.js";
 import type { ConnectionService } from "../agent/runtime/ConnectionService.js";
 import { orpcErrors } from "../orpcErrors.js";
 import type { SessionRegistry } from "./SessionRegistry.js";
@@ -43,7 +47,7 @@ export const sessionsRouter = os.router({
     if (session instanceof Error) return orpcErrors.badRequest(session);
     return session.watch(signal);
   }),
-  prompt: os.prompt.handler(async ({ input, context }) => {
+  prompt: os.prompt.handler(async ({ input, context, signal }) => {
     context.logger.info({
       event: "prompt",
       sessionId: input.sessionId,
@@ -51,44 +55,50 @@ export const sessionsRouter = os.router({
     });
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    const prompted = await session.prompt(input.text);
+    const prompted = await runWithSignal(signal, () =>
+      session.prompt(input.text),
+    );
     if (prompted instanceof Error) return orpcErrors.badRequest(prompted);
   }),
-  startConnection: os.startConnection.handler(async ({ input, context }) => {
-    context.logger.info({
-      event: "agentSession.startConnection",
-      sessionId: input.sessionId,
-      integration: input.request.integration,
-    });
-    const session = await context.sessions.open(input.sessionId);
-    if (session instanceof Error) return orpcErrors.badRequest(session);
-    const started = await context.connections.startConnection({
-      sessionId: input.sessionId,
-      request: input.request,
-      onEvent: async (event) => {
-        session.publishConnectionEvent(event);
-        if (event.status !== "connected") return;
-        const notified = await notifyConnectedSession({
-          session,
-          request: event.request,
-        });
-        if (notified instanceof Error) {
-          context.logger.warn({
-            event: "agentSession.connectionNotificationFailed",
-            error: notified,
+  startConnection: os.startConnection.handler(
+    async ({ input, context, signal }) => {
+      context.logger.info({
+        event: "agentSession.startConnection",
+        sessionId: input.sessionId,
+        integration: input.request.integration,
+      });
+      const session = await context.sessions.open(input.sessionId);
+      if (session instanceof Error) return orpcErrors.badRequest(session);
+      const started = await context.connections.startConnection({
+        sessionId: input.sessionId,
+        request: input.request,
+        onEvent: async (event) => {
+          session.publishConnectionEvent(event);
+          if (event.status !== "connected") return;
+          const notified = await notifyConnectedSession({
+            session,
+            request: event.request,
+            signal,
           });
-        }
-      },
-    });
-    if (started instanceof Error) return orpcErrors.badRequest(started);
-    if (started.status === "authorization-required") return started;
-    const notified = await notifyConnectedSession({
-      session,
-      request: input.request,
-    });
-    if (notified instanceof Error) return orpcErrors.badRequest(notified);
-    return started;
-  }),
+          if (notified instanceof Error) {
+            context.logger.warn({
+              event: "agentSession.connectionNotificationFailed",
+              error: notified,
+            });
+          }
+        },
+      });
+      if (started instanceof Error) return orpcErrors.badRequest(started);
+      if (started.status === "authorization-required") return started;
+      const notified = await notifyConnectedSession({
+        session,
+        request: input.request,
+        signal,
+      });
+      if (notified instanceof Error) return orpcErrors.badRequest(notified);
+      return started;
+    },
+  ),
   cancelConnection: os.cancelConnection.handler(async ({ input, context }) => {
     context.logger.info({
       event: "agentSession.cancelConnection",
@@ -121,9 +131,18 @@ export const sessionsRouter = os.router({
 function notifyConnectedSession(args: {
   session: HaloAgentSession;
   request: ConnectionRequest;
+  signal: AbortSignal | undefined;
 }) {
-  return args.session.notify({
-    customType: "halo.integration.connected",
-    content: `[System] The user connected ${connectionRequestLabel(args.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
-  });
+  return runWithSignal(args.signal, () =>
+    args.session.notify({
+      customType: "halo.integration.connected",
+      content: `[System] The user connected ${connectionRequestLabel(args.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
+    }),
+  ).catch(
+    (cause) =>
+      new PromptFailedError({
+        reason: "Connection notification interrupted",
+        cause,
+      }),
+  );
 }
