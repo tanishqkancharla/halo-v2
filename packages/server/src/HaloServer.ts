@@ -173,13 +173,12 @@ export class HaloServer {
           : options.extensionRuntime,
     });
     cleanup.defer(() => extensions.stop());
-    const extensionTools = await ExtensionTools.open({
+    const extensionTools = ExtensionTools.open({
       database,
       filesystem,
       workspaceRoot,
       toolRuntime,
     });
-    if (extensionTools instanceof Error) return extensionTools;
     const context: HaloContext = {
       browsers: new BrowserService(options.appBrowserTarget),
       browserControlAllowed: false,

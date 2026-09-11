@@ -1,10 +1,12 @@
 import { EventEmitter, on } from "node:events";
 import { join } from "node:path";
+import { asc, eq } from "drizzle-orm";
 import * as errore from "errore";
 import { SerialQueue } from "@get-halo/shared/SerialQueue";
 import type { ExtensionPermissionRequest } from "@get-halo/shared/contract";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 import type { DatabaseClient } from "../storage/DatabaseClient.js";
+import { haloExtensionPermissions } from "../storage/schema.js";
 import type { ToolRuntime } from "../agent/runtime/ToolRuntime.js";
 import { readExtensionManifest } from "./ExtensionManifest.js";
 
@@ -14,11 +16,6 @@ export class ExtensionToolsError extends errore.createTaggedError({
 }) {}
 
 type Grant = { granted: string[]; pending: string[] };
-type PermissionRow = {
-  extension_id: string;
-  path: string;
-  status: keyof Grant;
-};
 type ExtensionToolsContext = {
   database: DatabaseClient;
   filesystem: FilesystemService;
@@ -45,18 +42,7 @@ export class ExtensionTools {
     this.toolRuntime = toolRuntime;
   }
 
-  static async open(ctx: ExtensionToolsContext) {
-    const initialized = await ctx.database.access((connection) =>
-      connection.exec(`
-        CREATE TABLE IF NOT EXISTS halo_extension_permissions (
-          extension_id TEXT NOT NULL,
-          path TEXT NOT NULL,
-          status TEXT NOT NULL CHECK (status IN ('granted', 'pending')),
-          PRIMARY KEY (extension_id, path)
-        )
-      `),
-    );
-    if (initialized instanceof Error) return initialized;
+  static open(ctx: ExtensionToolsContext) {
     return new ExtensionTools(ctx);
   }
 
@@ -196,20 +182,31 @@ export class ExtensionTools {
     const existing = requested.filter((path) => catalog.includes(path));
     change?.(grant, existing);
     if (before !== JSON.stringify(grant)) {
-      const written = await this.database.access((connection) =>
-        connection.transaction(() => {
-          connection
-            .prepare(
-              "DELETE FROM halo_extension_permissions WHERE extension_id = ?",
-            )
-            .run(id);
-          const insert = connection.prepare(
-            "INSERT INTO halo_extension_permissions (extension_id, path, status) VALUES (?, ?, ?)",
-          );
-          for (const path of grant.granted) insert.run(id, path, "granted");
-          for (const path of grant.pending) insert.run(id, path, "pending");
-        })(),
-      );
+      const written = await this.database.query((db) => {
+        db.transaction(
+          (tx) => {
+            tx.delete(haloExtensionPermissions)
+              .where(eq(haloExtensionPermissions.extensionId, id))
+              .run();
+            const rows = [
+              ...grant.granted.map((path) => ({
+                extensionId: id,
+                path,
+                status: "granted" as const,
+              })),
+              ...grant.pending.map((path) => ({
+                extensionId: id,
+                path,
+                status: "pending" as const,
+              })),
+            ];
+            if (rows.length === 0) return;
+            tx.insert(haloExtensionPermissions).values(rows).run();
+          },
+          // Turso 0.7.2 needs IMMEDIATE; deferred transactions lock under WAL.
+          { behavior: "immediate" },
+        );
+      });
       if (written instanceof Error) return written;
       this.changes.emit("change");
     }
@@ -238,27 +235,29 @@ export class ExtensionTools {
   }
 
   private readGrants(id?: string) {
-    return this.database.access((connection) => {
-      // SAFETY: Both queries match the columns and status constraint initialized in open().
-      const rows = (
+    return this.database.query((db) => {
+      const rows =
         id === undefined
-          ? connection
-              .prepare(
-                "SELECT extension_id, path, status FROM halo_extension_permissions ORDER BY extension_id, path",
+          ? db
+              .select()
+              .from(haloExtensionPermissions)
+              .orderBy(
+                asc(haloExtensionPermissions.extensionId),
+                asc(haloExtensionPermissions.path),
               )
               .all()
-          : connection
-              .prepare(
-                "SELECT extension_id, path, status FROM halo_extension_permissions WHERE extension_id = ? ORDER BY path",
-              )
-              .all(id)
-      ) as PermissionRow[];
+          : db
+              .select()
+              .from(haloExtensionPermissions)
+              .where(eq(haloExtensionPermissions.extensionId, id))
+              .orderBy(asc(haloExtensionPermissions.path))
+              .all();
       const state = new Map<string, Grant>();
       for (const row of rows) {
-        let grant = state.get(row.extension_id);
+        let grant = state.get(row.extensionId);
         if (grant === undefined) {
           grant = { granted: [], pending: [] };
-          state.set(row.extension_id, grant);
+          state.set(row.extensionId, grant);
         }
         grant[row.status].push(row.path);
       }

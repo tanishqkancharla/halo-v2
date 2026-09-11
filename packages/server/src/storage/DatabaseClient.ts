@@ -1,23 +1,32 @@
 import path from "node:path";
 import { Database } from "@tursodatabase/database/compat";
+import {
+  drizzle,
+  type BetterSQLite3Database,
+} from "drizzle-orm/better-sqlite3";
 import * as errore from "errore";
 import { SerialQueue } from "@get-halo/shared/SerialQueue";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
+import { haloSchema, haloSchemaSql } from "./schema.js";
 
 export class DatabaseError extends errore.createTaggedError({
   name: "DatabaseError",
   message: "Application database failed during $operation",
 }) {}
 
+type HaloDatabase = BetterSQLite3Database<typeof haloSchema>;
+
 export class DatabaseClient {
   // Orders database access and closes the connection after earlier work.
   private readonly actionQueue = new SerialQueue();
 
   private readonly connection: Database;
+  private readonly db: HaloDatabase;
 
-  private constructor(ctx: { connection: Database }) {
-    const { connection } = ctx;
+  private constructor(ctx: { connection: Database; db: HaloDatabase }) {
+    const { connection, db } = ctx;
     this.connection = connection;
+    this.db = db;
   }
 
   static async open(input: {
@@ -46,9 +55,25 @@ export class DatabaseClient {
       catch: (cause) => new DatabaseError({ operation: "configure", cause }),
     });
     if (configured instanceof Error) return configured;
-    const client = new DatabaseClient({ connection });
+    const schemaReady = errore.try({
+      try: () => connection.exec(haloSchemaSql),
+      catch: (cause) =>
+        new DatabaseError({ operation: "create schema", cause }),
+    });
+    if (schemaReady instanceof Error) return schemaReady;
+    // Turso compat implements the synchronous statement API expected by this Drizzle driver.
+    const db = drizzle(connection, { schema: haloSchema });
+    const client = new DatabaseClient({ connection, db });
     cleanup.move();
     return client;
+  }
+
+  query<T>(
+    operation: (db: HaloDatabase) => T | Promise<T>,
+  ): Promise<T | DatabaseError> {
+    return this.actionQueue
+      .run(() => operation(this.db))
+      .catch((cause) => new DatabaseError({ operation: "query", cause }));
   }
 
   access<T>(
