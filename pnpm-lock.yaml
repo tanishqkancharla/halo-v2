@@ -455,6 +455,9 @@ importers:
       '@pulumi/pulumi':
         specifier: ^3.262.0
         version: 3.262.0(supports-color@8.1.1)(typescript@7.0.2)
+      '@pulumi/random':
+        specifier: ^4.21.1
+        version: 4.21.1(supports-color@8.1.1)(typescript@7.0.2)
       alchemy:
         specifier: 2.0.0-beta.70
         version: 2.0.0-beta.70(@effect/platform-bun@4.0.0-beta.103(effect@4.0.0-beta.103))(@effect/platform-node@4.0.0-beta.103(effect@4.0.0-beta.103)(ioredis@5.11.1(supports-color@8.1.1)))(@types/react@19.2.18)(effect@4.0.0-beta.103)(supports-color@8.1.1)(typescript@7.0.2)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.13)(yaml@2.9.0))(vitest@4.1.11(@opentelemetry/api@1.9.0)(@types/node@22.20.1)(jsdom@30.0.1(@noble/hashes@2.3.0))(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.13)(yaml@2.9.0)))(workerd@1.20260704.1)(ws@8.21.1)
@@ -2921,6 +2924,9 @@ packages:
         optional: true
       typescript:
         optional: true
+
+  '@pulumi/random@4.21.1':
+    resolution: {integrity: sha512-2wD0UJTsoyj+MyBOa60E2FyrqyIaspTCz1qBG+mj34xQUk/u568s4925oWpGEeY3Z3wV7BbRpiEnnztnDb1xOA==}
 
   '@puppeteer/browsers@2.13.2':
     resolution: {integrity: sha512-5EUZSUIc37H6aIXyWO0Z4y8NlF8NnjgmqeQgOGiswAU7pY0HOo16ho4+alIWmSfdZnjqBRawMsP3I5YqLSn6kw==}
@@ -11686,6 +11692,14 @@ snapshots:
       typescript: 7.0.2
     transitivePeerDependencies:
       - supports-color
+
+  '@pulumi/random@4.21.1(supports-color@8.1.1)(typescript@7.0.2)':
+    dependencies:
+      '@pulumi/pulumi': 3.262.0(supports-color@8.1.1)(typescript@7.0.2)
+    transitivePeerDependencies:
+      - supports-color
+      - ts-node
+      - typescript
 
   '@puppeteer/browsers@2.13.2(supports-color@8.1.1)':
     dependencies:

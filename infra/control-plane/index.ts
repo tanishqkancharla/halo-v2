@@ -1,11 +1,14 @@
 /* oxlint-disable anti-slop/no-unused-exports, eslint/no-new -- Pulumi registers resources and stack outputs through module side effects. */
 import * as gcp from "@pulumi/gcp";
 import * as pulumi from "@pulumi/pulumi";
+import * as random from "@pulumi/random";
 
 const configuration = new pulumi.Config("gcp");
 const project = configuration.require("project");
 const region = configuration.require("region");
 const name = `halo-${pulumi.getStack()}`;
+const databaseName = "halo";
+const databaseUserName = "halo";
 
 const network = new gcp.compute.Network("network", {
   name,
@@ -75,9 +78,136 @@ new gcp.projects.IAMMember("build-logs", {
   member: pulumi.interpolate`serviceAccount:${builder.email}`,
 });
 
+const runtime = new gcp.serviceaccount.Account("control-plane-runtime", {
+  accountId: `${name}-control-plane`,
+  displayName: `Halo control plane ${pulumi.getStack()}`,
+});
+new gcp.projects.IAMMember("control-plane-logs", {
+  project,
+  role: "roles/logging.logWriter",
+  member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+});
+new gcp.projects.IAMMember("control-plane-cloud-sql", {
+  project,
+  role: "roles/cloudsql.client",
+  member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+});
+
+const databasePassword = new random.RandomPassword("database-password", {
+  length: 48,
+  special: false,
+});
+const authSecretValue = new random.RandomPassword("auth-secret-value", {
+  length: 48,
+  special: false,
+});
+const databaseInstance = new gcp.sql.DatabaseInstance(
+  "control-plane-database",
+  {
+    name: `${name}-control-plane-db`,
+    project,
+    region,
+    databaseVersion: "POSTGRES_16",
+    deletionProtection: true,
+    settings: {
+      tier: "db-f1-micro",
+      edition: "ENTERPRISE",
+      availabilityType: "ZONAL",
+      activationPolicy: "ALWAYS",
+      connectorEnforcement: "REQUIRED",
+      diskType: "PD_SSD",
+      diskSize: 10,
+      diskAutoresize: true,
+      deletionProtectionEnabled: true,
+      backupConfiguration: {
+        enabled: true,
+        pointInTimeRecoveryEnabled: true,
+        startTime: "09:00",
+        transactionLogRetentionDays: 7,
+        backupRetentionSettings: {
+          retainedBackups: 7,
+          retentionUnit: "COUNT",
+        },
+      },
+      ipConfiguration: { ipv4Enabled: true },
+    },
+  },
+  { protect: true, ignoreChanges: ["settings.diskSize"] },
+);
+const appDatabase = new gcp.sql.Database("control-plane-app-database", {
+  project,
+  instance: databaseInstance.name,
+  name: databaseName,
+});
+const appDatabaseUser = new gcp.sql.User("control-plane-app-user", {
+  project,
+  instance: databaseInstance.name,
+  name: databaseUserName,
+  password: databasePassword.result,
+});
+
+const databaseUrlSecret = new gcp.secretmanager.Secret(
+  "database-url-secret",
+  {
+    project,
+    secretId: `${name}-control-plane-database-url`,
+    replication: { auto: {} },
+    deletionProtection: true,
+  },
+  { protect: true },
+);
+const databaseUrl = pulumi.interpolate`postgresql://${databaseUserName}:${databasePassword.result}@/${databaseName}?host=/cloudsql/${databaseInstance.connectionName}`;
+const databaseUrlVersion = new gcp.secretmanager.SecretVersion(
+  "database-url-version",
+  {
+    secret: databaseUrlSecret.id,
+    secretData: databaseUrl,
+  },
+  { protect: true, dependsOn: [appDatabase, appDatabaseUser] },
+);
+new gcp.secretmanager.SecretIamMember("database-url-access", {
+  project,
+  secretId: databaseUrlSecret.id,
+  role: "roles/secretmanager.secretAccessor",
+  member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+});
+
+const authSecret = new gcp.secretmanager.Secret(
+  "auth-secret",
+  {
+    project,
+    secretId: `${name}-control-plane-auth`,
+    replication: { auto: {} },
+    deletionProtection: true,
+  },
+  { protect: true },
+);
+const authSecretVersion = new gcp.secretmanager.SecretVersion(
+  "auth-secret-version",
+  {
+    secret: authSecret.id,
+    secretData: authSecretValue.result,
+  },
+  { protect: true },
+);
+new gcp.secretmanager.SecretIamMember("auth-secret-access", {
+  project,
+  secretId: authSecret.id,
+  role: "roles/secretmanager.secretAccessor",
+  member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+});
+
 export const networkId = network.id;
 export const subnetId = subnet.id;
 export const repositoryId = repository.name;
 export const imageRepository = pulumi.interpolate`${region}-docker.pkg.dev/${project}/${repository.repositoryId}/workspace-server`;
+export const controlPlaneImageRepository = pulumi.interpolate`${region}-docker.pkg.dev/${project}/${repository.repositoryId}/control-plane`;
 export const buildSourceBucket = sources.name;
 export const buildServiceAccount = builder.name;
+export const controlPlaneServiceAccount = runtime.email;
+export const controlPlaneDatabaseConnectionName =
+  databaseInstance.connectionName;
+export const controlPlaneDatabaseUrlSecret = databaseUrlSecret.secretId;
+export const controlPlaneDatabaseUrlSecretVersion = databaseUrlVersion.version;
+export const controlPlaneAuthSecret = authSecret.secretId;
+export const controlPlaneAuthSecretVersion = authSecretVersion.version;

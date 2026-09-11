@@ -14,6 +14,9 @@ gcloud services enable \
   compute.googleapis.com \
   artifactregistry.googleapis.com \
   cloudbuild.googleapis.com \
+  run.googleapis.com \
+  sqladmin.googleapis.com \
+  secretmanager.googleapis.com \
   iam.googleapis.com \
   iap.googleapis.com \
   --project="$project" --quiet
