@@ -8,8 +8,8 @@
   "terminals": [
     {
       "name": "halo-dev",
-      "command": "export HALO_USE_SWIFTSHADER=1 && pnpm --filter @halo/desktop dev",
-      "description": "Halo Electron app; HALO_USE_SWIFTSHADER is always on in this environment"
+      "command": "mkdir -p /home/ubuntu/halo-workspace && HALO_USE_SWIFTSHADER=1 HALO_WORKSPACE_ROOT=/home/ubuntu/halo-workspace pnpm dev",
+      "description": "Independent user server and Electron client; SwiftShader enabled for the headless renderer"
     },
     {
       "name": "agentation-mcp",

@@ -2,7 +2,7 @@
 
 The Electron E2E suite packages Halo once, then launches a fresh app with an isolated workspace and user-data directory for every test.
 
-The `app` fixture opens automatically. Drive the current renderer through `app.page` and the app's public server through `app.server.rpc`. To test a full restart, quit and reopen the same app:
+The `app` fixture opens automatically. Drive the current renderer through `app.page` and the app's public server through `app.server.rpc`. To test an Electron restart, quit and reopen the same app:
 
 ```ts
 e2eTest("keeps saved data after reopening", async ({ app }) => {
@@ -13,9 +13,9 @@ e2eTest("keeps saved data after reopening", async ({ app }) => {
 });
 ```
 
-`quit()` closes Electron and its owned server/windows. `open()` launches a fresh process using the same test workspace and user-data directory. Read `app.page` and `app.server` again after reopening; saved pages, locators and RPC clients belong to the previous launch. Harness tool and session helpers resolve the current connection when called. Teardown quits any remaining app, including when the test has already quit it. If setup must happen while Halo is closed, call `app.quit()`, prepare the workspace, then `app.open()`.
+`quit()` closes Electron and its windows. The independently launched user server remains running until fixture teardown. `open()` launches a fresh process using the same test workspace and user-data directory. Read `app.page` and `app.server` again after reopening; saved pages and locators belong to the previous Electron launch. The server RPC connection remains available while Electron is closed. Harness tool and session helpers resolve the current connection when called. Teardown quits any remaining app, including when the test has already quit it. If setup must happen while Halo is closed, call `app.quit()`, prepare the workspace, then `app.open()`.
 
-The ordinary `e2eTest` fixture uses `LLMDriver` from `@get-halo/server/testing`, shared with the server suite, to own a scripted OpenAI-compatible HTTP endpoint on a random loopback port. The app fixture passes its URL, model metadata and test API key through `HALO_LLM_CONFIG` on each Electron launch. Main constructs an HTTP-backed `LLMApi` and supplies it to `HaloServer`; Pi's `ModelRuntime` is built on top. The endpoint lives in the harness and stays running across app restarts. Electron has no LLM test event handlers.
+The ordinary `e2eTest` fixture uses `LLMDriver` from `@get-halo/server/testing`, shared with the server suite, to own a scripted OpenAI-compatible HTTP endpoint on a random loopback port. The fixture launches `apps/user-server/src/main.ts` under Node with the workspace launch configuration and passes the model endpoint through `HALO_LLM_CONFIG`. The user server constructs the HTTP-backed `LLMApi` and `HaloServer`. Electron only reads the published connection. The endpoint lives in the harness and stays running across app restarts. Electron has no LLM test event handlers.
 
 Import `m` from `@get-halo/shared/testing`; server and Electron tests share this response vocabulary. Responses follow the timeline of the test:
 
@@ -31,7 +31,7 @@ e2eTest("answers a message", async ({ app, llm }) => {
 });
 ```
 
-`respond()` answers one pending inference request, waiting up to ten seconds if it has not arrived. It releases the scripted response; use UI assertions to wait for Halo to process it. Client disconnection removes pending requests, including when a run stops or Electron quits. Reopening connects to the same endpoint with a fresh app runtime.
+`respond()` answers one pending inference request, waiting up to ten seconds if it has not arrived. It releases the scripted response; use UI assertions to wait for Halo to process it. Stopping a run cancels its pending inference request. Closing Electron leaves the request running; reopening reconnects to the same server session.
 
 Use `m.assistant(...)`, `m.tool.start(...)`, or an array combining text and tool calls. Tool results come from Halo's real tool execution; `m.tool.end(...)` and the seeded-history helpers that include fabricated results are not accepted. `m.error("Model access denied")` returns HTTP 403 with an OpenAI-shaped error body. Successful replies use Chat Completions server-sent events, including tool-call deltas and a finish reason.
 
@@ -51,7 +51,7 @@ Scenario actions use product services directly. Harness helpers may organize obs
 
 `app.openWindow()` opens another real renderer connected to the same server. The Electron fixture owns all windows and closes them when the app quits; the artifact fixture captures their console output and the Playwright trace.
 
-`app.server.rpc.browser` is the same workspace browser API used by `halo browser`. Tests open a browser through that API and drive it through `exec`; Halo owns its lifecycle and closes it when the workspace or app closes. The fixture does not serve assets or fabricate responses.
+`app.server.rpc.browser` is the same workspace browser API used by `halo browser`. Tests open a browser through that API and drive it through `exec`; Halo owns its lifecycle and closes it when the user server stops. The fixture does not serve assets or fabricate responses.
 
 Run the suite:
 

@@ -1,11 +1,12 @@
 # Halo
 
-Halo is an Electron desktop app with a React renderer and Pi in the main process.
+Halo is an Electron desktop app with a React renderer and Pi in an independent Node user server.
 
 ## Structure
 
 - `apps/electron/src/renderer`: React UI built with Maui and Vite.
-- `apps/electron/src/main`: Electron main process, preload bridge, workspace service, and Pi service.
+- `apps/electron/src/main`: Electron main process, preload bridge, and server connection discovery.
+- `apps/user-server`: Independent workspace and agent service (`@get-halo/server`).
 - `infra`: Cloudflare infrastructure via [Alchemy](https://alchemy.run/) (`alchemy.run.ts`).
 - `packages/halo-cli`: Workspace commands, private browser testing, and debug app control.
 - `packages/logger`: Shared structured logger.
@@ -18,14 +19,14 @@ Install [pnpm 12](https://pnpm.io/installation) with the standalone script, not 
 ```sh
 curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=12.1.0 sh -
 pnpm install
-pnpm dev
+HALO_WORKSPACE_ROOT=/absolute/path/to/workspace pnpm dev
 ```
 
 On Linux hosts without a real GPU (including Cursor cloud agents on Xvfb), set `HALO_USE_SWIFTSHADER=1` before starting Halo. The Cursor environment terminal always exports it.
 
 ```sh
 export HALO_USE_SWIFTSHADER=1
-pnpm --filter @halo/desktop dev
+HALO_WORKSPACE_ROOT=/absolute/path/to/workspace pnpm dev
 ```
 
 Set a model provider key for the same process:
@@ -37,7 +38,7 @@ export OPENAI_API_KEY=your-key
 
 In Cursor cloud agents, add the key as an environment secret named `OPENAI_API_KEY` (or another provider key above) in the Secrets panel. The dev terminal inherits it, so Pi picks it up with no extra step. Halo builds, tests, and launches without a key; you only need one to chat with a model.
 
-Each new app process asks you to choose a workspace folder the first time. Halo saves that choice in app data and reopens it on the next launch. In development, app data lives at `<repo>/.halo/`. Packaged builds use Electron's default userData path.
+Choose the workspace when launching the user server with `HALO_WORKSPACE_ROOT`, or set it in the repository `.env`. `pnpm dev` starts the server and Electron independently. Electron discovers the server through `<repo>/.halo/server.json`; closing Electron leaves the server running. Both services accept `HALO_USER_DATA` to select a different application-data directory. See [user-server configuration](apps/user-server/README.md).
 
 Halo runs Pi's `AgentHarness` with one `main` lane per conversation. `HaloServer` owns a `DatabaseClient` that stores Pi conversations and Executor application data in one embedded Turso database. The file currently lives in the selected workspace:
 
@@ -53,13 +54,13 @@ Halo's `TursoSessionRepo` implements Pi's repository contract, and `TursoStorage
 
 The adapter uses Turso's synchronous compatibility driver and ordinary tables. Turso 0.7.2 does not support recursive CTEs, so branch scans follow indexed parent links without a separate branch-index table. The schema is bundled with Halo; there is no Pi SQLite backend dependency, package patch, or SQL asset-copy step. Existing JSONL and vendor SQLite tables are not imported.
 
-Shutdown stops HTTP admission, closes sessions, drains request handlers, stops tools, closes the repository, then closes the database. Server lifecycle changes are deferred. Executor retains its generated table/index names and independent schema version. Future Halo and extension tables must avoid existing names; use `halo_*` and `ext_<installation>_*`. Extension records, grants, and the credential vault have not moved into this database yet.
+Shutdown stops HTTP admission, closes sessions, drains request handlers, stops tools, closes the repository, then closes the database. Executor retains its generated table/index names and independent schema version. Future Halo and extension tables must avoid existing names; use `halo_*` and `ext_<installation>_*`. Extension records, grants, and the credential vault have not moved into this database yet.
 
 The renderer consumes Halo session snapshots and events, adapted from Pi at the server boundary. The [session protocol](packages/shared/README.md) describes stable entries, run state, and first-class nested `exec` activity. It uses Pi's supplied transcript; loading older entries before compaction is deferred. `sessions.watch` sends an initial snapshot followed by ephemeral live events; disconnecting a viewer leaves its running session active. Nested `exec` tool details persist in Pi's tool results and progress checkpoints. Halo does not keep a separate event log or import existing JSONL conversation files.
 
 Pi's file and shell tools run on the host with the same rights as Halo. Halo does not import old AgentOS SQLite workspaces.
 
-Halo also reads provider keys from the first `.env` file found in `apps/electron` or the repository root. Keys stay in the main process and do not pass through renderer IPC.
+The user server reads the repository `.env`. The user server consumes provider configuration; it does not pass through renderer IPC.
 
 ## Debug UI control
 

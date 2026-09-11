@@ -1,9 +1,6 @@
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
-import { mauiSkillsDirName } from "@get-halo/shared/mauiSkills";
 import * as errore from "errore";
-import haloExtensionSkill from "./haloExtensionSkill.md?raw";
 import type { WorkspaceLayout } from "../workspace/WorkspaceService.js";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
@@ -29,7 +26,13 @@ export async function seedExtensionWorkspace(
       return new ExtensionSeedError({ cause: removed });
   }
 
-  const maui = await filesystem.readFile(mauiSkillPath(filesystem), "utf8");
+  const haloExtensionSkill = await filesystem.readFile(
+    join(import.meta.dirname, "haloExtensionSkill.md"),
+    "utf8",
+  );
+  if (haloExtensionSkill instanceof Error)
+    return new ExtensionSeedError({ cause: haloExtensionSkill });
+  const maui = await filesystem.readFile(mauiSkillPath(), "utf8");
   if (maui instanceof Error) return new ExtensionSeedError({ cause: maui });
   for (const [name, contents] of [
     ["halo-extension", haloExtensionSkill],
@@ -44,15 +47,7 @@ export async function seedExtensionWorkspace(
   }
 }
 
-function mauiSkillPath(filesystem: FilesystemService) {
-  const bundled = join(
-    dirname(fileURLToPath(import.meta.url)),
-    mauiSkillsDirName,
-    "maui",
-    "SKILL.md",
-  );
-  if (filesystem.exists(bundled)) return bundled;
-  // Source runs have not passed through Vite's copyMauiSkills plugin.
+function mauiSkillPath() {
   const require = createRequire(import.meta.url);
   return join(
     dirname(require.resolve("maui/package.json")),

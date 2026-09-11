@@ -1,3 +1,6 @@
+import { join, resolve } from "node:path";
+import { Logger } from "@repo/logger";
+import { startUserServerProcess } from "./UserServerProcess.js";
 import type { SessionDescription } from "@get-halo/shared/testing";
 import { test as baseTest } from "@playwright/test";
 import * as errore from "errore";
@@ -51,7 +54,34 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
   app: [
     async ({ testArtifacts, llm }, use) => {
       await using cleanup = new errore.AsyncDisposableStack();
-      const app = new ElectronTestApp(testArtifacts, llm.configuration);
+      const server = await startUserServerProcess({
+        entry: resolve(import.meta.dirname, "../../user-server/src/main.ts"),
+        configPath: join(testArtifacts.paths.root, "server.config.json"),
+        logger: new Logger({
+          sinks: [{ log: (entry) => console.log(entry.data) }],
+        }),
+        llmConfiguration: llm.configuration,
+        config: {
+          workspaceRoot: testArtifacts.paths.workspace,
+          appDataDir: testArtifacts.paths.userData,
+          appVersion: "0.0.0-test",
+          ownerUserId: "e2e-user",
+          logFilePath: testArtifacts.paths.haloLog,
+          corsOrigins: ["null"],
+          cliEntry: resolve(
+            import.meta.dirname,
+            "../../../packages/halo-cli/src/cli.ts",
+          ),
+          cliNodeExecutable: process.execPath,
+          testingApiEnabled: true,
+        },
+      });
+      if (server instanceof Error) throw server;
+      cleanup.defer(async () => {
+        const closed = await server.close();
+        if (closed instanceof Error) throw closed;
+      });
+      const app = new ElectronTestApp(testArtifacts);
       cleanup.defer(() => app.quit());
       await app.open();
       await use(app);

@@ -1,6 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
 import type { HaloRpcConnection } from "./rpc.js";
-import type { WorkspaceInfo } from "@get-halo/shared/rpc";
 
 export type AppUpdateStatus =
   | { state: "disabled"; reason: string }
@@ -24,10 +23,6 @@ export const desktopRequestSchema = Type.Union([
   ),
   Type.Object(
     { type: Type.Literal("getConnection") },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    { type: Type.Literal("chooseWorkspace") },
     { additionalProperties: false },
   ),
   Type.Object(
@@ -56,7 +51,6 @@ export type OpenExternalRequest = Extract<
 export type DesktopApi = {
   openWorkspaceFile: (path: string) => Promise<void>;
   getConnection: () => Promise<HaloRpcConnection | undefined>;
-  chooseWorkspace: () => Promise<WorkspaceInfo | undefined>;
   getAppInfo: () => Promise<AppInfo>;
   installAppUpdate: () => Promise<void>;
   openExternal: (request: OpenExternalRequest) => Promise<void>;

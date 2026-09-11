@@ -7,7 +7,6 @@
     "./connectionRequests": "./src/connectionRequests.ts",
     "./contract": "./src/contract.ts",
     "./isCallable": "./src/isCallable.ts",
-    "./mauiSkills": "./src/mauiSkills.ts",
     "./rpc": "./src/rpc.ts",
     "./sessionState": "./src/sessionState.ts",
     "./SerialQueue": "./src/SerialQueue.ts",

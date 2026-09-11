@@ -13,7 +13,7 @@ import { style, useStyles } from "purse-styles";
 import type { IncompatibleServerError } from "./api/HaloRpcClient.js";
 
 type ConnectionPageProps =
-  | { status: "disconnected" }
+  | { status: "disconnected" | "waiting" }
   | { status: "incompatible"; error: IncompatibleServerError };
 
 export function ConnectionPage(props: ConnectionPageProps) {
@@ -29,12 +29,16 @@ export function ConnectionPage(props: ConnectionPageProps) {
             <H1>
               {incompatible
                 ? "This Halo app cannot use this server version"
-                : "Halo disconnected from its server"}
+                : props.status === "waiting"
+                  ? "Waiting for your server"
+                  : "Halo disconnected from its server"}
             </H1>
             <P>
               {incompatible
                 ? `This app uses protocol ${props.error.clientProtocolVersion}, but the server uses protocol ${props.error.serverProtocolVersion}. Update Halo, then reload it.`
-                : "Reload Halo to reconnect."}
+                : props.status === "waiting"
+                  ? "Halo will connect when your server is ready."
+                  : "Reload Halo to reconnect."}
             </P>
           </div>
           <Button onClick={() => window.location.reload()}>Reload Halo</Button>

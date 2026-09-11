@@ -151,7 +151,7 @@ e2eTest(
 );
 
 e2eTest(
-  "answers after quitting Halo during a pending response",
+  "finishes a pending response while Electron is closed",
   async ({ app, llm }) => {
     await app.page.getByRole("button", { name: "New session" }).click();
     await app.page
@@ -162,17 +162,15 @@ e2eTest(
       app.page.getByRole("article", { name: "You message" }),
     ).toContainText("Start an answer");
 
+    await llm.waitForRequest();
     await app.quit();
+    await llm.respond(
+      m.assistant("The server finished while Electron was closed."),
+    );
     await app.open();
 
-    await app.page
-      .getByLabel("Message", { exact: true })
-      .fill("Answer after reopening");
-    await app.page.getByRole("button", { name: "Send", exact: true }).click();
-    await llm.respond(m.assistant("Here is the answer after reopening."));
-
     await expect(app.page.getByRole("main")).toContainText(
-      "Here is the answer after reopening.",
+      "The server finished while Electron was closed.",
     );
   },
 );

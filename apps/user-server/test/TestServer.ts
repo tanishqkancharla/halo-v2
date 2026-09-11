@@ -2,7 +2,7 @@ import { createHaloRpcClient } from "@halo/cli";
 import { HaloServer, type HaloServerOptions } from "@get-halo/server";
 import type { HaloClient } from "@get-halo/shared/contract";
 import path from "node:path";
-import { TemporaryCredentialVault } from "./TemporaryCredentialVault.js";
+import { FileCredentialVault } from "../src/agent/runtime/FileCredentialVault.js";
 import type { TestArtifacts } from "./TestArtifacts.js";
 
 type RunningServer = {
@@ -53,7 +53,7 @@ export class TestServer {
       ownerUserId: Promise.resolve("server-test-user"),
       logger: this.options.artifacts.logger,
       createCredentialVault: ({ filesystem, workspaceRoot }) =>
-        new TemporaryCredentialVault({
+        new FileCredentialVault({
           filesystem,
           directory: path.join(
             workspaceRoot,

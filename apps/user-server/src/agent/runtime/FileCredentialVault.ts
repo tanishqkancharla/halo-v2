@@ -3,19 +3,20 @@ import path from "node:path";
 import {
   type CredentialVault,
   CredentialVaultError,
-} from "@get-halo/server/agent";
+} from "./CredentialVault.js";
 import {
   type FilesystemService,
   FilesystemPathNotFoundError,
-} from "@get-halo/server/filesystem";
+} from "../../filesystem/FilesystemService.js";
 
-export class TemporaryCredentialVault implements CredentialVault {
+export class FileCredentialVault implements CredentialVault {
   private readonly filesystem: FilesystemService;
   private readonly directory: string;
 
-  constructor(options: { filesystem: FilesystemService; directory: string }) {
-    this.filesystem = options.filesystem;
-    this.directory = options.directory;
+  constructor(ctx: { filesystem: FilesystemService; directory: string }) {
+    const { filesystem, directory } = ctx;
+    this.filesystem = filesystem;
+    this.directory = directory;
   }
 
   async get(id: string) {

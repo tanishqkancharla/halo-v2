@@ -82,7 +82,7 @@ Always adhere to ISO 24495-1 Technical Language Standard for responses.
 
 ## Cursor Cloud specific instructions
 
-The one service is the Halo Electron app. Start it from the repo root with `pnpm --filter @halo/desktop dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo app` (see the halo-app skill). Follow the incremental verification workflow in Commands.
+Development runs the independent `apps/user-server` Node service and the Halo Electron client. Start both from the repo root with `HALO_WORKSPACE_ROOT=/absolute/workspace pnpm dev`; the `halo-dev` terminal in `.cursor/environment.json` already runs this. It serves the Vite renderer and opens the Electron window, and dev builds expose Chrome DevTools Protocol on `127.0.0.1:4445`. Drive and inspect the renderer with `pnpm halo app` (see the halo-app skill). Follow the incremental verification workflow in Commands.
 
 Cursor Cloud agents must record a short demo video when they add or change any UI, attach it to the PR, and show it in the walkthrough. Use screen recording against the running Halo app; do not skip this for “small” UI tweaks. This requirement does not apply to agents outside Cursor Cloud.
 
@@ -94,11 +94,6 @@ Headless hosts (Xvfb/VNC) need `HALO_USE_SWIFTSHADER=1`, which the `halo-dev` te
 
 To chat with a model, set a provider key as an environment secret: `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`). The dev terminal inherits it and Pi picks that provider's default model with no extra step. Halo builds, tests, and launches without a key; you only need one to send a prompt.
 
-First launch shows a "Choose workspace" screen that opens a native folder dialog, which `halo app` cannot click. To reach the main UI in a headless run, pick the workspace before launching by writing the preference file, then start the app so Electron restores it and starts its workspace server:
+Configure the workspace when starting the user server with `HALO_WORKSPACE_ROOT`, or pass a JSON configuration to `pnpm server <config.json>`. Electron has no workspace picker and never starts or stops the server. In development both services use `<repo>/.halo`; `HALO_USER_DATA` overrides that directory. The server publishes `server.json` for Electron and `rpc.json` for the CLI. Closing Electron leaves active sessions and extensions running. See `apps/user-server/README.md`.
 
-```sh
-mkdir -p /home/ubuntu/halo-workspace /workspace/.halo
-echo '{"workspaceRoot":"/home/ubuntu/halo-workspace"}' > /workspace/.halo/workspace.json
-```
-
-`.halo/` holds dev userData and is gitignored. Choosing a workspace seeds `halo-extension` and `maui` under `{workspace}/.agents/skills/`. Halo loads skills only from that directory and root instructions only from the workspace's `AGENTS.md`; Pi session state, Executor data, and extension permissions share `{workspace}/.halo/state.db`, owned by `HaloServer` through `DatabaseClient`. Agents use the single workspace Maui skill. Build inside the extension with `npm run build`, then use `halo extension reload` to start newly discovered extensions and reload the renderer to refresh the sidebar. Existing extension servers keep their current build until Halo restarts.
+`.halo/` holds dev userData and is gitignored. Starting the user server seeds `halo-extension` and `maui` under `{workspace}/.agents/skills/`. Halo loads skills only from that directory and root instructions only from the workspace's `AGENTS.md`; Pi session state, Executor data, and extension permissions share `{workspace}/.halo/state.db`, owned by `HaloServer` through `DatabaseClient`. Agents use the single workspace Maui skill. Build inside the extension with `npm run build`, then use `halo extension reload` to start newly discovered extensions and reload the renderer to refresh the sidebar. Existing extension servers keep their current build until the user server restarts.

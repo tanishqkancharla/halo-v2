@@ -1,7 +1,7 @@
 import { createORPCClient } from "@orpc/client";
 import type { HaloClient } from "@get-halo/shared/contract";
 import type { readFile, writeFile } from "@get-halo/server/filesystem";
-import type { runBash } from "../../../packages/server/src/agent/tools/bash/run.js";
+import type { runBash } from "../../user-server/src/agent/tools/bash/run.js";
 
 type HarnessTools = {
   bash: {

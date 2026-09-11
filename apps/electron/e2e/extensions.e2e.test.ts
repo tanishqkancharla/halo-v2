@@ -4,11 +4,9 @@ import { extensionE2eTest } from "./extensionE2eTest.js";
 extensionE2eTest.setTimeout(90_000);
 
 extensionE2eTest(
-  "runs the saved workspace's extensions until Halo quits",
-  async ({ prepareExtension, app, request }) => {
-    await app.quit();
-    const prepared = await prepareExtension("./fixtures/greeting");
-    await app.open();
+  "keeps workspace extensions running after Electron quits",
+  async ({ loadExtension, app, request }) => {
+    const prepared = await loadExtension("./fixtures/greeting");
     const extensions = await app.server.rpc.extensions.list();
     const extension = extensions.find((entry) => entry.id === prepared.id)!;
     const browser = await app.server.rpc.browser.open({ url: extension.url });
@@ -17,9 +15,9 @@ extensionE2eTest(
 
     await app.quit();
 
-    await expect(
-      request.get(extension.url, { timeout: 5_000 }),
-    ).rejects.toThrow(/ECONNREFUSED/);
+    expect((await request.get(extension.url, { timeout: 5_000 })).ok()).toBe(
+      true,
+    );
   },
 );
 

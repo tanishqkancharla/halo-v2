@@ -3,7 +3,7 @@ import nodePath from "node:path";
 import { expect } from "@playwright/test";
 import { e2eTest } from "./e2eTest.js";
 
-e2eTest("opens the saved workspace", async ({ harness, app }) => {
+e2eTest("opens the server-configured workspace", async ({ harness, app }) => {
   await expect(
     app.page.getByRole("main", { name: "New session" }),
   ).toBeVisible();
@@ -35,7 +35,11 @@ e2eTest(
       .poll(() => app.server.rpc.workspace.readFile({ path: "notes.md" }))
       .toContain("Edited in Halo");
 
+    const server = app.server.rpc;
     await app.quit();
+    expect(await server.workspace.readFile({ path: "notes.md" })).toContain(
+      "Edited in Halo",
+    );
     await app.open();
 
     await app.page.getByRole("link", { name: "notes.md" }).click();

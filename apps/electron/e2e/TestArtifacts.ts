@@ -73,10 +73,6 @@ export async function createTestArtifacts(
     fsPromises.mkdir(paths.workspace, { recursive: true }),
     fsPromises.mkdir(paths.userData, { recursive: true }),
   ]);
-  await fsPromises.writeFile(
-    path.join(paths.userData, "workspace.json"),
-    `${JSON.stringify({ workspaceRoot: paths.workspace })}\n`,
-  );
 
   const outputPrefix = `[e2e:${testInfo.title}:main]`;
   const captureFinalizers: Array<() => Promise<void>> = [];

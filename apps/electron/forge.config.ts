@@ -1,5 +1,4 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
-import { bundleHaloCli, haloCliBundlePath } from "./forge/bundleHaloCli.js";
 import { copyMainProcessExternals } from "./forge/copyMainProcessExternals.js";
 
 const appleApiKey = process.env.APPLE_API_KEY;
@@ -13,17 +12,12 @@ const shouldNotarize =
   appleApiIssuer !== undefined;
 
 const packagerConfig: NonNullable<ForgeConfig["packagerConfig"]> = {
-  asar: {
-    // Native binaries cannot execute from inside the asar.
-    unpack:
-      "**/node_modules/{esbuild,@esbuild,libsql,@libsql,@tursodatabase}/**/*",
-  },
+  asar: true,
   appBundleId: "com.saffronhealth.halo",
   appCategoryType: "public.app-category.medical",
   icon: "icons/icon",
   name: "Halo",
   executableName: "Halo",
-  extraResource: [haloCliBundlePath()],
 };
 if (shouldSign) {
   packagerConfig.osxSign = {};
@@ -44,9 +38,6 @@ const config: ForgeConfig = {
     ignoreModules: ["@parcel/watcher"],
   },
   hooks: {
-    prePackage: async () => {
-      await bundleHaloCli();
-    },
     packageAfterCopy: async (_forgeConfig, buildPath) => {
       await copyMainProcessExternals(buildPath);
     },

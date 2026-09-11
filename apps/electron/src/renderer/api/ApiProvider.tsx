@@ -14,7 +14,6 @@ import {
 } from "react";
 import type { HaloClient } from "@get-halo/shared/contract";
 import type { WorkspaceInfo } from "@get-halo/shared/rpc";
-import { Onboarding } from "../Onboarding.tsx";
 import { LoadingPage } from "../LoadingPage.tsx";
 import { ConnectionPage } from "../ConnectionPage.tsx";
 import { desktopApi } from "./electron.js";
@@ -80,6 +79,9 @@ function ResolveApi({
   }, []);
   const apiQuery = useQuery({
     queryKey: haloApiQueryKey,
+    // Dev starts Electron and the user server independently; discovery may arrive later.
+    refetchInterval: (query) =>
+      query.state.data?.api === undefined ? 1_000 : false,
     queryFn: async () => {
       const api = await createApi({ onDisconnect: disconnect });
       return { api };
@@ -93,7 +95,7 @@ function ResolveApi({
   }
   if (disconnected) return <ConnectionPage status="disconnected" />;
   const api = apiQuery.data.api;
-  if (api === undefined) return <ChooseWorkspace />;
+  if (api === undefined) return <ConnectionPage status="waiting" />;
   if (api instanceof IncompatibleServerError) {
     return <ConnectionPage status="incompatible" error={api} />;
   }
@@ -114,22 +116,6 @@ export function useWorkspaceQuery() {
     queryKey: workspaceQueryKey,
     queryFn: () => api.workspace.get(),
   });
-}
-
-function ChooseWorkspace() {
-  const choose = useMutation({
-    mutationFn: () => desktopApi.chooseWorkspace(),
-    onSuccess: (workspace) => {
-      if (workspace !== undefined) window.location.reload();
-    },
-  });
-  return (
-    <Onboarding
-      message={choose.error === null ? undefined : String(choose.error)}
-      isChoosing={choose.isPending}
-      onChoose={() => choose.mutate()}
-    />
-  );
 }
 
 export function useSessionsQuery(workspace: WorkspaceInfo | undefined) {

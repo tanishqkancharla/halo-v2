@@ -7,9 +7,8 @@ import {
   shell,
   type IpcMainEvent,
 } from "electron";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { registerSessionResourceCleanup } from "@earendil-works/pi-ai";
 import {
   Logger,
   type LogLevel,
@@ -20,8 +19,7 @@ import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS } from "../shared/channels.js";
-import { WorkspaceServer } from "./WorkspaceServer.js";
-import { resolveHaloCliEntry } from "@get-halo/server/cli";
+import { readUserServerConnection } from "@get-halo/server/connection";
 import { FilesystemService } from "@get-halo/server/filesystem";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import {
@@ -30,20 +28,6 @@ import {
 } from "./ApplicationLaunchMode.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import { registerDesktopApi } from "./DesktopApi.js";
-import { createEncryptedFileCredentialVault } from "./EncryptedFileCredentialVault.js";
-import { UserService } from "./UserService.js";
-import {
-  createPiLLMApi,
-  createOpenAILLMApi,
-  type OpenAILLMApiOptions,
-} from "@get-halo/server/llm";
-import * as errore from "errore";
-
-class LLMConfigurationError extends errore.createTaggedError({
-  name: "LLMConfigurationError",
-  message: "Could not parse HALO_LLM_CONFIG",
-}) {}
-
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
@@ -51,10 +35,6 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const isDevelopment =
   applicationLaunchMode === ApplicationLaunchMode.Development;
 const filesystemService = new FilesystemService();
-
-// Rolldown omits pi-ai's session-resources module initializer when it is only
-// reached through pi-coding-agent, leaving packaged session disposal broken.
-registerSessionResourceCleanup(() => {})();
 
 if (started) app.quit();
 
@@ -81,7 +61,6 @@ const logger = new Logger({
       : [new PrettyConsoleLoggerSink(), fileSink],
 });
 const rendererLogger = logger.scope("renderer");
-const rpcLogger = logger.scope("rpc");
 
 if (isDevelopment) {
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
@@ -98,78 +77,16 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
 
 process.env.HALO_USER_DATA = applicationConfig.dataDir;
 
-const userService = new UserService({
-  appDataDir: applicationConfig.dataDir,
-  filesystem: filesystemService,
-});
-const ownerUserId = userService
-  .getUser()
-  .then((user) => (user instanceof Error ? user : user.id));
-const workspaceServer = new WorkspaceServer({
-  filesystem: filesystemService,
-  createLLMApi: async (workspaceRoot) => {
-    const configuration = process.env.HALO_LLM_CONFIG;
-    if (configuration !== undefined) {
-      const options = errore.try({
-        // SAFETY: The host supplies serialized OpenAILLMApiOptions as launch configuration.
-        try: () => JSON.parse(configuration) as OpenAILLMApiOptions,
-        catch: (cause) => new LLMConfigurationError({ cause }),
-      });
-      if (options instanceof Error) return options;
-      return createOpenAILLMApi(options);
-    }
-    return await createPiLLMApi({
-      agentDir: join(workspaceRoot, ".pi", "agent"),
-      provider: "openai-codex",
-      modelId: "gpt-5.6-terra",
-    });
-  },
-  corsOrigins: [getRendererOrigin()],
-  server: {
-    appBrowserTarget: isDevelopment
-      ? {
-          cdpUrl: "http://127.0.0.1:4445",
-          pageUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL,
-        }
-      : undefined,
-    appDataDir: applicationConfig.dataDir,
-    appVersion: app.getVersion(),
-    cliEntry: resolveHaloCliEntry(filesystemService, import.meta.url),
-    cliNodeExecutable: isDevelopment ? "node" : process.execPath,
-    cliElectronRunAsNode: !isDevelopment,
-    extensionRuntime: { executable: process.execPath, electronRunAsNode: true },
-    testingApiEnabled: applicationLaunchMode === ApplicationLaunchMode.Test,
-    ownerUserId,
-    logger: rpcLogger,
-    createCredentialVault: ({ filesystem, workspaceRoot }) =>
-      createEncryptedFileCredentialVault({
-        filesystem,
-        workspaceRoot,
-      }),
-  },
-});
 let mainWindow: BrowserWindow | undefined;
 const windows = new Set<BrowserWindow>();
-let shutdownStarted = false;
 
 // oxlint-disable-next-line typescript/no-floating-promises -- Electron owns the app-ready lifecycle and keeps the process alive for this work.
 app.whenReady().then(async () => {
   registerLogBridge();
   registerDesktopApi({
-    selectWorkspace: async (directory, sender) => {
-      const selected = await workspaceServer.select(directory);
-      if (selected instanceof Error) return selected;
-      await reloadWindows(sender);
-      return selected;
-    },
-    getConnection: () => workspaceServer.getConnection(),
-    getWorkspaceRoot: () => workspaceServer.getWorkspaceRoot(),
+    getServer: () => readUserServerConnection(applicationConfig.dataDir),
     ownsWindow: (window) => windows.has(window),
   });
-  const restored = await workspaceServer.restore();
-  if (restored instanceof Error) {
-    logger.warn({ event: "workspace-restore-failed", error: restored });
-  }
   installMenu();
   await openMainWindow();
   if (applicationLaunchMode === ApplicationLaunchMode.Test) {
@@ -196,27 +113,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("will-quit", (event) => {
-  if (shutdownStarted) return;
-  event.preventDefault();
-  shutdownStarted = true;
-  // oxlint-disable-next-line typescript/no-floating-promises -- Electron requires will-quit to return while cleanup runs before the second quit call.
-  void closeAppServices().finally(() => {
-    logger.destroy();
-    app.quit();
-  });
-});
-
-async function closeAppServices() {
-  const serverClosed = await workspaceServer.close();
-  if (serverClosed instanceof Error) {
-    logger.error({ event: "halo-server-close-failed", error: serverClosed });
-  }
-  const filesystemClosed = await filesystemService.close();
-  if (filesystemClosed instanceof Error) {
-    logger.error({ event: "filesystem-close-failed", error: filesystemClosed });
-  }
-}
+app.on("will-quit", () => logger.destroy());
 
 async function openMainWindow(): Promise<void> {
   const window = await createWindow();
@@ -300,23 +197,6 @@ function installMenu(): void {
       void openLogs();
     },
   };
-  const switchWorkspaceItem = {
-    label: "Switch Workspace…",
-    click: () => {
-      // oxlint-disable-next-line typescript/no-floating-promises -- Electron menu callbacks cannot await command work.
-      void switchWorkspace();
-    },
-  };
-  const fileMenu = {
-    label: "File",
-    submenu: [
-      switchWorkspaceItem,
-      { type: "separator" as const },
-      process.platform === "darwin"
-        ? { role: "close" as const }
-        : { role: "quit" as const },
-    ],
-  };
   const viewSubmenu = [
     {
       label: "Reload",
@@ -346,7 +226,6 @@ function installMenu(): void {
             { role: "quit" },
           ],
         },
-        fileMenu,
         { role: "editMenu" },
         { label: "View", submenu: viewSubmenu },
         { role: "windowMenu" },
@@ -357,7 +236,6 @@ function installMenu(): void {
 
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      fileMenu,
       { role: "editMenu" },
       { label: "View", submenu: viewSubmenu },
       { role: "windowMenu" },
@@ -379,49 +257,6 @@ async function openLogs(): Promise<void> {
   });
 }
 
-async function switchWorkspace(): Promise<void> {
-  if (mainWindow === undefined) return;
-
-  const selection = await dialog.showOpenDialog(mainWindow, {
-    title: "Switch workspace",
-    buttonLabel: "Switch workspace",
-    properties: ["openDirectory", "createDirectory"],
-  });
-  if (selection.canceled) return;
-  const directory = selection.filePaths[0];
-  if (directory === undefined) return;
-
-  const previous = workspaceServer.getConnection();
-  const workspace = await workspaceServer.select(directory);
-  if (workspace instanceof Error) {
-    await dialog.showMessageBox(mainWindow, {
-      type: "error",
-      title: "Switch Workspace",
-      message: "Could not switch workspace",
-      detail: workspace.message,
-    });
-    return;
-  }
-  if (previous === workspaceServer.getConnection()) return;
-  await reloadWindows();
-}
-
-async function reloadWindows(except?: BrowserWindow) {
-  for (const window of windows) {
-    if (window === except) continue;
-    const rendererUrl = new URL(window.webContents.getURL());
-    rendererUrl.hash = "";
-    await window.loadURL(rendererUrl.href);
-  }
-}
-
-function getRendererOrigin() {
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    return new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin;
-  }
-  return "null";
-}
-
 function ignoreClosedStdioPipe(stream: NodeJS.WriteStream) {
   stream.on("error", (error: NodeJS.ErrnoException) => {
     if (error.code === "EPIPE") return;
@@ -430,6 +265,11 @@ function ignoreClosedStdioPipe(stream: NodeJS.WriteStream) {
 }
 
 function configureUserDataPath(): void {
+  const configured = process.env.HALO_USER_DATA;
+  if (configured !== undefined) {
+    app.setPath("userData", resolve(configured));
+    return;
+  }
   if (!isDevelopment) return;
   const appDirectory = join(currentDirectory, "../..");
   app.setPath("userData", join(appDirectory, "../..", ".halo"));

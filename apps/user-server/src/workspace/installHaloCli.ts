@@ -1,7 +1,7 @@
 import * as errore from "errore";
 import { createRequire } from "node:module";
 import { delimiter, dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import type { FilesystemService } from "../filesystem/FilesystemService.js";
 
 export class InstallHaloCliError extends errore.createTaggedError({
@@ -23,24 +23,6 @@ export function workspaceCliPath(
 
 function haloCliBinPath(workspaceRoot: string) {
   return join(haloCliBinDir(workspaceRoot), "halo");
-}
-
-export const haloCliResourceName = "halo-cli.cjs";
-
-export function resolveHaloCliEntry(
-  filesystem: FilesystemService,
-  fromMainUrl: string,
-) {
-  const electronRoot = join(dirname(fileURLToPath(fromMainUrl)), "../..");
-  const destCli = join(electronRoot, "../../packages/halo-cli/src/cli.ts");
-  if (filesystem.exists(destCli)) return destCli;
-  const resourcesDir =
-    process.platform === "darwin"
-      ? join(dirname(process.execPath), "..", "Resources")
-      : join(dirname(process.execPath), "resources");
-  const packaged = join(resourcesDir, haloCliResourceName);
-  if (filesystem.exists(packaged)) return packaged;
-  return undefined;
 }
 
 function wrapHaloCli(args: {

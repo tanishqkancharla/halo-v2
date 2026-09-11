@@ -8,7 +8,6 @@ import {
 } from "playwright";
 import type { TestArtifacts } from "./TestArtifacts.js";
 import { resolveUnpackedExecutable } from "./resolveUnpackedExecutable.js";
-import type { OpenAILLMApiOptions } from "@get-halo/server/llm";
 
 type RunningApp = {
   electron: ElectronApplication;
@@ -19,10 +18,7 @@ type RunningApp = {
 
 export class ElectronTestApp {
   private current: RunningApp | undefined;
-  constructor(
-    private readonly artifacts: TestArtifacts,
-    private readonly llmConfiguration: OpenAILLMApiOptions,
-  ) {}
+  constructor(private readonly artifacts: TestArtifacts) {}
 
   get page() {
     return this.running.page;
@@ -49,7 +45,7 @@ export class ElectronTestApp {
       env: {
         ...processEnvironment(),
         HALO_E2E: "1",
-        HALO_LLM_CONFIG: JSON.stringify(this.llmConfiguration),
+        HALO_USER_DATA: this.artifacts.paths.userData,
       },
     });
     resources.defer(() => electronApp.close());

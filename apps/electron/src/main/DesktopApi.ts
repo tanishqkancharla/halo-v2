@@ -2,15 +2,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   BrowserWindow,
-  dialog,
   ipcMain,
   shell,
   type IpcMainInvokeEvent,
 } from "electron";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
-import type { HaloRpcConnection } from "../shared/rpc.js";
-import type { WorkspaceInfo } from "@get-halo/shared/rpc";
+import type { UserServerConnection } from "@get-halo/server/connection";
 import {
   DESKTOP_CHANNEL,
   desktopRequestSchema,
@@ -30,24 +28,16 @@ class DesktopOperationError extends errore.createTaggedError({
 }) {}
 
 export function registerDesktopApi(args: {
-  selectWorkspace: (
-    directory: string,
-    sender: BrowserWindow,
-  ) => Promise<WorkspaceInfo | Error>;
-  getConnection: () => HaloRpcConnection | undefined;
-  getWorkspaceRoot: () => string | undefined;
+  getServer: () => Promise<UserServerConnection | Error | undefined>;
   ownsWindow: (window: BrowserWindow) => boolean;
 }): void {
   ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
-    const window = assertTrustedSender({ event, ownsWindow: args.ownsWindow });
+    assertTrustedSender({ event, ownsWindow: args.ownsWindow });
     const validated = validateDesktopRequest(request);
     if (validated instanceof Error) throw validated;
     const result = await handleDesktopRequest({
       request: validated,
-      window,
-      selectWorkspace: args.selectWorkspace,
-      getConnection: args.getConnection,
-      getWorkspaceRoot: args.getWorkspaceRoot,
+      getServer: args.getServer,
     });
     if (result instanceof Error) throw result;
     return result;
@@ -63,24 +53,20 @@ function validateDesktopRequest(
 
 async function handleDesktopRequest(args: {
   request: DesktopRequest;
-  getConnection: () => HaloRpcConnection | undefined;
-  getWorkspaceRoot: () => string | undefined;
-  window: BrowserWindow;
-  selectWorkspace: (
-    directory: string,
-    sender: BrowserWindow,
-  ) => Promise<WorkspaceInfo | Error>;
+  getServer: () => Promise<UserServerConnection | Error | undefined>;
 }) {
   switch (args.request.type) {
-    case "openWorkspaceFile":
-      return openWorkspaceFile(args.getWorkspaceRoot(), args.request.path);
-    case "getConnection":
-      return args.getConnection();
-    case "chooseWorkspace":
-      return chooseWorkspace({
-        window: args.window,
-        selectWorkspace: args.selectWorkspace,
-      });
+    case "openWorkspaceFile": {
+      const server = await args.getServer();
+      if (server instanceof Error) return server;
+      return openWorkspaceFile(server?.workspaceRoot, args.request.path);
+    }
+    case "getConnection": {
+      const server = await args.getServer();
+      if (server instanceof Error) return server;
+      if (server === undefined) return undefined;
+      return { origin: server.origin, token: server.token };
+    }
     case "getAppInfo":
       return getAppInfo();
     case "installAppUpdate":
@@ -90,31 +76,6 @@ async function handleDesktopRequest(args: {
     default:
       return new DesktopRequestError({ operation: "desktop API" });
   }
-}
-
-async function chooseWorkspace(args: {
-  window: BrowserWindow;
-  selectWorkspace: (
-    directory: string,
-    sender: BrowserWindow,
-  ) => Promise<WorkspaceInfo | Error>;
-}) {
-  const selection = await dialog
-    .showOpenDialog(args.window, {
-      title: "Choose a Halo workspace",
-      buttonLabel: "Choose workspace",
-      properties: ["openDirectory", "createDirectory"],
-    })
-    .catch(
-      (e) =>
-        new DesktopOperationError({
-          operation: "open the workspace picker",
-          cause: e,
-        }),
-    );
-  if (selection instanceof Error) return selection;
-  if (selection.canceled) return undefined;
-  return args.selectWorkspace(selection.filePaths[0]!, args.window);
 }
 
 async function openExternal(request: OpenExternalRequest) {
