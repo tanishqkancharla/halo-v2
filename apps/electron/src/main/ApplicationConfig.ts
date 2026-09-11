@@ -1,6 +1,6 @@
 import { app } from "electron";
 import { join } from "node:path";
-import type { FilesystemService } from "@get-halo/server/filesystem";
+import type { FilesystemService } from "@get-halo/workspace-server/filesystem";
 
 type ApplicationConfig = {
   isDevelopment: boolean;

@@ -97,12 +97,6 @@ extensionE2eTest(
     await expect(
       app.page.getByRole("main", { name: "Welcome", exact: true }),
     ).toBeVisible();
-    await app.page
-      .getByRole("button", { name: "Permissions", exact: true })
-      .click();
-    await expect(
-      app.page.getByRole("dialog", { name: "Permissions for Welcome" }),
-    ).toBeVisible();
     const [after] = await app.server.rpc.extensions.list();
     expect(after?.url).toBe(before?.url);
   },

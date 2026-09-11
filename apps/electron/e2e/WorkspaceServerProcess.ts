@@ -3,22 +3,22 @@ import { fork, type ChildProcess, type Serializable } from "node:child_process";
 import { createInterface } from "node:readline";
 import { Value } from "@sinclair/typebox/value";
 import {
-  userServerReadySchema,
-  type UserServerConfig,
-  type UserServerReady,
-} from "@get-halo/server/process";
+  workspaceServerReadySchema,
+  type WorkspaceServerConfig,
+  type WorkspaceServerReady,
+} from "@get-halo/workspace-server/process";
 import type { Logger } from "@repo/logger";
-import type { OpenAILLMApiOptions } from "@get-halo/server/llm";
+import type { OpenAILLMApiOptions } from "@get-halo/workspace-server/llm";
 import * as errore from "errore";
 
-class UserServerProcessError extends errore.createTaggedError({
-  name: "UserServerProcessError",
+class WorkspaceServerProcessError extends errore.createTaggedError({
+  name: "WorkspaceServerProcessError",
   message: "User-server process failed: $detail",
 }) {}
 
-export async function startUserServerProcess(ctx: {
+export async function startWorkspaceServerProcess(ctx: {
   entry: string;
-  config: UserServerConfig;
+  config: WorkspaceServerConfig;
   logger: Logger;
   configPath: string;
   llmConfiguration: OpenAILLMApiOptions;
@@ -27,7 +27,10 @@ export async function startUserServerProcess(ctx: {
     .writeFile(ctx.configPath, JSON.stringify(ctx.config), { mode: 0o600 })
     .catch(
       (cause) =>
-        new UserServerProcessError({ detail: "write configuration", cause }),
+        new WorkspaceServerProcessError({
+          detail: "write configuration",
+          cause,
+        }),
     );
   if (written instanceof Error) return written;
   const child = errore.try({
@@ -41,15 +44,16 @@ export async function startUserServerProcess(ctx: {
         },
         stdio: ["ignore", "pipe", "pipe", "ipc"],
       }),
-    catch: (cause) => new UserServerProcessError({ detail: "spawn", cause }),
+    catch: (cause) =>
+      new WorkspaceServerProcessError({ detail: "spawn", cause }),
   });
   if (child instanceof Error) return child;
-  const exited = new Promise<void | UserServerProcessError>((resolve) => {
+  const exited = new Promise<void | WorkspaceServerProcessError>((resolve) => {
     child.once("close", (code, signal) =>
       resolve(
         code === 0
           ? undefined
-          : new UserServerProcessError({
+          : new WorkspaceServerProcessError({
               detail: `exited (${signal === null ? code : signal})`,
             }),
       ),
@@ -59,13 +63,13 @@ export async function startUserServerProcess(ctx: {
   const stdout = createInterface({ input: child.stdout! });
   const stderr = createInterface({ input: child.stderr! });
   stdout.on("line", (line: string) =>
-    ctx.logger.info({ event: "user-server-stdout", line }),
+    ctx.logger.info({ event: "workspace-server-stdout", line }),
   );
   stderr.on("line", (line: string) =>
-    ctx.logger.warn({ event: "user-server-stderr", line }),
+    ctx.logger.warn({ event: "workspace-server-stderr", line }),
   );
   child.on("error", (error) =>
-    ctx.logger.warn({ event: "user-server-process-error", error }),
+    ctx.logger.warn({ event: "workspace-server-process-error", error }),
   );
   const ready = await waitForReady(child);
   if (ready instanceof Error) {
@@ -88,7 +92,7 @@ export async function startUserServerProcess(ctx: {
       child.send("shutdown", (cause) => {
         if (cause === null) return;
         ctx.logger.warn({
-          event: "user-server-shutdown-message-failed",
+          event: "workspace-server-shutdown-message-failed",
           error: cause,
         });
         child.kill("SIGKILL");
@@ -100,16 +104,16 @@ export async function startUserServerProcess(ctx: {
 
 async function waitForReady(child: ChildProcess) {
   using cleanup = new errore.DisposableStack();
-  return await new Promise<UserServerReady | UserServerProcessError>(
+  return await new Promise<WorkspaceServerReady | WorkspaceServerProcessError>(
     (resolve) => {
       const onMessage = (message: Serializable) => {
-        if (Value.Check(userServerReadySchema, message)) resolve(message);
+        if (Value.Check(workspaceServerReadySchema, message)) resolve(message);
       };
       const onError = (cause: Error) =>
-        resolve(new UserServerProcessError({ detail: "startup", cause }));
+        resolve(new WorkspaceServerProcessError({ detail: "startup", cause }));
       const onClose = () =>
         resolve(
-          new UserServerProcessError({
+          new WorkspaceServerProcessError({
             detail: "exited before becoming ready",
           }),
         );
@@ -117,7 +121,7 @@ async function waitForReady(child: ChildProcess) {
       const timeout = setTimeout(
         () =>
           resolve(
-            new UserServerProcessError({
+            new WorkspaceServerProcessError({
               detail: "startup exceeded 60 seconds",
             }),
           ),

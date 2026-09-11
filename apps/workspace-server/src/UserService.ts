@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
-import type { FilesystemService } from "@get-halo/server/filesystem";
+import type { FilesystemService } from "@get-halo/workspace-server/filesystem";
 
 type User = {
   id: string;

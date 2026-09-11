@@ -10,7 +10,7 @@ const connectionSchema = Type.Object({
   token: Type.String(),
 });
 
-export type UserServerConnection = Static<typeof connectionSchema>;
+export type WorkspaceServerConnection = Static<typeof connectionSchema>;
 
 class ConnectionFileError extends errore.createTaggedError({
   name: "ConnectionFileError",
@@ -21,7 +21,7 @@ function connectionFile(appDataDir: string) {
   return join(appDataDir, "server.json");
 }
 
-export async function readUserServerConnection(appDataDir: string) {
+export async function readWorkspaceServerConnection(appDataDir: string) {
   const raw = await fs
     .readFile(connectionFile(appDataDir), "utf8")
     .catch((cause: NodeJS.ErrnoException) =>
@@ -41,9 +41,9 @@ export async function readUserServerConnection(appDataDir: string) {
   return parsed;
 }
 
-export async function writeUserServerConnection(ctx: {
+export async function writeWorkspaceServerConnection(ctx: {
   appDataDir: string;
-  connection: UserServerConnection;
+  connection: WorkspaceServerConnection;
 }) {
   const destination = connectionFile(ctx.appDataDir);
   const written = await fs
@@ -57,7 +57,7 @@ export async function writeUserServerConnection(ctx: {
     .catch((cause) => new ConnectionFileError({ operation: "publish", cause }));
 }
 
-export async function removeUserServerConnection(appDataDir: string) {
+export async function removeWorkspaceServerConnection(appDataDir: string) {
   return await fs
     .rm(connectionFile(appDataDir), { force: true })
     .catch((cause) => new ConnectionFileError({ operation: "remove", cause }));

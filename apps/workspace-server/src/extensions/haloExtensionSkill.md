@@ -51,7 +51,7 @@ Set optional presentation fields in `package.json`:
 }
 ```
 
-`displayName` appears in the sidebar, pane header, and permission UI. If omitted, Halo uses the extension ID. The directory ID still identifies commands, routes, storage, and grants. Keep existing `halo.capabilities` when editing these fields.
+`displayName` appears in the sidebar and pane header. If omitted, Halo uses the extension ID. The directory ID still identifies commands, routes, and storage.
 
 `icon` is an exact, case-sensitive Maui icon export name. Search the installed package from the extension directory:
 
@@ -130,16 +130,7 @@ Halo currently supplies one sidebar entry per extension. The extension owns rout
 
 Hosted extension API handlers receive `context.tools`. Calls go through Halo's existing tool runtime and connected accounts. Keep these calls in `api.ts`; the view calls your API. Never copy provider credentials into extension source or frontend code.
 
-Request the tools the extension needs:
-
-```sh
-halo extension tools add notes files.read
-halo extension tools status notes
-```
-
-`tools add` updates `halo.capabilities` in the extension's `package.json` and asks the user to approve access in Halo. It returns `awaiting-approval` until the user approves; it does not wait for their answer or grant itself permission. Previously approved tools remain available. Unavailable tool paths are reported as `missing` rather than silently approved.
-
-The user can decline the request or revoke access using the **Permissions** icon in the extension header. Halo stores approvals separately from the manifest and checks them on every call. Removing a capability revokes its approval when Halo next checks the manifest; adding it again requires approval again.
+Workspace extensions are trusted and can call any tool available in Halo. No manifest declaration or approval step is required.
 
 Declare the types of the tools your handler consumes, then call them as you would from the agent's tool runtime:
 
@@ -165,7 +156,7 @@ export default {
 };
 ```
 
-Tool paths and inputs match Halo's live catalog, including connected services. The example's types describe the existing file tool contract; service tool types must match their actual schema. Handle failed calls and show their errors in the view. Granting a tool does not connect an account; if a service is disconnected, have the user connect it in Halo. Do not substitute sample records for live service data.
+Tool paths and inputs match Halo's live catalog, including connected services. The example's types describe the existing file tool contract; service tool types must match their actual schema. Handle failed calls and show their errors in the view. Tool access does not connect an account; if a service is disconnected, have the user connect it in Halo. Do not substitute sample records for live service data.
 
 For testing tool access, open the hosted extension URL with `halo browser`. A standalone `npm start` preview still supports its own API and storage, but tool calls return `halo_not_connected` unless Halo supplied the tool connection.
 
@@ -175,4 +166,4 @@ The released app uses published npm packages. The published SDK 0.1.0 does not s
 
 Before reporting completion, exercise the user's main workflow in the hosted view and verify the actual result. For a calendar, wait for a successful events request and confirm the events render, or confirm that a successful response contains no events. Clicking Next day and seeing the heading change does not verify calendar access. Check failed API responses and visible error states as well as browser errors; `errors: []` does not mean that a caught API failure succeeded.
 
-If permission, account connection, or a platform dependency prevents the main workflow, report the task as blocked or incomplete and name the missing step. Do not describe a broken integration as completed with a caveat. Keep reusable browser checks that assert the main result and fail when the view reports an error.
+If an account connection or a platform dependency prevents the main workflow, report the task as blocked or incomplete and name the missing step. Do not describe a broken integration as completed with a caveat. Keep reusable browser checks that assert the main result and fail when the view reports an error.

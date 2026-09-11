@@ -79,7 +79,7 @@ function ResolveApi({
   }, []);
   const apiQuery = useQuery({
     queryKey: haloApiQueryKey,
-    // Dev starts Electron and the user server independently; discovery may arrive later.
+    // Dev starts Electron and the workspace server independently; discovery may arrive later.
     refetchInterval: (query) =>
       query.state.data?.api === undefined ? 1_000 : false,
     queryFn: async () => {

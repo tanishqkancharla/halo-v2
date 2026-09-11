@@ -3,16 +3,16 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev --filter=@halo/desktop --filter=@get-halo/server --env-mode=loose",
+    "dev": "turbo run dev --filter=@halo/desktop --filter=@get-halo/workspace-server --env-mode=loose",
     "halo": "pnpm --silent --filter @halo/cli cli",
     "tkstack": "pnpm --silent exec tkstack",
     "spec": "pnpm --silent exec tkstack",
     "walkthrough": "pnpm --silent exec tkstack",
-    "infra:deploy": "pnpm --filter @halo/infra run deploy",
     "infra:bootstrap": "bash infra/bootstrap.sh",
-    "infra:dev": "pnpm --filter @halo/infra run dev",
-    "infra:login": "pnpm --filter @halo/infra run login",
-    "infra:plan": "pnpm --filter @halo/infra run plan",
+    "infra:control-plane:preview": "pnpm --filter @halo/infra control-plane:preview",
+    "infra:control-plane:up": "pnpm --filter @halo/infra control-plane:up",
+    "infra:workspace:preview": "pnpm --filter @halo/infra workspace:preview",
+    "infra:workspace:up": "pnpm --filter @halo/infra workspace:up",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "format": "turbo run format",
@@ -21,7 +21,7 @@
     "check": "turbo run typecheck lint format:check test --affected --concurrency=1",
     "check:static": "turbo run typecheck lint format:check --affected --concurrency=1",
     "check-affected": "pnpm run check",
-    "server": "pnpm --filter @get-halo/server start"
+    "server": "pnpm --filter @get-halo/workspace-server start"
   },
   "devDependencies": {
     "@oxlint/plugins": "^1.80.0",

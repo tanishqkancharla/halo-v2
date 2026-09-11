@@ -19,8 +19,8 @@ import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS } from "../shared/channels.js";
-import { readUserServerConnection } from "@get-halo/server/connection";
-import { FilesystemService } from "@get-halo/server/filesystem";
+import { readWorkspaceServerConnection } from "@get-halo/workspace-server/connection";
+import { FilesystemService } from "@get-halo/workspace-server/filesystem";
 import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
 import {
   ApplicationLaunchMode,
@@ -84,7 +84,7 @@ const windows = new Set<BrowserWindow>();
 app.whenReady().then(async () => {
   registerLogBridge();
   registerDesktopApi({
-    getServer: () => readUserServerConnection(applicationConfig.dataDir),
+    getServer: () => readWorkspaceServerConnection(applicationConfig.dataDir),
     ownsWindow: (window) => windows.has(window),
   });
   installMenu();

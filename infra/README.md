@@ -42,7 +42,7 @@ decryption of their Pulumi secrets.
 
 ## Infrastructure programs
 
-The next implementation step is to add two Pulumi programs:
+Two Pulumi programs separate shared resources from the one personal workspace:
 
 - `control-plane/`: shared network, image registry, and deployment permissions.
 - `workspace/`: one workspace VM, persistent disk, and runtime service account.
@@ -55,6 +55,47 @@ pulumi stack init dev \
 pulumi config set gcp:project halo-relay
 pulumi config set gcp:region us-central1
 ```
+
+The workspace stack also needs `gcp:zone`, the control-plane stack reference,
+and an immutable workspace-server image reference:
+
+```sh
+pulumi config set gcp:zone us-central1-a
+pulumi config set controlPlaneStack organization/halo-control-plane/dev
+pulumi config set image us-central1-docker.pkg.dev/halo-relay/halo-dev-workspaces/workspace-server@sha256:<digest>
+```
+
+Preview and deploy from the repository root:
+
+```sh
+pnpm infra:control-plane:preview
+pnpm infra:control-plane:up
+pnpm infra:workspace:preview
+pnpm infra:workspace:up
+```
+
+The control-plane stack creates the private VPC, Cloud NAT egress, Artifact
+Registry repository, Cloud Build source bucket, and builder identity. Build the
+workspace image with the outputs from that stack:
+
+```sh
+image="$(pulumi -C infra/control-plane stack output imageRepository):$(git rev-parse --short HEAD)"
+bucket="$(pulumi -C infra/control-plane stack output buildSourceBucket)"
+builder="$(pulumi -C infra/control-plane stack output buildServiceAccount)"
+gcloud builds submit . \
+  --project=halo-relay \
+  --region=us-central1 \
+  --config=infra/cloudbuild.yaml \
+  --ignore-file=infra/buildignore \
+  --gcs-source-staging-dir="gs://$bucket/source" \
+  --service-account="$builder" \
+  --substitutions="_IMAGE=$image"
+```
+
+Set the workspace stack's `image` to the digest printed by Cloud Build before
+deploying it. The workspace stack creates one always-running `e2-standard-2` VM
+and a protected 50 GB persistent disk. The server listens on the VM, while its
+HTTP port remains private until the control-plane session transport is added.
 
 The Google credentials used by Pulumi are Application Default Credentials.
 They are separate from the Google sign-in session that Halo users will use.

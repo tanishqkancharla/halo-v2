@@ -1,7 +1,7 @@
-# User server
+# Workspace server
 
-`apps/user-server` runs Halo's workspace, agent, integrations, and extensions in
-an independent Node process. Its workspace package name is `@get-halo/server`.
+`apps/workspace-server` runs Halo's workspace, agent, integrations, and extensions in
+an independent Node process. Its workspace package name is `@get-halo/workspace-server`.
 Electron is an HTTP client: it neither starts nor stops this process.
 
 ## Development
@@ -13,7 +13,7 @@ HALO_WORKSPACE_ROOT=/absolute/path/to/workspace pnpm dev
 ```
 
 Run this from the repository root. The workspace directory must already exist.
-Turbo starts the user server and Electron as separate development services.
+Turbo starts the workspace server and Electron as separate development services.
 The server reads the repository's `.env`; `HALO_WORKSPACE_ROOT` can be set there.
 Both services use `<repo>/.halo` for local application data. Set `HALO_USER_DATA`
 to use a different shared directory.
@@ -37,13 +37,14 @@ pnpm server /absolute/path/to/config.json
   "appDataDir": "/absolute/path/to/user-data",
   "appVersion": "0.0.0",
   "ownerUserId": "local-user",
+  "port": 8788,
   "logFilePath": "/absolute/path/to/user-data/logs/server.jsonl",
   "corsOrigins": ["http://localhost:1420", "null"]
 }
 ```
 
 Electron must use the same `appDataDir` through `HALO_USER_DATA`. Packaged
-Electron also accepts its `--user-data-dir` argument. The server binds to loopback on an available port
+Electron also accepts its `--user-data-dir` argument. The server binds to loopback on the configured port
 and publishes `server.json` for Electron and `rpc.json` for the CLI. These files
 contain distinct local bearer credentials and are written with mode `0600`.
 Graceful server shutdown removes both files. Desktop reload reads the latest
@@ -66,7 +67,7 @@ migrated.
 
 ```text
 pnpm dev
-├── user-server: tsx watch src/main.ts
+├── workspace-server: tsx watch src/main.ts
 │   ├── read launch configuration
 │   ├── HaloServer.start()
 │   └── publish local connection files

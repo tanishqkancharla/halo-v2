@@ -18,7 +18,7 @@ import type {
   WorkspaceTreeEvent,
 } from "./rpc.js";
 
-export const haloProtocolVersion = 7 as const;
+export const haloProtocolVersion = 8 as const;
 
 export const RequestRejectedError = error("BAD_REQUEST", {
   message: "Halo could not complete the request.",
@@ -44,20 +44,6 @@ export type ExtensionSummary = {
   displayName: string;
   icon?: string;
 };
-export type ExtensionPermissionRequest = {
-  id: string;
-  displayName: string;
-  paths: string[];
-};
-export type ExtensionPermissionReport = {
-  displayName: string;
-  requested: string[];
-  existing: string[];
-  granted: string[];
-  pending: string[];
-  missing: string[];
-};
-
 const browserSnapshot = type<{
   url: string;
   title: string;
@@ -104,26 +90,6 @@ export const contract = publicProcedure.router({
   extensions: {
     list: oc.output(type<ExtensionSummary[]>()),
     reload: oc.output(type<void>()),
-    tools: {
-      add: oc
-        .input(type<{ id: string; paths: string[] }>())
-        .output(type<ExtensionPermissionReport>()),
-      check: oc
-        .input(type<{ id: string }>())
-        .output(type<ExtensionPermissionReport>()),
-      requests: oc.output(
-        asyncIteratorObject(type<ExtensionPermissionRequest[]>()),
-      ),
-      decide: oc
-        .input(
-          type<{
-            id: string;
-            paths: string[];
-            action: "allow" | "deny" | "revoke";
-          }>(),
-        )
-        .output(type<ExtensionPermissionReport>()),
-    },
   },
   workspace: {
     get: oc.output(type<WorkspaceInfo>()),

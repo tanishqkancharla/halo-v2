@@ -4,21 +4,28 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "NODE_OPTIONS=--experimental-strip-types alchemy deploy",
-    "destroy": "NODE_OPTIONS=--experimental-strip-types alchemy destroy",
-    "dev": "NODE_OPTIONS=--experimental-strip-types alchemy dev",
+    "cloudflare:deploy": "NODE_OPTIONS=--experimental-strip-types alchemy deploy",
+    "cloudflare:destroy": "NODE_OPTIONS=--experimental-strip-types alchemy destroy",
+    "cloudflare:dev": "NODE_OPTIONS=--experimental-strip-types alchemy dev",
+    "cloudflare:login": "NODE_OPTIONS=--experimental-strip-types alchemy login",
+    "cloudflare:plan": "NODE_OPTIONS=--experimental-strip-types alchemy plan",
+    "control-plane:preview": "pulumi -C control-plane preview",
+    "control-plane:up": "pulumi -C control-plane up",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings .",
     "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix .",
-    "login": "NODE_OPTIONS=--experimental-strip-types alchemy login",
-    "plan": "NODE_OPTIONS=--experimental-strip-types alchemy plan",
+    "workspace:preview": "pulumi -C workspace preview",
+    "workspace:up": "pulumi -C workspace up",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-beta.103",
+    "@pulumi/gcp": "^9.36.1",
+    "@pulumi/pulumi": "^3.262.0",
     "alchemy": "2.0.0-beta.70",
-    "effect": "4.0.0-beta.103"
+    "effect": "4.0.0-beta.103",
+    "tsx": "^4.23.13"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

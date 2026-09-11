@@ -1,8 +1,8 @@
 import * as errore from "errore";
 import { test as baseTest, vi } from "vitest";
 import { createTestArtifacts } from "./TestArtifacts.js";
-import { createOpenAILLMApi } from "@get-halo/server/llm";
-import { HttpService, LLMDriver } from "@get-halo/server/testing";
+import { createOpenAILLMApi } from "@get-halo/workspace-server/llm";
+import { HttpService, LLMDriver } from "@get-halo/workspace-server/testing";
 import { TestServer } from "./TestServer.js";
 
 // Server setup and teardown can exceed Vitest's five-second default in CI.

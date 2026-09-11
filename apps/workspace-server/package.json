@@ -1,5 +1,5 @@
 {
-  "name": "@get-halo/server",
+  "name": "@get-halo/workspace-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "./router": "./src/router.ts",
     "./sessions": "./src/sessions.ts",
     "./workspace": "./src/workspace.ts",
-    "./process": "./src/UserServerConfig.ts",
+    "./process": "./src/WorkspaceServerConfig.ts",
     "./connection": "./src/ConnectionFile.ts"
   },
   "scripts": {

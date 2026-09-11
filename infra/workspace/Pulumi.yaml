@@ -1,0 +1,10 @@
+name: halo-workspace
+description: One persistent Halo workspace VM
+runtime:
+  name: nodejs
+  options:
+    typescript: false
+    nodeargs: --import tsx
+main: index.ts
+backend:
+  url: gs://halo-relay-pulumi-state

@@ -6,7 +6,6 @@ import { Cli, z } from "incur";
 import * as errore from "errore";
 import { connectHalo, type HaloRpcEnv } from "./connectHalo.js";
 import { packDevelopmentExtensions } from "./extensionDevelopment.js";
-import type { ExtensionPermissionReport } from "@get-halo/shared/contract";
 
 class ExtensionCommandError extends errore.createTaggedError({
   name: "ExtensionCommandError",
@@ -19,63 +18,9 @@ const env = z.object({
   HALO_EXTENSION_SOURCE: z.string().optional(),
 });
 
-const tools = Cli.create("tools", {
-  description: "Request and inspect extension tool access",
-})
-  .command("add", {
-    description: "Add tools to package.json and request approval in Halo",
-    args: z.object({ id: z.string(), paths: z.array(z.string()).min(1) }),
-    env,
-    async run(c) {
-      const connected = await connectHalo(c.env);
-      if (connected instanceof Error)
-        return c.error({ code: "NOT_RUNNING", message: connected.message });
-      const report = await connected.client.extensions.tools
-        .add(c.args)
-        .catch(
-          (cause) =>
-            new ExtensionCommandError({ detail: "request tools", cause }),
-        );
-      if (report instanceof Error)
-        return c.error({ code: "EXTENSION", message: report.message });
-      return c.ok({ ...report, status: permissionStatus(report) });
-    },
-  })
-  .command("status", {
-    description: "Show requested, granted, pending, and unavailable tools",
-    args: z.object({ id: z.string() }),
-    env,
-    async run(c) {
-      const connected = await connectHalo(c.env);
-      if (connected instanceof Error)
-        return c.error({ code: "NOT_RUNNING", message: connected.message });
-      const report = await connected.client.extensions.tools
-        .check(c.args)
-        .catch(
-          (cause) =>
-            new ExtensionCommandError({
-              detail: "read tool permissions",
-              cause,
-            }),
-        );
-      if (report instanceof Error)
-        return c.error({ code: "EXTENSION", message: report.message });
-      return c.ok({ ...report, status: permissionStatus(report) });
-    },
-  });
-
-function permissionStatus(report: ExtensionPermissionReport) {
-  if (report.pending.length > 0) return "awaiting-approval";
-  if (report.missing.length > 0) return "unavailable";
-  if (report.requested.some((path) => !report.granted.includes(path)))
-    return "not-granted";
-  return "granted";
-}
-
 export const extension = Cli.create("extension", {
   description: "Create and load standalone workspace extensions",
 })
-  .command(tools)
   .command("new", {
     description: "Scaffold an extension and install its dependencies",
     args: z.object({ id: z.string().regex(/^[a-z][a-z0-9-]*$/) }),

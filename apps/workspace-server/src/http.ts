@@ -141,8 +141,7 @@ export function serveHaloHttp(options: {
       const handled = await extensionHandler.handle(request, response, {
         prefix: "/extension-tools",
         context: {
-          extensionId,
-          extensionTools: options.context.extensionTools,
+          toolRuntime: options.context.toolRuntime,
         },
       });
       if (!handled.matched) response.writeHead(404).end();
@@ -162,8 +161,6 @@ export function serveHaloHttp(options: {
         ...options.context,
         browserControlAllowed:
           request.headers.authorization === `Bearer ${cliToken}`,
-        extensionApprovalAllowed:
-          request.headers.authorization === `Bearer ${rendererToken}`,
       },
     });
     if (handled.matched) return;

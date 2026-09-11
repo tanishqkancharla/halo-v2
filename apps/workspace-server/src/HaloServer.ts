@@ -10,7 +10,6 @@ import * as errore from "errore";
 import { FilesystemService } from "./filesystem/FilesystemService.js";
 import { closeHaloHttp, listenHaloHttp, serveHaloHttp } from "./http.js";
 import { ExtensionHost } from "./extensions/ExtensionHost.js";
-import { ExtensionTools } from "./extensions/ExtensionTools.js";
 import type { ExtensionRuntime } from "./extensions/ExtensionProcess.js";
 import type { HaloContext } from "./router.js";
 import { SessionRegistry } from "./sessions/SessionRegistry.js";
@@ -173,18 +172,9 @@ export class HaloServer {
           : options.extensionRuntime,
     });
     cleanup.defer(() => extensions.stop());
-    const extensionTools = await ExtensionTools.open({
-      database,
-      filesystem,
-      workspaceRoot,
-      toolRuntime,
-    });
-    if (extensionTools instanceof Error) return extensionTools;
     const context: HaloContext = {
       browsers: new BrowserService(options.appBrowserTarget),
       browserControlAllowed: false,
-      extensionApprovalAllowed: false,
-      extensionTools,
       extensions,
       workspace,
       sessions: new SessionRegistry({

@@ -15,7 +15,6 @@ const manifestSchema = Type.Object({
     Type.Object({
       displayName: Type.Optional(Type.String({ minLength: 1 })),
       icon: Type.Optional(Type.String({ minLength: 1 })),
-      capabilities: Type.Optional(Type.Array(Type.String())),
     }),
   ),
 });

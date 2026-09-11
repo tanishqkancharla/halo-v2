@@ -8,15 +8,15 @@ import { HaloServer } from "./HaloServer.js";
 import { FilesystemService } from "./filesystem/FilesystemService.js";
 import { UserService } from "./UserService.js";
 import {
-  writeUserServerConnection,
-  removeUserServerConnection,
+  writeWorkspaceServerConnection,
+  removeWorkspaceServerConnection,
 } from "./ConnectionFile.js";
 import { writeHaloRpcFile, removeHaloRpcFile } from "./rpcFile.js";
 import {
-  userServerConfigSchema,
-  type UserServerConfig,
-  type UserServerReady,
-} from "./UserServerConfig.js";
+  workspaceServerConfigSchema,
+  type WorkspaceServerConfig,
+  type WorkspaceServerReady,
+} from "./WorkspaceServerConfig.js";
 import { FileCredentialVault } from "./agent/runtime/FileCredentialVault.js";
 import { createPiLLMApi } from "./llm/PiLLMApi.js";
 import {
@@ -24,34 +24,37 @@ import {
   type OpenAILLMApiOptions,
 } from "./llm/OpenAILLMApi.js";
 
-class UserServerStartupError extends errore.createTaggedError({
-  name: "UserServerStartupError",
-  message: "User server startup failed: $detail",
+class WorkspaceServerStartupError extends errore.createTaggedError({
+  name: "WorkspaceServerStartupError",
+  message: "Workspace server startup failed: $detail",
 }) {}
 
-async function readConfiguration(): Promise<UserServerConfig | Error> {
+async function readConfiguration(): Promise<WorkspaceServerConfig | Error> {
   const configPath = process.argv[2];
   if (configPath === undefined) return await developmentConfiguration();
-  const raw = await fs
-    .readFile(configPath, "utf8")
-    .catch(
-      (cause) =>
-        new UserServerStartupError({ detail: "read configuration", cause }),
-    );
+  const raw = await fs.readFile(configPath, "utf8").catch(
+    (cause) =>
+      new WorkspaceServerStartupError({
+        detail: "read configuration",
+        cause,
+      }),
+  );
   if (raw instanceof Error) return raw;
   const config = errore.try({
-    // SAFETY: JSON.parse is untyped; userServerConfigSchema validates the result below.
+    // SAFETY: JSON.parse is untyped; workspaceServerConfigSchema validates the result below.
     try: () => JSON.parse(raw) as unknown,
     catch: (cause) =>
-      new UserServerStartupError({ detail: "parse configuration", cause }),
+      new WorkspaceServerStartupError({ detail: "parse configuration", cause }),
   });
   if (config instanceof Error) return config;
-  if (!Value.Check(userServerConfigSchema, config))
-    return new UserServerStartupError({ detail: "invalid configuration" });
+  if (!Value.Check(workspaceServerConfigSchema, config))
+    return new WorkspaceServerStartupError({ detail: "invalid configuration" });
   return config;
 }
 
-async function developmentConfiguration(): Promise<UserServerConfig | Error> {
+async function developmentConfiguration(): Promise<
+  WorkspaceServerConfig | Error
+> {
   const repositoryRoot = resolve(import.meta.dirname, "../../..");
   const filesystem = new FilesystemService();
   await using cleanup = new errore.AsyncDisposableStack();
@@ -66,7 +69,7 @@ async function developmentConfiguration(): Promise<UserServerConfig | Error> {
   }
   const workspaceRoot = process.env.HALO_WORKSPACE_ROOT;
   if (workspaceRoot === undefined)
-    return new UserServerStartupError({
+    return new WorkspaceServerStartupError({
       detail: "set HALO_WORKSPACE_ROOT or pass a configuration JSON file",
     });
   const appDataDir =
@@ -87,6 +90,7 @@ async function developmentConfiguration(): Promise<UserServerConfig | Error> {
     ownerUserId: user.id,
     logFilePath: join(appDataDir, "logs", "server.jsonl"),
     corsOrigins: [rendererOrigin, "null"],
+    port: 0,
     cliEntry: join(repositoryRoot, "packages", "halo-cli", "src", "cli.ts"),
     cliNodeExecutable: process.execPath,
     extensionRuntime: {
@@ -107,7 +111,10 @@ async function createLLMApi(workspaceRoot: string) {
       // SAFETY: The host supplies serialized OpenAILLMApiOptions as launch configuration.
       try: () => JSON.parse(configuration) as OpenAILLMApiOptions,
       catch: (cause) =>
-        new UserServerStartupError({ detail: "parse HALO_LLM_CONFIG", cause }),
+        new WorkspaceServerStartupError({
+          detail: "parse HALO_LLM_CONFIG",
+          cause,
+        }),
     });
     if (options instanceof Error) return options;
     return createOpenAILLMApi(options);
@@ -135,7 +142,10 @@ async function run() {
     .mkdir(dirname(config.logFilePath), { recursive: true })
     .catch(
       (cause) =>
-        new UserServerStartupError({ detail: "create log directory", cause }),
+        new WorkspaceServerStartupError({
+          detail: "create log directory",
+          cause,
+        }),
     );
   if (created instanceof Error) return created;
   const llmApi = await createLLMApi(config.workspaceRoot);
@@ -151,7 +161,7 @@ async function run() {
     ownerUserId: Promise.resolve(config.ownerUserId),
     logger: logger.scope("rpc"),
     host: "127.0.0.1",
-    port: 0,
+    port: config.port,
     createCredentialVault: ({ filesystem, workspaceRoot }) =>
       new FileCredentialVault({
         filesystem,
@@ -173,7 +183,7 @@ async function run() {
     if (removed instanceof Error) console.error(removed);
   });
   const renderer = server.connections.renderer;
-  const published = await writeUserServerConnection({
+  const published = await writeWorkspaceServerConnection({
     appDataDir: config.appDataDir,
     connection: {
       workspaceRoot: server.getWorkspace().workspaceRoot,
@@ -183,14 +193,14 @@ async function run() {
   });
   if (published instanceof Error) return published;
   cleanup.defer(async () => {
-    const removed = await removeUserServerConnection(config.appDataDir);
+    const removed = await removeWorkspaceServerConnection(config.appDataDir);
     if (removed instanceof Error) console.error(removed);
   });
-  const ready: UserServerReady = {
+  const ready: WorkspaceServerReady = {
     workspace: server.getWorkspace(),
     connections: server.connections,
   };
-  console.log(`User server ready for ${ready.workspace.workspaceRoot}`);
+  console.log(`Workspace server ready for ${ready.workspace.workspaceRoot}`);
   if (process.connected) process.send?.(ready);
 
   await stopping;

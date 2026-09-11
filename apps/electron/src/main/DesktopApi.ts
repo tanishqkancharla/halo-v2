@@ -8,7 +8,7 @@ import {
 } from "electron";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
-import type { UserServerConnection } from "@get-halo/server/connection";
+import type { WorkspaceServerConnection } from "@get-halo/workspace-server/connection";
 import {
   DESKTOP_CHANNEL,
   desktopRequestSchema,
@@ -28,7 +28,7 @@ class DesktopOperationError extends errore.createTaggedError({
 }) {}
 
 export function registerDesktopApi(args: {
-  getServer: () => Promise<UserServerConnection | Error | undefined>;
+  getServer: () => Promise<WorkspaceServerConnection | Error | undefined>;
   ownsWindow: (window: BrowserWindow) => boolean;
 }): void {
   ipcMain.handle(DESKTOP_CHANNEL, async (event, request: DesktopRequest) => {
@@ -53,7 +53,7 @@ function validateDesktopRequest(
 
 async function handleDesktopRequest(args: {
   request: DesktopRequest;
-  getServer: () => Promise<UserServerConnection | Error | undefined>;
+  getServer: () => Promise<WorkspaceServerConnection | Error | undefined>;
 }) {
   switch (args.request.type) {
     case "openWorkspaceFile": {
