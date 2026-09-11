@@ -33,7 +33,7 @@ const authServiceTest = test.extend<{
   auth: async ({ appDataDir }, use) => {
     await using cleanup = new errore.AsyncDisposableStack();
     const auth = await AuthService.start({
-      appDataDir,
+      database: { type: "sqlite", path: join(appDataDir, "auth.db") },
       origin: testOrigin,
       secret: testAuth.secret,
       googleClientId: testAuth.googleClientId,

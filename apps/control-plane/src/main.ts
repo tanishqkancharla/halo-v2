@@ -18,7 +18,11 @@ class ControlPlaneStartupError extends errore.createTaggedError({
 
 async function readConfiguration(): Promise<ControlPlaneConfig | Error> {
   const configPath = process.argv[2];
-  if (configPath === undefined) return developmentConfiguration();
+  if (configPath === undefined) {
+    return process.env.K_SERVICE === undefined
+      ? developmentConfiguration()
+      : cloudRunConfiguration();
+  }
   const raw = await fsPromises
     .readFile(configPath, "utf8")
     .catch(
@@ -65,6 +69,7 @@ function developmentConfiguration(): ControlPlaneConfig | Error {
       ? join(repositoryRoot, ".halo")
       : resolve(process.env.HALO_USER_DATA);
   const config = {
+    deployment: "local" as const,
     appDataDir,
     port: developmentPort,
     auth: {
@@ -76,6 +81,42 @@ function developmentConfiguration(): ControlPlaneConfig | Error {
   if (!Value.Check(controlPlaneConfigSchema, config))
     return new ControlPlaneStartupError({
       detail: "invalid development configuration",
+    });
+  return config;
+}
+
+function cloudRunConfiguration(): ControlPlaneConfig | Error {
+  const portValue = process.env.PORT;
+  if (portValue === undefined)
+    return new ControlPlaneStartupError({ detail: "set PORT" });
+  const port = Number(portValue);
+  const origin = process.env.BETTER_AUTH_URL;
+  if (origin === undefined)
+    return new ControlPlaneStartupError({ detail: "set BETTER_AUTH_URL" });
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl === undefined)
+    return new ControlPlaneStartupError({ detail: "set DATABASE_URL" });
+  const secret = process.env.BETTER_AUTH_SECRET;
+  if (secret === undefined)
+    return new ControlPlaneStartupError({ detail: "set BETTER_AUTH_SECRET" });
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  if (googleClientId === undefined)
+    return new ControlPlaneStartupError({ detail: "set GOOGLE_CLIENT_ID" });
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (googleClientSecret === undefined)
+    return new ControlPlaneStartupError({
+      detail: "set GOOGLE_CLIENT_SECRET",
+    });
+  const config = {
+    deployment: "cloudRun" as const,
+    port,
+    origin,
+    databaseUrl,
+    auth: { secret, googleClientId, googleClientSecret },
+  };
+  if (!Value.Check(controlPlaneConfigSchema, config))
+    return new ControlPlaneStartupError({
+      detail: "invalid Cloud Run configuration",
     });
   return config;
 }

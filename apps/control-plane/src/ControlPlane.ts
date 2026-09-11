@@ -5,6 +5,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
+import { join } from "node:path";
 import * as errore from "errore";
 import { AuthService } from "./AuthService.js";
 import type { ControlPlaneConfig } from "./ControlPlaneConfig.js";
@@ -14,6 +15,7 @@ import {
 } from "./ControlPlaneFile.js";
 
 const loopbackHost = "127.0.0.1";
+const cloudRunHost = "0.0.0.0";
 
 class ControlPlaneHttpError extends errore.createTaggedError({
   name: "ControlPlaneHttpError",
@@ -26,35 +28,62 @@ type ListeningControlPlaneHttp = {
 };
 
 export class ControlPlane {
-  private constructor(
-    private readonly resources: {
-      appDataDir: string;
-      auth: AuthService;
-      origin: string;
-      server: HttpServer;
-    },
-  ) {}
+  private readonly appDataDir: string | undefined;
+  private readonly auth: AuthService;
+  private readonly publicOrigin: string;
+  private readonly server: HttpServer;
+
+  private constructor(ctx: {
+    appDataDir: string | undefined;
+    auth: AuthService;
+    publicOrigin: string;
+    server: HttpServer;
+  }) {
+    this.appDataDir = ctx.appDataDir;
+    this.auth = ctx.auth;
+    this.publicOrigin = ctx.publicOrigin;
+    this.server = ctx.server;
+  }
 
   get origin() {
-    return this.resources.origin;
+    return this.publicOrigin;
   }
 
   static async start(options: ControlPlaneConfig) {
     await using cleanup = new errore.AsyncDisposableStack();
-    const listening = await listenControlPlaneHttp(options.port);
+    const host = options.deployment === "local" ? loopbackHost : cloudRunHost;
+    const listening = await listenControlPlaneHttp(host, options.port);
     if (listening instanceof Error) return listening;
     cleanup.defer(async () => {
       const closed = await closeControlPlaneHttp(listening.server);
       if (closed instanceof Error) console.error(closed);
     });
-    const published = await writeControlPlaneFile({
-      appDataDir: options.appDataDir,
-      origin: listening.origin,
-    });
-    if (published instanceof Error) return published;
+    const origin =
+      options.deployment === "local" ? listening.origin : options.origin;
+    if (options.deployment === "local") {
+      const published = await writeControlPlaneFile({
+        appDataDir: options.appDataDir,
+        origin,
+      });
+      if (published instanceof Error) return published;
+      cleanup.defer(async () => {
+        const removed = await removeControlPlaneFile(options.appDataDir);
+        if (removed instanceof Error) console.error(removed);
+      });
+    }
+    const database =
+      options.deployment === "local"
+        ? {
+            type: "sqlite" as const,
+            path: join(options.appDataDir, "auth.db"),
+          }
+        : {
+            type: "postgres" as const,
+            connectionString: options.databaseUrl,
+          };
     const auth = await AuthService.start({
-      appDataDir: options.appDataDir,
-      origin: listening.origin,
+      database,
+      origin,
       secret: options.auth.secret,
       googleClientId: options.auth.googleClientId,
       googleClientSecret: options.auth.googleClientSecret,
@@ -67,17 +96,21 @@ export class ControlPlane {
     serveControlPlaneHttp(listening.server, auth);
     cleanup.move();
     return new ControlPlane({
-      appDataDir: options.appDataDir,
+      appDataDir:
+        options.deployment === "local" ? options.appDataDir : undefined,
       auth,
-      origin: listening.origin,
+      publicOrigin: origin,
       server: listening.server,
     });
   }
 
   async close() {
-    const httpClosed = await closeControlPlaneHttp(this.resources.server);
-    const authClosed = await this.resources.auth.close();
-    const removed = await removeControlPlaneFile(this.resources.appDataDir);
+    const httpClosed = await closeControlPlaneHttp(this.server);
+    const authClosed = await this.auth.close();
+    const removed =
+      this.appDataDir === undefined
+        ? undefined
+        : await removeControlPlaneFile(this.appDataDir);
     if (httpClosed instanceof Error) return httpClosed;
     if (authClosed instanceof Error) return authClosed;
     if (removed instanceof Error) return removed;
@@ -119,7 +152,7 @@ async function handleRequest(
   response.writeHead(404).end();
 }
 
-function listenControlPlaneHttp(port: number) {
+function listenControlPlaneHttp(host: string, port: number) {
   const server = createServer(startingResponse);
   return new Promise<ListeningControlPlaneHttp | ControlPlaneHttpError>(
     (resolve) => {
@@ -128,11 +161,11 @@ function listenControlPlaneHttp(port: number) {
           new ControlPlaneHttpError({ detail: "listen failed", cause: error }),
         );
       });
-      server.listen(port, loopbackHost, () => {
+      server.listen(port, host, () => {
         // SAFETY: Node returns a TCP address after successfully listening with a numeric port.
         const address = server.address() as AddressInfo;
         resolve({
-          origin: `http://${loopbackHost}:${address.port}`,
+          origin: `http://${host}:${address.port}`,
           server,
         });
       });

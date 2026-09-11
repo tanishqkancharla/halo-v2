@@ -26,6 +26,7 @@ controlPlaneTest(
   async ({ appDataDir }) => {
     await using cleanup = new errore.AsyncDisposableStack();
     const plane = await ControlPlane.start({
+      deployment: "local",
       appDataDir,
       port: 0,
       auth: testAuth,
@@ -64,6 +65,7 @@ controlPlaneTest(
 controlPlaneTest("serves Better Auth at /api/auth", async ({ appDataDir }) => {
   await using cleanup = new errore.AsyncDisposableStack();
   const plane = await ControlPlane.start({
+    deployment: "local",
     appDataDir,
     port: 0,
     auth: testAuth,

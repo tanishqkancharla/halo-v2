@@ -7,6 +7,8 @@
 !packages/
 !packages/**
 !apps/
+!apps/control-plane/
+!apps/control-plane/**
 !apps/workspace-server/
 !apps/workspace-server/**
 !infra/

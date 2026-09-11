@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { join } from "node:path";
+import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { betterAuth } from "better-auth";
+import { betterAuth, type Auth, type BetterAuthOptions } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
 import { toNodeHandler } from "better-auth/node";
 import * as errore from "errore";
+import { Pool } from "pg";
 
 class AuthServiceError extends errore.createTaggedError({
   name: "AuthServiceError",
@@ -13,7 +14,9 @@ class AuthServiceError extends errore.createTaggedError({
 }) {}
 
 type AuthServiceOptions = {
-  appDataDir: string;
+  database:
+    | { type: "sqlite"; path: string }
+    | { type: "postgres"; connectionString: string };
   origin: string;
   secret: string;
   googleClientId: string;
@@ -36,7 +39,16 @@ type AuthSession = {
   user: AuthUser;
 };
 
-function authOptions(options: AuthServiceOptions, database: DatabaseSync) {
+type AuthDatabase = DatabaseSync | Pool;
+type NodeHandler = (
+  request: IncomingMessage,
+  response: ServerResponse,
+) => Promise<void>;
+
+function authOptions(
+  options: AuthServiceOptions,
+  database: AuthDatabase,
+): BetterAuthOptions {
   return {
     baseURL: options.origin,
     secret: options.secret,
@@ -51,36 +63,29 @@ function authOptions(options: AuthServiceOptions, database: DatabaseSync) {
   };
 }
 
-function createAuth(config: ReturnType<typeof authOptions>) {
-  return betterAuth(config);
-}
-
 export class AuthService {
-  private constructor(
-    private readonly resources: {
-      auth: ReturnType<typeof createAuth>;
-      database: DatabaseSync;
-      nodeHandler: ReturnType<typeof toNodeHandler>;
-    },
-  ) {}
+  private readonly auth: Auth;
+  private readonly database: AuthDatabase;
+  private readonly nodeHandler: NodeHandler;
+
+  private constructor(ctx: {
+    auth: Auth;
+    database: AuthDatabase;
+    nodeHandler: NodeHandler;
+  }) {
+    this.auth = ctx.auth;
+    this.database = ctx.database;
+    this.nodeHandler = ctx.nodeHandler;
+  }
 
   static async start(options: AuthServiceOptions) {
     await using cleanup = new errore.AsyncDisposableStack();
-    const created = await fs
-      .mkdir(options.appDataDir, { recursive: true, mode: 0o700 })
-      .catch(
-        (cause) =>
-          new AuthServiceError({ detail: "create data directory", cause }),
-      );
-    if (created instanceof Error) return created;
-
-    const database = errore.try({
-      try: () => new DatabaseSync(join(options.appDataDir, "auth.db")),
-      catch: (cause) =>
-        new AuthServiceError({ detail: "open database", cause }),
-    });
+    const database = await openDatabase(options.database);
     if (database instanceof Error) return database;
-    cleanup.defer(() => database.close());
+    cleanup.defer(async () => {
+      const closed = await closeDatabase(database);
+      if (closed instanceof Error) console.error(closed);
+    });
 
     const config = authOptions(options, database);
     const migrations = await getMigrations(config).catch(
@@ -94,7 +99,7 @@ export class AuthService {
       );
     if (migrated instanceof Error) return migrated;
 
-    const auth = createAuth(config);
+    const auth = betterAuth(config);
 
     cleanup.move();
     return new AuthService({
@@ -105,7 +110,7 @@ export class AuthService {
   }
 
   handle(request: Request) {
-    return this.resources.auth
+    return this.auth
       .handler(request)
       .catch(
         (cause) => new AuthServiceError({ detail: "handle request", cause }),
@@ -113,15 +118,13 @@ export class AuthService {
   }
 
   handleHttp(request: IncomingMessage, response: ServerResponse) {
-    return this.resources
-      .nodeHandler(request, response)
-      .catch(
-        (cause) => new AuthServiceError({ detail: "handle request", cause }),
-      );
+    return this.nodeHandler(request, response).catch(
+      (cause) => new AuthServiceError({ detail: "handle request", cause }),
+    );
   }
 
   async getSession(headers: Headers) {
-    const result = await this.resources.auth.api
+    const result = await this.auth.api
       .getSession({ headers })
       .catch((cause) => new AuthServiceError({ detail: "get session", cause }));
     if (result instanceof Error) return result;
@@ -142,10 +145,48 @@ export class AuthService {
   }
 
   close() {
+    return closeDatabase(this.database);
+  }
+}
+
+async function openDatabase(config: AuthServiceOptions["database"]) {
+  if (config.type === "postgres") {
     return errore.try({
-      try: () => this.resources.database.close(),
+      try: () =>
+        new Pool({ connectionString: config.connectionString, max: 5 }),
       catch: (cause) =>
-        new AuthServiceError({ detail: "close database", cause }),
+        new AuthServiceError({ detail: "open PostgreSQL pool", cause }),
     });
   }
+
+  const created = await fs
+    .mkdir(dirname(config.path), { recursive: true, mode: 0o700 })
+    .catch(
+      (cause) =>
+        new AuthServiceError({ detail: "create data directory", cause }),
+    );
+  if (created instanceof Error) return created;
+  return errore.try({
+    try: () => new DatabaseSync(config.path),
+    catch: (cause) => new AuthServiceError({ detail: "open database", cause }),
+  });
+}
+
+function closeDatabase(database: AuthDatabase) {
+  if (database instanceof DatabaseSync) {
+    return Promise.resolve(
+      errore.try({
+        try: () => database.close(),
+        catch: (cause) =>
+          new AuthServiceError({ detail: "close database", cause }),
+      }),
+    );
+  }
+  return database
+    .end()
+    .then(() => undefined)
+    .catch(
+      (cause) =>
+        new AuthServiceError({ detail: "close PostgreSQL pool", cause }),
+    );
 }
