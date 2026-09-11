@@ -126,21 +126,21 @@ Patterns, demo apps, and the gallery `Panel` preview surface are not part of the
 
 ### Patterns — `src/patterns/`
 
-| Path                                | Role                                               |
-| ----------------------------------- | -------------------------------------------------- |
+| Path | Role |
+| --- | --- |
 | `src/patterns/AssistantMessage.tsx` | Streaming markdown reply (Streamdown + Maui prose) |
-| `src/patterns/Sidebar.tsx`          | App sidebar chrome                                 |
-| `src/patterns/Inbox.tsx`            | Mail inbox layout                                  |
-| `src/patterns/MessageList.tsx`      | Message list rows                                  |
+| `src/patterns/Sidebar.tsx` | App sidebar chrome |
+| `src/patterns/Inbox.tsx` | Mail inbox layout |
+| `src/patterns/MessageList.tsx` | Message list rows |
 
 ### Apps — `src/apps/`
 
-| Path                    | Role                                                       |
-| ----------------------- | ---------------------------------------------------------- |
-| `src/apps/AiChat/`      | Mock streaming AI chat (Editor + AssistantMessage)         |
-| `src/apps/EmailClient/` | Email client demo composing inbox patterns                 |
-| `src/apps/Calendar/`    | Three-pane schedule (mini month, week grid, event details) |
-| `src/apps/JsxEditor/`   | Live JSX playground (CodeMirror + Maui catalog)            |
+| Path | Role |
+| --- | --- |
+| `src/apps/AiChat/` | Mock streaming AI chat (Editor + AssistantMessage) |
+| `src/apps/EmailClient/` | Email client demo composing inbox patterns |
+| `src/apps/Calendar/` | Three-pane schedule (mini month, week grid, event details) |
+| `src/apps/JsxEditor/` | Live JSX playground (CodeMirror + Maui catalog) |
 
 ## License
 
