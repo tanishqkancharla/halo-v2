@@ -7,17 +7,21 @@
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src",
-    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src test",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src test",
     "format": "oxfmt .",
-    "format:check": "oxfmt --check ."
+    "format:check": "oxfmt --check .",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.52",
+    "errore": "^0.14.1",
     "tsx": "^4.23.13"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.20.1",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "^4.1.11"
   }
 }
