@@ -53,6 +53,10 @@ Scenario actions use product services directly. Harness helpers may organize obs
 
 `app.server.rpc.browser` is the same workspace browser API used by `halo browser`. Tests open a browser through that API and drive it through `exec`; Halo owns its lifecycle and closes it when the user server stops. The fixture does not serve assets or fabricate responses.
 
+The suite uses Playwright's default worker count: half the logical CPU cores, each with its own server, workspace, and Electron app. Pass `--workers=1` to run serially when you want lower resource usage.
+
+The app fixture has a separate 60-second setup and teardown timeout, so concurrent process startup does not consume the test's 30-second action budget.
+
 Run the suite:
 
 ```sh

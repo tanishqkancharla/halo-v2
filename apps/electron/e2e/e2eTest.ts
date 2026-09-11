@@ -86,7 +86,8 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
       await app.open();
       await use(app);
     },
-    { auto: true },
+    // Concurrent process startup has its own budget, separate from test actions.
+    { auto: true, timeout: 60_000 },
   ],
   harness: async ({ app, testArtifacts }, use) => {
     await use({
