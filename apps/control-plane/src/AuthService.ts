@@ -36,8 +36,8 @@ type AuthSession = {
   user: AuthUser;
 };
 
-function createAuth(options: AuthServiceOptions, database: DatabaseSync) {
-  return betterAuth({
+function authOptions(options: AuthServiceOptions, database: DatabaseSync) {
+  return {
     baseURL: options.origin,
     secret: options.secret,
     database,
@@ -48,7 +48,11 @@ function createAuth(options: AuthServiceOptions, database: DatabaseSync) {
         clientSecret: options.googleClientSecret,
       },
     },
-  });
+  };
+}
+
+function createAuth(config: ReturnType<typeof authOptions>) {
+  return betterAuth(config);
 }
 
 export class AuthService {
@@ -78,8 +82,8 @@ export class AuthService {
     if (database instanceof Error) return database;
     cleanup.defer(() => database.close());
 
-    const auth = createAuth(options, database);
-    const migrations = await getMigrations(auth.options).catch(
+    const config = authOptions(options, database);
+    const migrations = await getMigrations(config).catch(
       (cause) => new AuthServiceError({ detail: "prepare migrations", cause }),
     );
     if (migrations instanceof Error) return migrations;
@@ -89,6 +93,8 @@ export class AuthService {
         (cause) => new AuthServiceError({ detail: "run migrations", cause }),
       );
     if (migrated instanceof Error) return migrated;
+
+    const auth = createAuth(config);
 
     cleanup.move();
     return new AuthService({
