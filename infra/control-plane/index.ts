@@ -2,16 +2,19 @@
 import * as gcp from "@pulumi/gcp";
 import * as pulumi from "@pulumi/pulumi";
 import * as random from "@pulumi/random";
+import { workspaceStartup } from "../workspace/startup.js";
 
 const configuration = new pulumi.Config();
 const cloud = new pulumi.Config("gcp");
 const project = cloud.require("project");
 const region = cloud.require("region");
+const zone = cloud.require("zone");
 const name = `halo-${pulumi.getStack()}`;
 const databaseName = "halo";
 const databaseUserName = "halo";
 const controlPlaneServiceName = `${name}-control-plane`;
 const controlPlaneImage = configuration.require("controlPlaneImage");
+const workspaceImage = configuration.require("workspaceImage");
 const googleClientIdSecretId = `${name}-control-plane-google-client-id`;
 const googleClientSecretId = `${name}-control-plane-google-client-secret`;
 const projectInfo = gcp.organizations.getProjectOutput({ projectId: project });
@@ -99,6 +102,74 @@ new gcp.projects.IAMMember("control-plane-cloud-sql", {
   role: "roles/cloudsql.client",
   member: pulumi.interpolate`serviceAccount:${runtime.email}`,
 });
+
+const workspaceRuntime = new gcp.serviceaccount.Account("workspace-runtime", {
+  accountId: `${name}-workspace`,
+  displayName: `Halo workspace runtime ${pulumi.getStack()}`,
+});
+const workspaceImageAccess = new gcp.artifactregistry.RepositoryIamMember(
+  "workspace-image-reader",
+  {
+    project,
+    location: region,
+    repository: repository.name,
+    role: "roles/artifactregistry.reader",
+    member: pulumi.interpolate`serviceAccount:${workspaceRuntime.email}`,
+  },
+);
+
+const controlPlaneComputeAccess = new gcp.projects.IAMMember(
+  "control-plane-compute",
+  {
+    project,
+    role: "roles/compute.instanceAdmin.v1",
+    member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+  },
+);
+const workspaceServiceAccountAccess = new gcp.serviceaccount.IAMMember(
+  "control-plane-workspace-service-account",
+  {
+    serviceAccountId: workspaceRuntime.name,
+    role: "roles/iam.serviceAccountUser",
+    member: pulumi.interpolate`serviceAccount:${runtime.email}`,
+  },
+);
+
+const workspaceTemplate = new gcp.compute.InstanceTemplate(
+  "workspace-template",
+  {
+    project,
+    region,
+    namePrefix: `${name}-workspace-`,
+    instanceDescription: "Halo workspace server",
+    machineType: "e2-standard-2",
+    // The control plane adds each user's durable halo-workspace disk when it creates the VM.
+    disks: [
+      {
+        sourceImage: "debian-cloud/debian-12",
+        diskSizeGb: 20,
+        diskType: "pd-balanced",
+        autoDelete: true,
+        boot: true,
+      },
+    ],
+    networkInterfaces: [{ network: network.id, subnetwork: subnet.id }],
+    tags: ["halo-workspace"],
+    serviceAccount: {
+      email: workspaceRuntime.email,
+      scopes: ["cloud-platform"],
+    },
+    metadata: {
+      "enable-oslogin": "TRUE",
+      "block-project-ssh-keys": "TRUE",
+    },
+    metadataStartupScript: workspaceStartup({
+      image: workspaceImage,
+      registry: `${region}-docker.pkg.dev`,
+    }),
+  },
+  { dependsOn: [workspaceImageAccess] },
+);
 
 const databasePassword = new random.RandomPassword("database-password", {
   length: 48,
@@ -313,9 +384,11 @@ const controlPlane = new gcp.cloudrunv2.Service(
     protect: true,
     dependsOn: [
       authSecretAccess,
+      controlPlaneComputeAccess,
       databaseUrlAccess,
       googleClientIdAccess,
       googleClientSecretAccess,
+      workspaceServiceAccountAccess,
     ],
   },
 );
@@ -328,6 +401,9 @@ export const controlPlaneImageRepository = pulumi.interpolate`${region}-docker.p
 export const buildSourceBucket = sources.name;
 export const buildServiceAccount = builder.name;
 export const controlPlaneServiceAccount = runtime.email;
+export const workspaceServiceAccount = workspaceRuntime.email;
+export const workspaceInstanceTemplate = workspaceTemplate.selfLink;
+export const workspaceZone = zone;
 export const controlPlaneDatabaseConnectionName =
   databaseInstance.connectionName;
 export const controlPlaneDatabaseUrlSecret = databaseUrlSecret.secretId;
