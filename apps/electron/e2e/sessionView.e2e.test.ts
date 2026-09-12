@@ -1,7 +1,7 @@
 import { expect, type Locator } from "@playwright/test";
 import { e2eTest } from "./e2eTest.js";
 import { m } from "@get-halo/shared/testing";
-import { messageText } from "@get-halo/server/testing";
+import { messageText } from "@get-halo/workspace-server/testing";
 
 e2eTest("starts a new session", async ({ harness, app }) => {
   await harness.loadSession({

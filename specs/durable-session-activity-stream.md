@@ -339,7 +339,7 @@ Use a fresh nested invocation ID for every call and the outer Pi `toolCallId` as
 - [x] Wrap the QuickJS `CodeExecutor` invoker in `ToolRuntime.ts` to emit one started and one terminal update per actual invocation, including parallel calls and errors.
 - [x] Build tool identities from Executor tool/integration catalog records and exclude non-user-facing discovery helpers using metadata owned by the runtime.
 - [x] Extend `adaptPiEvent` to unpack `ExecActivityUpdate` into normal child `tool.started` and `tool.finished` session events; ignore unrelated partial-result details.
-- [x] Verify parallel success/failure lifecycles, parent IDs, catalog labels, discovery exclusion, and session adaptation with a temporary real-runtime test; remove the unit test before commit and retain the end-user E2E regression as requested. Run `pnpm --filter @get-halo/server test` and `pnpm run check-affected`.
+- [x] Verify parallel success/failure lifecycles, parent IDs, catalog labels, discovery exclusion, and session adaptation with a temporary real-runtime test; remove the unit test before commit and retain the end-user E2E regression as requested. Run `pnpm --filter @get-halo/workspace-server test` and `pnpm run check-affected`.
 
 ### Phase 5: Client-owned grouping, deduplication, and progressive summaries
 

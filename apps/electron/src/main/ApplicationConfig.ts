@@ -1,8 +1,14 @@
 import { app } from "electron";
 import { join } from "node:path";
-import type { FilesystemService } from "@get-halo/server/filesystem";
+import type { FilesystemService } from "@get-halo/workspace-server/filesystem";
+
+const productionControlPlaneOrigin =
+  "https://halo-dev-control-plane-912701444316.us-central1.run.app";
 
 type ApplicationConfig = {
+  controlPlane:
+    | { deployment: "local" }
+    | { deployment: "cloudRun"; origin: string };
   isDevelopment: boolean;
   dataDir: string;
   logsDir: string;
@@ -17,6 +23,9 @@ export function getApplicationConfig(env: {
   const created = env.filesystem.makeDirectorySync(logsDir);
   if (created instanceof Error) throw created;
   return {
+    controlPlane: env.isDevelopment
+      ? { deployment: "local" }
+      : { deployment: "cloudRun", origin: productionControlPlaneOrigin },
     isDevelopment: env.isDevelopment,
     dataDir,
     logsDir,

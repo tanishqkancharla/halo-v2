@@ -1,12 +1,12 @@
 import { join, resolve } from "node:path";
 import { Logger } from "@repo/logger";
-import { startUserServerProcess } from "./UserServerProcess.js";
+import { startWorkspaceServerProcess } from "./WorkspaceServerProcess.js";
 import type { SessionDescription } from "@get-halo/shared/testing";
 import { test as baseTest } from "@playwright/test";
 import * as errore from "errore";
 import { createTestArtifacts, type TestArtifacts } from "./TestArtifacts.js";
 import { ElectronTestApp } from "./ElectronTestApp.js";
-import { LLMDriver, HttpService } from "@get-halo/server/testing";
+import { LLMDriver, HttpService } from "@get-halo/workspace-server/testing";
 import { createHarnessTools } from "./tools.js";
 import { loadSessionDescription } from "./SessionDescription.js";
 
@@ -54,8 +54,11 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
   app: [
     async ({ testArtifacts, llm }, use) => {
       await using cleanup = new errore.AsyncDisposableStack();
-      const server = await startUserServerProcess({
-        entry: resolve(import.meta.dirname, "../../user-server/src/main.ts"),
+      const server = await startWorkspaceServerProcess({
+        entry: resolve(
+          import.meta.dirname,
+          "../../workspace-server/src/main.ts",
+        ),
         configPath: join(testArtifacts.paths.root, "server.config.json"),
         logger: new Logger({
           sinks: [{ log: (entry) => console.log(entry.data) }],
@@ -68,6 +71,7 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
           ownerUserId: "e2e-user",
           logFilePath: testArtifacts.paths.haloLog,
           corsOrigins: ["null"],
+          port: 0,
           cliEntry: resolve(
             import.meta.dirname,
             "../../../packages/halo-cli/src/cli.ts",

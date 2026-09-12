@@ -1,13 +1,13 @@
 # Halo
 
-Halo is an Electron desktop app with a React renderer and Pi in an independent Node user server.
+Halo is an Electron desktop app with a React renderer and Pi in an independent Node workspace server.
 
 ## Structure
 
 - `apps/electron/src/renderer`: React UI built with Maui and Vite.
 - `apps/electron/src/main`: Electron main process, preload bridge, and server connection discovery.
-- `apps/user-server`: Independent workspace and agent service (`@get-halo/server`).
-- `infra`: Cloudflare infrastructure via [Alchemy](https://alchemy.run/) (`alchemy.run.ts`).
+- `apps/workspace-server`: Independent workspace and agent service (`@get-halo/workspace-server`).
+- `infra`: [GCP/Pulumi bootstrap](infra/README.md) and existing Cloudflare resources managed by Alchemy.
 - `packages/halo-cli`: Workspace commands, private browser testing, and debug app control.
 - `packages/logger`: Shared structured logger.
 - `packages/typescript-config`: Shared TypeScript settings.
@@ -29,16 +29,17 @@ export HALO_USE_SWIFTSHADER=1
 HALO_WORKSPACE_ROOT=/absolute/path/to/workspace pnpm dev
 ```
 
-Set a model provider key for the same process:
+Halo reads model and authentication credentials from GCP Secret Manager at
+runtime using Application Default Credentials. Follow the
+[infrastructure secret setup](infra/README.md#runtime-secrets) before starting
+development.
 
-```sh
-export OPENAI_API_KEY=your-key
-# or ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY
-```
-
-In Cursor cloud agents, add the key as an environment secret named `OPENAI_API_KEY` (or another provider key above) in the Secrets panel. The dev terminal inherits it, so Pi picks it up with no extra step. Halo builds, tests, and launches without a key; you only need one to chat with a model.
-
-Choose the workspace when launching the user server with `HALO_WORKSPACE_ROOT`, or set it in the repository `.env`. `pnpm dev` starts the server and Electron independently. Electron discovers the server through `<repo>/.halo/server.json`; closing Electron leaves the server running. Both services accept `HALO_USER_DATA` to select a different application-data directory. See [user-server configuration](apps/user-server/README.md).
+Choose the workspace when launching the workspace server with
+`HALO_WORKSPACE_ROOT`. `pnpm dev` starts the server and Electron independently.
+Electron discovers the server through `<repo>/.halo/server.json`; closing Electron
+leaves the server running. Both services accept `HALO_USER_DATA` to select a
+different application-data directory. See
+[workspace-server configuration](apps/workspace-server/README.md).
 
 Halo runs Pi's `AgentHarness` with one `main` lane per conversation. `HaloServer` owns a `DatabaseClient` that stores Pi conversations and Executor application data in one embedded Turso database. The file currently lives in the selected workspace:
 
@@ -54,13 +55,14 @@ Halo's `TursoSessionRepo` implements Pi's repository contract, and `TursoStorage
 
 The adapter uses Turso's synchronous compatibility driver and ordinary tables. Turso 0.7.2 does not support recursive CTEs, so branch scans follow indexed parent links without a separate branch-index table. The schema is bundled with Halo; there is no Pi SQLite backend dependency, package patch, or SQL asset-copy step. Existing JSONL and vendor SQLite tables are not imported.
 
-Shutdown stops HTTP admission, closes sessions, drains request handlers, stops tools, closes the repository, then closes the database. Executor retains its generated table/index names and independent schema version. Future Halo and extension tables must avoid existing names; use `halo_*` and `ext_<installation>_*`. Extension records, grants, and the credential vault have not moved into this database yet.
+Shutdown stops HTTP admission, closes sessions, drains request handlers, stops tools, closes the repository, then closes the database. Executor retains its generated table/index names and independent schema version. Future Halo and extension tables must avoid existing names; use `halo_*` and `ext_<installation>_*`. Extensions are trusted, so Halo does not store extension grants. Extension records and the credential vault have not moved into this database yet.
 
 The renderer consumes Halo session snapshots and events, adapted from Pi at the server boundary. The [session protocol](packages/shared/README.md) describes stable entries, run state, and first-class nested `exec` activity. It uses Pi's supplied transcript; loading older entries before compaction is deferred. `sessions.watch` sends an initial snapshot followed by ephemeral live events; disconnecting a viewer leaves its running session active. Nested `exec` tool details persist in Pi's tool results and progress checkpoints. Halo does not keep a separate event log or import existing JSONL conversation files.
 
 Pi's file and shell tools run on the host with the same rights as Halo. Halo does not import old AgentOS SQLite workspaces.
 
-The user server reads the repository `.env`. The user server consumes provider configuration; it does not pass through renderer IPC.
+The workspace server reads required credentials from GCP Secret Manager. It does
+not pass them through renderer IPC or extension process environments.
 
 ## Debug UI control
 
@@ -77,9 +79,12 @@ Use `halo browser open <url>` for an isolated extension preview, followed by `ha
 
 Pass `--stdin` or `--file checks.js` for longer scripts. Output uses TOON by default; pass `--json` for JSON. Packaged builds do not expose the debug port.
 
-## Cloudflare infrastructure
+## Infrastructure
 
-Cloudflare is the cloud target. Alchemy owns the stack under `infra/`.
+New infrastructure targets GCP project `halo-relay` with Pulumi. See the
+[bootstrap instructions](infra/README.md) for the state bucket and KMS key.
+The existing `infra:login`, `infra:plan`, `infra:deploy`, and `infra:dev`
+commands still operate the Cloudflare Alchemy stack below.
 
 | Need                                                         | Cloudflare product                                                | Alchemy resource                    |
 | ------------------------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------- |

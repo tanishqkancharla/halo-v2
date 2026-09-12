@@ -1,157 +1,126 @@
+import { join } from "node:path";
 import {
-  createServer,
-  type Server as HttpServer,
-  type IncomingMessage,
-  type ServerResponse,
-} from "node:http";
-import type { AddressInfo } from "node:net";
+  removeControlPlaneDiscovery,
+  writeControlPlaneDiscovery,
+} from "@get-halo/control-plane-contract/discovery";
 import * as errore from "errore";
-import { AuthService } from "./AuthService.js";
+import { AuthService, type AuthDatabaseConfig } from "./AuthService.js";
 import type { ControlPlaneConfig } from "./ControlPlaneConfig.js";
 import {
-  removeControlPlaneFile,
-  writeControlPlaneFile,
-} from "./ControlPlaneFile.js";
+  closeControlPlaneHttp,
+  type ListeningControlPlaneHttp,
+  listenControlPlaneHttp,
+  serveControlPlaneHttp,
+} from "./ControlPlaneHttp.js";
 
 const loopbackHost = "127.0.0.1";
-
-class ControlPlaneHttpError extends errore.createTaggedError({
-  name: "ControlPlaneHttpError",
-  message: "Control plane HTTP failed: $detail",
-}) {}
-
-type ListeningControlPlaneHttp = {
-  origin: string;
-  server: HttpServer;
-};
+const cloudRunHost = "0.0.0.0";
 
 export class ControlPlane {
-  private constructor(
-    private readonly resources: {
-      appDataDir: string;
-      auth: AuthService;
-      origin: string;
-      server: HttpServer;
-    },
-  ) {}
+  private readonly appDataDir: string | undefined;
+  private readonly auth: AuthService;
+  private readonly http: ListeningControlPlaneHttp;
+  private readonly publicOrigin: string;
 
-  get origin() {
-    return this.resources.origin;
+  private constructor(ctx: {
+    appDataDir: string | undefined;
+    auth: AuthService;
+    http: ListeningControlPlaneHttp;
+    publicOrigin: string;
+  }) {
+    this.appDataDir = ctx.appDataDir;
+    this.auth = ctx.auth;
+    this.http = ctx.http;
+    this.publicOrigin = ctx.publicOrigin;
   }
 
-  static async start(options: ControlPlaneConfig) {
+  get origin() {
+    return this.publicOrigin;
+  }
+
+  static async start(config: ControlPlaneConfig) {
     await using cleanup = new errore.AsyncDisposableStack();
-    const listening = await listenControlPlaneHttp(options.port);
-    if (listening instanceof Error) return listening;
+
+    const http = await listenControlPlaneHttp(
+      controlPlaneHost(config),
+      config.port,
+    );
+    if (http instanceof Error) return http;
+
     cleanup.defer(async () => {
-      const closed = await closeControlPlaneHttp(listening.server);
+      const closed = await closeControlPlaneHttp(http.server);
       if (closed instanceof Error) console.error(closed);
     });
-    const published = await writeControlPlaneFile({
-      appDataDir: options.appDataDir,
-      origin: listening.origin,
-    });
-    if (published instanceof Error) return published;
+
+    const publicOrigin =
+      config.deployment === "local" ? http.origin : config.origin;
+
+    if (config.deployment === "local") {
+      const published = await writeControlPlaneDiscovery({
+        appDataDir: config.appDataDir,
+        origin: publicOrigin,
+      });
+      if (published instanceof Error) return published;
+
+      cleanup.defer(async () => {
+        const removed = await removeControlPlaneDiscovery(config.appDataDir);
+        if (removed instanceof Error) console.error(removed);
+      });
+    }
+
     const auth = await AuthService.start({
-      appDataDir: options.appDataDir,
-      origin: listening.origin,
-      secret: options.auth.secret,
-      googleClientId: options.auth.googleClientId,
-      googleClientSecret: options.auth.googleClientSecret,
+      database: authDatabase(config),
+      origin: publicOrigin,
+      secret: config.auth.secret,
+      googleClientId: config.auth.googleClientId,
+      googleClientSecret: config.auth.googleClientSecret,
     });
     if (auth instanceof Error) return auth;
+
     cleanup.defer(async () => {
       const closed = await auth.close();
       if (closed instanceof Error) console.error(closed);
     });
-    serveControlPlaneHttp(listening.server, auth);
+
+    serveControlPlaneHttp(http.server, auth);
     cleanup.move();
+
     return new ControlPlane({
-      appDataDir: options.appDataDir,
+      appDataDir: config.deployment === "local" ? config.appDataDir : undefined,
       auth,
-      origin: listening.origin,
-      server: listening.server,
+      http,
+      publicOrigin,
     });
   }
 
   async close() {
-    const httpClosed = await closeControlPlaneHttp(this.resources.server);
-    const authClosed = await this.resources.auth.close();
-    const removed = await removeControlPlaneFile(this.resources.appDataDir);
+    const httpClosed = await closeControlPlaneHttp(this.http.server);
+    const authClosed = await this.auth.close();
+    const originFileRemoved =
+      this.appDataDir === undefined
+        ? undefined
+        : await removeControlPlaneDiscovery(this.appDataDir);
+
     if (httpClosed instanceof Error) return httpClosed;
     if (authClosed instanceof Error) return authClosed;
-    if (removed instanceof Error) return removed;
+    if (originFileRemoved instanceof Error) return originFileRemoved;
   }
 }
 
-function startingResponse(_request: IncomingMessage, response: ServerResponse) {
-  response.writeHead(503).end("Control plane is starting.");
+function controlPlaneHost(config: ControlPlaneConfig) {
+  return config.deployment === "local" ? loopbackHost : cloudRunHost;
 }
 
-function serveControlPlaneHttp(server: HttpServer, auth: AuthService) {
-  server.removeAllListeners("request");
-  server.on("request", async (request, response) => {
-    await handleRequest(request, response, auth);
-  });
-}
-
-async function handleRequest(
-  request: IncomingMessage,
-  response: ServerResponse,
-  auth: AuthService,
-) {
-  const url = new URL(
-    request.url === undefined ? "/" : request.url,
-    `http://${loopbackHost}`,
-  );
-  if (request.method === "GET" && url.pathname === "/health") {
-    response.writeHead(200).end();
-    return;
+function authDatabase(config: ControlPlaneConfig): AuthDatabaseConfig {
+  if (config.deployment === "local") {
+    return {
+      type: "sqlite",
+      path: join(config.appDataDir, "auth.db"),
+    };
   }
-  if (url.pathname === "/api/auth" || url.pathname.startsWith("/api/auth/")) {
-    const handled = await auth.handleHttp(request, response);
-    if (handled instanceof Error) {
-      console.error(handled);
-      if (!response.writableEnded) response.writeHead(500).end();
-    }
-    return;
-  }
-  response.writeHead(404).end();
-}
 
-function listenControlPlaneHttp(port: number) {
-  const server = createServer(startingResponse);
-  return new Promise<ListeningControlPlaneHttp | ControlPlaneHttpError>(
-    (resolve) => {
-      server.once("error", (error) => {
-        resolve(
-          new ControlPlaneHttpError({ detail: "listen failed", cause: error }),
-        );
-      });
-      server.listen(port, loopbackHost, () => {
-        // SAFETY: Node returns a TCP address after successfully listening with a numeric port.
-        const address = server.address() as AddressInfo;
-        resolve({
-          origin: `http://${loopbackHost}:${address.port}`,
-          server,
-        });
-      });
-    },
-  );
-}
-
-function closeControlPlaneHttp(server: HttpServer) {
-  const closing = new Promise<undefined | ControlPlaneHttpError>((resolve) => {
-    server.close((error) => {
-      if (error !== undefined) {
-        resolve(
-          new ControlPlaneHttpError({ detail: "close failed", cause: error }),
-        );
-        return;
-      }
-      resolve(undefined);
-    });
-  });
-  server.closeAllConnections();
-  return closing;
+  return {
+    type: "postgres",
+    connectionString: config.databaseUrl,
+  };
 }

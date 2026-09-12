@@ -1,0 +1,25 @@
+{
+  "name": "@get-halo/gcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./secrets": "./src/secrets.ts"
+  },
+  "scripts": {
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "errore": "^0.14.1",
+    "google-auth-library": "^11.0.2"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.20.1",
+    "typescript": "7.0.2"
+  }
+}

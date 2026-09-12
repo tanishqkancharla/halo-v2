@@ -28,10 +28,9 @@ Scaffolding and esbuild configuration live in the separate development package,
 repository's TypeScript version to emit their runtime JavaScript and declarations.
 
 When Halo hosts the extension, API handlers receive `context.tools`. Calls use
-Halo's connected services and require tools declared in `halo.capabilities` and
-approved by the user. Request access with `halo extension tools add <id> <paths...>`;
-then call the tool from `api.ts`, keeping credentials out of the view. Import
-`ExtensionToolResult` from `/api` to describe a tool's result.
+Halo's connected services. Workspace extensions are trusted and can call any
+available tool. Call tools from `api.ts`, keep credentials out of the view, and
+import `ExtensionToolResult` from `/api` to describe a tool's result.
 
 A standalone server still serves its API and storage, but calls to Halo tools
 return `halo_not_connected`. Verify connected-service behavior through the

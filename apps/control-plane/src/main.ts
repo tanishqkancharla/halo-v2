@@ -1,6 +1,6 @@
-import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { readSecret } from "@get-halo/gcp/secrets";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import { ControlPlane } from "./ControlPlane.js";
@@ -10,6 +10,24 @@ import {
 } from "./ControlPlaneConfig.js";
 
 const developmentPort = 8787;
+const secretProjectId = "halo-relay";
+const developmentAuthSecretIds = {
+  secret: "halo-dev-local-better-auth-secret",
+  googleClientId: "halo-dev-control-plane-google-client-id",
+  googleClientSecret: "halo-dev-control-plane-google-client-secret",
+};
+
+interface AuthSecretIds {
+  secret: string;
+  googleClientId: string;
+  googleClientSecret: string;
+}
+
+interface AuthConfiguration {
+  secret: string;
+  googleClientId: string;
+  googleClientSecret: string;
+}
 
 class ControlPlaneStartupError extends errore.createTaggedError({
   name: "ControlPlaneStartupError",
@@ -18,7 +36,11 @@ class ControlPlaneStartupError extends errore.createTaggedError({
 
 async function readConfiguration(): Promise<ControlPlaneConfig | Error> {
   const configPath = process.argv[2];
-  if (configPath === undefined) return developmentConfiguration();
+  if (configPath === undefined) {
+    return process.env.K_SERVICE === undefined
+      ? await developmentConfiguration()
+      : await cloudRunConfiguration();
+  }
   const raw = await fsPromises
     .readFile(configPath, "utf8")
     .catch(
@@ -38,44 +60,96 @@ async function readConfiguration(): Promise<ControlPlaneConfig | Error> {
   return config;
 }
 
-function developmentConfiguration(): ControlPlaneConfig | Error {
+async function readAuthConfiguration(
+  secretIds: AuthSecretIds,
+): Promise<AuthConfiguration | Error> {
+  const [secret, googleClientId, googleClientSecret] = await Promise.all([
+    readSecret({ projectId: secretProjectId, secretId: secretIds.secret }),
+    readSecret({
+      projectId: secretProjectId,
+      secretId: secretIds.googleClientId,
+    }),
+    readSecret({
+      projectId: secretProjectId,
+      secretId: secretIds.googleClientSecret,
+    }),
+  ]);
+  if (secret instanceof Error) return secret;
+  if (googleClientId instanceof Error) return googleClientId;
+  if (googleClientSecret instanceof Error) return googleClientSecret;
+  return { secret, googleClientId, googleClientSecret };
+}
+
+async function developmentConfiguration(): Promise<ControlPlaneConfig | Error> {
   const repositoryRoot = resolve(import.meta.dirname, "../../..");
-  const environmentFile = join(repositoryRoot, ".env");
-  if (fs.existsSync(environmentFile)) {
-    const loaded = errore.try({
-      try: () => process.loadEnvFile(environmentFile),
-      catch: (cause) =>
-        new ControlPlaneStartupError({ detail: "load environment", cause }),
-    });
-    if (loaded instanceof Error) return loaded;
-  }
-  const secret = process.env.BETTER_AUTH_SECRET;
-  if (secret === undefined)
-    return new ControlPlaneStartupError({ detail: "set BETTER_AUTH_SECRET" });
-  const googleClientId = process.env.GOOGLE_CLIENT_ID;
-  if (googleClientId === undefined)
-    return new ControlPlaneStartupError({ detail: "set GOOGLE_CLIENT_ID" });
-  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (googleClientSecret === undefined)
-    return new ControlPlaneStartupError({
-      detail: "set GOOGLE_CLIENT_SECRET",
-    });
+  const auth = await readAuthConfiguration(developmentAuthSecretIds);
+  if (auth instanceof Error) return auth;
   const appDataDir =
     process.env.HALO_USER_DATA === undefined
       ? join(repositoryRoot, ".halo")
       : resolve(process.env.HALO_USER_DATA);
   const config = {
+    deployment: "local" as const,
     appDataDir,
     port: developmentPort,
-    auth: {
-      secret,
-      googleClientId,
-      googleClientSecret,
-    },
+    auth,
   };
   if (!Value.Check(controlPlaneConfigSchema, config))
     return new ControlPlaneStartupError({
       detail: "invalid development configuration",
+    });
+  return config;
+}
+
+async function cloudRunConfiguration(): Promise<ControlPlaneConfig | Error> {
+  const portValue = process.env.PORT;
+  if (portValue === undefined)
+    return new ControlPlaneStartupError({ detail: "set PORT" });
+  const port = Number(portValue);
+  const origin = process.env.BETTER_AUTH_URL;
+  if (origin === undefined)
+    return new ControlPlaneStartupError({ detail: "set BETTER_AUTH_URL" });
+  const databaseUrlSecretId = process.env.DATABASE_URL_SECRET_ID;
+  if (databaseUrlSecretId === undefined)
+    return new ControlPlaneStartupError({
+      detail: "set DATABASE_URL_SECRET_ID",
+    });
+  const authSecretId = process.env.BETTER_AUTH_SECRET_ID;
+  if (authSecretId === undefined)
+    return new ControlPlaneStartupError({
+      detail: "set BETTER_AUTH_SECRET_ID",
+    });
+  const googleClientIdSecretId = process.env.GOOGLE_CLIENT_ID_SECRET_ID;
+  if (googleClientIdSecretId === undefined)
+    return new ControlPlaneStartupError({
+      detail: "set GOOGLE_CLIENT_ID_SECRET_ID",
+    });
+  const googleClientSecretId = process.env.GOOGLE_CLIENT_SECRET_ID;
+  if (googleClientSecretId === undefined)
+    return new ControlPlaneStartupError({
+      detail: "set GOOGLE_CLIENT_SECRET_ID",
+    });
+  const databaseUrl = await readSecret({
+    projectId: secretProjectId,
+    secretId: databaseUrlSecretId,
+  });
+  if (databaseUrl instanceof Error) return databaseUrl;
+  const auth = await readAuthConfiguration({
+    secret: authSecretId,
+    googleClientId: googleClientIdSecretId,
+    googleClientSecret: googleClientSecretId,
+  });
+  if (auth instanceof Error) return auth;
+  const config = {
+    deployment: "cloudRun" as const,
+    port,
+    origin,
+    databaseUrl,
+    auth,
+  };
+  if (!Value.Check(controlPlaneConfigSchema, config))
+    return new ControlPlaneStartupError({
+      detail: "invalid Cloud Run configuration",
     });
   return config;
 }

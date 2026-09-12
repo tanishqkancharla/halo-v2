@@ -1,0 +1,27 @@
+{
+  "name": "@get-halo/control-plane-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/contract.ts",
+    "./discovery": "./src/ControlPlaneDiscovery.ts"
+  },
+  "scripts": {
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "NODE_OPTIONS=--experimental-strip-types oxlint --deny-warnings src",
+    "lint:fix": "NODE_OPTIONS=--experimental-strip-types oxlint --fix src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@orpc/contract": "2.0.0-beta.29",
+    "@sinclair/typebox": "^0.34.52",
+    "errore": "^0.14.1"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.20.1",
+    "typescript": "7.0.2"
+  }
+}
