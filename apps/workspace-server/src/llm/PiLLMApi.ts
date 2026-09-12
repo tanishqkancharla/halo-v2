@@ -17,6 +17,7 @@ export async function createPiLLMApi(options: {
 }): Promise<LLMApi | PiLLMApiError> {
   registerBunOAuthFlows();
   const runtime = await ModelRuntime.create({
+    authPath: join(options.agentDir, "auth.json"),
     modelsPath: join(options.agentDir, "models.json"),
   }).catch((cause) => new PiLLMApiError({ ...options, cause }));
   if (runtime instanceof Error) return runtime;

@@ -22,6 +22,12 @@ export const workspaceServerConfigSchema = Type.Object({
   ownerUserId: Type.String(),
   logFilePath: Type.String(),
   corsOrigins: Type.Array(Type.String()),
+  gateway: Type.Optional(
+    Type.Object({
+      audience: Type.String({ minLength: 1 }),
+      serviceAccountEmail: Type.String({ minLength: 1 }),
+    }),
+  ),
   port: Type.Integer({ minimum: 0, maximum: 65_535 }),
   cliEntry: Type.Optional(Type.String()),
   cliNodeExecutable: Type.Optional(Type.String()),
@@ -256,7 +262,7 @@ async function readInferenceConfig(
     backend: "pi",
     options: {
       agentDir: path.join(workspaceRoot, ".pi", "agent"),
-      provider: "openai-codex",
+      provider: "openai",
       modelId: "gpt-5.6-terra",
       apiKey,
     },

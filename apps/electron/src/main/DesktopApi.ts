@@ -17,6 +17,7 @@ import {
 } from "../shared/desktop.js";
 import { getAppInfo, installAppUpdate } from "./app/AppUpdate.js";
 import type { DesktopAuthentication } from "./ControlPlaneAuth.js";
+import type { HaloRpcConnection } from "../shared/rpc.js";
 
 class DesktopRequestError extends errore.createTaggedError({
   name: "DesktopRequestError",
@@ -30,6 +31,7 @@ class DesktopOperationError extends errore.createTaggedError({
 
 export function registerDesktopApi(args: {
   authentication: DesktopAuthentication;
+  getConnection: () => Promise<HaloRpcConnection | Error | undefined>;
   getServer: () => Promise<WorkspaceServerConnection | Error | undefined>;
   ownsWindow: (window: BrowserWindow) => boolean;
 }): void {
@@ -40,6 +42,7 @@ export function registerDesktopApi(args: {
     const result = await handleDesktopRequest({
       request: validated,
       authentication: args.authentication,
+      getConnection: args.getConnection,
       getServer: args.getServer,
     });
     if (result instanceof Error) throw result;
@@ -57,6 +60,7 @@ function validateDesktopRequest(
 async function handleDesktopRequest(args: {
   request: DesktopRequest;
   authentication: DesktopAuthentication;
+  getConnection: () => Promise<HaloRpcConnection | Error | undefined>;
   getServer: () => Promise<WorkspaceServerConnection | Error | undefined>;
 }) {
   switch (args.request.type) {
@@ -66,10 +70,7 @@ async function handleDesktopRequest(args: {
       return await openWorkspaceFile(server?.workspaceRoot, args.request.path);
     }
     case "getConnection": {
-      const server = await args.getServer();
-      if (server instanceof Error) return server;
-      if (server === undefined) return undefined;
-      return { origin: server.origin, token: server.token };
+      return await args.getConnection();
     }
     case "getAuthSession":
       return await args.authentication.getSession();

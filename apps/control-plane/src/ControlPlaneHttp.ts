@@ -21,6 +21,10 @@ import {
   type ControlPlaneContext,
 } from "./ControlPlaneRouter.js";
 import type { WorkspaceService } from "./workspace/WorkspaceService.js";
+import {
+  isWorkspaceProxyRequest,
+  WorkspaceGateway,
+} from "./workspace/proxy.js";
 
 const requestUrlBase = "http://localhost";
 
@@ -70,10 +74,18 @@ export function serveControlPlaneHttp(ctx: {
       new ResponseHeadersHandlerPlugin(),
     ],
   });
+  const gateway = new WorkspaceGateway({ auth, workspace });
 
   server.removeListener("request", respondStarting);
   server.on("request", async (request, response) => {
-    await routeControlPlaneRequest({ request, response, auth, workspace, rpc });
+    await routeControlPlaneRequest({
+      request,
+      response,
+      auth,
+      workspace,
+      gateway,
+      rpc,
+    });
   });
 }
 
@@ -103,10 +115,11 @@ async function routeControlPlaneRequest(ctx: {
   request: IncomingMessage;
   response: ServerResponse;
   auth: AuthService;
+  gateway: WorkspaceGateway;
   workspace: WorkspaceService;
   rpc: RPCHandler<ControlPlaneContext>;
 }) {
-  const { request, response, auth, workspace, rpc } = ctx;
+  const { request, response, auth, workspace, gateway, rpc } = ctx;
   const url = new URL(
     request.url === undefined ? "/" : request.url,
     requestUrlBase,
@@ -132,6 +145,11 @@ async function routeControlPlaneRequest(ctx: {
 
   if (isBetterAuthRequest(url)) {
     await serveBetterAuth(request, response, auth);
+    return;
+  }
+
+  if (isWorkspaceProxyRequest(url)) {
+    await gateway.serve(request, response);
     return;
   }
 

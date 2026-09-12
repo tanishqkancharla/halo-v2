@@ -8,7 +8,14 @@ import {
 import type { Logger } from "@repo/logger";
 import * as errore from "errore";
 import { FilesystemService } from "./filesystem/FilesystemService.js";
-import { closeHaloHttp, listenHaloHttp, serveHaloHttp } from "./http.js";
+import {
+  closeHaloHttp,
+  listenHaloHttp,
+  serveHaloHttp,
+  type ListeningHaloHttp,
+  type ServingHaloHttp,
+  type WorkspaceGatewayIdentity,
+} from "./http.js";
 import { ExtensionHost } from "./extensions/ExtensionHost.js";
 import type { ExtensionRuntime } from "./extensions/ExtensionProcess.js";
 import type { HaloContext } from "./router.js";
@@ -34,6 +41,7 @@ export type HaloServerOptions = {
   cliNodeExecutable?: string;
   cliElectronRunAsNode?: boolean;
   extensionRuntime?: ExtensionRuntime;
+  gateway?: WorkspaceGatewayIdentity;
   testingApiEnabled?: boolean;
   ownerUserId: Promise<string | Error>;
   logger: Logger;
@@ -43,8 +51,6 @@ export type HaloServerOptions = {
   }) => CredentialVault;
 };
 
-type ListeningHttp = Exclude<Awaited<ReturnType<typeof listenHaloHttp>>, Error>;
-
 export class HaloServer {
   private constructor(
     private readonly resources: {
@@ -52,8 +58,8 @@ export class HaloServer {
       filesystem: FilesystemService;
       database: DatabaseClient;
       sessionRepo: TursoSessionRepo;
-      http: ListeningHttp;
-      requests: ReturnType<typeof serveHaloHttp>;
+      http: ListeningHaloHttp;
+      requests: ServingHaloHttp;
     },
   ) {}
 
@@ -202,6 +208,7 @@ export class HaloServer {
       ...http,
       context,
       corsOrigins: options.corsOrigins,
+      gateway: options.gateway,
     });
     cleanup.defer(async () => await requests.close());
     await extensions.reload();

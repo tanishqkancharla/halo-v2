@@ -54,6 +54,13 @@ new gcp.compute.Firewall("ssh", {
   targetTags: ["halo-workspace"],
   allows: [{ protocol: "tcp", ports: ["22"] }],
 });
+new gcp.compute.Firewall("workspace-gateway", {
+  name: `${name}-workspace-gateway`,
+  network: network.id,
+  sourceTags: ["halo-control-plane"],
+  targetTags: ["halo-workspace"],
+  allows: [{ protocol: "tcp", ports: ["8788"] }],
+});
 
 const repository = new gcp.artifactregistry.Repository("images", {
   repositoryId: `${name}-workspaces`,
@@ -177,8 +184,10 @@ const workspaceTemplate = new gcp.compute.InstanceTemplate(
     metadata: {
       "enable-oslogin": "TRUE",
       "block-project-ssh-keys": "TRUE",
+      "halo-control-plane-service-account": runtime.email,
     },
     metadataStartupScript: workspaceStartup({
+      gateway: true,
       image: workspaceImage,
       registry: `${region}-docker.pkg.dev`,
     }),

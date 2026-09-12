@@ -1,4 +1,18 @@
-export function workspaceStartup(ctx: { image: string; registry: string }) {
+export function workspaceStartup(ctx: {
+  gateway?: true;
+  image: string;
+  registry: string;
+}) {
+  const gatewayMetadata =
+    ctx.gateway === undefined
+      ? ""
+      : `workspace_hostname=$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/hostname)
+gateway_service_account=$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/halo-control-plane-service-account)`;
+  const writeConfig =
+    ctx.gateway === undefined
+      ? `jq --arg owner "$owner_user_id" '.ownerUserId = $owner' /run/halo-workspace-server.json > /mnt/halo/workspace/.halo/workspace-server.json`
+      : `jq --arg owner "$owner_user_id" --arg audience "http://$workspace_hostname:8788" --arg service_account "$gateway_service_account" '.ownerUserId = $owner | .gateway = { audience: $audience, serviceAccountEmail: $service_account }' /run/halo-workspace-server.json > /mnt/halo/workspace/.halo/workspace-server.json`;
+
   return `#!/usr/bin/env bash
 set -euo pipefail
 
@@ -34,9 +48,10 @@ cat > /usr/local/bin/halo-workspace-config <<'CONFIG'
 set -euo pipefail
 
 owner_user_id=$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/halo-owner-user-id)
+${gatewayMetadata}
 mkdir -p /mnt/halo/workspace/.halo
 docker run --rm --entrypoint cat ${ctx.image} /opt/halo/apps/workspace-server/container.json > /run/halo-workspace-server.json
-jq --arg owner "$owner_user_id" '.ownerUserId = $owner' /run/halo-workspace-server.json > /mnt/halo/workspace/.halo/workspace-server.json
+${writeConfig}
 chown -R 1000:1000 /mnt/halo/workspace/.halo
 CONFIG
 chmod 0755 /usr/local/bin/halo-workspace-config

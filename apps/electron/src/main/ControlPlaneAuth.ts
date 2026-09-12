@@ -17,6 +17,7 @@ import {
 import { SerialQueue } from "@get-halo/shared/SerialQueue";
 import { safeStorage, shell } from "electron";
 import * as errore from "errore";
+import type { HaloRpcConnection } from "../shared/rpc.js";
 
 const loopbackHost = "127.0.0.1";
 const callbackPath = "/auth/callback";
@@ -34,6 +35,7 @@ type ListeningDesktopAuthCallback = {
 };
 
 export type DesktopAuthentication = {
+  getWorkspaceConnection: () => Promise<HaloRpcConnection | Error | undefined>;
   getSession: () => Promise<ControlPlaneSession | Error | undefined>;
   signIn: () => Promise<ControlPlaneSession | Error>;
 };
@@ -83,6 +85,37 @@ export class ControlPlaneAuth implements DesktopAuthentication {
 
   async signIn() {
     return await this.actionQueue.run(async () => await this.signInUnqueued());
+  }
+
+  getWorkspaceConnection() {
+    return this.actionQueue.run(async () => {
+      if (this.token === undefined) return undefined;
+
+      const connection = {
+        origin: this.origin,
+        path: "/workspace/rpc",
+        token: this.token,
+      } satisfies HaloRpcConnection;
+
+      const health = await fetch(`${this.origin}/workspace/health`, {
+        headers: { authorization: `Bearer ${this.token}` },
+      }).catch(
+        (cause) =>
+          new ControlPlaneAuthError({
+            operation: "connect to your workspace",
+            cause,
+          }),
+      );
+      if (health instanceof Error) return health;
+      if (health.status === 502 || health.status === 503) return undefined;
+      if (!health.ok) {
+        return new ControlPlaneAuthError({
+          operation: "connect to your workspace",
+        });
+      }
+
+      return connection;
+    });
   }
 
   private async getSessionUnqueued() {

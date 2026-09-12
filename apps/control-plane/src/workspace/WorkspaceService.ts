@@ -25,6 +25,10 @@ type Workspace = {
   createdAt: Date;
 };
 
+type WorkspaceConnection = {
+  origin: string;
+};
+
 export class WorkspaceService {
   private readonly db: DatabaseService;
   private readonly config: WorkspaceConfig;
@@ -58,53 +62,50 @@ export class WorkspaceService {
     return workspace;
   }
 
-  private async ensureRecord(userId: string) {
+  async getConnection(userId: string) {
+    if (this.config.deployment === "local") {
+      return new WorkspaceServiceError({
+        detail: "connect to a local workspace through the gateway",
+      });
+    }
+
+    const workspace = await this.findRecord(userId);
+    if (workspace instanceof Error) return workspace;
+    if (workspace === undefined) {
+      return new WorkspaceServiceError({ detail: "find workspace" });
+    }
+
+    const instanceName = `halo-${workspace.id}`;
+    return {
+      origin: `http://${instanceName}.${this.config.zone}.c.${this.config.projectId}.internal:8788`,
+    } satisfies WorkspaceConnection;
+  }
+
+  private async findRecord(userId: string) {
     const client = this.db.client;
-    const workspaceId = crypto.randomUUID();
-    const createdAt = new Date();
 
     if (client instanceof DatabaseSync) {
       return errore.try({
         try: () => {
-          client
-            .prepare(
-              `INSERT INTO workspace (id, user_id, created_at)
-               VALUES (?, ?, ?)
-               ON CONFLICT (user_id) DO NOTHING`,
-            )
-            .run(workspaceId, userId, createdAt.toISOString());
-
-          // SAFETY: The insert or its unique conflict guarantees this row exists.
+          // SAFETY: The query selects the fields represented by SqliteWorkspaceRow.
           const row = client
             .prepare(
               `SELECT id, created_at
                FROM workspace
                WHERE user_id = ?`,
             )
-            .get(userId) as SqliteWorkspaceRow;
+            .get(userId) as SqliteWorkspaceRow | undefined;
 
+          if (row === undefined) return undefined;
           return {
             id: row.id,
             createdAt: new Date(row.created_at),
           } satisfies Workspace;
         },
         catch: (cause) =>
-          new WorkspaceServiceError({ detail: "ensure workspace", cause }),
+          new WorkspaceServiceError({ detail: "load workspace", cause }),
       });
     }
-
-    const inserted = await client
-      .query(
-        `INSERT INTO workspace (id, user_id, created_at)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (user_id) DO NOTHING`,
-        [workspaceId, userId, createdAt],
-      )
-      .catch(
-        (cause) =>
-          new WorkspaceServiceError({ detail: "ensure workspace", cause }),
-      );
-    if (inserted instanceof Error) return inserted;
 
     const selected = await client
       .query<PostgresWorkspaceRow>(
@@ -119,9 +120,53 @@ export class WorkspaceService {
       );
     if (selected instanceof Error) return selected;
 
-    // SAFETY: The insert or its unique conflict guarantees this row exists.
-    const row = selected.rows[0] as PostgresWorkspaceRow;
+    const row = selected.rows[0];
+    if (row === undefined) return undefined;
     return { id: row.id, createdAt: row.created_at } satisfies Workspace;
+  }
+
+  private async ensureRecord(userId: string) {
+    const client = this.db.client;
+    const workspaceId = crypto.randomUUID();
+    const createdAt = new Date();
+
+    if (client instanceof DatabaseSync) {
+      const inserted = errore.try({
+        try: () => {
+          client
+            .prepare(
+              `INSERT INTO workspace (id, user_id, created_at)
+               VALUES (?, ?, ?)
+               ON CONFLICT (user_id) DO NOTHING`,
+            )
+            .run(workspaceId, userId, createdAt.toISOString());
+        },
+        catch: (cause) =>
+          new WorkspaceServiceError({ detail: "ensure workspace", cause }),
+      });
+      if (inserted instanceof Error) return inserted;
+    } else {
+      const inserted = await client
+        .query(
+          `INSERT INTO workspace (id, user_id, created_at)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [workspaceId, userId, createdAt],
+        )
+        .catch(
+          (cause) =>
+            new WorkspaceServiceError({ detail: "ensure workspace", cause }),
+        );
+      if (inserted instanceof Error) return inserted;
+    }
+
+    const workspace = await this.findRecord(userId);
+    if (workspace instanceof Error) return workspace;
+    if (workspace === undefined) {
+      return new WorkspaceServiceError({ detail: "find ensured workspace" });
+    }
+
+    return workspace;
   }
 
   private migrate() {

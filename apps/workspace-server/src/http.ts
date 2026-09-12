@@ -9,10 +9,13 @@ import type { AddressInfo } from "node:net";
 import { RPCHandler, type RPCHandlerOptions } from "@orpc/server/node";
 import { CORSHandlerPlugin } from "@orpc/server/plugins";
 import { anyAbortSignal } from "@orpc/shared";
+import { OAuth2Client } from "google-auth-library";
 import * as errore from "errore";
 import { handleOAuthCallback } from "./oauth.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
 import { extensionToolRouter } from "./extensions/extensionsRouter.js";
+
+const localConnectionHost = "127.0.0.1";
 
 type HaloHttpConnection = {
   host: string;
@@ -25,10 +28,19 @@ type HaloHttpConnections = {
   renderer: HaloHttpConnection;
 };
 
-type ListeningHaloHttp = {
+export type WorkspaceGatewayIdentity = {
+  audience: string;
+  serviceAccountEmail: string;
+};
+
+export type ListeningHaloHttp = {
   connections: HaloHttpConnections;
   server: HttpServer;
   origin: string;
+};
+
+export type ServingHaloHttp = {
+  close: () => Promise<void>;
 };
 
 export class HaloHttpError extends errore.createTaggedError({
@@ -42,6 +54,11 @@ class HaloRequestsClosedError extends errore.createTaggedError({
   extends: errore.AbortError,
 }) {}
 
+class WorkspaceGatewayAuthenticationError extends errore.createTaggedError({
+  name: "WorkspaceGatewayAuthenticationError",
+  message: "Workspace gateway authentication failed",
+}) {}
+
 export async function listenHaloHttp(options: {
   host: string;
   port: number;
@@ -53,15 +70,15 @@ export async function listenHaloHttp(options: {
   const address = server.address() as AddressInfo;
   return {
     server,
-    origin: `http://${options.host}:${address.port}`,
+    origin: `http://${localConnectionHost}:${address.port}`,
     connections: {
       cli: {
-        host: options.host,
+        host: localConnectionHost,
         port: address.port,
         token: crypto.randomBytes(32).toString("base64url"),
       },
       renderer: {
-        host: options.host,
+        host: localConnectionHost,
         port: address.port,
         token: crypto.randomBytes(32).toString("base64url"),
       },
@@ -78,19 +95,13 @@ export function serveHaloHttp(options: {
   connections: HaloHttpConnections;
   context: HaloContext;
   corsOrigins: readonly string[];
-}) {
+  gateway?: WorkspaceGatewayIdentity;
+}): ServingHaloHttp {
   const shutdown = new AbortController();
   const pendingRequests = new Set<Promise<void>>();
   const cliToken = options.connections.cli.token;
   const rendererToken = options.connections.renderer.token;
-  const authorizations = new Set([
-    `Bearer ${cliToken}`,
-    `Bearer ${rendererToken}`,
-  ]);
-  const isAuthorized = (authorization: string | undefined) => {
-    if (authorization === undefined) return false;
-    return authorizations.has(authorization);
-  };
+  const identityVerifier = new OAuth2Client();
   const interceptors: RPCHandlerOptions<object>["interceptors"] = [
     async ({ next, ...call }) =>
       await next({
@@ -147,20 +158,41 @@ export function serveHaloHttp(options: {
       if (!handled.matched) response.writeHead(404).end();
       return;
     }
-    if (
-      request.method !== "OPTIONS" &&
-      !isAuthorized(request.headers.authorization)
-    ) {
+    const authorization =
+      request.method === "OPTIONS"
+        ? undefined
+        : await authorizeWorkspaceRequest({
+            authorization: request.headers.authorization,
+            cliToken,
+            rendererToken,
+            gateway: options.gateway,
+            identityVerifier,
+          });
+    if (authorization instanceof Error) {
+      options.context.logger.warn({
+        event: "workspace-gateway-authentication-failed",
+        error: authorization,
+      });
       response.statusCode = 401;
       response.end();
       return;
     }
+    if (request.method !== "OPTIONS" && authorization === undefined) {
+      response.statusCode = 401;
+      response.end();
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/health") {
+      response.writeHead(200).end();
+      return;
+    }
+
     const handled = await handler.handle(request, response, {
       prefix: "/rpc",
       context: {
         ...options.context,
-        browserControlAllowed:
-          request.headers.authorization === `Bearer ${cliToken}`,
+        browserControlAllowed: authorization === "cli",
       },
     });
     if (handled.matched) return;
@@ -185,6 +217,39 @@ export function serveHaloHttp(options: {
       await Promise.all(pendingRequests);
     },
   };
+}
+
+async function authorizeWorkspaceRequest(ctx: {
+  authorization: string | undefined;
+  cliToken: string;
+  gateway: WorkspaceGatewayIdentity | undefined;
+  identityVerifier: OAuth2Client;
+  rendererToken: string;
+}) {
+  if (ctx.authorization === `Bearer ${ctx.cliToken}`) return "cli" as const;
+  if (ctx.authorization === `Bearer ${ctx.rendererToken}`)
+    return "renderer" as const;
+  if (ctx.authorization === undefined || ctx.gateway === undefined)
+    return undefined;
+  if (!ctx.authorization.startsWith("Bearer ")) return undefined;
+
+  const ticket = await ctx.identityVerifier
+    .verifyIdToken({
+      idToken: ctx.authorization.slice("Bearer ".length),
+      audience: ctx.gateway.audience,
+    })
+    .catch((cause) => new WorkspaceGatewayAuthenticationError({ cause }));
+  if (ticket instanceof Error) return ticket;
+
+  const payload = ticket.getPayload();
+  if (
+    payload?.email !== ctx.gateway.serviceAccountEmail ||
+    payload.email_verified !== true
+  ) {
+    return undefined;
+  }
+
+  return "gateway" as const;
 }
 
 export async function closeHaloHttp(http: ListeningHaloHttp) {
