@@ -20,7 +20,7 @@ import {
   controlPlaneRpcRouter,
   type ControlPlaneContext,
 } from "./ControlPlaneRouter.js";
-import type { WorkspaceService } from "./WorkspaceService.js";
+import type { WorkspaceService } from "./workspace/WorkspaceService.js";
 
 const requestUrlBase = "http://localhost";
 

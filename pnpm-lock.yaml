@@ -164,6 +164,9 @@ importers:
       errore:
         specifier: ^0.14.1
         version: 0.14.1
+      google-auth-library:
+        specifier: ^11.0.2
+        version: 11.0.2(supports-color@8.1.1)
       pg:
         specifier: ^8.23.0
         version: 8.23.0

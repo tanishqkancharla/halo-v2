@@ -20,6 +20,19 @@ const authSchema = Type.Object({
   googleClientSecret: Type.String({ minLength: 1 }),
 });
 const portSchema = Type.Integer({ minimum: 0, maximum: 65_535 });
+const localWorkspaceSchema = Type.Object({
+  deployment: Type.Literal("local"),
+});
+const gcpWorkspaceSchema = Type.Object({
+  deployment: Type.Literal("gcp"),
+  instanceTemplate: Type.String({ minLength: 1 }),
+  projectId: Type.String({ minLength: 1 }),
+  zone: Type.String({ minLength: 1 }),
+});
+
+const workspaceSchema = Type.Union([localWorkspaceSchema, gcpWorkspaceSchema]);
+
+export type WorkspaceConfig = Static<typeof workspaceSchema>;
 
 export const controlPlaneConfigSchema = Type.Union([
   Type.Object({
@@ -27,6 +40,7 @@ export const controlPlaneConfigSchema = Type.Union([
     appDataDir: Type.String(),
     port: portSchema,
     auth: authSchema,
+    workspace: localWorkspaceSchema,
   }),
   Type.Object({
     deployment: Type.Literal("cloudRun"),
@@ -34,6 +48,7 @@ export const controlPlaneConfigSchema = Type.Union([
     origin: Type.String({ pattern: "^https://" }),
     databaseUrl: Type.String({ minLength: 1 }),
     auth: authSchema,
+    workspace: gcpWorkspaceSchema,
   }),
 ]);
 
@@ -136,6 +151,7 @@ async function readDevelopmentConfig(): Promise<ControlPlaneConfig | Error> {
         : path.resolve(configuredDataDir),
     port: developmentPort,
     auth,
+    workspace: { deployment: "local" as const },
   };
   if (!Value.Check(controlPlaneConfigSchema, server))
     return new ControlPlaneConfigError({
@@ -171,6 +187,17 @@ async function readCloudRunConfig(): Promise<ControlPlaneConfig | Error> {
     return new ControlPlaneConfigError({
       detail: "set GOOGLE_CLIENT_SECRET_ID",
     });
+  const workspaceProjectId = process.env.WORKSPACE_PROJECT_ID;
+  if (workspaceProjectId === undefined)
+    return new ControlPlaneConfigError({ detail: "set WORKSPACE_PROJECT_ID" });
+  const workspaceZone = process.env.WORKSPACE_ZONE;
+  if (workspaceZone === undefined)
+    return new ControlPlaneConfigError({ detail: "set WORKSPACE_ZONE" });
+  const workspaceInstanceTemplate = process.env.WORKSPACE_INSTANCE_TEMPLATE;
+  if (workspaceInstanceTemplate === undefined)
+    return new ControlPlaneConfigError({
+      detail: "set WORKSPACE_INSTANCE_TEMPLATE",
+    });
 
   const databaseUrl = await readGcpSecret({
     projectId: secretProjectId,
@@ -189,6 +216,12 @@ async function readCloudRunConfig(): Promise<ControlPlaneConfig | Error> {
     origin,
     databaseUrl,
     auth,
+    workspace: {
+      deployment: "gcp" as const,
+      projectId: workspaceProjectId,
+      zone: workspaceZone,
+      instanceTemplate: workspaceInstanceTemplate,
+    },
   };
   if (!Value.Check(controlPlaneConfigSchema, server))
     return new ControlPlaneConfigError({

@@ -20,6 +20,7 @@
     "@sinclair/typebox": "^0.34.52",
     "better-auth": "1.7.4",
     "errore": "^0.14.1",
+    "google-auth-library": "^11.0.2",
     "pg": "^8.23.0",
     "tsx": "^4.23.13"
   },
