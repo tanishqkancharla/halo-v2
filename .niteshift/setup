@@ -12,4 +12,9 @@ for generated_path in ".agents/skills/halo-extension/" ".pi/"; do
 done
 
 pnpm install --frozen-lockfile
+niteshift_extensions_dir="$(dirname "$NITESHIFT_CHECKOUT_ROOT")/.niteshift/openvscode-extensions"
+mkdir -p "$niteshift_extensions_dir"
+ln -sfn \
+  "$repository_root/packages/copy-path-to-symbol" \
+  "$niteshift_extensions_dir/halo.halo-copy-path-to-symbol"
 pnpm --filter @halo/desktop exec playwright install chromium

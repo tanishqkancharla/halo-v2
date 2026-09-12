@@ -1,10 +1,13 @@
 {
-  "name": "@get-halo/gcp",
+  "name": "@get-halo/config",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
-    "./secrets": "./src/secrets.ts"
+    "./ApplicationMode": "./src/ApplicationMode.ts",
+    "./controlPlane": "./src/controlPlane.ts",
+    "./electron": "./src/electron.ts",
+    "./workspaceServer": "./src/workspaceServer.ts"
   },
   "scripts": {
     "format": "oxfmt .",
@@ -14,12 +17,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "0.85.1",
+    "@sinclair/typebox": "^0.34.52",
     "errore": "^0.14.1",
     "google-auth-library": "^11.0.2"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.20.1",
+    "electron": "^44.0.0",
     "typescript": "7.0.2"
+  },
+  "peerDependencies": {
+    "electron": "^44.0.0"
   }
 }

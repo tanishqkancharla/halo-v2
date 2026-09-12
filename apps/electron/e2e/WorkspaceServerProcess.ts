@@ -2,9 +2,9 @@ import fs from "node:fs/promises";
 import { fork, type ChildProcess, type Serializable } from "node:child_process";
 import { createInterface } from "node:readline";
 import { Value } from "@sinclair/typebox/value";
+import type { WorkspaceServerConfig } from "@get-halo/config/workspaceServer";
 import {
   workspaceServerReadySchema,
-  type WorkspaceServerConfig,
   type WorkspaceServerReady,
 } from "@get-halo/workspace-server/process";
 import type { Logger } from "@repo/logger";
@@ -40,6 +40,7 @@ export async function startWorkspaceServerProcess(ctx: {
         env: {
           ...process.env,
           ELECTRON_RUN_AS_NODE: undefined,
+          HALO_E2E: "1",
           HALO_LLM_CONFIG: JSON.stringify(ctx.llmConfiguration),
         },
         stdio: ["ignore", "pipe", "pipe", "ipc"],

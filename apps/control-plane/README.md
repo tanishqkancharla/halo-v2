@@ -16,7 +16,8 @@ pnpm --filter @get-halo/control-plane start
 `dev` watches for source changes. Both stay running until interrupted. Application
 data defaults to `<repo>/.halo`; set `HALO_USER_DATA` to use a different directory.
 Pass a JSON configuration file as the first argument to provide a configuration
-that matches `ControlPlaneConfig.ts` explicitly.
+that matches the `ControlPlaneConfig` schema in
+`packages/config/src/controlPlane.ts` explicitly.
 
 Development reads these secrets from GCP Secret Manager through Application
 Default Credentials:

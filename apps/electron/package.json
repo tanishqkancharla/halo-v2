@@ -27,6 +27,7 @@
     "typecheck": "pnpm --filter @get-halo/extension-tools build && tsc --noEmit && tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
+    "@get-halo/config": "workspace:*",
     "@get-halo/control-plane-contract": "workspace:*",
     "@get-halo/shared": "workspace:*",
     "@get-halo/workspace-server": "workspace:*",
