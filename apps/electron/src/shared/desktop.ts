@@ -1,4 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
+import type { ControlPlaneSession } from "@get-halo/control-plane-contract";
 import type { HaloRpcConnection } from "./rpc.js";
 
 export type AppUpdateStatus =
@@ -23,6 +24,14 @@ export const desktopRequestSchema = Type.Union([
   ),
   Type.Object(
     { type: Type.Literal("getConnection") },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    { type: Type.Literal("getAuthSession") },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    { type: Type.Literal("signIn") },
     { additionalProperties: false },
   ),
   Type.Object(
@@ -51,6 +60,8 @@ export type OpenExternalRequest = Extract<
 export type DesktopApi = {
   openWorkspaceFile: (path: string) => Promise<void>;
   getConnection: () => Promise<HaloRpcConnection | undefined>;
+  getAuthSession: () => Promise<ControlPlaneSession | undefined>;
+  signIn: () => Promise<ControlPlaneSession>;
   getAppInfo: () => Promise<AppInfo>;
   installAppUpdate: () => Promise<void>;
   openExternal: (request: OpenExternalRequest) => Promise<void>;

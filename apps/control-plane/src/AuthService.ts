@@ -168,6 +168,16 @@ export class AuthService {
     );
   }
 
+  desktopSignInUrl(request: DesktopSignInRequest) {
+    const signIn = parseDesktopSignInRequest(request);
+    if (signIn instanceof Error) return signIn;
+
+    const start = new URL("/api/desktop-auth/start", this.origin);
+    start.searchParams.set("callback", signIn.callback.toString());
+    start.searchParams.set("state", signIn.state);
+    return start;
+  }
+
   async startDesktopSignIn(request: DesktopSignInRequest) {
     const signIn = parseDesktopSignInRequest(request);
     if (signIn instanceof Error) return signIn;
@@ -178,6 +188,7 @@ export class AuthService {
 
     const result = await this.auth.api
       .signInSocial({
+        returnHeaders: true,
         body: {
           provider: "google",
           callbackURL: completion.toString(),
@@ -189,7 +200,10 @@ export class AuthService {
       );
     if (result instanceof Error) return result;
 
-    return result.url;
+    return {
+      authorizationUrl: result.response.url,
+      headers: result.headers,
+    };
   }
 
   async completeDesktopSignIn(headers: Headers, request: DesktopSignInRequest) {

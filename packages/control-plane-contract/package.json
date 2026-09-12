@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/contract.ts"
+    ".": "./src/contract.ts",
+    "./discovery": "./src/ControlPlaneDiscovery.ts"
   },
   "scripts": {
     "format": "oxfmt .",
@@ -14,10 +15,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@orpc/contract": "2.0.0-beta.29"
+    "@orpc/contract": "2.0.0-beta.29",
+    "@sinclair/typebox": "^0.34.52",
+    "errore": "^0.14.1"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.20.1",
     "typescript": "7.0.2"
   }
 }

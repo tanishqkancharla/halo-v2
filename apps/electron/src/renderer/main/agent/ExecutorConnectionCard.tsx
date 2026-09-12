@@ -4,6 +4,7 @@ import * as errore from "errore";
 import { background, Button, Flex, radius, shadow, Spacer, Text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { connectionRequestLabel } from "@get-halo/shared/connectionRequests";
+import { BrandLogo, brands } from "../../BrandLogo.tsx";
 import { useApi } from "../../api/ApiProvider.tsx";
 import { desktopApi } from "../../api/electron.ts";
 import {
@@ -12,7 +13,6 @@ import {
   type ConnectionState,
 } from "./ConnectionState.ts";
 import type { SessionViewPart } from "./sessionView.ts";
-import { integrationBrands } from "./IntegrationBrands.ts";
 
 type ExecutorConnectionPart = Extract<
   SessionViewPart,
@@ -27,12 +27,6 @@ const card = style(background.element, radius.lg, shadow.subtle, {
   width: "100%",
   maxWidth: "400px",
 });
-const brandLogo = style({
-  width: "24px",
-  height: "24px",
-  objectFit: "contain",
-  flexShrink: 0,
-});
 const brandButton = style({
   flexShrink: 0,
 });
@@ -46,7 +40,6 @@ export function ExecutorConnectionCard({
 }) {
   const api = useApi();
   const cardClassName = useStyles(card);
-  const brandLogoClassName = useStyles(brandLogo);
   const brandButtonClassName = useStyles(brandButton);
   const queryClient = useQueryClient();
   const statusKey = useMemo(
@@ -163,7 +156,7 @@ export function ExecutorConnectionCard({
 
   const status = connection.status;
   const label = connectionRequestLabel(part.request);
-  const brand = integrationBrands.google;
+  const brand = brands.google;
 
   return (
     <section
@@ -175,9 +168,7 @@ export function ExecutorConnectionCard({
     >
       <Flex column gap={6} p={6}>
         <Flex row gap={4} alignItems="start">
-          {/* Electron has no Next.js image component; this logo is a local build asset. */}
-          {/* oxlint-disable-next-line next/no-img-element */}
-          <img src={brand.logoUrl} alt="" className={brandLogoClassName} />
+          <BrandLogo brand="google" size="xl" />
           <Flex column gap={1}>
             <Text size="md" fontWeight={600}>
               {label}

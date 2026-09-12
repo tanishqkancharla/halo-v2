@@ -110,6 +110,11 @@ async function routeControlPlaneRequest(ctx: {
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/desktop-auth/start") {
+    await serveDesktopAuthStart(response, auth, url);
+    return;
+  }
+
   if (
     request.method === "GET" &&
     url.pathname === "/api/desktop-auth/complete"
@@ -124,6 +129,42 @@ async function routeControlPlaneRequest(ctx: {
   }
 
   await serveControlPlaneRpc(request, response, auth, rpc);
+}
+
+async function serveDesktopAuthStart(
+  response: ServerResponse,
+  auth: AuthService,
+  url: URL,
+) {
+  const callback = url.searchParams.get("callback");
+  const state = url.searchParams.get("state");
+
+  if (callback === null || state === null) {
+    response.writeHead(400).end("Invalid desktop sign-in request.");
+    return;
+  }
+
+  const started = await auth.startDesktopSignIn({ callback, state });
+
+  if (started instanceof InvalidDesktopSignInRequestError) {
+    response.writeHead(400).end("Invalid desktop sign-in request.");
+    return;
+  }
+
+  if (started instanceof Error) {
+    console.error(started);
+    response.writeHead(500).end();
+    return;
+  }
+
+  response
+    .writeHead(302, {
+      "cache-control": "no-store",
+      location: started.authorizationUrl,
+      "referrer-policy": "no-referrer",
+      "set-cookie": started.headers.getSetCookie(),
+    })
+    .end();
 }
 
 async function serveDesktopAuthCompletion(

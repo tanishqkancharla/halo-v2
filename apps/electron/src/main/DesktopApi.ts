@@ -16,6 +16,7 @@ import {
   type OpenExternalRequest,
 } from "../shared/desktop.js";
 import { getAppInfo, installAppUpdate } from "./app/AppUpdate.js";
+import type { DesktopAuthentication } from "./ControlPlaneAuth.js";
 
 class DesktopRequestError extends errore.createTaggedError({
   name: "DesktopRequestError",
@@ -28,6 +29,7 @@ class DesktopOperationError extends errore.createTaggedError({
 }) {}
 
 export function registerDesktopApi(args: {
+  authentication: DesktopAuthentication;
   getServer: () => Promise<WorkspaceServerConnection | Error | undefined>;
   ownsWindow: (window: BrowserWindow) => boolean;
 }): void {
@@ -37,6 +39,7 @@ export function registerDesktopApi(args: {
     if (validated instanceof Error) throw validated;
     const result = await handleDesktopRequest({
       request: validated,
+      authentication: args.authentication,
       getServer: args.getServer,
     });
     if (result instanceof Error) throw result;
@@ -53,6 +56,7 @@ function validateDesktopRequest(
 
 async function handleDesktopRequest(args: {
   request: DesktopRequest;
+  authentication: DesktopAuthentication;
   getServer: () => Promise<WorkspaceServerConnection | Error | undefined>;
 }) {
   switch (args.request.type) {
@@ -67,6 +71,10 @@ async function handleDesktopRequest(args: {
       if (server === undefined) return undefined;
       return { origin: server.origin, token: server.token };
     }
+    case "getAuthSession":
+      return args.authentication.getSession();
+    case "signIn":
+      return args.authentication.signIn();
     case "getAppInfo":
       return getAppInfo();
     case "installAppUpdate":

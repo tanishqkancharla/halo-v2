@@ -10,6 +10,9 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "openWorkspaceFile", path }),
   getConnection: () =>
     ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getConnection" }),
+  getAuthSession: () =>
+    ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getAuthSession" }),
+  signIn: () => ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "signIn" }),
   getAppInfo: () => ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getAppInfo" }),
   installAppUpdate: () =>
     ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "installAppUpdate" }),

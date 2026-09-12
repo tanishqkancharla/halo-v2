@@ -44,21 +44,13 @@ const getServerInfo = os.server.info.handler(() => ({
 }));
 
 const startDesktopSignIn = os.auth.start.handler(async ({ context, input }) => {
-  const authorizationUrl = await context.auth.startDesktopSignIn(input);
+  const authorizationUrl = context.auth.desktopSignInUrl(input);
 
   if (authorizationUrl instanceof InvalidDesktopSignInRequestError) {
     throw badRequest(authorizationUrl);
   }
 
-  if (authorizationUrl instanceof Error) throw internalError(authorizationUrl);
-
-  if (authorizationUrl === undefined) {
-    throw internalError(
-      new Error("Google did not return an authorization URL"),
-    );
-  }
-
-  return { authorizationUrl };
+  return { authorizationUrl: authorizationUrl.toString() };
 });
 
 const exchangeDesktopAuthCode = os.auth.exchange.handler(

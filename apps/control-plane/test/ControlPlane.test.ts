@@ -7,12 +7,12 @@ import {
   controlPlaneProtocolVersion,
   type ControlPlaneClient,
 } from "@get-halo/control-plane-contract";
+import { readControlPlaneDiscovery } from "@get-halo/control-plane-contract/discovery";
 import { betterAuth } from "better-auth";
 import { testUtils } from "better-auth/plugins";
 import * as errore from "errore";
 import { expect, test } from "vitest";
 import { ControlPlane } from "../src/ControlPlane.js";
-import { readControlPlaneFile } from "../src/ControlPlaneFile.js";
 
 const testAuth = {
   secret: "test-control-plane-auth-secret-key!",
@@ -72,7 +72,7 @@ controlPlaneTest(
     const health = await fetch(`${plane.origin}/health`);
     expect(health.status).toBe(200);
 
-    const published = await readControlPlaneFile(appDataDir);
+    const published = await readControlPlaneDiscovery(appDataDir);
     if (published instanceof Error) throw published;
     expect(published).toEqual({ origin: plane.origin });
 
@@ -80,7 +80,7 @@ controlPlaneTest(
     const closed = await plane.close();
     if (closed instanceof Error) throw closed;
 
-    const removed = await readControlPlaneFile(appDataDir);
+    const removed = await readControlPlaneDiscovery(appDataDir);
     if (removed instanceof Error) throw removed;
     expect(removed).toBeUndefined();
 
@@ -106,13 +106,22 @@ controlPlaneTest("serves the typed control-plane RPC", async ({ rpc }) => {
 });
 
 controlPlaneTest(
-  "starts Google sign-in for a desktop loopback callback",
-  async ({ rpc }) => {
+  "starts Google sign-in in the browser with its state cookie",
+  async ({ plane, rpc }) => {
     const result = await rpc.auth.start({
       callback: "http://127.0.0.1:49152/auth/callback",
       state: desktopAuthState,
     });
-    const google = new URL(result.authorizationUrl);
+
+    const start = new URL(result.authorizationUrl);
+    expect(start.origin).toBe(plane.origin);
+    expect(start.pathname).toBe("/api/desktop-auth/start");
+
+    const response = await fetch(start, { redirect: "manual" });
+    expect(response.status).toBe(302);
+    expect(response.headers.getSetCookie()).not.toHaveLength(0);
+
+    const google = new URL(response.headers.get("location")!);
     expect(google.origin).toBe("https://accounts.google.com");
     expect(google.pathname).toBe("/o/oauth2/v2/auth");
   },

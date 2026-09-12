@@ -6,17 +6,16 @@ Electron is an HTTP client: it neither starts nor stops this process.
 
 ## Development
 
-Choose the workspace when starting development:
+Start the complete local application from the repository root:
 
 ```sh
-HALO_WORKSPACE_ROOT=/absolute/path/to/workspace pnpm dev
+pnpm dev
 ```
 
-Run this from the repository root. The workspace directory must already exist.
-Turbo starts the workspace server and Electron as separate development services.
-The server reads its OpenAI credential from GCP Secret Manager through Application
-Default Credentials. Both services use `<repo>/.halo` for local application data.
-Set `HALO_USER_DATA` to use a different shared directory.
+Turbo starts the control plane, workspace server, and Electron as separate
+development services. They share `<repo>/tmp/workspace` as the workspace and
+`<repo>/tmp/workspace/.halo` as application data. The services read development
+secrets from GCP Secret Manager through Application Default Credentials.
 
 Electron waits for the server to publish its connection. Closing Electron
 leaves the server, active conversations, and extensions running. To change
@@ -67,6 +66,8 @@ migrated.
 
 ```text
 pnpm dev
+├── control-plane: tsx watch src/main.ts
+│   └── publish local connection information
 ├── workspace-server: tsx watch src/main.ts
 │   ├── read launch configuration
 │   ├── HaloServer.start()
@@ -76,5 +77,5 @@ pnpm dev
 ```
 
 The server retains the existing workspace files, conversation database, and
-service APIs. Control-plane identity, hosted integrations, hosted inference,
-and cloud provisioning are separate work.
+service APIs. Hosted integrations, hosted inference, and cloud provisioning are
+separate work.

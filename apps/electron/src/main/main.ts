@@ -15,6 +15,8 @@ import {
   type LoggerData,
   type LoggerScope,
 } from "@repo/logger";
+import type { ControlPlaneSession } from "@get-halo/control-plane-contract";
+import { readControlPlaneDiscovery } from "@get-halo/control-plane-contract/discovery";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
@@ -27,6 +29,10 @@ import {
   applicationLaunchMode,
 } from "./ApplicationLaunchMode.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
+import {
+  ControlPlaneAuth,
+  type DesktopAuthentication,
+} from "./ControlPlaneAuth.js";
 import { registerDesktopApi } from "./DesktopApi.js";
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -81,8 +87,11 @@ const windows = new Set<BrowserWindow>();
 
 // oxlint-disable-next-line typescript/no-floating-promises -- Electron owns the app-ready lifecycle and keeps the process alive for this work.
 app.whenReady().then(async () => {
+  const authentication = await createDesktopAuthentication();
+
   registerLogBridge();
   registerDesktopApi({
+    authentication,
     getServer: () => readWorkspaceServerConnection(applicationConfig.dataDir),
     ownsWindow: (window) => windows.has(window),
   });
@@ -107,6 +116,49 @@ app.whenReady().then(async () => {
     void openMainWindow();
   });
 });
+
+async function createDesktopAuthentication(): Promise<DesktopAuthentication> {
+  if (applicationLaunchMode === ApplicationLaunchMode.Test) {
+    const session = testAuthSession();
+
+    return {
+      getSession: () => Promise.resolve(session),
+      signIn: () => Promise.resolve(session),
+    };
+  }
+
+  const authentication = await ControlPlaneAuth.start({
+    getOrigin: () => {
+      if (applicationConfig.controlPlane.deployment === "cloudRun") {
+        return Promise.resolve(applicationConfig.controlPlane.origin);
+      }
+
+      return readControlPlaneDiscovery(applicationConfig.dataDir).then(
+        (discovery) =>
+          discovery instanceof Error || discovery === undefined
+            ? discovery
+            : discovery.origin,
+      );
+    },
+    dataDir: applicationConfig.dataDir,
+  });
+  return authentication;
+}
+
+function testAuthSession(): ControlPlaneSession {
+  return {
+    session: {
+      id: "e2e-session",
+      userId: "e2e-user",
+      expiresAt: "2100-01-01T00:00:00.000Z",
+    },
+    user: {
+      id: "e2e-user",
+      email: "e2e@example.com",
+      name: "E2E User",
+    },
+  };
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

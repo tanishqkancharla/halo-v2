@@ -40,7 +40,6 @@ export function MediaFilePreview({
         // oxlint-disable-next-line react/iframe-missing-sandbox -- Chromium disables its PDF plugin in sandboxed iframes. The blob has a fixed application/pdf MIME type.
         <iframe title={`PDF preview: ${path}`} ref={attachSource} />
       ) : preview.kind === "image" ? (
-        // oxlint-disable-next-line next/no-img-element -- Local Electron blob preview, not a Next.js image.
         <img ref={attachSource} alt={path} onError={() => setFailed(true)} />
       ) : preview.kind === "audio" ? (
         <audio

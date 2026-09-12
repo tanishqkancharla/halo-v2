@@ -1,11 +1,11 @@
 import { join } from "node:path";
+import {
+  removeControlPlaneDiscovery,
+  writeControlPlaneDiscovery,
+} from "@get-halo/control-plane-contract/discovery";
 import * as errore from "errore";
 import { AuthService, type AuthDatabaseConfig } from "./AuthService.js";
 import type { ControlPlaneConfig } from "./ControlPlaneConfig.js";
-import {
-  removeControlPlaneFile,
-  writeControlPlaneFile,
-} from "./ControlPlaneFile.js";
 import {
   closeControlPlaneHttp,
   type ListeningControlPlaneHttp,
@@ -56,14 +56,14 @@ export class ControlPlane {
       config.deployment === "local" ? http.origin : config.origin;
 
     if (config.deployment === "local") {
-      const published = await writeControlPlaneFile({
+      const published = await writeControlPlaneDiscovery({
         appDataDir: config.appDataDir,
         origin: publicOrigin,
       });
       if (published instanceof Error) return published;
 
       cleanup.defer(async () => {
-        const removed = await removeControlPlaneFile(config.appDataDir);
+        const removed = await removeControlPlaneDiscovery(config.appDataDir);
         if (removed instanceof Error) console.error(removed);
       });
     }
@@ -99,7 +99,7 @@ export class ControlPlane {
     const originFileRemoved =
       this.appDataDir === undefined
         ? undefined
-        : await removeControlPlaneFile(this.appDataDir);
+        : await removeControlPlaneDiscovery(this.appDataDir);
 
     if (httpClosed instanceof Error) return httpClosed;
     if (authClosed instanceof Error) return authClosed;
