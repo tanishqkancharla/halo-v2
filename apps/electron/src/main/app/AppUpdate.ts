@@ -1,8 +1,8 @@
 import { app, autoUpdater, dialog, type BrowserWindow } from "electron";
+import type { ElectronConfig } from "@get-halo/config/electron";
 import * as errore from "errore";
 import { updateElectronApp } from "update-electron-app";
 import type { AppInfo, AppUpdateStatus } from "../../shared/desktop.js";
-import { ApplicationLaunchMode } from "../ApplicationLaunchMode.js";
 
 /** How often packaged macOS/Windows builds poll update.electronjs.org. */
 const UPDATE_POLL_INTERVAL = "10 minutes";
@@ -28,17 +28,14 @@ export function getAppInfo(): AppInfo {
 }
 
 export function startAppUpdates(args: {
-  mode: ApplicationLaunchMode;
+  config: ElectronConfig["updates"];
   getWindow: () => BrowserWindow | undefined;
 }): void {
   getWindow = args.getWindow;
-  if (args.mode !== ApplicationLaunchMode.Production) {
+  if (!args.config.enabled) {
     updateStatus = {
       state: "disabled",
-      reason:
-        args.mode === ApplicationLaunchMode.Development
-          ? "Dev builds do not auto-update"
-          : "Test builds do not auto-update",
+      reason: args.config.reason,
     };
     return;
   }

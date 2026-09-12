@@ -3,9 +3,9 @@ import {
   removeControlPlaneDiscovery,
   writeControlPlaneDiscovery,
 } from "@get-halo/control-plane-contract/discovery";
+import type { ControlPlaneConfig } from "@get-halo/config/controlPlane";
 import * as errore from "errore";
 import { AuthService, type AuthDatabaseConfig } from "./AuthService.js";
-import type { ControlPlaneConfig } from "./ControlPlaneConfig.js";
 import {
   closeControlPlaneHttp,
   type ListeningControlPlaneHttp,

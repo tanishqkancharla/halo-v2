@@ -7,7 +7,7 @@ import {
   shell,
   type IpcMainEvent,
 } from "electron";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   Logger,
@@ -15,6 +15,7 @@ import {
   type LoggerData,
   type LoggerScope,
 } from "@repo/logger";
+import { config as resolvedApplicationConfig } from "@get-halo/config/electron";
 import type { ControlPlaneSession } from "@get-halo/control-plane-contract";
 import { readControlPlaneDiscovery } from "@get-halo/control-plane-contract/discovery";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
@@ -22,12 +23,6 @@ import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS } from "../shared/channels.js";
 import { readWorkspaceServerConnection } from "@get-halo/workspace-server/connection";
-import { FilesystemService } from "@get-halo/workspace-server/filesystem";
-import { getApplicationConfig, getLogFilePath } from "./ApplicationConfig.js";
-import {
-  ApplicationLaunchMode,
-  applicationLaunchMode,
-} from "./ApplicationLaunchMode.js";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import {
   ControlPlaneAuth,
@@ -38,40 +33,36 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const isDevelopment =
-  applicationLaunchMode === ApplicationLaunchMode.Development;
-const filesystemService = new FilesystemService();
 
 if (started) app.quit();
 
-configureUserDataPath();
+if (resolvedApplicationConfig instanceof Error)
+  throw new Error("Electron could not read its application configuration", {
+    cause: resolvedApplicationConfig,
+  });
+const applicationConfig = resolvedApplicationConfig;
 
-const applicationConfig = getApplicationConfig({
-  isDevelopment,
-  filesystem: filesystemService,
-});
-if (isDevelopment) {
+if (applicationConfig.protectClosedStdio) {
   // Forge closes this process's stdio when it restarts main. A log after
   // that writes EPIPE; Node throws unless the stream has an error listener.
   ignoreClosedStdioPipe(process.stdout);
   ignoreClosedStdioPipe(process.stderr);
 }
 const fileSink = new JsonlLoggerSink({
-  filePath: getLogFilePath(applicationConfig),
+  filePath: applicationConfig.logFilePath,
 });
 const logger = new Logger({
-  sinks:
-    applicationLaunchMode === ApplicationLaunchMode.Production
-      ? [fileSink]
-      : [new PrettyConsoleLoggerSink(), fileSink],
+  sinks: applicationConfig.prettyConsoleLogging
+    ? [new PrettyConsoleLoggerSink(), fileSink]
+    : [fileSink],
 });
 const rendererLogger = logger.scope("renderer");
 
-if (isDevelopment) {
+if (applicationConfig.remoteDebugging) {
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", "4445");
 }
-if (process.env.HALO_USE_SWIFTSHADER === "1") {
+if (applicationConfig.useSwiftShader) {
   // Software WebGL for headless / Xvfb hosts where Mesa llvmpipe is blocklisted.
   app.commandLine.appendSwitch("ignore-gpu-blocklist");
   app.commandLine.appendSwitch("enable-webgl");
@@ -79,8 +70,6 @@ if (process.env.HALO_USE_SWIFTSHADER === "1") {
   app.commandLine.appendSwitch("use-angle", "swiftshader");
   app.commandLine.appendSwitch("disable-gpu-sandbox");
 }
-
-process.env.HALO_USER_DATA = applicationConfig.dataDir;
 
 let mainWindow: BrowserWindow | undefined;
 const windows = new Set<BrowserWindow>();
@@ -97,7 +86,7 @@ app.whenReady().then(async () => {
   });
   installMenu();
   await openMainWindow();
-  if (applicationLaunchMode === ApplicationLaunchMode.Test) {
+  if (applicationConfig.testWindowEvents) {
     const testEvents: NodeJS.EventEmitter = app;
     testEvents.on("halo:e2e:open-window", () => {
       // oxlint-disable-next-line typescript/no-floating-promises -- The harness waits for Electron's window event.
@@ -105,7 +94,7 @@ app.whenReady().then(async () => {
     });
   }
   startAppUpdates({
-    mode: applicationLaunchMode,
+    config: applicationConfig.updates,
     getWindow: () => mainWindow,
   });
   logger.info({ event: "app-ready" });
@@ -118,7 +107,7 @@ app.whenReady().then(async () => {
 });
 
 async function createDesktopAuthentication(): Promise<DesktopAuthentication> {
-  if (applicationLaunchMode === ApplicationLaunchMode.Test) {
+  if (applicationConfig.testAuthentication) {
     const session = testAuthSession();
 
     return {
@@ -176,7 +165,7 @@ async function openMainWindow(): Promise<void> {
 
 async function createWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
-    show: shouldShowMainWindow(applicationLaunchMode),
+    show: applicationConfig.showMainWindow,
     title: "Halo",
     width: 1100,
     height: 720,
@@ -203,12 +192,6 @@ async function createWindow(): Promise<BrowserWindow> {
     );
   }
   return window;
-}
-
-function shouldShowMainWindow(mode: ApplicationLaunchMode) {
-  if (mode !== ApplicationLaunchMode.Test) return true;
-  if (process.env.HALO_E2E_HEADFUL === "1") return true;
-  return process.env.PWDEBUG === "1";
 }
 
 function registerLogBridge(): void {
@@ -313,15 +296,4 @@ function ignoreClosedStdioPipe(stream: NodeJS.WriteStream) {
     if (error.code === "EPIPE") return;
     throw error;
   });
-}
-
-function configureUserDataPath(): void {
-  const configured = process.env.HALO_USER_DATA;
-  if (configured !== undefined) {
-    app.setPath("userData", resolve(configured));
-    return;
-  }
-  if (!isDevelopment) return;
-  const appDirectory = join(currentDirectory, "../..");
-  app.setPath("userData", join(appDirectory, "../..", ".halo"));
 }
