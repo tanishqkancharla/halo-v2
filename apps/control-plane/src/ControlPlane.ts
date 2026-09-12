@@ -9,7 +9,7 @@ import {
   serveControlPlaneHttp,
 } from "./ControlPlaneHttp.js";
 import { DatabaseService, type DatabaseConfig } from "./DatabaseService.js";
-import { WorkspaceService } from "./WorkspaceService.js";
+import { WorkspaceService } from "./workspace/WorkspaceService.js";
 
 const loopbackHost = "127.0.0.1";
 const cloudRunHost = "0.0.0.0";
@@ -67,7 +67,10 @@ export class ControlPlane {
     });
     if (auth instanceof Error) return auth;
 
-    const workspace = await WorkspaceService.start({ db });
+    const workspace = await WorkspaceService.start({
+      db,
+      config: config.workspace,
+    });
     if (workspace instanceof Error) return workspace;
 
     serveControlPlaneHttp({ server: http.server, auth, workspace });

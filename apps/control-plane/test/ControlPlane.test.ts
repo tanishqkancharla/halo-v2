@@ -37,6 +37,7 @@ const controlPlaneTest = test.extend<{
   plane: async ({ appDataDir }, use) => {
     const plane = await ControlPlane.start({
       deployment: "local",
+      workspace: { deployment: "local" },
       appDataDir,
       port: 0,
       auth: testAuth,
@@ -81,6 +82,7 @@ controlPlaneTest(
     await using cleanup = new errore.AsyncDisposableStack();
     const plane = await ControlPlane.start({
       deployment: "local",
+      workspace: { deployment: "local" },
       appDataDir,
       port: 0,
       auth: testAuth,

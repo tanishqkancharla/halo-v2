@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import type { WorkspaceConfig } from "@get-halo/config/controlPlane";
 import * as errore from "errore";
-import type { DatabaseService } from "./DatabaseService.js";
+import type { DatabaseService } from "../DatabaseService.js";
+import { provisionGcpWorkspace } from "./gcpProvisioning.js";
 
 class WorkspaceServiceError extends errore.createTaggedError({
   name: "WorkspaceServiceError",
@@ -25,12 +27,14 @@ type Workspace = {
 
 export class WorkspaceService {
   private readonly db: DatabaseService;
+  private readonly config: WorkspaceConfig;
 
-  private constructor(ctx: { db: DatabaseService }) {
+  private constructor(ctx: { config: WorkspaceConfig; db: DatabaseService }) {
     this.db = ctx.db;
+    this.config = ctx.config;
   }
 
-  static async start(ctx: { db: DatabaseService }) {
+  static async start(ctx: { config: WorkspaceConfig; db: DatabaseService }) {
     const service = new WorkspaceService(ctx);
     const migrated = await service.migrate();
     if (migrated instanceof Error) return migrated;
@@ -39,6 +43,22 @@ export class WorkspaceService {
   }
 
   async ensure(userId: string) {
+    const workspace = await this.ensureRecord(userId);
+    if (workspace instanceof Error) return workspace;
+
+    if (this.config.deployment === "local") return workspace;
+
+    const provisioned = await provisionGcpWorkspace({
+      config: this.config,
+      ownerUserId: userId,
+      workspaceId: workspace.id,
+    });
+    if (provisioned instanceof Error) return provisioned;
+
+    return workspace;
+  }
+
+  private async ensureRecord(userId: string) {
     const client = this.db.client;
     const workspaceId = crypto.randomUUID();
     const createdAt = new Date();
