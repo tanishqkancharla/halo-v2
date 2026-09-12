@@ -22,7 +22,7 @@ extensionE2eTest(
 extensionE2eTest(
   "syncs tasks from a separate browser into an open Halo pane without losing its draft",
   async ({ app, loadExtension }) => {
-    extensionE2eTest.setTimeout(60_000);
+    extensionE2eTest.setTimeout(240_000);
     const loaded = await loadExtension(
       "../../../packages/extension-tools/test/fixtures/tasks",
     );

@@ -36,7 +36,7 @@ function wrapHaloCli(args: {
   const nodeArgs =
     args.importHook === undefined
       ? [args.cliEntry]
-      : ["--import", args.importHook, args.cliEntry];
+      : ["--import", pathToFileURL(args.importHook).href, args.cliEntry];
   // Electron treats extra argv as app args unless this is set, and then runs
   // as Node using this same binary.
   const runAsNode = args.electronRunAsNode
