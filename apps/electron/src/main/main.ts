@@ -17,7 +17,6 @@ import {
 } from "@repo/logger";
 import { config as resolvedApplicationConfig } from "@get-halo/config/electron";
 import type { ControlPlaneSession } from "@get-halo/control-plane-contract";
-import { readControlPlaneDiscovery } from "@get-halo/control-plane-contract/discovery";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
@@ -117,18 +116,7 @@ async function createDesktopAuthentication(): Promise<DesktopAuthentication> {
   }
 
   const authentication = await ControlPlaneAuth.start({
-    getOrigin: () => {
-      if (applicationConfig.controlPlane.deployment === "cloudRun") {
-        return Promise.resolve(applicationConfig.controlPlane.origin);
-      }
-
-      return readControlPlaneDiscovery(applicationConfig.dataDir).then(
-        (discovery) =>
-          discovery instanceof Error || discovery === undefined
-            ? discovery
-            : discovery.origin,
-      );
-    },
+    origin: applicationConfig.controlPlaneOrigin,
     dataDir: applicationConfig.dataDir,
   });
   return authentication;
