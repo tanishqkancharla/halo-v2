@@ -1,28 +1,30 @@
 import { join } from "node:path";
 import type { ControlPlaneConfig } from "@get-halo/config/controlPlane";
 import * as errore from "errore";
-import { AuthService, type AuthDatabaseConfig } from "./AuthService.js";
+import { AuthService } from "./AuthService.js";
 import {
   closeControlPlaneHttp,
   type ListeningControlPlaneHttp,
   listenControlPlaneHttp,
   serveControlPlaneHttp,
 } from "./ControlPlaneHttp.js";
+import { DatabaseService, type DatabaseConfig } from "./DatabaseService.js";
+import { WorkspaceService } from "./WorkspaceService.js";
 
 const loopbackHost = "127.0.0.1";
 const cloudRunHost = "0.0.0.0";
 
 export class ControlPlane {
-  private readonly auth: AuthService;
+  private readonly db: DatabaseService;
   private readonly http: ListeningControlPlaneHttp;
   private readonly publicOrigin: string;
 
   private constructor(ctx: {
-    auth: AuthService;
+    db: DatabaseService;
     http: ListeningControlPlaneHttp;
     publicOrigin: string;
   }) {
-    this.auth = ctx.auth;
+    this.db = ctx.db;
     this.http = ctx.http;
     this.publicOrigin = ctx.publicOrigin;
   }
@@ -48,8 +50,16 @@ export class ControlPlane {
     const publicOrigin =
       config.deployment === "local" ? http.origin : config.origin;
 
+    const db = await DatabaseService.start(databaseConfig(config));
+    if (db instanceof Error) return db;
+
+    cleanup.defer(async () => {
+      const closed = await db.close();
+      if (closed instanceof Error) console.error(closed);
+    });
+
     const auth = await AuthService.start({
-      database: authDatabase(config),
+      db,
       origin: publicOrigin,
       secret: config.auth.secret,
       googleClientId: config.auth.googleClientId,
@@ -57,16 +67,14 @@ export class ControlPlane {
     });
     if (auth instanceof Error) return auth;
 
-    cleanup.defer(async () => {
-      const closed = await auth.close();
-      if (closed instanceof Error) console.error(closed);
-    });
+    const workspace = await WorkspaceService.start({ db });
+    if (workspace instanceof Error) return workspace;
 
-    serveControlPlaneHttp(http.server, auth);
+    serveControlPlaneHttp({ server: http.server, auth, workspace });
     cleanup.move();
 
     return new ControlPlane({
-      auth,
+      db,
       http,
       publicOrigin,
     });
@@ -74,10 +82,10 @@ export class ControlPlane {
 
   async close() {
     const httpClosed = await closeControlPlaneHttp(this.http.server);
-    const authClosed = await this.auth.close();
+    const databaseClosed = await this.db.close();
 
     if (httpClosed instanceof Error) return httpClosed;
-    if (authClosed instanceof Error) return authClosed;
+    if (databaseClosed instanceof Error) return databaseClosed;
   }
 }
 
@@ -85,11 +93,11 @@ function controlPlaneHost(config: ControlPlaneConfig) {
   return config.deployment === "local" ? loopbackHost : cloudRunHost;
 }
 
-function authDatabase(config: ControlPlaneConfig): AuthDatabaseConfig {
+function databaseConfig(config: ControlPlaneConfig): DatabaseConfig {
   if (config.deployment === "local") {
     return {
       type: "sqlite",
-      path: join(config.appDataDir, "auth.db"),
+      path: join(config.appDataDir, "control-plane.db"),
     };
   }
 

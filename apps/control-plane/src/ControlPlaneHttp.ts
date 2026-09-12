@@ -20,6 +20,7 @@ import {
   controlPlaneRpcRouter,
   type ControlPlaneContext,
 } from "./ControlPlaneRouter.js";
+import type { WorkspaceService } from "./WorkspaceService.js";
 
 const requestUrlBase = "http://localhost";
 
@@ -57,7 +58,12 @@ export function listenControlPlaneHttp(host: string, port: number) {
   );
 }
 
-export function serveControlPlaneHttp(server: HttpServer, auth: AuthService) {
+export function serveControlPlaneHttp(ctx: {
+  server: HttpServer;
+  auth: AuthService;
+  workspace: WorkspaceService;
+}) {
+  const { server, auth, workspace } = ctx;
   const rpc = new RPCHandler<ControlPlaneContext>(controlPlaneRpcRouter, {
     plugins: [
       new RequestHeadersHandlerPlugin(),
@@ -67,7 +73,7 @@ export function serveControlPlaneHttp(server: HttpServer, auth: AuthService) {
 
   server.removeListener("request", respondStarting);
   server.on("request", async (request, response) => {
-    await routeControlPlaneRequest({ request, response, auth, rpc });
+    await routeControlPlaneRequest({ request, response, auth, workspace, rpc });
   });
 }
 
@@ -97,9 +103,10 @@ async function routeControlPlaneRequest(ctx: {
   request: IncomingMessage;
   response: ServerResponse;
   auth: AuthService;
+  workspace: WorkspaceService;
   rpc: RPCHandler<ControlPlaneContext>;
 }) {
-  const { request, response, auth, rpc } = ctx;
+  const { request, response, auth, workspace, rpc } = ctx;
   const url = new URL(
     request.url === undefined ? "/" : request.url,
     requestUrlBase,
@@ -128,7 +135,7 @@ async function routeControlPlaneRequest(ctx: {
     return;
   }
 
-  await serveControlPlaneRpc(request, response, auth, rpc);
+  await serveControlPlaneRpc({ request, response, auth, workspace, rpc });
 }
 
 async function serveDesktopAuthStart(
@@ -228,15 +235,17 @@ async function serveBetterAuth(
   }
 }
 
-async function serveControlPlaneRpc(
-  request: IncomingMessage,
-  response: ServerResponse,
-  auth: AuthService,
-  rpc: RPCHandler<ControlPlaneContext>,
-) {
+async function serveControlPlaneRpc(ctx: {
+  request: IncomingMessage;
+  response: ServerResponse;
+  auth: AuthService;
+  workspace: WorkspaceService;
+  rpc: RPCHandler<ControlPlaneContext>;
+}) {
+  const { request, response, auth, workspace, rpc } = ctx;
   const handled = await rpc.handle(request, response, {
     prefix: "/rpc",
-    context: { auth },
+    context: { auth, workspace },
   });
 
   if (handled.matched) return;

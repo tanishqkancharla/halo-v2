@@ -1,14 +1,11 @@
-import fs from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { dirname } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { betterAuth, type Auth, type BetterAuthOptions } from "better-auth";
 import { isAPIError } from "better-auth/api";
 import { getMigrations } from "better-auth/db/migration";
 import { toNodeHandler } from "better-auth/node";
 import { bearer, oneTimeToken } from "better-auth/plugins";
 import * as errore from "errore";
-import { Pool } from "pg";
+import type { DatabaseClient, DatabaseService } from "./DatabaseService.js";
 
 const loopbackHost = "127.0.0.1";
 const desktopAuthStatePattern = /^[A-Za-z0-9_-]{32,128}$/u;
@@ -33,12 +30,8 @@ export class InvalidDesktopAuthCodeError extends errore.createTaggedError({
   message: "Desktop sign-in code is invalid or expired",
 }) {}
 
-export type AuthDatabaseConfig =
-  | { type: "sqlite"; path: string }
-  | { type: "postgres"; connectionString: string };
-
 type AuthServiceOptions = {
-  database: AuthDatabaseConfig;
+  db: DatabaseService;
   origin: string;
   secret: string;
   googleClientId: string;
@@ -70,13 +63,12 @@ type DesktopAuthSession = AuthSession & {
   token: string;
 };
 
-type AuthDatabase = DatabaseSync | Pool;
 type NodeHandler = (
   request: IncomingMessage,
   response: ServerResponse,
 ) => Promise<void>;
 
-function authOptions(options: AuthServiceOptions, database: AuthDatabase) {
+function authOptions(options: AuthServiceOptions, database: DatabaseClient) {
   return {
     baseURL: options.origin,
     secret: options.secret,
@@ -99,38 +91,26 @@ function authOptions(options: AuthServiceOptions, database: AuthDatabase) {
   } satisfies BetterAuthOptions;
 }
 
-type AuthInstance = Auth<ReturnType<typeof authOptions>>;
+type AuthOptions = ReturnType<typeof authOptions>;
+type BetterAuth = Auth<AuthOptions>;
 
 export class AuthService {
-  private readonly auth: AuthInstance;
-  private readonly database: AuthDatabase;
+  private readonly auth: BetterAuth;
   private readonly nodeHandler: NodeHandler;
   private readonly origin: string;
 
   private constructor(ctx: {
-    auth: AuthInstance;
-    database: AuthDatabase;
+    auth: BetterAuth;
     nodeHandler: NodeHandler;
     origin: string;
   }) {
     this.auth = ctx.auth;
-    this.database = ctx.database;
     this.nodeHandler = ctx.nodeHandler;
     this.origin = ctx.origin;
   }
 
   static async start(options: AuthServiceOptions) {
-    await using cleanup = new errore.AsyncDisposableStack();
-
-    const database = await openDatabase(options.database);
-    if (database instanceof Error) return database;
-
-    cleanup.defer(async () => {
-      const closed = await closeDatabase(database);
-      if (closed instanceof Error) console.error(closed);
-    });
-
-    const config = authOptions(options, database);
+    const config = authOptions(options, options.db.client);
     const migrations = await getMigrations(config).catch(
       (cause) => new AuthServiceError({ detail: "prepare migrations", cause }),
     );
@@ -145,10 +125,8 @@ export class AuthService {
 
     const auth = betterAuth(config);
 
-    cleanup.move();
     return new AuthService({
       auth,
-      database,
       nodeHandler: toNodeHandler(auth),
       origin: options.origin,
     });
@@ -270,10 +248,6 @@ export class AuthService {
     } satisfies AuthSession;
   }
 
-  close() {
-    return closeDatabase(this.database);
-  }
-
   private async createDesktopAuthCode(headers: Headers) {
     const session = await this.getSession(headers);
 
@@ -321,48 +295,4 @@ function parseDesktopSignInRequest(request: DesktopSignInRequest) {
   }
 
   return { callback, state: request.state };
-}
-
-async function openDatabase(config: AuthDatabaseConfig) {
-  if (config.type === "postgres") {
-    return errore.try({
-      try: () =>
-        new Pool({ connectionString: config.connectionString, max: 5 }),
-      catch: (cause) =>
-        new AuthServiceError({ detail: "open PostgreSQL pool", cause }),
-    });
-  }
-
-  const created = await fs
-    .mkdir(dirname(config.path), { recursive: true, mode: 0o700 })
-    .catch(
-      (cause) =>
-        new AuthServiceError({ detail: "create data directory", cause }),
-    );
-  if (created instanceof Error) return created;
-
-  return errore.try({
-    try: () => new DatabaseSync(config.path),
-    catch: (cause) => new AuthServiceError({ detail: "open database", cause }),
-  });
-}
-
-function closeDatabase(database: AuthDatabase) {
-  if (database instanceof DatabaseSync) {
-    return Promise.resolve(
-      errore.try({
-        try: () => database.close(),
-        catch: (cause) =>
-          new AuthServiceError({ detail: "close database", cause }),
-      }),
-    );
-  }
-
-  return database
-    .end()
-    .then(() => undefined)
-    .catch(
-      (cause) =>
-        new AuthServiceError({ detail: "close PostgreSQL pool", cause }),
-    );
 }
