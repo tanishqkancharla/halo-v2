@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@get-halo/config": "workspace:*",
-    "@get-halo/control-plane-contract": "workspace:*",
+    "@get-halo/shared": "workspace:*",
     "@orpc/server": "2.0.0-beta.29",
     "@sinclair/typebox": "^0.34.52",
     "better-auth": "1.7.4",

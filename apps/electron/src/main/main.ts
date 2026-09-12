@@ -16,7 +16,7 @@ import {
   type LoggerScope,
 } from "@repo/logger";
 import { config as resolvedApplicationConfig } from "@get-halo/config/electron";
-import type { ControlPlaneSession } from "@get-halo/control-plane-contract";
+import type { ControlPlaneSession } from "@get-halo/shared/controlPlaneContract";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
