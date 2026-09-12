@@ -6,6 +6,7 @@ import { ApplicationMode } from "./ApplicationMode.js";
 
 const productionControlPlaneOrigin =
   "https://halo-dev-control-plane-912701444316.us-central1.run.app";
+const developmentControlPlaneOrigin = "http://127.0.0.1:8787";
 
 class ElectronConfigError extends errore.createTaggedError({
   name: "ElectronConfigError",
@@ -14,9 +15,7 @@ class ElectronConfigError extends errore.createTaggedError({
 
 export type ElectronConfig = {
   mode: ApplicationMode;
-  controlPlane:
-    | { deployment: "local" }
-    | { deployment: "cloudRun"; origin: string };
+  controlPlaneOrigin: string;
   dataDir: string;
   logsDir: string;
   logFilePath: string;
@@ -70,10 +69,10 @@ function readConfig(): ElectronConfig | Error {
   const isTest = mode === ApplicationMode.Test;
   return {
     mode,
-    controlPlane:
+    controlPlaneOrigin:
       mode === ApplicationMode.Production
-        ? { deployment: "cloudRun", origin: productionControlPlaneOrigin }
-        : { deployment: "local" },
+        ? productionControlPlaneOrigin
+        : developmentControlPlaneOrigin,
     dataDir,
     logsDir,
     logFilePath: path.join(

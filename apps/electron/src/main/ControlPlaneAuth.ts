@@ -42,7 +42,7 @@ export class ControlPlaneAuth implements DesktopAuthentication {
   // Serializes session-token changes across windows.
   private readonly actionQueue = new SerialQueue();
 
-  private readonly getOrigin: () => Promise<string | Error | undefined>;
+  private readonly origin: string;
   private readonly sessionStore: ControlPlaneSessionStore;
   // Preserves a startup storage failure until the renderer can present it.
   private restoreError: Error | undefined;
@@ -50,28 +50,25 @@ export class ControlPlaneAuth implements DesktopAuthentication {
   private token: string | undefined;
 
   private constructor(ctx: {
-    getOrigin: () => Promise<string | Error | undefined>;
+    origin: string;
     restoreError: Error | undefined;
     sessionStore: ControlPlaneSessionStore;
     token: string | undefined;
   }) {
-    this.getOrigin = ctx.getOrigin;
+    this.origin = ctx.origin;
     this.restoreError = ctx.restoreError;
     this.sessionStore = ctx.sessionStore;
     this.token = ctx.token;
   }
 
-  static async start(ctx: {
-    getOrigin: () => Promise<string | Error | undefined>;
-    dataDir: string;
-  }) {
+  static async start(ctx: { origin: string; dataDir: string }) {
     const sessionStore = new ControlPlaneSessionStore({
       path: join(ctx.dataDir, "control-plane-session"),
     });
     const token = await sessionStore.read();
 
     return new ControlPlaneAuth({
-      getOrigin: ctx.getOrigin,
+      origin: ctx.origin,
       restoreError: token instanceof Error ? token : undefined,
       sessionStore,
       token: token instanceof Error ? undefined : token,
@@ -95,8 +92,7 @@ export class ControlPlaneAuth implements DesktopAuthentication {
 
     if (this.token === undefined) return undefined;
 
-    const client = await this.createClient(this.token);
-    if (client instanceof Error) return client;
+    const client = this.createClient(this.token);
 
     const session = await client.auth.session().catch(
       (cause) =>
@@ -116,8 +112,7 @@ export class ControlPlaneAuth implements DesktopAuthentication {
   }
 
   private async signInUnqueued() {
-    const client = await this.createClient();
-    if (client instanceof Error) return client;
+    const client = this.createClient();
 
     const state = randomBytes(32).toString("base64url");
     const callback = await listenForDesktopAuthCallback(state);
@@ -171,21 +166,8 @@ export class ControlPlaneAuth implements DesktopAuthentication {
     return session;
   }
 
-  private async createClient(token?: string) {
-    const origin = await this.getOrigin();
-    if (origin instanceof Error) {
-      return new ControlPlaneAuthError({
-        operation: "find the control plane",
-        cause: origin,
-      });
-    }
-    if (origin === undefined) {
-      return new ControlPlaneAuthError({
-        operation: "find the running local control plane",
-      });
-    }
-
-    return createControlPlaneClient(origin, token);
+  private createClient(token?: string) {
+    return createControlPlaneClient(this.origin, token);
   }
 }
 

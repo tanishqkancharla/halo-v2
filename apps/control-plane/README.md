@@ -1,10 +1,8 @@
 # Control plane
 
-Halo's control plane. In development it listens on loopback port `8787`, uses
-SQLite, and
-publishes `{appDataDir}/control-plane.json` with `{ origin }` (mode `0600`).
-`GET /health` returns 200. Auth lives at `/api/auth/*` through Better Auth with
-Google sign-in. Stopping the process closes HTTP and removes the origin file.
+Halo's control plane. In development it listens on loopback port `8787` and uses
+SQLite. `GET /health` returns 200. Auth lives at `/api/auth/*` through Better
+Auth with Google sign-in.
 
 Run from the repository root:
 
