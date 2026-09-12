@@ -3,4 +3,6 @@ encryptedkey: CiQAdv4E5jEG5/S3NUuMrS9oKk2qWh1ipnxHv0N5/J5gMaOHIBoSSQBYrJ1diILQSv
 config:
   gcp:project: halo-relay
   gcp:region: us-central1
+  gcp:zone: us-central1-a
   halo-control-plane:controlPlaneImage: us-central1-docker.pkg.dev/halo-relay/halo-dev-workspaces/control-plane@sha256:9eb41bdf22bc2d740227be99522e19936ad2d6230bbb858cb2974898ec812106
+  halo-control-plane:workspaceImage: us-central1-docker.pkg.dev/halo-relay/halo-dev-workspaces/workspace-server@sha256:98d6ffd54fd086d3f46f33cc1b497f6d84297783263daef762679e8c9b9ff242
