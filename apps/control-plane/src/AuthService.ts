@@ -3,14 +3,26 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { betterAuth, type Auth, type BetterAuthOptions } from "better-auth";
+import { isAPIError } from "better-auth/api";
 import { getMigrations } from "better-auth/db/migration";
 import { toNodeHandler } from "better-auth/node";
+import { bearer, oneTimeToken } from "better-auth/plugins";
 import * as errore from "errore";
 import { Pool } from "pg";
 
 class AuthServiceError extends errore.createTaggedError({
   name: "AuthServiceError",
   message: "Auth service failed: $detail",
+}) {}
+
+export class DesktopAuthRequiredError extends errore.createTaggedError({
+  name: "DesktopAuthRequiredError",
+  message: "Google sign-in has not completed",
+}) {}
+
+export class InvalidDesktopAuthCodeError extends errore.createTaggedError({
+  name: "InvalidDesktopAuthCodeError",
+  message: "Desktop sign-in code is invalid or expired",
 }) {}
 
 type AuthServiceOptions = {
@@ -39,16 +51,17 @@ type AuthSession = {
   user: AuthUser;
 };
 
+type DesktopAuthSession = AuthSession & {
+  token: string;
+};
+
 type AuthDatabase = DatabaseSync | Pool;
 type NodeHandler = (
   request: IncomingMessage,
   response: ServerResponse,
 ) => Promise<void>;
 
-function authOptions(
-  options: AuthServiceOptions,
-  database: AuthDatabase,
-): BetterAuthOptions {
+function authOptions(options: AuthServiceOptions, database: AuthDatabase) {
   return {
     baseURL: options.origin,
     secret: options.secret,
@@ -60,22 +73,35 @@ function authOptions(
         clientSecret: options.googleClientSecret,
       },
     },
-  };
+    plugins: [
+      bearer(),
+      oneTimeToken({
+        disableClientRequest: true,
+        expiresIn: 1,
+        storeToken: "hashed",
+      }),
+    ],
+  } satisfies BetterAuthOptions;
 }
 
+type AuthInstance = Auth<ReturnType<typeof authOptions>>;
+
 export class AuthService {
-  private readonly auth: Auth;
+  private readonly auth: AuthInstance;
   private readonly database: AuthDatabase;
   private readonly nodeHandler: NodeHandler;
+  private readonly origin: string;
 
   private constructor(ctx: {
-    auth: Auth;
+    auth: AuthInstance;
     database: AuthDatabase;
     nodeHandler: NodeHandler;
+    origin: string;
   }) {
     this.auth = ctx.auth;
     this.database = ctx.database;
     this.nodeHandler = ctx.nodeHandler;
+    this.origin = ctx.origin;
   }
 
   static async start(options: AuthServiceOptions) {
@@ -106,6 +132,7 @@ export class AuthService {
       auth,
       database,
       nodeHandler: toNodeHandler(auth),
+      origin: options.origin,
     });
   }
 
@@ -121,6 +148,67 @@ export class AuthService {
     return this.nodeHandler(request, response).catch(
       (cause) => new AuthServiceError({ detail: "handle request", cause }),
     );
+  }
+
+  async startDesktopSignIn(callback: URL, state: string) {
+    const completion = new URL("/api/desktop-auth/complete", this.origin);
+    completion.searchParams.set("callback", callback.toString());
+    completion.searchParams.set("state", state);
+    const result = await this.auth.api
+      .signInSocial({
+        body: {
+          provider: "google",
+          callbackURL: completion.toString(),
+        },
+      })
+      .catch(
+        (cause) =>
+          new AuthServiceError({ detail: "start desktop sign-in", cause }),
+      );
+    if (result instanceof Error) return result;
+    return result.url;
+  }
+
+  async createDesktopAuthCode(headers: Headers) {
+    const session = await this.getSession(headers);
+    if (session instanceof Error) return session;
+    if (session === undefined) return new DesktopAuthRequiredError();
+    return this.auth.api
+      .generateOneTimeToken({ headers })
+      .then((result) => result.token)
+      .catch(
+        (cause) =>
+          new AuthServiceError({ detail: "create desktop auth code", cause }),
+      );
+  }
+
+  async exchangeDesktopAuthCode(code: string) {
+    const result = await this.auth.api
+      .verifyOneTimeToken({ body: { token: code } })
+      .catch((cause: unknown) => {
+        if (isAPIError(cause) && cause.statusCode === 400) {
+          return new InvalidDesktopAuthCodeError();
+        }
+        return new AuthServiceError({
+          detail: "exchange desktop auth code",
+          cause,
+        });
+      });
+    if (result instanceof Error) return result;
+    return {
+      token: result.session.token,
+      session: {
+        id: result.session.id,
+        userId: result.session.userId,
+        expiresAt: result.session.expiresAt,
+      },
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        image: result.user.image === null ? undefined : result.user.image,
+      },
+    } satisfies DesktopAuthSession;
   }
 
   async getSession(headers: Headers) {
