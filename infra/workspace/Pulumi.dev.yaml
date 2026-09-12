@@ -5,4 +5,4 @@ config:
   gcp:region: us-central1
   gcp:zone: us-central1-a
   halo-workspace:controlPlaneStack: organization/halo-control-plane/dev
-  halo-workspace:image: us-central1-docker.pkg.dev/halo-relay/halo-dev-workspaces/workspace-server@sha256:654ca5b5c23ad30108c269d1861ce1858f2933305813fb36ad8ae8243cc89c9b
+  halo-workspace:image: us-central1-docker.pkg.dev/halo-relay/halo-dev-workspaces/workspace-server@sha256:98d6ffd54fd086d3f46f33cc1b497f6d84297783263daef762679e8c9b9ff242
