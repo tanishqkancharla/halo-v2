@@ -114,7 +114,7 @@ export function useWorkspaceQuery() {
   const api = useApi();
   return useQuery({
     queryKey: workspaceQueryKey,
-    queryFn: () => api.workspace.get(),
+    queryFn: async () => await api.workspace.get(),
   });
 }
 
@@ -124,7 +124,7 @@ export function useSessionsQuery(workspace: WorkspaceInfo | undefined) {
 
   return useQuery({
     queryKey: ["sessions", workspaceRoot],
-    queryFn: () => api.sessions.list(),
+    queryFn: async () => await api.sessions.list(),
     enabled: workspaceRoot !== undefined,
   });
 }
@@ -139,7 +139,7 @@ export function useWorkspacePathsQuery(workspace: WorkspaceInfo | undefined) {
 
   return useQuery({
     queryKey: workspacePathsQueryKey(workspaceRoot),
-    queryFn: () => api.workspace.listPaths(),
+    queryFn: async () => await api.workspace.listPaths(),
     enabled: workspaceRoot !== undefined,
   });
 }
@@ -148,21 +148,21 @@ export function useWorkspaceFileQuery(path: string) {
   const api = useApi();
   return useQuery({
     queryKey: ["workspace-file", path],
-    queryFn: () => api.workspace.readFile({ path }),
+    queryFn: async () => await api.workspace.readFile({ path }),
   });
 }
 
 export function useAppInfoQuery() {
   return useQuery({
     queryKey: ["app-info"],
-    queryFn: () => desktopApi.getAppInfo(),
+    queryFn: async () => await desktopApi.getAppInfo(),
     refetchInterval: 5_000,
   });
 }
 
 export function useInstallAppUpdateMutation() {
   return useMutation({
-    mutationFn: () => desktopApi.installAppUpdate(),
+    mutationFn: async () => await desktopApi.installAppUpdate(),
   });
 }
 
@@ -172,7 +172,7 @@ export function useExtensionsQuery(workspace: WorkspaceInfo | undefined) {
 
   return useQuery({
     queryKey: ["extensions", workspaceRoot],
-    queryFn: () => api.extensions.list(),
+    queryFn: async () => await api.extensions.list(),
     enabled: workspaceRoot !== undefined,
   });
 }

@@ -4,10 +4,10 @@ import { buildExtension } from "./build.js";
 import { scaffoldExtension } from "./scaffold.js";
 
 async function main() {
-  if (process.argv[2] === "build") return buildExtension(process.cwd());
+  if (process.argv[2] === "build") return await buildExtension(process.cwd());
   if (process.argv[2] === "scaffold" && process.argv[3] !== undefined) {
     const directory = resolve(process.argv[3]);
-    return scaffoldExtension({ directory, name: basename(directory) });
+    return await scaffoldExtension({ directory, name: basename(directory) });
   }
   console.error(
     "Usage: halo-extension build | halo-extension scaffold <directory>",

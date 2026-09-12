@@ -32,7 +32,10 @@ e2eTest(
     await editor.fill("Edited in Halo");
 
     await expect
-      .poll(() => app.server.rpc.workspace.readFile({ path: "notes.md" }))
+      .poll(
+        async () =>
+          await app.server.rpc.workspace.readFile({ path: "notes.md" }),
+      )
       .toContain("Edited in Halo");
 
     const server = app.server.rpc;
@@ -104,7 +107,10 @@ e2eTest(
       editor.getByText("Last line appended", { exact: true }),
     ).toBeVisible();
     await expect
-      .poll(() => app.server.rpc.workspace.readFile({ path: "notes.md" }))
+      .poll(
+        async () =>
+          await app.server.rpc.workspace.readFile({ path: "notes.md" }),
+      )
       .toContain("Last line appended");
   },
 );
@@ -324,7 +330,7 @@ e2eTest(
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(page.getByRole("main", { name: "New session" })).toBeVisible();
     await expect
-      .poll(() => app.server.rpc.workspace.listPaths())
+      .poll(async () => await app.server.rpc.workspace.listPaths())
       .toEqual(["Keep.md"]);
     await page.reload();
     await expect(
@@ -352,14 +358,20 @@ e2eTest("edits plain text and displays an image preview", async ({ app }) => {
   await expect(editor).toHaveValue("Plain text");
   await editor.fill("Saved plain text");
   await expect
-    .poll(() => app.server.rpc.workspace.readFile({ path: "notes.txt" }))
+    .poll(
+      async () =>
+        await app.server.rpc.workspace.readFile({ path: "notes.txt" }),
+    )
     .toBe("Saved plain text");
   await page.getByRole("link", { name: "picture.svg", exact: true }).click();
   const image = page.getByRole("img", { name: "picture.svg", exact: true });
   await expect(image).toBeVisible();
   await expect
-    .poll(() =>
-      image.evaluate((element: HTMLImageElement) => element.naturalWidth),
+    .poll(
+      async () =>
+        await image.evaluate(
+          (element: HTMLImageElement) => element.naturalWidth,
+        ),
     )
     .toBe(80);
   await page.getByRole("link", { name: "notes.txt", exact: true }).click();
@@ -444,8 +456,11 @@ e2eTest(
     const player = page.locator('audio[aria-label="recording.wav"]');
     await expect(player).toBeVisible();
     await expect
-      .poll(() =>
-        player.evaluate((element: HTMLAudioElement) => element.duration),
+      .poll(
+        async () =>
+          await player.evaluate(
+            (element: HTMLAudioElement) => element.duration,
+          ),
       )
       .toBe(1);
     await page.getByRole("link", { name: "archive.zip", exact: true }).click();

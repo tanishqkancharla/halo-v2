@@ -15,11 +15,11 @@ import type {
   DatabaseError,
 } from "../../storage/DatabaseClient.js";
 
-export function createExecutorDatabase<T extends FumaTables>(
+export async function createExecutorDatabase<T extends FumaTables>(
   client: DatabaseClient,
   tables: T,
 ): Promise<Pick<ExecutorFumaDb<T>, "db"> | DatabaseError> {
-  return client.access((connection) => {
+  return await client.access((connection) => {
     const options = {
       tables,
       namespace: "halo_executor",
@@ -59,15 +59,24 @@ function coordinateExecutor<S extends AnySchema>(
     // Fuma supplies a non-enumerable withContext; decorators must preserve its policy context.
     withContext: (context) =>
       coordinateExecutor(client, db.withContext!(context)),
-    count: (table, options) => access(() => db.count(table, options)),
-    findFirst: (table, options) => access(() => db.findFirst(table, options)),
-    findMany: (table, options) => access(() => db.findMany(table, options)),
-    create: (table, values) => access(() => db.create(table, values)),
-    createMany: (table, values) => access(() => db.createMany(table, values)),
-    updateMany: (table, options) => access(() => db.updateMany(table, options)),
-    deleteMany: (table, options) => access(() => db.deleteMany(table, options)),
-    upsert: (table, options) => access(() => db.upsert(table, options)),
+    count: async (table, options) =>
+      await access(async () => await db.count(table, options)),
+    findFirst: async (table, options) =>
+      await access(async () => await db.findFirst(table, options)),
+    findMany: async (table, options) =>
+      await access(async () => await db.findMany(table, options)),
+    create: async (table, values) =>
+      await access(async () => await db.create(table, values)),
+    createMany: async (table, values) =>
+      await access(async () => await db.createMany(table, values)),
+    updateMany: async (table, options) =>
+      await access(async () => await db.updateMany(table, options)),
+    deleteMany: async (table, options) =>
+      await access(async () => await db.deleteMany(table, options)),
+    upsert: async (table, options) =>
+      await access(async () => await db.upsert(table, options)),
     // The callback receives Fuma's transaction query, so its operations do not acquire the queue again.
-    transaction: (run) => access(() => db.transaction(run)),
+    transaction: async (run) =>
+      await access(async () => await db.transaction(run)),
   };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import * as errore from "errore";
 import { LoadingPage } from "./LoadingPage.tsx";
 import { SignInPage } from "./SignInPage.tsx";
@@ -15,7 +15,7 @@ type AuthenticationState =
   | { status: "signingIn" }
   | { status: "signedIn" };
 
-export function Authentication({ children }: { children: ReactNode }) {
+export function Authentication({ children }: { children: ReactElement }) {
   const [state, setState] = useState<AuthenticationState>({
     status: "checking",
   });

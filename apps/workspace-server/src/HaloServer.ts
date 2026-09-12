@@ -171,7 +171,7 @@ export class HaloServer {
           ? { executable: process.execPath, electronRunAsNode: false }
           : options.extensionRuntime,
     });
-    cleanup.defer(() => extensions.stop());
+    cleanup.defer(async () => await extensions.stop());
     const context: HaloContext = {
       browsers: new BrowserService(options.appBrowserTarget),
       browserControlAllowed: false,
@@ -203,7 +203,7 @@ export class HaloServer {
       context,
       corsOrigins: options.corsOrigins,
     });
-    cleanup.defer(() => requests.close());
+    cleanup.defer(async () => await requests.close());
     await extensions.reload();
     cleanup.move();
     return new HaloServer({

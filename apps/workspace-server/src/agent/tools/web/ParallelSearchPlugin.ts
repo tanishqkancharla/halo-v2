@@ -74,7 +74,7 @@ type ParallelMcpCall = {
 
 let clientPromise: Promise<Client | ParallelMcpError> | undefined;
 
-function getClient() {
+async function getClient() {
   if (clientPromise === undefined) {
     const client = new Client({ name: "halo", version: "1" });
     clientPromise = client
@@ -88,7 +88,7 @@ function getClient() {
         return client;
       });
   }
-  return clientPromise;
+  return await clientPromise;
 }
 
 async function callParallelTool(args: {
@@ -151,8 +151,8 @@ export const parallelSearchPlugin: HaloToolPlugin = {
         "Search the live web and return relevant excerpts. Search excerpts are usually enough to answer without fetching each result.",
       inputSchema: webSearchParameters,
       requiredCapabilities: ["network.web.search"],
-      execute: (args, context) =>
-        callParallelTool({
+      execute: async (args, context) =>
+        await callParallelTool({
           name: "web_search",
           arguments: args,
           context,
@@ -164,8 +164,8 @@ export const parallelSearchPlugin: HaloToolPlugin = {
         "Fetch and extract content from specific web URLs when search excerpts are insufficient or the user named a URL.",
       inputSchema: webFetchParameters,
       requiredCapabilities: ["network.web.search"],
-      execute: (args, context) =>
-        callParallelTool({
+      execute: async (args, context) =>
+        await callParallelTool({
           name: "web_fetch",
           arguments: args,
           context,

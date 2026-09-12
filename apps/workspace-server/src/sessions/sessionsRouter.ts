@@ -55,8 +55,9 @@ export const sessionsRouter = os.router({
     });
     const session = await context.sessions.open(input.sessionId);
     if (session instanceof Error) return orpcErrors.badRequest(session);
-    const prompted = await runWithSignal(signal, () =>
-      session.prompt(input.text),
+    const prompted = await runWithSignal(
+      signal,
+      async () => await session.prompt(input.text),
     );
     if (prompted instanceof Error) return orpcErrors.badRequest(prompted);
   }),
@@ -128,16 +129,18 @@ export const sessionsRouter = os.router({
   }),
 });
 
-function notifyConnectedSession(args: {
+async function notifyConnectedSession(args: {
   session: HaloAgentSession;
   request: ConnectionRequest;
   signal: AbortSignal | undefined;
 }) {
-  return runWithSignal(args.signal, () =>
-    args.session.notify({
-      customType: "halo.integration.connected",
-      content: `[System] The user connected ${connectionRequestLabel(args.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
-    }),
+  return await runWithSignal(
+    args.signal,
+    async () =>
+      await args.session.notify({
+        customType: "halo.integration.connected",
+        content: `[System] The user connected ${connectionRequestLabel(args.request)}. You can now retry the operation that required this connection. Continue the user's last request.`,
+      }),
   ).catch(
     (cause) =>
       new PromptFailedError({

@@ -72,10 +72,10 @@ async function execute(input: {
   if (code.trim().length === 0)
     return new BrowserCommandError({ detail: "The script cannot be empty." });
   const browserId = input.id;
-  return await request(input.env, (client) =>
+  return await request(input.env, async (client) =>
     browserId === undefined
-      ? client.app.exec({ source: code })
-      : client.browser.exec({ id: browserId, source: code }),
+      ? await client.app.exec({ source: code })
+      : await client.browser.exec({ id: browserId, source: code }),
   );
 }
 
@@ -89,8 +89,9 @@ export const browser = Cli.create("browser", {
     args: z.object({ url: z.string().url() }),
     env,
     async run(c) {
-      const result = await request(c.env, (client) =>
-        client.browser.open(c.args),
+      const result = await request(
+        c.env,
+        async (client) => await client.browser.open(c.args),
       );
       if (result instanceof Error)
         return c.error({ code: "BROWSER", message: result.message });
@@ -101,7 +102,10 @@ export const browser = Cli.create("browser", {
     description: "List this workspace's open browsers",
     env,
     async run(c) {
-      const result = await request(c.env, (client) => client.browser.list());
+      const result = await request(
+        c.env,
+        async (client) => await client.browser.list(),
+      );
       if (result instanceof Error)
         return c.error({ code: "BROWSER", message: result.message });
       return c.ok(result);
@@ -124,8 +128,9 @@ export const browser = Cli.create("browser", {
     args: z.object({ id }),
     env,
     async run(c) {
-      const result = await request(c.env, (client) =>
-        client.browser.snapshot(c.args),
+      const result = await request(
+        c.env,
+        async (client) => await client.browser.snapshot(c.args),
       );
       if (result instanceof Error)
         return c.error({ code: "BROWSER", message: result.message });
@@ -137,8 +142,9 @@ export const browser = Cli.create("browser", {
     args: z.object({ id }),
     env,
     async run(c) {
-      const result = await request(c.env, (client) =>
-        client.browser.screenshot(c.args),
+      const result = await request(
+        c.env,
+        async (client) => await client.browser.screenshot(c.args),
       );
       if (result instanceof Error)
         return c.error({ code: "BROWSER", message: result.message });
@@ -150,8 +156,9 @@ export const browser = Cli.create("browser", {
     args: z.object({ id }),
     env,
     async run(c) {
-      const result = await request(c.env, (client) =>
-        client.browser.close(c.args),
+      const result = await request(
+        c.env,
+        async (client) => await client.browser.close(c.args),
       );
       if (result instanceof Error)
         return c.error({ code: "BROWSER", message: result.message });
@@ -178,7 +185,10 @@ export const app = Cli.create("app", {
     description: "Read Halo's accessibility tree",
     env,
     async run(c) {
-      const result = await request(c.env, (client) => client.app.snapshot());
+      const result = await request(
+        c.env,
+        async (client) => await client.app.snapshot(),
+      );
       if (result instanceof Error)
         return c.error({ code: "BROWSER", message: result.message });
       return c.ok(result);
@@ -188,7 +198,10 @@ export const app = Cli.create("app", {
     description: "Save a screenshot of Halo in the workspace",
     env,
     async run(c) {
-      const result = await request(c.env, (client) => client.app.screenshot());
+      const result = await request(
+        c.env,
+        async (client) => await client.app.screenshot(),
+      );
       if (result instanceof Error)
         return c.error({ code: "BROWSER", message: result.message });
       return c.ok(result);

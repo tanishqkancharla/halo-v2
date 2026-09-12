@@ -50,13 +50,13 @@ export class BrowserService {
       .catch((cause) => new BrowserError({ detail: "launch Chromium", cause }));
     if (browser instanceof Error) return browser;
     await using cleanup = new errore.AsyncDisposableStack();
-    cleanup.defer(() => browser.close());
+    cleanup.defer(async () => await browser.close());
     const page = await browser
       .newPage({ viewport: { width: 1280, height: 800 } })
       .catch((cause) => new BrowserError({ detail: "open page", cause }));
     if (page instanceof Error) return page;
     const view = new BrowserPage(page);
-    cleanup.defer(() => view.dispose());
+    cleanup.defer(async () => await view.dispose());
     const loaded = await page
       .goto(url)
       .catch(
@@ -145,7 +145,7 @@ export class BrowserService {
       );
     if (browser instanceof Error) return browser;
     await using cleanup = new errore.AsyncDisposableStack();
-    cleanup.defer(() => browser.close());
+    cleanup.defer(async () => await browser.close());
     const url = this.appTarget.pageUrl;
     const page = browser
       .contexts()
@@ -154,19 +154,21 @@ export class BrowserService {
     if (page === undefined)
       return new BrowserError({ detail: "Halo renderer is not open" });
     const view = new BrowserPage(page);
-    cleanup.defer(() => view.dispose());
+    cleanup.defer(async () => await view.dispose());
     return await run(view);
   }
 
-  appExec(source: string) {
-    return this.withApp((view) => view.exec(source));
+  async appExec(source: string) {
+    return await this.withApp(async (view) => await view.exec(source));
   }
 
-  appSnapshot() {
-    return this.withApp((view) => view.snapshot());
+  async appSnapshot() {
+    return await this.withApp(async (view) => await view.snapshot());
   }
 
-  appScreenshot(workspaceRoot: string) {
-    return this.withApp((view) => this.capture(view, workspaceRoot));
+  async appScreenshot(workspaceRoot: string) {
+    return await this.withApp(
+      async (view) => await this.capture(view, workspaceRoot),
+    );
   }
 }

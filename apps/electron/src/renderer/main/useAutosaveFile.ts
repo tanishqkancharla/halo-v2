@@ -8,7 +8,9 @@ const autosaveDelayMs = 400;
 const fileSaves = new Set<FileAutosave>();
 
 export async function flushFileAutosaves() {
-  const results = await Promise.all([...fileSaves].map((save) => save.flush()));
+  const results = await Promise.all(
+    [...fileSaves].map(async (save) => await save.flush()),
+  );
   return results.find((result) => result instanceof Error);
 }
 
@@ -55,13 +57,13 @@ class FileAutosave {
     }, autosaveDelayMs);
   }
 
-  flush() {
+  async flush() {
     if (this.timer !== undefined) {
       clearTimeout(this.timer);
       this.timer = undefined;
     }
-    this.write = this.write.then(() => this.save());
-    return this.write;
+    this.write = this.write.then(async () => await this.save());
+    return await this.write;
   }
 
   private async save() {

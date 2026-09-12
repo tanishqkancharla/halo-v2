@@ -21,7 +21,7 @@ const os = implement(contract)
         }),
       );
     const workspace = context.workspace.getWorkspace();
-    return next({ context: { workspaceRoot: workspace.workspaceRoot } });
+    return await next({ context: { workspaceRoot: workspace.workspaceRoot } });
   });
 
 export const browserRouter = os.browser.router({

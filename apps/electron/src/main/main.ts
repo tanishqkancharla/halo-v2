@@ -80,7 +80,8 @@ app.whenReady().then(async () => {
   registerLogBridge();
   registerDesktopApi({
     authentication,
-    getServer: () => readWorkspaceServerConnection(applicationConfig.dataDir),
+    getServer: async () =>
+      await readWorkspaceServerConnection(applicationConfig.dataDir),
     ownsWindow: (window) => windows.has(window),
   });
   installMenu();
@@ -110,8 +111,8 @@ async function createDesktopAuthentication(): Promise<DesktopAuthentication> {
     const session = testAuthSession();
 
     return {
-      getSession: () => Promise.resolve(session),
-      signIn: () => Promise.resolve(session),
+      getSession: async () => await Promise.resolve(session),
+      signIn: async () => await Promise.resolve(session),
     };
   }
 

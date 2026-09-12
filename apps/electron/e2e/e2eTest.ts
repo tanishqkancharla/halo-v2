@@ -33,7 +33,7 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
     const http = await HttpService.start();
     if (http instanceof Error) throw http;
     await using cleanup = new errore.AsyncDisposableStack();
-    cleanup.defer(() => http.close());
+    cleanup.defer(async () => await http.close());
     await use(http);
   },
   // oxlint-disable-next-line eslint/no-empty-pattern -- Playwright fixture callbacks require an object-destructured first parameter.
@@ -41,7 +41,7 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
     const llm = await LLMDriver.start();
     if (llm instanceof Error) throw llm;
     await using cleanup = new errore.AsyncDisposableStack();
-    cleanup.defer(() => llm.close());
+    cleanup.defer(async () => await llm.close());
     await use(llm);
   },
   // oxlint-disable-next-line eslint/no-empty-pattern -- Playwright fixture callbacks require an object-destructured first parameter.
@@ -86,7 +86,7 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
         if (closed instanceof Error) throw closed;
       });
       const app = new ElectronTestApp(testArtifacts);
-      cleanup.defer(() => app.quit());
+      cleanup.defer(async () => await app.quit());
       await app.open();
       await use(app);
     },
@@ -101,9 +101,10 @@ export const e2eTest = baseTest.extend<E2EFixtures>({
         await app.page.getByRole("main").waitFor();
         const loaded = await loadSessionDescription({
           description,
-          load: (input) => app.server.rpc.testHarness.loadSession(input),
-          getToolIdentity: (path) =>
-            app.server.rpc.testHarness.getToolIdentity({ path }),
+          load: async (input) =>
+            await app.server.rpc.testHarness.loadSession(input),
+          getToolIdentity: async (path) =>
+            await app.server.rpc.testHarness.getToolIdentity({ path }),
         });
         if (loaded instanceof Error) throw loaded;
         await app.page.reload();

@@ -92,8 +92,8 @@ export function serveHaloHttp(options: {
     return authorizations.has(authorization);
   };
   const interceptors: RPCHandlerOptions<object>["interceptors"] = [
-    ({ next, ...call }) =>
-      next({
+    async ({ next, ...call }) =>
+      await next({
         ...call,
         request: {
           ...call.request,
@@ -202,8 +202,11 @@ export async function closeHaloHttp(http: ListeningHaloHttp) {
   return await closing;
 }
 
-function listen(server: HttpServer, options: { host: string; port: number }) {
-  return new Promise<undefined | HaloHttpError>((resolve) => {
+async function listen(
+  server: HttpServer,
+  options: { host: string; port: number },
+) {
+  return await new Promise<undefined | HaloHttpError>((resolve) => {
     server.once("error", (error) => {
       resolve(new HaloHttpError({ detail: "listen failed", cause: error }));
     });

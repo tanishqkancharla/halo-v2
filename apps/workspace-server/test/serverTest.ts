@@ -21,7 +21,7 @@ export const serverTest = baseTest.extend<{
     const llm = await LLMDriver.start();
     if (llm instanceof Error) throw llm;
     await using cleanup = new errore.AsyncDisposableStack();
-    cleanup.defer(() => llm.close());
+    cleanup.defer(async () => await llm.close());
     await use(llm);
   },
   // oxlint-disable-next-line eslint/no-empty-pattern -- Vitest fixture callbacks require destructured parameters.
@@ -29,7 +29,7 @@ export const serverTest = baseTest.extend<{
     const http = await HttpService.start();
     if (http instanceof Error) throw http;
     await using cleanup = new errore.AsyncDisposableStack();
-    cleanup.defer(() => http.close());
+    cleanup.defer(async () => await http.close());
     await use(http);
   },
   server: async ({ createServer }, use) => {
@@ -41,7 +41,7 @@ export const serverTest = baseTest.extend<{
     await using artifactsCleanup = new errore.AsyncDisposableStack();
     const artifacts = await createTestArtifacts(task.id);
     const outcome = { passed: false };
-    artifactsCleanup.defer(() => artifacts.finish(outcome));
+    artifactsCleanup.defer(async () => await artifacts.finish(outcome));
     await using cleanup = new errore.AsyncDisposableStack();
     await use((options = {}) => {
       const server = new TestServer({
@@ -52,7 +52,7 @@ export const serverTest = baseTest.extend<{
             ? artifacts.paths.workspace
             : options.workspaceRoot,
       });
-      cleanup.defer(() => server.stop());
+      cleanup.defer(async () => await server.stop());
       return server;
     });
     await cleanup.disposeAsync();

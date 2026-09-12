@@ -76,13 +76,13 @@ export class ExtensionHost {
     return id;
   }
 
-  stop() {
-    return this.actionQueue.run(async () => {
+  async stop() {
+    return await this.actionQueue.run(async () => {
       const processes = [...this.processes.values()];
       this.processes.clear();
       this.toolTokens.clear();
       for (const result of await Promise.all(
-        processes.map((extension) => extension.stop()),
+        processes.map(async (extension) => await extension.stop()),
       )) {
         if (result instanceof Error)
           this.logger.warn({
@@ -93,8 +93,8 @@ export class ExtensionHost {
     });
   }
 
-  reload() {
-    return this.actionQueue.run(async () => {
+  async reload() {
+    return await this.actionQueue.run(async () => {
       const workspaceRoot = this.workspaceRoot;
       const directory = join(workspaceRoot, ".halo", "extensions");
       const entries = await this.filesystem.listDirectory(directory);

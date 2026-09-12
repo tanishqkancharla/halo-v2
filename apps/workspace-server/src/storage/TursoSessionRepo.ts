@@ -40,10 +40,10 @@ export class TursoSessionRepo implements SessionRepo {
     return new TursoSessionRepo(database);
   }
 
-  create(options: SessionCreateOptions | undefined) {
+  async create(options: SessionCreateOptions | undefined) {
     const createdAt = Date.now();
     const id = options?.id === undefined ? uuidv7(createdAt) : options.id;
-    return this.openSession(id, (connection) => {
+    return await this.openSession(id, (connection) => {
       const metadata: SessionMetadata = {
         id,
         createdAt,
@@ -65,8 +65,8 @@ export class TursoSessionRepo implements SessionRepo {
     });
   }
 
-  open(metadata: SessionMetadata) {
-    return this.openSession(
+  async open(metadata: SessionMetadata) {
+    return await this.openSession(
       metadata.id,
       (connection) => readSessionRow(connection, metadata.id).metadata,
     );
@@ -102,10 +102,10 @@ export class TursoSessionRepo implements SessionRepo {
     if (removed instanceof Error) throw removed;
   }
 
-  fork(source: SessionMetadata, options: ForkOptions) {
+  async fork(source: SessionMetadata, options: ForkOptions) {
     const createdAt = Date.now();
     const id = options.id === undefined ? uuidv7(createdAt) : options.id;
-    return this.openSession(id, (connection) => {
+    return await this.openSession(id, (connection) => {
       readSessionRow(connection, source.id);
       // SAFETY: The projection matches the session schema initialized by this repository.
       const entryRows = connection
@@ -184,13 +184,14 @@ export class TursoSessionRepo implements SessionRepo {
   async close() {
     this.closed = true;
     const results = await Promise.all(
-      [...this.sessions].map((session) =>
-        session
-          .close(BACKGROUND_CONTEXT)
-          .catch(
-            (cause) =>
-              new SessionBackendError({ detail: "Close session", cause }),
-          ),
+      [...this.sessions].map(
+        async (session) =>
+          await session
+            .close(BACKGROUND_CONTEXT)
+            .catch(
+              (cause) =>
+                new SessionBackendError({ detail: "Close session", cause }),
+            ),
       ),
     );
     return results.find((result) => result instanceof Error);

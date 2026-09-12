@@ -35,7 +35,10 @@ describe("Pi Storage conformance", () => {
     const { repo, database } = await openBackend();
     const session = await repo.create(undefined);
     const storage = new TursoStorage(database, session.metadata.id);
-    return { storage, [Symbol.asyncDispose]: () => storage.close() };
+    return {
+      storage,
+      [Symbol.asyncDispose]: async () => await storage.close(),
+    };
   })) {
     test(`${scenario.group}: ${scenario.name}`, scenario.run);
   }

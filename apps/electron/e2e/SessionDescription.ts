@@ -103,7 +103,7 @@ export async function loadSessionDescription(args: {
       timestamp,
     });
   }
-  return args
+  return await args
     .load({ title: args.description.title, messages })
     .catch((cause) => new LoadSessionError({ cause }));
 }

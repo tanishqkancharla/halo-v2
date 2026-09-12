@@ -51,16 +51,16 @@ export class DatabaseClient {
     return client;
   }
 
-  access<T>(
+  async access<T>(
     operation: (connection: Database) => T | Promise<T>,
   ): Promise<T | DatabaseError> {
-    return this.actionQueue
-      .run(() => operation(this.connection))
+    return await this.actionQueue
+      .run(async () => await operation(this.connection))
       .catch((cause) => new DatabaseError({ operation: "access", cause }));
   }
 
-  close() {
-    return this.actionQueue.run(() =>
+  async close() {
+    return await this.actionQueue.run(() =>
       errore.try({
         try: () => this.connection.close(),
         catch: (cause) => new DatabaseError({ operation: "close", cause }),

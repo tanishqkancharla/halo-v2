@@ -97,7 +97,7 @@ export const extensionTest = base.extend<
       await command("npm", ["run", "build"], directory);
       const dataDirectory = path.join(root, "data");
       let running: RunningExtension = await start(directory, dataDirectory);
-      cleanup.defer(() => running.stop());
+      cleanup.defer(async () => await running.stop());
       return {
         get url() {
           return running.url;

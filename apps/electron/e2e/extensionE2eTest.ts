@@ -29,7 +29,9 @@ export const extensionE2eTest = e2eTest.extend<
       await mkdir(parent, { recursive: true });
       const directory = await mkdtemp(path.join(parent, "packages-"));
       await using cleanup = new errore.AsyncDisposableStack();
-      cleanup.defer(() => rm(directory, { recursive: true, force: true }));
+      cleanup.defer(
+        async () => await rm(directory, { recursive: true, force: true }),
+      );
       const packed: string[] = [];
       for (const name of ["extension-sdk", "extension-tools"]) {
         const cwd = path.join(repository, "packages", name);

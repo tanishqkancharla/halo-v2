@@ -555,7 +555,7 @@ serverTest(
     await llm.respond(m.assistant("I kept going."));
 
     await expect
-      .poll(() => server.rpc.sessions.snapshot(session))
+      .poll(async () => await server.rpc.sessions.snapshot(session))
       .toMatchObject({
         lastRun: { status: "completed" },
       });
@@ -693,7 +693,7 @@ serverTest(
         },
       ]);
     await expect
-      .poll(() => server.rpc.sessions.snapshot(session))
+      .poll(async () => await server.rpc.sessions.snapshot(session))
       .toEqual(live);
 
     request.respond("The report is ready.");

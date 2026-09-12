@@ -24,14 +24,14 @@ export function FilePane({ path }: { path: string }) {
   const changingEntry = useIsMutating({ mutationKey: ["workspace-entry"] });
   const preview = useQuery({
     queryKey: ["workspace-preview", path],
-    queryFn: () => api.workspace.previewFile({ path }),
+    queryFn: async () => await api.workspace.previewFile({ path }),
     gcTime: 0,
   });
   const open = useMutation({
     mutationFn: async () => {
       const saved = await flushFileAutosaves();
       if (saved instanceof Error) throw saved;
-      return desktopApi.openWorkspaceFile(path);
+      return await desktopApi.openWorkspaceFile(path);
     },
   });
   const pane = useStyles(styles.pane);

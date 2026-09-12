@@ -115,7 +115,7 @@ export async function serveExtension(args: {
         },
       );
       if (closed instanceof Error) return closed;
-      return remote
+      return await remote
         .destroy()
         .catch(
           (cause) =>
@@ -146,7 +146,7 @@ export async function runExtension(args: {
     return;
   }
   let shutdownPromise: Promise<void> | undefined;
-  const shutdown = () => {
+  const shutdown = async () => {
     if (shutdownPromise === undefined) {
       shutdownPromise = running.close().then((closed) => {
         if (closed instanceof Error) {
@@ -156,21 +156,21 @@ export async function runExtension(args: {
         if (process.connected) process.disconnect();
       });
     }
-    return shutdownPromise;
+    return await shutdownPromise;
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
   if (process.send !== undefined) {
-    process.on("message", (message) => {
-      if (message === "shutdown") return shutdown();
+    process.on("message", async (message) => {
+      if (message === "shutdown") await shutdown();
     });
     process.once("disconnect", shutdown);
-    process.send(running.url, (cause) => {
+    process.send(running.url, async (cause) => {
       if (cause === null) return;
       console.warn(
         new ExtensionServerError({ operation: "announce server", cause }),
       );
-      return shutdown();
+      await shutdown();
     });
   }
   console.log(`Listening on ${running.url}`);

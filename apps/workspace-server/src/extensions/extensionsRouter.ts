@@ -15,7 +15,9 @@ export const extensionsRouter = os.router({
     if (extensions instanceof Error) return orpcErrors.badRequest(extensions);
     return extensions;
   }),
-  reload: os.reload.handler(({ context }) => context.extensions.reload()),
+  reload: os.reload.handler(
+    async ({ context }) => await context.extensions.reload(),
+  ),
 });
 
 const toolOs = baseOs.$context<{ toolRuntime: ToolRuntime }>();

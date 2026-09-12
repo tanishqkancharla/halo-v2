@@ -14,26 +14,26 @@ export type FindHaloRpcFileArgs = {
 
 export async function findHaloRpcFile(args: FindHaloRpcFileArgs) {
   if (args.rpcFile !== undefined && args.rpcFile.length > 0) {
-    return readHaloRpcFile(args.rpcFile);
+    return await readHaloRpcFile(args.rpcFile);
   }
 
   if (args.userDataDir !== undefined && args.userDataDir.length > 0) {
-    return readHaloRpcFile(rpcFilePath(args.userDataDir));
+    return await readHaloRpcFile(rpcFilePath(args.userDataDir));
   }
 
   const platformFile = platformRpcFile(args);
   if (platformFile !== undefined && existsSync(platformFile)) {
-    return readHaloRpcFile(platformFile);
+    return await readHaloRpcFile(platformFile);
   }
 
   const walked = walkUpRpcFile(args.cwd);
-  if (walked !== undefined) return readHaloRpcFile(walked);
+  if (walked !== undefined) return await readHaloRpcFile(walked);
 
   return new HaloRpcFileError({ detail: "Halo is not running" });
 }
 
-export function findHaloRpcFileFromEnv() {
-  return findHaloRpcFile({
+export async function findHaloRpcFileFromEnv() {
+  return await findHaloRpcFile({
     rpcFile: process.env.HALO_RPC_FILE,
     userDataDir: process.env.HALO_USER_DATA,
     cwd: process.cwd(),

@@ -24,8 +24,8 @@ type HarnessTools = {
 
 export function createHarnessTools(getClient: () => HaloClient): HarnessTools {
   return createORPCClient<HarnessTools>({
-    call(path, input, options) {
-      return getClient().testHarness.invokeTool(
+    async call(path, input, options) {
+      return await getClient().testHarness.invokeTool(
         { path: path.join("."), input },
         { signal: options.signal },
       );

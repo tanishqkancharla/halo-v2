@@ -14,7 +14,7 @@ export async function createElectronApi({
 }): Promise<Error | HaloClient | undefined> {
   const connection = await desktopApi.getConnection();
   if (connection === undefined) return undefined;
-  return connectHaloRpc({
+  return await connectHaloRpc({
     connection,
     onDisconnect,
   });

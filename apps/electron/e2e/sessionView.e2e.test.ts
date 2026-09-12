@@ -371,24 +371,26 @@ e2eTest(
     const code = details.getByRole("code");
     await expect(code).toHaveText([js, result]);
     await expect
-      .poll(() =>
-        details.evaluate((element) =>
-          Array.from(element.querySelectorAll("pre")).every(
-            (block) => block.scrollWidth <= block.clientWidth,
+      .poll(
+        async () =>
+          await details.evaluate((element) =>
+            Array.from(element.querySelectorAll("pre")).every(
+              (block) => block.scrollWidth <= block.clientWidth,
+            ),
           ),
-        ),
       )
       .toBe(true);
     for (const block of await code.all()) {
       await expect
-        .poll(() =>
-          block.evaluate((element) => {
-            const range = document.createRange();
-            range.selectNodeContents(element);
-            return new Set(
-              Array.from(range.getClientRects(), (rect) => rect.top),
-            ).size;
-          }),
+        .poll(
+          async () =>
+            await block.evaluate((element) => {
+              const range = document.createRange();
+              range.selectNodeContents(element);
+              return new Set(
+                Array.from(range.getClientRects(), (rect) => rect.top),
+              ).size;
+            }),
         )
         .toBeGreaterThan(1);
     }
@@ -740,17 +742,18 @@ async function expectThinkingVisible(indicator: Locator) {
   await expect(indicator).toBeVisible();
   // The status container can be visible even when its animated dots have no painted area.
   await expect
-    .poll(() =>
-      indicator.evaluate((element) =>
-        Array.from(element.children).some((dot) => {
-          const bounds = dot.getBoundingClientRect();
-          return (
-            bounds.width > 0 &&
-            bounds.height > 0 &&
-            Number(getComputedStyle(dot).opacity) > 0
-          );
-        }),
-      ),
+    .poll(
+      async () =>
+        await indicator.evaluate((element) =>
+          Array.from(element.children).some((dot) => {
+            const bounds = dot.getBoundingClientRect();
+            return (
+              bounds.width > 0 &&
+              bounds.height > 0 &&
+              Number(getComputedStyle(dot).opacity) > 0
+            );
+          }),
+        ),
     )
     .toBe(true);
 }
