@@ -1,5 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
-import type { ControlPlaneSession } from "@get-halo/control-plane-contract";
+import type { ControlPlaneSession } from "@get-halo/shared/controlPlaneContract";
 import type { HaloRpcConnection } from "./rpc.js";
 
 export type AppUpdateStatus =
