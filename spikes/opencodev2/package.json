@@ -1,0 +1,21 @@
+{
+  "name": "@get-halo/opencode-v2-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "embedded": "bun run src/spike.ts",
+    "spike": "bun run src/NetworkSpike.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.2",
+    "@opencode/plugin": "2.0.2",
+    "@opencode/sdk": "2.0.2",
+    "@opencode/server": "2.0.2",
+    "effect": "4.0.0-rc.112"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "typescript": "7.0.2"
+  }
+}
