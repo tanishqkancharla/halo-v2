@@ -2,15 +2,16 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
-import type { Model } from "@earendil-works/pi-ai";
+import type { Model, ThinkingLevel } from "@earendil-works/pi-ai";
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import { ApplicationMode } from "./ApplicationMode.js";
-import { readGcpSecret } from "./readGcpSecret.js";
 
-const openAiApiKeySecretId = "halo-dev-local-openai-api-key";
-const secretProjectId = "halo-relay";
+const inferenceProjectId = "halo-relay";
+const inferenceLocation = "global";
+// Pi reserves this credential value to select Vertex Application Default Credentials.
+const vertexAdcMarker = "gcp-vertex-credentials";
 const developmentUserSchema = Type.Object({
   id: Type.String({ minLength: 1 }),
 });
@@ -64,6 +65,8 @@ type PiInferenceConfig = {
     provider: string;
     modelId: string;
     apiKey: string;
+    environment: Record<string, string>;
+    reasoning: ThinkingLevel;
   };
 };
 
@@ -85,7 +88,7 @@ async function readConfig(): Promise<WorkspaceServerApplicationConfig | Error> {
       ? await readDevelopmentConfig()
       : await readConfigFile(configPath);
   if (server instanceof Error) return server;
-  const inference = await readInferenceConfig(server.workspaceRoot);
+  const inference = readInferenceConfig(server.workspaceRoot);
   if (inference instanceof Error) return inference;
   const mode =
     configPath === undefined
@@ -235,9 +238,9 @@ async function readExistingDevelopmentUserId(userPath: string) {
   return parsed.id;
 }
 
-async function readInferenceConfig(
+function readInferenceConfig(
   workspaceRoot: string,
-): Promise<OpenAIInferenceConfig | PiInferenceConfig | Error> {
+): OpenAIInferenceConfig | PiInferenceConfig | Error {
   const configured = process.env.HALO_LLM_CONFIG;
   if (configured !== undefined) {
     const options = errore.try({
@@ -253,18 +256,18 @@ async function readInferenceConfig(
     return { backend: "openAI", options };
   }
 
-  const apiKey = await readGcpSecret({
-    projectId: secretProjectId,
-    secretId: openAiApiKeySecretId,
-  });
-  if (apiKey instanceof Error) return apiKey;
   return {
     backend: "pi",
     options: {
       agentDir: path.join(workspaceRoot, ".pi", "agent"),
-      provider: "openai",
-      modelId: "gpt-5.6-terra",
-      apiKey,
+      provider: "google-vertex",
+      modelId: "gemini-3.8-flash",
+      apiKey: vertexAdcMarker,
+      environment: {
+        GOOGLE_CLOUD_PROJECT: inferenceProjectId,
+        GOOGLE_CLOUD_LOCATION: inferenceLocation,
+      },
+      reasoning: "low",
     },
   };
 }

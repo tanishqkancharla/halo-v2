@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { ThinkingLevel } from "@earendil-works/pi-ai";
 import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import * as errore from "errore";
@@ -14,6 +15,8 @@ export async function createPiLLMApi(options: {
   provider: string;
   modelId: string;
   apiKey: string;
+  environment: Record<string, string>;
+  reasoning: ThinkingLevel;
 }): Promise<LLMApi | PiLLMApiError> {
   registerBunOAuthFlows();
   const runtime = await ModelRuntime.create({
@@ -29,7 +32,16 @@ export async function createPiLLMApi(options: {
   if (model === undefined) return new PiLLMApiError(options);
   return {
     model,
-    stream: (context, streamOptions) =>
-      runtime.streamSimple(model, context, streamOptions),
+    stream: (context, streamOptions) => {
+      const reasoning =
+        streamOptions?.reasoning === undefined
+          ? options.reasoning
+          : streamOptions.reasoning;
+      return runtime.streamSimple(model, context, {
+        ...streamOptions,
+        env: options.environment,
+        reasoning,
+      });
+    },
   };
 }

@@ -17,9 +17,14 @@ const controlPlaneImage = configuration.require("controlPlaneImage");
 const workspaceImage = configuration.require("workspaceImage");
 const googleClientIdSecretId = `${name}-control-plane-google-client-id`;
 const googleClientSecretId = `${name}-control-plane-google-client-secret`;
-const openAiApiKeySecretId = "halo-dev-local-openai-api-key";
 const projectInfo = gcp.organizations.getProjectOutput({ projectId: project });
 const controlPlaneOrigin = pulumi.interpolate`https://${controlPlaneServiceName}-${projectInfo.number}.${region}.run.app`;
+
+const vertexAi = new gcp.projects.Service("vertex-ai", {
+  project,
+  service: "aiplatform.googleapis.com",
+  disableOnDestroy: false,
+});
 
 const network = new gcp.compute.Network("network", {
   name,
@@ -130,14 +135,14 @@ const workspaceLogAccess = new gcp.projects.IAMMember("workspace-logs", {
   role: "roles/logging.logWriter",
   member: pulumi.interpolate`serviceAccount:${workspaceRuntime.email}`,
 });
-const workspaceInferenceAccess = new gcp.secretmanager.SecretIamMember(
-  "workspace-inference-secret",
+const workspaceInferenceAccess = new gcp.projects.IAMMember(
+  "workspace-inference",
   {
     project,
-    secretId: openAiApiKeySecretId,
-    role: "roles/secretmanager.secretAccessor",
+    role: "roles/aiplatform.user",
     member: pulumi.interpolate`serviceAccount:${workspaceRuntime.email}`,
   },
+  { dependsOn: [vertexAi] },
 );
 
 const controlPlaneComputeAccess = new gcp.projects.IAMMember(
