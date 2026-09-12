@@ -4,7 +4,7 @@ import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import { expect, test } from "vitest";
-import { AuthService } from "../src/AuthService.js";
+import { AuthService } from "../src/auth/AuthService.js";
 
 const testAuth = {
   secret: "test-control-plane-auth-secret-key!",

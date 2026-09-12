@@ -14,9 +14,9 @@ import {
   desktopRequestSchema,
   type DesktopRequest,
   type OpenExternalRequest,
-} from "../shared/desktop.js";
-import { getAppInfo, installAppUpdate } from "./app/AppUpdate.js";
-import type { DesktopAuthentication } from "./ControlPlaneAuth.js";
+} from "../../shared/desktop.js";
+import { getAppInfo, installAppUpdate } from "../app/appUpdate.js";
+import type { DesktopAuthentication } from "../auth/ControlPlaneAuth.js";
 
 class DesktopRequestError extends errore.createTaggedError({
   name: "DesktopRequestError",

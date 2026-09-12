@@ -12,7 +12,7 @@ import { anyAbortSignal } from "@orpc/shared";
 import * as errore from "errore";
 import { handleOAuthCallback } from "./oauth.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
-import { extensionToolRouter } from "./extensions/extensionsRouter.js";
+import { extensionToolRouter } from "../extensions/extensionsRouter.js";
 
 type HaloHttpConnection = {
   host: string;
