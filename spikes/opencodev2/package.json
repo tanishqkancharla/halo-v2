@@ -1,0 +1,17 @@
+{
+  "name": "@get-halo/opencode-v2-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "spike": "bun run src/spike.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opencode/plugin": "2.0.1",
+    "@opencode/sdk": "2.0.1"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "typescript": "7.0.2"
+  }
+}
