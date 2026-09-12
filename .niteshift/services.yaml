@@ -1,0 +1,12 @@
+services:
+  - name: halo
+    command: |
+      export HALO_WORKSPACE_ROOT="$PWD"
+      exec pnpm dev
+    environment:
+      - name: DISPLAY
+        value: :99
+      - name: HALO_USE_SWIFTSHADER
+        value: 1
+      - name: ELECTRON_DISABLE_SANDBOX
+        value: 1

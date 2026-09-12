@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repository_root="${NITESHIFT_CHECKOUT_ROOT}/halo-v2"
+cd "$repository_root"
+
+for generated_path in ".agents/skills/halo-extension/" ".pi/"; do
+  if ! grep -qxF "$generated_path" .git/info/exclude; then
+    printf '%s\n' "$generated_path" >> .git/info/exclude
+  fi
+done
+
+pnpm install --frozen-lockfile
+pnpm --filter @halo/desktop exec playwright install chromium
