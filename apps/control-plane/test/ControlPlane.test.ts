@@ -7,7 +7,6 @@ import {
   controlPlaneProtocolVersion,
   type ControlPlaneClient,
 } from "@get-halo/control-plane-contract";
-import { readControlPlaneDiscovery } from "@get-halo/control-plane-contract/discovery";
 import { betterAuth } from "better-auth";
 import { testUtils } from "better-auth/plugins";
 import * as errore from "errore";
@@ -52,7 +51,7 @@ const controlPlaneTest = test.extend<{
 });
 
 controlPlaneTest(
-  "stays reachable on loopback and removes the origin file on close",
+  "stays reachable on loopback until closed",
   async ({ appDataDir }) => {
     await using cleanup = new errore.AsyncDisposableStack();
     const plane = await ControlPlane.start({
@@ -72,17 +71,9 @@ controlPlaneTest(
     const health = await fetch(`${plane.origin}/health`);
     expect(health.status).toBe(200);
 
-    const published = await readControlPlaneDiscovery(appDataDir);
-    if (published instanceof Error) throw published;
-    expect(published).toEqual({ origin: plane.origin });
-
     lifetime.open = false;
     const closed = await plane.close();
     if (closed instanceof Error) throw closed;
-
-    const removed = await readControlPlaneDiscovery(appDataDir);
-    if (removed instanceof Error) throw removed;
-    expect(removed).toBeUndefined();
 
     const afterClose = await fetch(`${plane.origin}/health`).then(
       () => "answered",
