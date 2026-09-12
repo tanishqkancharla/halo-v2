@@ -30,6 +30,7 @@ export default defineConfig({
   },
   clearScreen: false,
   server: {
+    allowedHosts: [".preview.niteshift.dev"],
     port: rendererPort === undefined ? 1420 : Number(rendererPort),
     strictPort: true,
   },

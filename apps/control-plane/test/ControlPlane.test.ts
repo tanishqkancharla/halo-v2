@@ -6,7 +6,7 @@ import { RPCLink } from "@orpc/client/fetch";
 import {
   controlPlaneProtocolVersion,
   type ControlPlaneClient,
-} from "@get-halo/control-plane-contract";
+} from "@get-halo/shared/controlPlaneContract";
 import { betterAuth } from "better-auth";
 import { testUtils } from "better-auth/plugins";
 import * as errore from "errore";

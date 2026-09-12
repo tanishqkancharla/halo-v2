@@ -2,7 +2,7 @@ import {
   controlPlaneContract,
   controlPlaneProtocolVersion,
   type ControlPlaneSession,
-} from "@get-halo/control-plane-contract";
+} from "@get-halo/shared/controlPlaneContract";
 import { implement, ORPCError } from "@orpc/server";
 import type {
   RequestHeadersHandlerPluginContext,

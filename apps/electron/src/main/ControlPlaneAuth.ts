@@ -13,7 +13,7 @@ import { RPCLink } from "@orpc/client/fetch";
 import {
   type ControlPlaneClient,
   type ControlPlaneSession,
-} from "@get-halo/control-plane-contract";
+} from "@get-halo/shared/controlPlaneContract";
 import { SerialQueue } from "@get-halo/shared/SerialQueue";
 import { safeStorage, shell } from "electron";
 import * as errore from "errore";
