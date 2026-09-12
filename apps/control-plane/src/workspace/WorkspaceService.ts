@@ -169,28 +169,26 @@ export class WorkspaceService {
     return workspace;
   }
 
-  private migrate() {
+  private async migrate() {
     const client = this.db.client;
 
     if (client instanceof DatabaseSync) {
-      return Promise.resolve(
-        errore.try({
-          try: () =>
-            client.exec(`CREATE TABLE IF NOT EXISTS workspace (
-              id TEXT PRIMARY KEY,
-              user_id TEXT NOT NULL UNIQUE REFERENCES "user"(id) ON DELETE CASCADE,
-              created_at TEXT NOT NULL
-            )`),
-          catch: (cause) =>
-            new WorkspaceServiceError({
-              detail: "migrate SQLite schema",
-              cause,
-            }),
-        }),
-      );
+      return errore.try({
+        try: () =>
+          client.exec(`CREATE TABLE IF NOT EXISTS workspace (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL UNIQUE REFERENCES "user"(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL
+          )`),
+        catch: (cause) =>
+          new WorkspaceServiceError({
+            detail: "migrate SQLite schema",
+            cause,
+          }),
+      });
     }
 
-    return client
+    return await client
       .query(`CREATE TABLE IF NOT EXISTS workspace (
         id UUID PRIMARY KEY,
         user_id TEXT NOT NULL UNIQUE REFERENCES "user"(id) ON DELETE CASCADE,

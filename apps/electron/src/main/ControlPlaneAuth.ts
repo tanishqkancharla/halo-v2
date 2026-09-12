@@ -87,8 +87,8 @@ export class ControlPlaneAuth implements DesktopAuthentication {
     return await this.actionQueue.run(async () => await this.signInUnqueued());
   }
 
-  getWorkspaceConnection() {
-    return this.actionQueue.run(async () => {
+  async getWorkspaceConnection() {
+    return await this.actionQueue.run(async () => {
       if (this.token === undefined) return undefined;
 
       const connection = {

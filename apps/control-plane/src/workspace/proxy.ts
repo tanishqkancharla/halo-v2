@@ -120,7 +120,7 @@ export class WorkspaceGateway {
   }
 }
 
-function forwardWorkspaceRequest(ctx: {
+async function forwardWorkspaceRequest(ctx: {
   authorization: string;
   origin: string;
   request: IncomingMessage;
@@ -136,7 +136,7 @@ function forwardWorkspaceRequest(ctx: {
     ctx.origin,
   );
 
-  return new Promise<void>((resolve) => {
+  return await new Promise<void>((resolve) => {
     const upstreamRequest = http.request(
       target,
       {
