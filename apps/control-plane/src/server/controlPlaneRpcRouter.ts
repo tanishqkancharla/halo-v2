@@ -13,7 +13,7 @@ import {
   type AuthService,
   InvalidDesktopAuthCodeError,
   InvalidDesktopSignInRequestError,
-} from "./AuthService.js";
+} from "../auth/AuthService.js";
 
 export type ControlPlaneContext = RequestHeadersHandlerPluginContext &
   ResponseHeadersHandlerPluginContext & {

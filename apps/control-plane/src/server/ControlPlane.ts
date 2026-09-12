@@ -1,13 +1,13 @@
 import { join } from "node:path";
 import type { ControlPlaneConfig } from "@get-halo/config/controlPlane";
 import * as errore from "errore";
-import { AuthService, type AuthDatabaseConfig } from "./AuthService.js";
+import { AuthService, type AuthDatabaseConfig } from "../auth/AuthService.js";
 import {
   closeControlPlaneHttp,
   type ListeningControlPlaneHttp,
   listenControlPlaneHttp,
   serveControlPlaneHttp,
-} from "./ControlPlaneHttp.js";
+} from "./controlPlaneHttp.js";
 
 const loopbackHost = "127.0.0.1";
 const cloudRunHost = "0.0.0.0";

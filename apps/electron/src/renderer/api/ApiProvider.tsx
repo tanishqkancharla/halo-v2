@@ -20,7 +20,7 @@ import { desktopApi } from "./electron.js";
 import {
   IncompatibleServerError,
   type HaloRpcConnectionError,
-} from "./HaloRpcClient.js";
+} from "./connectHaloRpc.js";
 
 type ApiContextValue = {
   api: HaloClient;

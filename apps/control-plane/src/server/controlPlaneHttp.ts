@@ -15,11 +15,11 @@ import {
   type AuthService,
   DesktopAuthRequiredError,
   InvalidDesktopSignInRequestError,
-} from "./AuthService.js";
+} from "../auth/AuthService.js";
 import {
   controlPlaneRpcRouter,
   type ControlPlaneContext,
-} from "./ControlPlaneRouter.js";
+} from "./controlPlaneRpcRouter.js";
 
 const requestUrlBase = "http://localhost";
 

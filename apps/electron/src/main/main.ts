@@ -22,12 +22,12 @@ import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
 import started from "electron-squirrel-startup";
 import { LOG_CHANNELS } from "../shared/channels.js";
 import { readWorkspaceServerConnection } from "@get-halo/workspace-server/connection";
-import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
+import { checkForUpdates, startAppUpdates } from "./app/appUpdate.js";
 import {
   ControlPlaneAuth,
   type DesktopAuthentication,
-} from "./ControlPlaneAuth.js";
-import { registerDesktopApi } from "./DesktopApi.js";
+} from "./auth/ControlPlaneAuth.js";
+import { registerDesktopApi } from "./api/registerDesktopApi.js";
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
