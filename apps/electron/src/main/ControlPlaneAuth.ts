@@ -104,7 +104,18 @@ export class ControlPlaneAuth implements DesktopAuthentication {
         }),
     );
     if (session instanceof Error) return session;
-    if (session !== undefined) return session;
+    if (session !== undefined) {
+      const workspace = await client.workspace.ensure().catch(
+        (cause) =>
+          new ControlPlaneAuthError({
+            operation: "prepare your workspace",
+            cause,
+          }),
+      );
+      if (workspace instanceof Error) return workspace;
+
+      return session;
+    }
 
     const removed = await this.sessionStore.remove();
     if (removed instanceof Error) return removed;
@@ -157,6 +168,17 @@ export class ControlPlaneAuth implements DesktopAuthentication {
         }),
     );
     if (exchanged instanceof Error) return exchanged;
+
+    const workspace = await this.createClient(exchanged.token)
+      .workspace.ensure()
+      .catch(
+        (cause) =>
+          new ControlPlaneAuthError({
+            operation: "prepare your workspace",
+            cause,
+          }),
+      );
+    if (workspace instanceof Error) return workspace;
 
     const saved = await this.sessionStore.write(exchanged.token);
     if (saved instanceof Error) return saved;

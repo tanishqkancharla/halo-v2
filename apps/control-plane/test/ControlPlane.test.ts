@@ -23,6 +23,7 @@ const desktopAuthState = "desktop-auth-state-0123456789abcdef";
 
 const controlPlaneTest = test.extend<{
   appDataDir: string;
+  authenticatedRpc: ControlPlaneClient;
   plane: ControlPlane;
   rpc: ControlPlaneClient;
 }>({
@@ -47,6 +48,30 @@ const controlPlaneTest = test.extend<{
   },
   rpc: async ({ plane }, use) => {
     await use(createControlPlaneRpcClient(plane.origin));
+  },
+  authenticatedRpc: async ({ appDataDir, plane, rpc }, use) => {
+    const browserHeaders = await createAuthenticatedHeaders(
+      appDataDir,
+      plane.origin,
+    );
+    const complete = new URL("/api/desktop-auth/complete", plane.origin);
+    complete.searchParams.set(
+      "callback",
+      "http://127.0.0.1:49152/auth/callback",
+    );
+    complete.searchParams.set("state", desktopAuthState);
+
+    const completion = await fetch(complete, {
+      headers: browserHeaders,
+      redirect: "manual",
+    });
+    const location = completion.headers.get("location");
+    if (location === null) throw new Error("Desktop sign-in did not complete");
+    const code = new URL(location).searchParams.get("code");
+    if (code === null) throw new Error("Desktop sign-in did not return a code");
+
+    const session = await rpc.auth.exchange({ code });
+    await use(createControlPlaneRpcClient(plane.origin, session.token));
   },
 });
 
@@ -95,6 +120,15 @@ controlPlaneTest("serves the typed control-plane RPC", async ({ rpc }) => {
   });
   expect(await rpc.auth.session()).toBeUndefined();
 });
+
+controlPlaneTest(
+  "requires authentication to ensure a workspace",
+  async ({ rpc }) => {
+    await expect(rpc.workspace.ensure()).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+  },
+);
 
 controlPlaneTest(
   "starts Google sign-in in the browser with its state cookie",
@@ -172,6 +206,20 @@ controlPlaneTest(
   },
 );
 
+controlPlaneTest(
+  "ensures one durable workspace for an authenticated user",
+  async ({ authenticatedRpc }) => {
+    const first = await authenticatedRpc.workspace.ensure();
+    const second = await authenticatedRpc.workspace.ensure();
+
+    expect(second).toEqual(first);
+    expect(first.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+    );
+    expect(new Date(first.createdAt).toISOString()).toBe(first.createdAt);
+  },
+);
+
 function createControlPlaneRpcClient(origin: string, token?: string) {
   const link = new RPCLink({
     origin,
@@ -184,7 +232,7 @@ function createControlPlaneRpcClient(origin: string, token?: string) {
 }
 
 async function createAuthenticatedHeaders(appDataDir: string, origin: string) {
-  using database = new DatabaseSync(join(appDataDir, "auth.db"));
+  using database = new DatabaseSync(join(appDataDir, "control-plane.db"));
   const auth = betterAuth({
     baseURL: origin,
     secret: testAuth.secret,
