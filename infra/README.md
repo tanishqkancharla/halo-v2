@@ -153,10 +153,13 @@ using Application Default Credentials locally and their attached service account
 on GCP. Secret values are never stored in a local environment file or injected as
 process environment variables. The development stack reads these secret names:
 
-- `halo-dev-local-openai-api-key`
 - `halo-dev-local-better-auth-secret`
 - `halo-dev-control-plane-google-client-id`
 - `halo-dev-control-plane-google-client-secret`
+
+Workspace inference uses `google-vertex/gemini-3.8-flash` through Vertex AI.
+Local development uses the active ADC identity. Production workspace VMs use
+their attached service accounts, which Pulumi grants `roles/aiplatform.user`.
 
 References: [GCP authentication](https://www.pulumi.com/registry/packages/gcp/installation-configuration/),
 [GCS backends](https://www.pulumi.com/docs/iac/operations/stack-management/using-a-diy-backend/),
