@@ -17,6 +17,7 @@ const controlPlaneImage = configuration.require("controlPlaneImage");
 const workspaceImage = configuration.require("workspaceImage");
 const googleClientIdSecretId = `${name}-control-plane-google-client-id`;
 const googleClientSecretId = `${name}-control-plane-google-client-secret`;
+const openAiApiKeySecretId = "halo-dev-local-openai-api-key";
 const projectInfo = gcp.organizations.getProjectOutput({ projectId: project });
 const controlPlaneOrigin = pulumi.interpolate`https://${controlPlaneServiceName}-${projectInfo.number}.${region}.run.app`;
 
@@ -117,6 +118,20 @@ const workspaceImageAccess = new gcp.artifactregistry.RepositoryIamMember(
     member: pulumi.interpolate`serviceAccount:${workspaceRuntime.email}`,
   },
 );
+const workspaceLogAccess = new gcp.projects.IAMMember("workspace-logs", {
+  project,
+  role: "roles/logging.logWriter",
+  member: pulumi.interpolate`serviceAccount:${workspaceRuntime.email}`,
+});
+const workspaceInferenceAccess = new gcp.secretmanager.SecretIamMember(
+  "workspace-inference-secret",
+  {
+    project,
+    secretId: openAiApiKeySecretId,
+    role: "roles/secretmanager.secretAccessor",
+    member: pulumi.interpolate`serviceAccount:${workspaceRuntime.email}`,
+  },
+);
 
 const controlPlaneComputeAccess = new gcp.projects.IAMMember(
   "control-plane-compute",
@@ -168,7 +183,13 @@ const workspaceTemplate = new gcp.compute.InstanceTemplate(
       registry: `${region}-docker.pkg.dev`,
     }),
   },
-  { dependsOn: [workspaceImageAccess] },
+  {
+    dependsOn: [
+      workspaceImageAccess,
+      workspaceInferenceAccess,
+      workspaceLogAccess,
+    ],
+  },
 );
 
 const databasePassword = new random.RandomPassword("database-password", {
@@ -374,6 +395,12 @@ const controlPlane = new gcp.cloudrunv2.Service(
             {
               name: "GOOGLE_CLIENT_SECRET_ID",
               value: googleClientSecretId,
+            },
+            { name: "WORKSPACE_PROJECT_ID", value: project },
+            { name: "WORKSPACE_ZONE", value: zone },
+            {
+              name: "WORKSPACE_INSTANCE_TEMPLATE",
+              value: workspaceTemplate.name,
             },
           ],
         },

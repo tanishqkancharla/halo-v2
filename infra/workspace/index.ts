@@ -75,7 +75,11 @@ const instance = new gcp.compute.Instance(
       email: identity.email,
       scopes: ["https://www.googleapis.com/auth/cloud-platform"],
     },
-    metadata: { "enable-oslogin": "TRUE", "block-project-ssh-keys": "TRUE" },
+    metadata: {
+      "enable-oslogin": "TRUE",
+      "block-project-ssh-keys": "TRUE",
+      "halo-owner-user-id": "development",
+    },
     metadataStartupScript: workspaceStartup({
       image,
       registry: `${region}-docker.pkg.dev`,
