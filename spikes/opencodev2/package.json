@@ -3,12 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "spike": "bun run src/spike.ts",
+    "embedded": "bun run src/spike.ts",
+    "spike": "bun run src/NetworkSpike.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@opencode/plugin": "2.0.1",
-    "@opencode/sdk": "2.0.1"
+    "@opencode/client": "2.0.2",
+    "@opencode/plugin": "2.0.2",
+    "@opencode/sdk": "2.0.2",
+    "@opencode/server": "2.0.2",
+    "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
     "@types/bun": "1.4.2",

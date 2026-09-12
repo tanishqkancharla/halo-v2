@@ -1,106 +1,11 @@
 import assert from "node:assert/strict";
 import { rm } from "node:fs/promises";
 import path from "node:path";
-import { Plugin } from "@opencode/plugin";
 import { OpenCode, type OpenCodeEvent } from "@opencode/sdk";
+import executorBridge, { executorCalls } from "./executorBridge/index.js";
+import { messageText, ScriptedModel } from "./ScriptedModel.js";
 
 type OpenCodeHost = OpenCode.Interface;
-type ChatMessage = {
-  role: string;
-  content?: unknown;
-};
-type ChatRequest = {
-  model: string;
-  messages: ChatMessage[];
-};
-type ExecutorCall = {
-  operation: string;
-};
-type CompletionDelta = {
-  role?: string;
-  content?: string;
-  tool_calls?: Array<{
-    index: number;
-    id: string;
-    type: string;
-    function: { name: string; arguments: string };
-  }>;
-};
-
-class ScriptedModel {
-  // Records requests so the spike can inspect the real model boundary.
-  readonly requests: ChatRequest[] = [];
-
-  // Hosts the local OpenAI-compatible model endpoint.
-  private readonly server: Bun.Server<undefined>;
-
-  // Resolves once a deliberately blocked model request reaches the server.
-  private blocked = false;
-
-  // Releases the blocked response after OpenCode interrupts its run.
-  private releaseBlockedResponse: (() => void) | undefined;
-
-  constructor(ctx: { port: number }) {
-    const { port } = ctx;
-    this.server = Bun.serve({
-      port,
-      fetch: (request) => this.respond(request),
-    });
-  }
-
-  get baseURL() {
-    return `http://127.0.0.1:${this.server.port}/v1`;
-  }
-
-  get isBlocked() {
-    return this.blocked;
-  }
-
-  async close() {
-    this.releaseBlockedResponse?.();
-    await this.server.stop(true);
-  }
-
-  releaseBlocked() {
-    this.releaseBlockedResponse?.();
-  }
-
-  private async respond(request: Request): Promise<Response> {
-    // SAFETY: This private test server only receives requests from the configured OpenCode client.
-    const input = (await request.json()) as ChatRequest;
-    this.requests.push(input);
-    const system = messageText(input.messages[0]);
-    if (system.includes("title generator"))
-      return textResponse(input.model, ["OpenCode migration spike"]);
-
-    const user = input.messages
-      .toReversed()
-      .find((message) => message.role === "user");
-    const prompt = messageText(user);
-    const hasToolResult = input.messages.some(
-      (message) => message.role === "tool",
-    );
-    if (prompt.includes("integration") && !hasToolResult) {
-      return toolResponse(input.model, "execute", {
-        code: 'return await tools.halo.integration({ operation: "gmail.search" })',
-      });
-    }
-    if (hasToolResult)
-      return textResponse(input.model, ["Executor bridge complete."]);
-    if (prompt.includes("block")) return this.block(request, input.model);
-    return textResponse(input.model, ["Hello ", "from OpenCode."]);
-  }
-
-  private block(request: Request, model: string): Promise<Response> {
-    this.blocked = true;
-    return new Promise((resolve) => {
-      const release = () =>
-        resolve(textResponse(model, ["Released after interrupt."]));
-      this.releaseBlockedResponse = release;
-      request.signal.addEventListener("abort", release, { once: true });
-    });
-  }
-}
 
 const workspaceRoot = path.resolve(import.meta.dir, "../../..");
 const databasePath = path.resolve(import.meta.dir, "../spike.db");
@@ -109,40 +14,6 @@ await Promise.all([
   rm(`${databasePath}-shm`, { force: true }),
   rm(`${databasePath}-wal`, { force: true }),
 ]);
-
-const executorCalls: ExecutorCall[] = [];
-const executorBridge = Plugin.define({
-  id: "halo.executor.bridge",
-  async setup(context) {
-    await context.tool.transform((editor) => {
-      editor.namespace({
-        name: "halo",
-        description: "Halo integration tools backed by Executor.",
-      });
-      editor.add({
-        name: "integration",
-        description: "Call a connected Halo integration through Executor.",
-        input: {
-          type: "object",
-          properties: { operation: { type: "string" } },
-          required: ["operation"],
-          additionalProperties: false,
-        },
-        options: { namespace: "halo", codemode: true },
-        async execute(input, tool) {
-          // SAFETY: OpenCode validates tool input against the object schema above before execution.
-          const call = input as ExecutorCall;
-          executorCalls.push(call);
-          await tool.progress({ phase: "executor.invoke" });
-          return {
-            content: JSON.stringify({ ok: true, operation: call.operation }),
-            metadata: { backend: "executor" },
-          };
-        },
-      });
-    });
-  },
-});
 
 const scriptedModel = new ScriptedModel({ port: 0 });
 const firstHost = await createHost(scriptedModel);
@@ -410,12 +281,6 @@ function assistantText(
     .join("\n");
 }
 
-function messageText(message: ChatMessage | undefined) {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- OpenAI message content may be text or structured content.
-  if (message === undefined || typeof message.content !== "string") return "";
-  return message.content;
-}
-
 async function waitFor(description: string, predicate: () => Promise<boolean>) {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
@@ -423,59 +288,4 @@ async function waitFor(description: string, predicate: () => Promise<boolean>) {
     await Bun.sleep(25);
   }
   assert.fail(`Timed out waiting for ${description}`);
-}
-
-function textResponse(model: string, text: string[]) {
-  const id = crypto.randomUUID();
-  return eventStream([
-    chunk(id, model, { role: "assistant" }),
-    ...text.map((part) => chunk(id, model, { content: part })),
-    chunk(id, model, {}, "stop"),
-  ]);
-}
-
-function toolResponse(model: string, name: string, input: { code: string }) {
-  const id = crypto.randomUUID();
-  return eventStream([
-    chunk(id, model, { role: "assistant" }),
-    chunk(id, model, {
-      tool_calls: [
-        {
-          index: 0,
-          id: `call_${crypto.randomUUID()}`,
-          type: "function",
-          function: { name, arguments: JSON.stringify(input) },
-        },
-      ],
-    }),
-    chunk(id, model, {}, "tool_calls"),
-  ]);
-}
-
-function eventStream(chunks: string[]) {
-  return new Response(`${chunks.join("")}data: [DONE]\n\n`, {
-    headers: { "content-type": "text/event-stream" },
-  });
-}
-
-function chunk(
-  id: string,
-  model: string,
-  delta: CompletionDelta,
-  finishReason?: string,
-) {
-  return `data: ${JSON.stringify({
-    id,
-    object: "chat.completion.chunk",
-    created: Math.floor(Date.now() / 1000),
-    model,
-    choices: [
-      {
-        index: 0,
-        delta,
-        // oxlint-disable-next-line unicorn/no-null -- OpenAI streaming requires JSON null before the final chunk.
-        finish_reason: finishReason === undefined ? null : finishReason,
-      },
-    ],
-  })}\n\n`;
 }

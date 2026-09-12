@@ -1,2 +1,3 @@
 node_modules/
+network-spike.db*
 spike.db*
