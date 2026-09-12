@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
-import ts from "typescript6";
+import ts from "@typescript/typescript6";
 
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const skipDirectoryNames = new Set([
