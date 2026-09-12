@@ -61,8 +61,8 @@ export async function createTestArtifacts(taskId: string) {
       await fs.mkdir(path.dirname(filePath), { recursive: true });
       await fs.writeFile(filePath, input.content);
     },
-    read(filePath) {
-      return fs.readFile(resolveFilePath(filePath));
+    async read(filePath) {
+      return await fs.readFile(resolveFilePath(filePath));
     },
   };
   const harness = {

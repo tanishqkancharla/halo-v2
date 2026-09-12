@@ -76,7 +76,7 @@ export class HaloAgentSession {
 
   static async attach(options: HaloAgentSessionOptions, stored: Session) {
     await using cleanup = new errore.AsyncDisposableStack();
-    cleanup.defer(() => stored.close(BACKGROUND_CONTEXT));
+    cleanup.defer(async () => await stored.close(BACKGROUND_CONTEXT));
     const layout = options.layout;
     const runtime = options.toolRuntime;
     const runtimeDescription = await runtime.getAgentDescription();
@@ -92,8 +92,14 @@ export class HaloAgentSession {
         authority: runtime,
       }).map((tool: AgentTool): AgentHarnessTool<object | undefined> => ({
         ...tool,
-        execute: (id, params, onUpdate, _toolContext, _invocation, context) =>
-          tool.execute(id, params, context.abortSignal, onUpdate),
+        execute: async (
+          id,
+          params,
+          onUpdate,
+          _toolContext,
+          _invocation,
+          context,
+        ) => await tool.execute(id, params, context.abortSignal, onUpdate),
       })),
       createExecTool({
         runtime,
@@ -113,7 +119,7 @@ export class HaloAgentSession {
       BACKGROUND_CONTEXT,
     ).catch((cause) => new CreateAgentSessionError({ cause }));
     if (created instanceof Error) return created;
-    cleanup.defer(() => created.harness.close(BACKGROUND_CONTEXT));
+    cleanup.defer(async () => await created.harness.close(BACKGROUND_CONTEXT));
     // Attaching Pi restores unfinished operations without running them; Halo cancels them before accepting new work.
     for (const operation of created.open) {
       const recovering = await created.harness.lane(
@@ -197,7 +203,7 @@ export class HaloAgentSession {
   }
 
   async setName(name: string) {
-    return this.harness.setName(name, BACKGROUND_CONTEXT).catch(
+    return await this.harness.setName(name, BACKGROUND_CONTEXT).catch(
       (cause) =>
         new SessionStorageError({
           sessionId: this.sessionId,
@@ -208,7 +214,11 @@ export class HaloAgentSession {
 
   async prompt(text: string) {
     if (text.trim().length === 0) return new EmptyPromptError();
-    return this.send({ role: "user", content: text, timestamp: Date.now() });
+    return await this.send({
+      role: "user",
+      content: text,
+      timestamp: Date.now(),
+    });
   }
 
   private async send(message: AgentMessage) {
@@ -254,7 +264,7 @@ export class HaloAgentSession {
   }
 
   async notify(input: SessionNotification) {
-    return this.send({
+    return await this.send({
       role: "custom",
       ...input,
       display: false,

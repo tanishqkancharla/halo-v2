@@ -31,7 +31,7 @@ const loadSession = implementer.middleware(async ({ context, next }) => {
   const session = await context.auth.getSession(context.reqHeaders);
   if (session instanceof Error) throw internalError(session);
 
-  return next({ context: { session } });
+  return await next({ context: { session } });
 });
 
 const os = implementer.use(({ context, next }) => {

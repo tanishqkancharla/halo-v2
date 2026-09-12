@@ -75,12 +75,14 @@ export class ControlPlaneAuth implements DesktopAuthentication {
     });
   }
 
-  getSession() {
-    return this.actionQueue.run(() => this.getSessionUnqueued());
+  async getSession() {
+    return await this.actionQueue.run(
+      async () => await this.getSessionUnqueued(),
+    );
   }
 
-  signIn() {
-    return this.actionQueue.run(() => this.signInUnqueued());
+  async signIn() {
+    return await this.actionQueue.run(async () => await this.signInUnqueued());
   }
 
   private async getSessionUnqueued() {
@@ -248,7 +250,7 @@ class ControlPlaneSessionStore {
     );
     if (encrypted instanceof Error) return encrypted;
 
-    return fs
+    return await fs
       .writeFile(this.path, encrypted, { mode: 0o600 })
       .catch(
         (cause) =>
@@ -256,8 +258,8 @@ class ControlPlaneSessionStore {
       );
   }
 
-  remove() {
-    return fs.rm(this.path, { force: true }).catch(
+  async remove() {
+    return await fs.rm(this.path, { force: true }).catch(
       (cause) =>
         new ControlPlaneAuthError({
           operation: "remove the expired session",
@@ -279,62 +281,62 @@ function createControlPlaneClient(origin: string, token?: string) {
   return createORPCClient(link) as ControlPlaneClient;
 }
 
-function listenForDesktopAuthCallback(state: string) {
-  return new Promise<ListeningDesktopAuthCallback | ControlPlaneAuthError>(
-    (resolve) => {
-      let resolveCode!: (result: string | ControlPlaneAuthError) => void;
-      const code = new Promise<string | ControlPlaneAuthError>(
-        (resolveResult) => {
-          resolveCode = resolveResult;
-        },
-      );
-      let timeout: NodeJS.Timeout | undefined;
+async function listenForDesktopAuthCallback(state: string) {
+  return await new Promise<
+    ListeningDesktopAuthCallback | ControlPlaneAuthError
+  >((resolve) => {
+    let resolveCode!: (result: string | ControlPlaneAuthError) => void;
+    const code = new Promise<string | ControlPlaneAuthError>(
+      (resolveResult) => {
+        resolveCode = resolveResult;
+      },
+    );
+    let timeout: NodeJS.Timeout | undefined;
 
-      const server = createServer((request, response) => {
-        receiveDesktopAuthCallback({ request, response, state, resolveCode });
-      });
-      const listenError = (cause: Error) => {
-        resolve(
+    const server = createServer((request, response) => {
+      receiveDesktopAuthCallback({ request, response, state, resolveCode });
+    });
+    const listenError = (cause: Error) => {
+      resolve(
+        new ControlPlaneAuthError({
+          operation: "listen for Google sign-in",
+          cause,
+        }),
+      );
+    };
+
+    server.once("error", listenError);
+    server.listen(0, loopbackHost, () => {
+      server.off("error", listenError);
+      server.once("error", (cause) => {
+        resolveCode(
           new ControlPlaneAuthError({
-            operation: "listen for Google sign-in",
+            operation: "receive Google sign-in",
             cause,
           }),
         );
-      };
-
-      server.once("error", listenError);
-      server.listen(0, loopbackHost, () => {
-        server.off("error", listenError);
-        server.once("error", (cause) => {
-          resolveCode(
-            new ControlPlaneAuthError({
-              operation: "receive Google sign-in",
-              cause,
-            }),
-          );
-        });
-
-        // SAFETY: Node returns a TCP address after successfully listening with a numeric port.
-        const address = server.address() as AddressInfo;
-        timeout = setTimeout(() => {
-          resolveCode(
-            new ControlPlaneAuthError({
-              operation: "wait for Google sign-in",
-            }),
-          );
-        }, callbackTimeoutMs);
-
-        resolve({
-          callbackUrl: `http://${loopbackHost}:${address.port}${callbackPath}`,
-          code,
-          close: async () => {
-            if (timeout !== undefined) clearTimeout(timeout);
-            return closeCallbackServer(server);
-          },
-        });
       });
-    },
-  );
+
+      // SAFETY: Node returns a TCP address after successfully listening with a numeric port.
+      const address = server.address() as AddressInfo;
+      timeout = setTimeout(() => {
+        resolveCode(
+          new ControlPlaneAuthError({
+            operation: "wait for Google sign-in",
+          }),
+        );
+      }, callbackTimeoutMs);
+
+      resolve({
+        callbackUrl: `http://${loopbackHost}:${address.port}${callbackPath}`,
+        code,
+        close: async () => {
+          if (timeout !== undefined) clearTimeout(timeout);
+          return await closeCallbackServer(server);
+        },
+      });
+    });
+  });
 }
 
 function receiveDesktopAuthCallback(ctx: {
@@ -369,7 +371,7 @@ function receiveDesktopAuthCallback(ctx: {
   ctx.resolveCode(code);
 }
 
-function closeCallbackServer(server: HttpServer) {
+async function closeCallbackServer(server: HttpServer) {
   const closing = new Promise<undefined | ControlPlaneAuthError>((resolve) => {
     server.close((cause) => {
       resolve(
@@ -384,5 +386,5 @@ function closeCallbackServer(server: HttpServer) {
   });
 
   server.closeAllConnections();
-  return closing;
+  return await closing;
 }

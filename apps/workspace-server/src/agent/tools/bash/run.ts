@@ -23,7 +23,7 @@ export async function runBash(
     return new BashRunError({ cause: signal.reason });
   }
 
-  return new Promise<
+  return await new Promise<
     { stdout: string; stderr: string; code: number | null } | BashRunError
   >((resolve) => {
     const child = spawn("bash", ["-lc", command], {

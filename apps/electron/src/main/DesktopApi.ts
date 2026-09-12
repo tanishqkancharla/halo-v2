@@ -63,7 +63,7 @@ async function handleDesktopRequest(args: {
     case "openWorkspaceFile": {
       const server = await args.getServer();
       if (server instanceof Error) return server;
-      return openWorkspaceFile(server?.workspaceRoot, args.request.path);
+      return await openWorkspaceFile(server?.workspaceRoot, args.request.path);
     }
     case "getConnection": {
       const server = await args.getServer();
@@ -72,15 +72,15 @@ async function handleDesktopRequest(args: {
       return { origin: server.origin, token: server.token };
     }
     case "getAuthSession":
-      return args.authentication.getSession();
+      return await args.authentication.getSession();
     case "signIn":
-      return args.authentication.signIn();
+      return await args.authentication.signIn();
     case "getAppInfo":
       return getAppInfo();
     case "installAppUpdate":
       return installAppUpdate();
     case "openExternal":
-      return openExternal(args.request);
+      return await openExternal(args.request);
     default:
       return new DesktopRequestError({ operation: "desktop API" });
   }
@@ -101,7 +101,7 @@ async function openExternal(request: OpenExternalRequest) {
       operation: `open an external ${url.protocol} URL`,
     });
   }
-  return shell
+  return await shell
     .openExternal(url.toString())
     .catch(
       (e) => new DesktopOperationError({ operation: "open the URL", cause: e }),

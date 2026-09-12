@@ -6,18 +6,23 @@ import { LOG_CHANNELS } from "../shared/channels.js";
 import { DESKTOP_CHANNEL, type DesktopApi } from "../shared/desktop.js";
 
 const desktopApi: DesktopApi = {
-  openWorkspaceFile: (path) =>
-    ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "openWorkspaceFile", path }),
-  getConnection: () =>
-    ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getConnection" }),
-  getAuthSession: () =>
-    ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getAuthSession" }),
-  signIn: () => ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "signIn" }),
-  getAppInfo: () => ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getAppInfo" }),
-  installAppUpdate: () =>
-    ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "installAppUpdate" }),
-  openExternal: (request) =>
-    ipcRenderer.invoke(DESKTOP_CHANNEL, {
+  openWorkspaceFile: async (path) =>
+    await ipcRenderer.invoke(DESKTOP_CHANNEL, {
+      type: "openWorkspaceFile",
+      path,
+    }),
+  getConnection: async () =>
+    await ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getConnection" }),
+  getAuthSession: async () =>
+    await ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getAuthSession" }),
+  signIn: async () =>
+    await ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "signIn" }),
+  getAppInfo: async () =>
+    await ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "getAppInfo" }),
+  installAppUpdate: async () =>
+    await ipcRenderer.invoke(DESKTOP_CHANNEL, { type: "installAppUpdate" }),
+  openExternal: async (request) =>
+    await ipcRenderer.invoke(DESKTOP_CHANNEL, {
       type: "openExternal",
       url: request.url,
     }),

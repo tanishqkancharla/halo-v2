@@ -13,7 +13,7 @@ export function createExecutorCredentialProvider(
     key: ProviderKey.make("halo"),
     writable: true,
     get: (id) =>
-      Effect.promise(() => vault.get(id)).pipe(
+      Effect.promise(async () => await vault.get(id)).pipe(
         Effect.flatMap((value) => {
           if (value instanceof Error) {
             return Effect.fail(
@@ -29,7 +29,7 @@ export function createExecutorCredentialProvider(
         }),
       ),
     set: (id, value) =>
-      Effect.promise(() => vault.set(id, value)).pipe(
+      Effect.promise(async () => await vault.set(id, value)).pipe(
         Effect.flatMap((result) => {
           if (result instanceof Error) {
             return Effect.fail(
@@ -43,7 +43,7 @@ export function createExecutorCredentialProvider(
         }),
       ),
     delete: (id) =>
-      Effect.promise(() => vault.delete(id)).pipe(
+      Effect.promise(async () => await vault.delete(id)).pipe(
         Effect.flatMap((result) => {
           if (result instanceof Error) {
             return Effect.fail(

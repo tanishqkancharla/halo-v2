@@ -154,16 +154,16 @@ export class AuthService {
     });
   }
 
-  handle(request: Request) {
-    return this.auth
+  async handle(request: Request) {
+    return await this.auth
       .handler(request)
       .catch(
         (cause) => new AuthServiceError({ detail: "handle request", cause }),
       );
   }
 
-  handleHttp(request: IncomingMessage, response: ServerResponse) {
-    return this.nodeHandler(request, response).catch(
+  async handleHttp(request: IncomingMessage, response: ServerResponse) {
+    return await this.nodeHandler(request, response).catch(
       (cause) => new AuthServiceError({ detail: "handle request", cause }),
     );
   }
@@ -270,8 +270,8 @@ export class AuthService {
     } satisfies AuthSession;
   }
 
-  close() {
-    return closeDatabase(this.database);
+  async close() {
+    return await closeDatabase(this.database);
   }
 
   private async createDesktopAuthCode(headers: Headers) {
@@ -280,7 +280,7 @@ export class AuthService {
     if (session instanceof Error) return session;
     if (session === undefined) return new DesktopAuthRequiredError();
 
-    return this.auth.api
+    return await this.auth.api
       .generateOneTimeToken({ headers })
       .then((result) => result.token)
       .catch(
@@ -347,9 +347,9 @@ async function openDatabase(config: AuthDatabaseConfig) {
   });
 }
 
-function closeDatabase(database: AuthDatabase) {
+async function closeDatabase(database: AuthDatabase) {
   if (database instanceof DatabaseSync) {
-    return Promise.resolve(
+    return await Promise.resolve(
       errore.try({
         try: () => database.close(),
         catch: (cause) =>
@@ -358,7 +358,7 @@ function closeDatabase(database: AuthDatabase) {
     );
   }
 
-  return database
+  return await database
     .end()
     .then(() => undefined)
     .catch(

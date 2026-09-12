@@ -49,8 +49,8 @@ export function createWorkspaceFilesPlugin(
         description: "Read a UTF-8 file in the active Halo workspace.",
         inputSchema: readInput,
         requiredCapabilities: ["workspace.files.read"],
-        execute: (input, context) =>
-          execution(
+        execute: async (input, context) =>
+          await execution(
             readFile({ filesystem, cwd: context.workspaceRoot, input }),
           ),
       }),
@@ -59,8 +59,8 @@ export function createWorkspaceFilesPlugin(
         description: "Replace exact text in a workspace file.",
         inputSchema: editInput,
         requiredCapabilities: ["workspace.files.write"],
-        execute: (input, context) =>
-          execution(
+        execute: async (input, context) =>
+          await execution(
             editFile({ filesystem, cwd: context.workspaceRoot, input }),
           ),
       }),
@@ -69,8 +69,8 @@ export function createWorkspaceFilesPlugin(
         description: "Apply a patch to workspace files.",
         inputSchema: patchInput,
         requiredCapabilities: ["workspace.files.write"],
-        execute: (input, context) =>
-          execution(
+        execute: async (input, context) =>
+          await execution(
             patchFiles({ filesystem, cwd: context.workspaceRoot, input }),
           ),
       }),
@@ -79,8 +79,8 @@ export function createWorkspaceFilesPlugin(
         description: "Write a UTF-8 workspace file.",
         inputSchema: writeInput,
         requiredCapabilities: ["workspace.files.write"],
-        execute: (input, context) =>
-          execution(
+        execute: async (input, context) =>
+          await execution(
             writeFile({ filesystem, cwd: context.workspaceRoot, input }),
           ),
       }),
@@ -89,8 +89,8 @@ export function createWorkspaceFilesPlugin(
         description: "Delete a workspace file.",
         inputSchema: deleteInput,
         requiredCapabilities: ["workspace.files.write"],
-        execute: (input, context) =>
-          execution(
+        execute: async (input, context) =>
+          await execution(
             deleteFile({ filesystem, cwd: context.workspaceRoot, input }),
           ),
       }),

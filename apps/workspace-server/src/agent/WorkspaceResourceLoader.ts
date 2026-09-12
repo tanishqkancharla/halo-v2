@@ -52,8 +52,8 @@ export class WorkspaceResourceLoader {
   }
 }
 
-function readInstructions(path: string) {
-  return readFile(path, "utf8").catch(
+async function readInstructions(path: string) {
+  return await readFile(path, "utf8").catch(
     (cause) => new WorkspaceInstructionsError({ path, cause }),
   );
 }

@@ -46,8 +46,8 @@ export class TursoStorage implements Storage {
     private readonly sessionId: string,
   ) {}
 
-  commit(writes: Write[]) {
-    return this.access((connection) =>
+  async commit(writes: Write[]) {
+    return await this.access((connection) =>
       connection.transaction(() => {
         const current = readSessionRow(connection, this.sessionId);
         const prepared = prepareStorageCommit(
@@ -88,8 +88,8 @@ export class TursoStorage implements Storage {
     );
   }
 
-  getEntries(ids: string[]) {
-    return this.access((connection) => {
+  async getEntries(ids: string[]) {
+    return await this.access((connection) => {
       const entries = new Map<string, Entry>();
       const statement = connection.prepare(
         "SELECT payload FROM halo_session_entries WHERE session_id = ? AND id = ?",
@@ -104,8 +104,8 @@ export class TursoStorage implements Storage {
     });
   }
 
-  getValue<T>(address: Value<T>) {
-    return this.access((connection) => {
+  async getValue<T>(address: Value<T>) {
+    return await this.access((connection) => {
       // SAFETY: This SQL projection selects the declared row fields from Halo-owned session tables.
       const row = connection
         .prepare(
@@ -123,8 +123,8 @@ export class TursoStorage implements Storage {
     });
   }
 
-  scanValues<T>(prefix: Value<T>) {
-    return this.access((connection) => {
+  async scanValues<T>(prefix: Value<T>) {
+    return await this.access((connection) => {
       // SAFETY: This SQL projection selects the declared row fields from Halo-owned session tables.
       const rows = connection
         .prepare(`SELECT namespace, key, seq, payload FROM halo_session_values
@@ -143,8 +143,11 @@ export class TursoStorage implements Storage {
     });
   }
 
-  readList<T>(address: ValueList<T>, options: ListReadOptions | undefined) {
-    return this.access((connection) => {
+  async readList<T>(
+    address: ValueList<T>,
+    options: ListReadOptions | undefined,
+  ) {
+    return await this.access((connection) => {
       const resolved = resolveListReadOptions(options);
       const direction = resolved.order === "asc" ? "ASC" : "DESC";
       const comparison = resolved.order === "asc" ? ">" : "<";
@@ -169,8 +172,8 @@ export class TursoStorage implements Storage {
     });
   }
 
-  scanEntries(query: EntryScan) {
-    return this.access((connection) => {
+  async scanEntries(query: EntryScan) {
+    return await this.access((connection) => {
       const direction = query.order === "desc" ? "DESC" : "ASC";
       const type = query.type === undefined ? null : query.type;
       const customType =
@@ -199,8 +202,8 @@ export class TursoStorage implements Storage {
     });
   }
 
-  scanBranch(query: StorageBranchScan) {
-    return this.access((connection) => {
+  async scanBranch(query: StorageBranchScan) {
+    return await this.access((connection) => {
       const rows = this.branchRows(connection, query);
       const statement = connection.prepare(
         "SELECT payload FROM halo_session_entries WHERE session_id = ? AND id = ?",
@@ -213,8 +216,8 @@ export class TursoStorage implements Storage {
     });
   }
 
-  scanBranchStructure(query: StorageBranchScan) {
-    return this.access((connection) =>
+  async scanBranchStructure(query: StorageBranchScan) {
+    return await this.access((connection) =>
       this.branchRows(connection, query).map((row): EntryStructure => {
         const entry: EntryStructure = {
           id: row.id,
@@ -229,8 +232,8 @@ export class TursoStorage implements Storage {
     );
   }
 
-  scanUsage(query: UsageScan) {
-    return this.access((connection) => {
+  async scanUsage(query: UsageScan) {
+    return await this.access((connection) => {
       const direction = query.order === "desc" ? "DESC" : "ASC";
       const from = query.fromSeq === undefined ? null : query.fromSeq;
       const to = query.toSeq === undefined ? null : query.toSeq;
@@ -250,8 +253,8 @@ export class TursoStorage implements Storage {
     });
   }
 
-  getStats() {
-    return this.access(
+  async getStats() {
+    return await this.access(
       (connection) => readSessionRow(connection, this.sessionId).stats,
     );
   }

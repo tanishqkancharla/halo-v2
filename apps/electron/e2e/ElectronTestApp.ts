@@ -48,7 +48,7 @@ export class ElectronTestApp {
         HALO_USER_DATA: this.artifacts.paths.userData,
       },
     });
-    resources.defer(() => electronApp.close());
+    resources.defer(async () => await electronApp.close());
     const captured = this.artifacts.captureProcess(
       electronApp.process(),
       launch,
@@ -57,8 +57,9 @@ export class ElectronTestApp {
     await electronApp
       .context()
       .tracing.start({ screenshots: true, snapshots: true });
-    resources.defer(() =>
-      electronApp.context().tracing.stop({ path: launch.trace }),
+    resources.defer(
+      async () =>
+        await electronApp.context().tracing.stop({ path: launch.trace }),
     );
     const page = await electronApp.firstWindow();
     const rendererCaptured = await this.artifacts.captureRenderer(page);

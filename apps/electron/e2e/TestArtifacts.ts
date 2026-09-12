@@ -179,7 +179,7 @@ export async function createTestArtifacts(
     },
     async finish() {
       const finalized = await Promise.all(
-        captureFinalizers.map((finalize) => finalize()),
+        captureFinalizers.map(async (finalize) => await finalize()),
       ).catch(
         (cause) => new TestArtifactError({ operation: "finalize logs", cause }),
       );
@@ -253,7 +253,9 @@ function captureProcessOutput(args: {
   let pendingLine = "";
   let writes = fsPromises.writeFile(args.logPath, "");
   const onData = (chunk: Buffer | string) => {
-    writes = writes.then(() => fsPromises.appendFile(args.logPath, chunk));
+    writes = writes.then(
+      async () => await fsPromises.appendFile(args.logPath, chunk),
+    );
     const text = pendingLine + chunk.toString();
     const lastNewline = text.lastIndexOf("\n");
     if (lastNewline === -1) {
@@ -280,7 +282,9 @@ function createRendererLog(args: { path: string; prefix: string }) {
   return {
     write(line: string) {
       process.stdout.write(`${args.prefix} ${line}\n`);
-      writes = writes.then(() => fsPromises.appendFile(args.path, `${line}\n`));
+      writes = writes.then(
+        async () => await fsPromises.appendFile(args.path, `${line}\n`),
+      );
     },
     async finish() {
       await writes;
@@ -309,8 +313,9 @@ async function attachArtifacts(args: {
   return await Promise.all(
     attachments
       .filter(([, filePath]) => fs.existsSync(filePath))
-      .map(([name, filePath]) =>
-        args.testInfo.attach(name, { path: filePath }),
+      .map(
+        async ([name, filePath]) =>
+          await args.testInfo.attach(name, { path: filePath }),
       ),
   )
     .then(() => undefined)

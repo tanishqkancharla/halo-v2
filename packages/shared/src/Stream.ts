@@ -188,17 +188,17 @@ export class StreamConsumer<T>
     this.cleanup.defer(() => signal?.removeEventListener("abort", abort));
   }
 
-  next(): Promise<IteratorResult<T, void>> {
+  async next(): Promise<IteratorResult<T, void>> {
     if (this.cleanup.disposed)
-      return Promise.resolve({ done: true, value: undefined });
+      return await Promise.resolve({ done: true, value: undefined });
     const value = this.values.shift();
-    if (value !== undefined) return Promise.resolve(value);
-    return new Promise((resolve) => this.readers.push(resolve));
+    if (value !== undefined) return await Promise.resolve(value);
+    return await new Promise((resolve) => this.readers.push(resolve));
   }
 
-  return(): Promise<IteratorResult<T, void>> {
+  async return(): Promise<IteratorResult<T, void>> {
     this[Symbol.dispose]();
-    return Promise.resolve({ done: true, value: undefined });
+    return await Promise.resolve({ done: true, value: undefined });
   }
 
   [Symbol.asyncIterator](): this {

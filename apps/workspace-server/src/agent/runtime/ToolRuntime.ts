@@ -338,8 +338,8 @@ type ToolRuntimeOptions = {
 };
 
 export class ToolRuntime {
-  static create(input: ToolRuntimeOptions) {
-    return createToolRuntime(input);
+  static async create(input: ToolRuntimeOptions) {
+    return await createToolRuntime(input);
   }
 
   private readonly executor: Executor<HaloRuntimePlugins>;
@@ -375,12 +375,12 @@ export class ToolRuntime {
     return toolIdentity(path, this.integrationNames);
   }
 
-  authorize(input: {
+  async authorize(input: {
     pluginId: string;
     toolName: string;
     requiredCapabilities: readonly string[];
   }) {
-    return this.authority.authorize(input);
+    return await this.authority.authorize(input);
   }
 
   async getAgentDescription() {
@@ -419,8 +419,8 @@ export class ToolRuntime {
         parentToolCallId: input.parentToolCallId,
         onToolEvent: input.onToolEvent,
       },
-      () =>
-        Effect.runPromise(
+      async () =>
+        await Effect.runPromise(
           this.engine.execute(input.code, {
             onElicitation: (context) => {
               const connection = connectionInput(
@@ -455,8 +455,8 @@ export class ToolRuntime {
   }) {
     const invocation = await this.executionContext.run(
       { signal: input.signal, modelId: input.modelId, runtime: this },
-      () =>
-        Effect.runPromise(
+      async () =>
+        await Effect.runPromise(
           this.executor.execute(ToolAddress.make(input.path), input.args),
         )
           .then((value) => ({ value }))
@@ -484,8 +484,8 @@ export class ToolRuntime {
   }): Promise<ToolResult<unknown> | ToolRuntimeError> {
     const result = await this.executionContext.run(
       { signal: input.signal, modelId: undefined, runtime: this },
-      () =>
-        Effect.runPromise(this.toolInvoker.invoke(input))
+      async () =>
+        await Effect.runPromise(this.toolInvoker.invoke(input))
           .then((value) => {
             // SAFETY: makeExecutorToolInvoker normalizes every successful invocation to ToolResult.
             return value as ToolResult<unknown>;
@@ -588,8 +588,8 @@ export class ToolRuntime {
         (cause) => new ToolRuntimeError({ operation: "close", cause }),
       ),
       Promise.all(
-        this.toolPlugins.map((plugin) =>
-          plugin.close === undefined ? undefined : plugin.close(),
+        this.toolPlugins.map(async (plugin) =>
+          plugin.close === undefined ? undefined : await plugin.close(),
         ),
       ),
     ]);
@@ -639,8 +639,8 @@ async function createToolRuntime(
       redirectUri: input.oauthRedirectUri,
       firstPartyOAuthClients: [googleOAuthClient],
       db: ({ tables }) =>
-        Effect.promise(() =>
-          createExecutorDatabase(input.database, tables),
+        Effect.promise(
+          async () => await createExecutorDatabase(input.database, tables),
         ).pipe(
           Effect.flatMap((database) => {
             if (database instanceof Error) {

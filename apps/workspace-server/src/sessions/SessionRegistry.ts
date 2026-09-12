@@ -53,20 +53,20 @@ export class SessionRegistry {
   >();
   constructor(private readonly options: SessionRegistryOptions) {}
 
-  list() {
-    return this.track(() => this.listSessions());
+  async list() {
+    return await this.track(async () => await this.listSessions());
   }
 
-  create() {
-    return this.track(() => this.createSession());
+  async create() {
+    return await this.track(async () => await this.createSession());
   }
 
-  open(sessionId: string) {
-    return this.track(() => this.openSession(sessionId));
+  async open(sessionId: string) {
+    return await this.track(async () => await this.openSession(sessionId));
   }
 
-  close(sessionId: string) {
-    return this.track(() => this.closeSession(sessionId));
+  async close(sessionId: string) {
+    return await this.track(async () => await this.closeSession(sessionId));
   }
 
   private async track<T>(operation: () => Promise<T>) {
@@ -105,7 +105,7 @@ export class SessionRegistry {
       .catch((cause) => new CreateAgentSessionError({ cause }));
     if (stored instanceof Error) return stored;
     this.stored.set(stored.metadata.id, Promise.resolve(stored));
-    return this.openSession(stored.metadata.id);
+    return await this.openSession(stored.metadata.id);
   }
 
   private async openSession(sessionId: string) {
@@ -136,7 +136,7 @@ export class SessionRegistry {
     const sessions = [...this.sessions.values()];
     this.sessions.clear();
     const closed = await Promise.all(
-      sessions.map((session) => session.close()),
+      sessions.map(async (session) => await session.close()),
     );
     const sessionError = closed.find((result) => result instanceof Error);
     this.stored.clear();
@@ -166,12 +166,12 @@ export class SessionRegistry {
     if (metadata instanceof Error) return metadata;
     const item = metadata.find((candidate) => candidate.id === sessionId);
     if (item === undefined) return new SessionNotFoundError({ sessionId });
-    return this.openStored(item);
+    return await this.openStored(item);
   }
 
   private async openStored(metadata: SessionMetadata) {
     const existing = this.stored.get(metadata.id);
-    if (existing !== undefined) return existing;
+    if (existing !== undefined) return await existing;
     const opening = this.options.repo
       .open(metadata, BACKGROUND_CONTEXT)
       .catch(

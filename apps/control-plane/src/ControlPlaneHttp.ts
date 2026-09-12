@@ -33,10 +33,10 @@ export type ListeningControlPlaneHttp = {
   server: HttpServer;
 };
 
-export function listenControlPlaneHttp(host: string, port: number) {
+export async function listenControlPlaneHttp(host: string, port: number) {
   const server = createServer(respondStarting);
 
-  return new Promise<ListeningControlPlaneHttp | ControlPlaneHttpError>(
+  return await new Promise<ListeningControlPlaneHttp | ControlPlaneHttpError>(
     (resolve) => {
       server.once("error", (error) => {
         resolve(
@@ -71,7 +71,7 @@ export function serveControlPlaneHttp(server: HttpServer, auth: AuthService) {
   });
 }
 
-export function closeControlPlaneHttp(server: HttpServer) {
+export async function closeControlPlaneHttp(server: HttpServer) {
   const closing = new Promise<undefined | ControlPlaneHttpError>((resolve) => {
     server.close((error) => {
       if (error !== undefined) {
@@ -86,7 +86,7 @@ export function closeControlPlaneHttp(server: HttpServer) {
   });
 
   server.closeAllConnections();
-  return closing;
+  return await closing;
 }
 
 function respondStarting(_request: IncomingMessage, response: ServerResponse) {

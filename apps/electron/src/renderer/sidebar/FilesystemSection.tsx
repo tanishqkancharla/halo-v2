@@ -79,7 +79,7 @@ export function FilesystemSection() {
     mutationKey: ["workspace-entry"],
     mutationFn: async (operation: FileOperation) => {
       if (operation.kind === "create") {
-        return api.workspace.createEntry({
+        return await api.workspace.createEntry({
           path: operation.path,
           kind: operation.entryKind,
         });
@@ -87,8 +87,8 @@ export function FilesystemSection() {
       const saved = await flushFileAutosaves();
       if (saved instanceof Error) throw saved;
       if (operation.kind === "delete")
-        return api.workspace.deleteEntry({ path: operation.path });
-      return api.workspace.moveEntry(operation);
+        return await api.workspace.deleteEntry({ path: operation.path });
+      return await api.workspace.moveEntry(operation);
     },
     onSuccess: async (_result, operation) => {
       const destination =
@@ -190,10 +190,13 @@ export function FilesystemSection() {
     if (workspaceRoot === undefined) return;
 
     const controller = new AbortController();
-    listenWorkspaceTree(api, controller.signal, () =>
-      queryClient.invalidateQueries({
-        queryKey: workspacePathsQueryKey(workspaceRoot),
-      }),
+    listenWorkspaceTree(
+      api,
+      controller.signal,
+      async () =>
+        await queryClient.invalidateQueries({
+          queryKey: workspacePathsQueryKey(workspaceRoot),
+        }),
     ).catch((cause) => {
       if (controller.signal.aborted) return;
       console.warn("Workspace tree stream failed:", cause);

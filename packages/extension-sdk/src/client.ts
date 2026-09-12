@@ -33,8 +33,8 @@ export async function connectExtension<Schema extends AnySchema>(
     new RPCLink({ url: "/sync/", origin: location.origin }),
   );
   const remote: RemoteApi<Schema> = {
-    push: (input) => sync.push(input),
-    pull: (input) => sync.pull(input),
+    push: async (input) => await sync.push(input),
+    pull: async (input) => await sync.pull(input),
     connect: async ({ clientId, poke }) => {
       const controller = new AbortController();
       const events = await sync.connect(
