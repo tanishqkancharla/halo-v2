@@ -42,7 +42,7 @@ export async function connectHaloRpc({
   };
   const link = new RPCLink({
     origin: connection.origin,
-    url: "/rpc",
+    url: connection.path,
     headers: { authorization: `Bearer ${connection.token}` },
   });
   // SAFETY: HaloRpcConnection points to the Halo router.

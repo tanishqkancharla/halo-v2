@@ -1,5 +1,6 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import { copyMainProcessExternals } from "./forge/copyMainProcessExternals.js";
+import { waitForDevelopmentServices } from "./forge/waitForDevelopmentServices.js";
 
 const appleApiKey = process.env.APPLE_API_KEY;
 const appleApiKeyId = process.env.APPLE_API_KEY_ID;
@@ -38,6 +39,10 @@ const config: ForgeConfig = {
     ignoreModules: ["@parcel/watcher"],
   },
   hooks: {
+    preStart: async () => {
+      const ready = await waitForDevelopmentServices();
+      if (ready instanceof Error) throw ready;
+    },
     packageAfterCopy: async (_forgeConfig, buildPath) => {
       await copyMainProcessExternals(buildPath);
     },

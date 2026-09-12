@@ -5,6 +5,7 @@ import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import { expect, test } from "vitest";
 import { AuthService } from "../src/AuthService.js";
+import { DatabaseService } from "../src/DatabaseService.js";
 
 const testAuth = {
   secret: "test-control-plane-auth-secret-key!",
@@ -32,18 +33,26 @@ const authServiceTest = test.extend<{
   },
   auth: async ({ appDataDir }, use) => {
     await using cleanup = new errore.AsyncDisposableStack();
+
+    const db = await DatabaseService.start({
+      type: "sqlite",
+      path: join(appDataDir, "control-plane.db"),
+    });
+    if (db instanceof Error) throw db;
+    cleanup.defer(async () => {
+      const closed = await db.close();
+      if (closed instanceof Error) console.warn(closed);
+    });
+
     const auth = await AuthService.start({
-      database: { type: "sqlite", path: join(appDataDir, "auth.db") },
+      db,
       origin: testOrigin,
       secret: testAuth.secret,
       googleClientId: testAuth.googleClientId,
       googleClientSecret: testAuth.googleClientSecret,
     });
     if (auth instanceof Error) throw auth;
-    cleanup.defer(async () => {
-      const closed = await auth.close();
-      if (closed instanceof Error) console.warn(closed);
-    });
+
     await use(auth);
   },
 });

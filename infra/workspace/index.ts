@@ -33,10 +33,9 @@ new gcp.projects.IAMMember("runtime-logs", {
   role: "roles/logging.logWriter",
   member: pulumi.interpolate`serviceAccount:${identity.email}`,
 });
-new gcp.secretmanager.SecretIamMember("openai-api-key", {
+const vertexAiAccess = new gcp.projects.IAMMember("vertex-ai", {
   project,
-  secretId: "halo-dev-local-openai-api-key",
-  role: "roles/secretmanager.secretAccessor",
+  role: "roles/aiplatform.user",
   member: pulumi.interpolate`serviceAccount:${identity.email}`,
 });
 const disk = new gcp.compute.Disk(
@@ -75,14 +74,18 @@ const instance = new gcp.compute.Instance(
       email: identity.email,
       scopes: ["https://www.googleapis.com/auth/cloud-platform"],
     },
-    metadata: { "enable-oslogin": "TRUE", "block-project-ssh-keys": "TRUE" },
+    metadata: {
+      "enable-oslogin": "TRUE",
+      "block-project-ssh-keys": "TRUE",
+      "halo-owner-user-id": "development",
+    },
     metadataStartupScript: workspaceStartup({
       image,
       registry: `${region}-docker.pkg.dev`,
     }),
   },
   {
-    dependsOn: [imageAccess],
+    dependsOn: [imageAccess, vertexAiAccess],
     // Replacing a VM must detach the workspace disk before its replacement attaches it.
     deleteBeforeReplace: true,
   },

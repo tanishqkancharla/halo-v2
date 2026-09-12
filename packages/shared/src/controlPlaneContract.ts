@@ -1,6 +1,6 @@
 import { error, oc, type, type RouterContractClient } from "@orpc/contract";
 
-export const controlPlaneProtocolVersion = 1 as const;
+export const controlPlaneProtocolVersion = 2 as const;
 
 export type ControlPlaneSession = {
   session: {
@@ -20,6 +20,11 @@ export type DesktopAuthSession = ControlPlaneSession & {
   token: string;
 };
 
+export type ControlPlaneWorkspace = {
+  id: string;
+  createdAt: string;
+};
+
 export const ControlPlaneRequestError = error("BAD_REQUEST", {
   message: "The control plane could not complete the request.",
   data: type<{ message: string }>(),
@@ -27,6 +32,10 @@ export const ControlPlaneRequestError = error("BAD_REQUEST", {
 
 const publicProcedure = oc.errors({
   [ControlPlaneRequestError.code]: ControlPlaneRequestError,
+});
+
+const authenticatedProcedure = publicProcedure.errors({
+  UNAUTHORIZED: {},
 });
 
 export const controlPlaneContract = publicProcedure.router({
@@ -43,6 +52,9 @@ export const controlPlaneContract = publicProcedure.router({
       .input(type<{ code: string }>())
       .output(type<DesktopAuthSession>()),
     session: publicProcedure.output(type<ControlPlaneSession | undefined>()),
+  },
+  workspace: {
+    ensure: authenticatedProcedure.output(type<ControlPlaneWorkspace>()),
   },
 });
 

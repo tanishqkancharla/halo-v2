@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { config } from "@get-halo/config/workspaceServer";
+import { ApplicationMode } from "@get-halo/config/ApplicationMode";
 import { Logger } from "@repo/logger";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import * as errore from "errore";
@@ -56,9 +57,13 @@ async function run() {
   const server = await HaloServer.start({
     ...applicationConfig.server,
     llmApi,
+    gateway: applicationConfig.server.gateway,
     ownerUserId: Promise.resolve(applicationConfig.server.ownerUserId),
     logger: logger.scope("rpc"),
-    host: "127.0.0.1",
+    host:
+      applicationConfig.mode === ApplicationMode.Production
+        ? "0.0.0.0"
+        : "127.0.0.1",
     port: applicationConfig.server.port,
     createCredentialVault: ({ filesystem, workspaceRoot }) =>
       new FileCredentialVault({

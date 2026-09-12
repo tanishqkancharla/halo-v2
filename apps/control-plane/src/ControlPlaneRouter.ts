@@ -14,10 +14,12 @@ import {
   InvalidDesktopAuthCodeError,
   InvalidDesktopSignInRequestError,
 } from "./AuthService.js";
+import type { WorkspaceService } from "./workspace/WorkspaceService.js";
 
 export type ControlPlaneContext = RequestHeadersHandlerPluginContext &
   ResponseHeadersHandlerPluginContext & {
     auth: AuthService;
+    workspace: WorkspaceService;
   };
 
 const implementer =
@@ -75,6 +77,22 @@ const getAuthSession = os.auth.session
       : serializeSession(context.session),
   );
 
+const ensureWorkspace = os.workspace.ensure
+  .use(loadSession)
+  .handler(async ({ context }) => {
+    if (context.session === undefined) {
+      throw new ORPCError("UNAUTHORIZED", { message: "Sign in required" });
+    }
+
+    const workspace = await context.workspace.ensure(context.session.user.id);
+    if (workspace instanceof Error) throw internalError(workspace);
+
+    return {
+      id: workspace.id,
+      createdAt: workspace.createdAt.toISOString(),
+    };
+  });
+
 export const controlPlaneRpcRouter = os.router({
   server: os.server.router({
     info: getServerInfo,
@@ -83,6 +101,9 @@ export const controlPlaneRpcRouter = os.router({
     start: startDesktopSignIn,
     exchange: exchangeDesktopAuthCode,
     session: getAuthSession,
+  }),
+  workspace: os.workspace.router({
+    ensure: ensureWorkspace,
   }),
 });
 

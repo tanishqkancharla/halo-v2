@@ -16,6 +16,7 @@ import {
   type LoggerScope,
 } from "@repo/logger";
 import { config as resolvedApplicationConfig } from "@get-halo/config/electron";
+import { ApplicationMode } from "@get-halo/config/ApplicationMode";
 import type { ControlPlaneSession } from "@get-halo/shared/controlPlaneContract";
 import { JsonlLoggerSink } from "@repo/logger/JsonlLoggerSink";
 import { PrettyConsoleLoggerSink } from "@repo/logger/PrettyConsoleLoggerSink";
@@ -28,6 +29,7 @@ import {
   type DesktopAuthentication,
 } from "./ControlPlaneAuth.js";
 import { registerDesktopApi } from "./DesktopApi.js";
+import type { HaloRpcConnection } from "../shared/rpc.js";
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
@@ -80,6 +82,7 @@ app.whenReady().then(async () => {
   registerLogBridge();
   registerDesktopApi({
     authentication,
+    getConnection: async () => await getWorkspaceConnection(authentication),
     getServer: async () =>
       await readWorkspaceServerConnection(applicationConfig.dataDir),
     ownsWindow: (window) => windows.has(window),
@@ -112,6 +115,7 @@ async function createDesktopAuthentication(): Promise<DesktopAuthentication> {
 
     return {
       getSession: async () => await Promise.resolve(session),
+      getWorkspaceConnection: async () => await Promise.resolve(undefined),
       signIn: async () => await Promise.resolve(session),
     };
   }
@@ -121,6 +125,23 @@ async function createDesktopAuthentication(): Promise<DesktopAuthentication> {
     dataDir: applicationConfig.dataDir,
   });
   return authentication;
+}
+
+async function getWorkspaceConnection(
+  authentication: DesktopAuthentication,
+): Promise<HaloRpcConnection | Error | undefined> {
+  if (applicationConfig.mode === ApplicationMode.Production) {
+    return await authentication.getWorkspaceConnection();
+  }
+
+  const server = await readWorkspaceServerConnection(applicationConfig.dataDir);
+  if (server instanceof Error || server === undefined) return server;
+
+  return {
+    origin: server.origin,
+    path: "/rpc",
+    token: server.token,
+  };
 }
 
 function testAuthSession(): ControlPlaneSession {

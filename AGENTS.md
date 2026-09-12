@@ -92,7 +92,7 @@ GCP infrastructure lives in `infra/control-plane/` and `infra/workspace/` (Pulum
 
 Headless hosts (Xvfb/VNC) need `HALO_USE_SWIFTSHADER=1`, which the `halo-dev` terminal exports. Without it the renderer cannot start WebGL.
 
-To chat with a model, authenticate to GCP with Application Default Credentials. The workspace server reads `halo-dev-local-openai-api-key` from Secret Manager at runtime and provides it to Pi without persisting it or adding it to the process environment.
+To chat with a model, authenticate to GCP with Application Default Credentials. The workspace server uses its ADC identity to call `google-vertex/gemini-3.8-flash` in project `halo-relay`; production VMs receive that access through their attached service accounts.
 
 Configure the workspace when starting the workspace server with `HALO_WORKSPACE_ROOT`, or pass a JSON configuration to `pnpm server <config.json>`. Electron has no workspace picker and never starts or stops the server. In development all services use `<repo>/tmp/workspace/.halo`. The workspace server publishes `server.json` for Electron and `rpc.json` for the CLI. Closing Electron leaves active sessions and extensions running. See `apps/workspace-server/README.md`.
 
