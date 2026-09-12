@@ -34,19 +34,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
   test:
-    name: Test ${{ matrix.platform }}
+    name: Test macOS
     needs: prepare
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux
-            os: ubuntu-latest
-          - platform: macos
-            os: macos-latest
-          - platform: windows
-            os: windows-latest
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,12 +47,6 @@ jobs:
           runtime: node@22
           cache: true
           install: false
-
-      - name: Install Linux display server
-        if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
 
       - name: Allow private Maui git dependency
         env:
@@ -76,20 +60,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run packaged Electron tests
-        if: matrix.platform != 'linux'
         run: pnpm --filter @halo/desktop test:e2e
-
-      - name: Run packaged Electron tests on Linux
-        if: matrix.platform == 'linux'
-        env:
-          HALO_USE_SWIFTSHADER: "1"
-        run: xvfb-run --auto-servernum pnpm --filter @halo/desktop test:e2e
 
       - name: Upload failed test artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: electron-e2e-${{ matrix.platform }}
+          name: electron-e2e-macos
           path: tmp/e2e
           if-no-files-found: ignore
           retention-days: 7
@@ -110,20 +87,10 @@ jobs:
             --latest
 
   publish:
-    name: Publish ${{ matrix.platform }}
+    name: Publish macOS
     needs: [prepare, release]
     environment: Release
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux
-            os: ubuntu-latest
-          - platform: macos
-            os: macos-latest
-          - platform: windows
-            os: windows-latest
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -135,21 +102,13 @@ jobs:
           cache: true
           install: false
 
-      - name: Install Linux packaging tools
-        if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fakeroot dpkg rpm
-
       - name: Import Apple signing certificate
-        if: matrix.platform == 'macos'
         uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Write Apple notarization key
-        if: matrix.platform == 'macos'
         env:
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
         run: |
