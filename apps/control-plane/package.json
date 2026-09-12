@@ -14,7 +14,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@get-halo/control-plane-contract": "workspace:*",
     "@get-halo/gcp": "workspace:*",
+    "@orpc/server": "2.0.0-beta.29",
     "@sinclair/typebox": "^0.34.52",
     "better-auth": "1.7.4",
     "errore": "^0.14.1",
@@ -22,6 +24,7 @@
     "tsx": "^4.23.13"
   },
   "devDependencies": {
+    "@orpc/client": "2.0.0-beta.29",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.20.1",
     "@types/pg": "^8.23.1",

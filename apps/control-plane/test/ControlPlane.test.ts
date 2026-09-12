@@ -1,8 +1,12 @@
 import fs from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { Type } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import {
+  controlPlaneProtocolVersion,
+  type ControlPlaneClient,
+} from "@get-halo/control-plane-contract";
 import { betterAuth } from "better-auth";
 import { testUtils } from "better-auth/plugins";
 import * as errore from "errore";
@@ -18,24 +22,10 @@ const testAuth = {
 
 const desktopAuthState = "desktop-auth-state-0123456789abcdef";
 
-const desktopAuthSessionSchema = Type.Object({
-  token: Type.String({ minLength: 1 }),
-  session: Type.Object({
-    id: Type.String({ minLength: 1 }),
-    userId: Type.String({ minLength: 1 }),
-    expiresAt: Type.String({ minLength: 1 }),
-  }),
-  user: Type.Object({
-    id: Type.String({ minLength: 1 }),
-    email: Type.String({ minLength: 1 }),
-    name: Type.String({ minLength: 1 }),
-    image: Type.Optional(Type.String()),
-  }),
-});
-
 const controlPlaneTest = test.extend<{
   appDataDir: string;
   plane: ControlPlane;
+  rpc: ControlPlaneClient;
 }>({
   appDataDir: async ({ task }, use) => {
     const parent = resolve(import.meta.dirname, "../../../tmp/control-plane");
@@ -55,6 +45,9 @@ const controlPlaneTest = test.extend<{
     await use(plane);
     const closed = await plane.close();
     if (closed instanceof Error) console.warn(closed);
+  },
+  rpc: async ({ plane }, use) => {
+    await use(createControlPlaneRpcClient(plane.origin));
   },
 });
 
@@ -105,18 +98,21 @@ controlPlaneTest("serves Better Auth at /api/auth", async ({ plane }) => {
   expect(await ok.json()).toEqual({ ok: true });
 });
 
+controlPlaneTest("serves the typed control-plane RPC", async ({ rpc }) => {
+  expect(await rpc.server.info()).toEqual({
+    protocolVersion: controlPlaneProtocolVersion,
+  });
+  expect(await rpc.auth.session()).toBeUndefined();
+});
+
 controlPlaneTest(
   "starts Google sign-in for a desktop loopback callback",
-  async ({ plane }) => {
-    const start = new URL("/api/desktop-auth/start", plane.origin);
-    start.searchParams.set("callback", "http://127.0.0.1:49152/auth/callback");
-    start.searchParams.set("state", desktopAuthState);
-
-    const response = await fetch(start, { redirect: "manual" });
-    expect(response.status).toBe(302);
-    const location = response.headers.get("location");
-    if (location === null) throw new Error("Desktop sign-in did not redirect");
-    const google = new URL(location);
+  async ({ rpc }) => {
+    const result = await rpc.auth.start({
+      callback: "http://127.0.0.1:49152/auth/callback",
+      state: desktopAuthState,
+    });
+    const google = new URL(result.authorizationUrl);
     expect(google.origin).toBe("https://accounts.google.com");
     expect(google.pathname).toBe("/o/oauth2/v2/auth");
   },
@@ -124,22 +120,19 @@ controlPlaneTest(
 
 controlPlaneTest(
   "rejects a desktop callback outside loopback",
-  async ({ plane }) => {
-    const start = new URL("/api/desktop-auth/start", plane.origin);
-    start.searchParams.set(
-      "callback",
-      "https://attacker.example/auth/callback",
-    );
-    start.searchParams.set("state", desktopAuthState);
-
-    const response = await fetch(start, { redirect: "manual" });
-    expect(response.status).toBe(400);
+  async ({ rpc }) => {
+    await expect(
+      rpc.auth.start({
+        callback: "https://attacker.example/auth/callback",
+        state: desktopAuthState,
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   },
 );
 
 controlPlaneTest(
   "exchanges a one-time code for a bearer session",
-  async ({ appDataDir, plane }) => {
+  async ({ appDataDir, plane, rpc }) => {
     const browserHeaders = await createAuthenticatedHeaders(
       appDataDir,
       plane.origin,
@@ -162,33 +155,33 @@ controlPlaneTest(
     const code = redirected.searchParams.get("code");
     if (code === null) throw new Error("Desktop sign-in did not return a code");
 
-    const exchange = await fetch(`${plane.origin}/api/desktop-auth/exchange`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code }),
-    });
-    expect(exchange.status).toBe(200);
-    const payload: unknown = await exchange.json();
-    if (!Value.Check(desktopAuthSessionSchema, payload))
-      throw new Error("Desktop exchange returned an invalid session");
+    const payload = await rpc.auth.exchange({ code });
     expect(payload.user.email).toBe("desktop@example.com");
 
-    const session = await fetch(`${plane.origin}/api/auth/get-session`, {
-      headers: { authorization: `Bearer ${payload.token}` },
-    });
-    expect(session.status).toBe(200);
-    expect(await session.json()).toMatchObject({
+    const authenticated = createControlPlaneRpcClient(
+      plane.origin,
+      payload.token,
+    );
+    expect(await authenticated.auth.session()).toMatchObject({
       user: { email: "desktop@example.com" },
     });
 
-    const reused = await fetch(`${plane.origin}/api/desktop-auth/exchange`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code }),
+    await expect(rpc.auth.exchange({ code })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
     });
-    expect(reused.status).toBe(400);
   },
 );
+
+function createControlPlaneRpcClient(origin: string, token?: string) {
+  const link = new RPCLink({
+    origin,
+    url: "/rpc",
+    headers:
+      token === undefined ? undefined : { authorization: `Bearer ${token}` },
+  });
+  // SAFETY: The control-plane origin serves controlPlaneContract at /rpc.
+  return createORPCClient(link) as ControlPlaneClient;
+}
 
 async function createAuthenticatedHeaders(appDataDir: string, origin: string) {
   using database = new DatabaseSync(join(appDataDir, "auth.db"));
