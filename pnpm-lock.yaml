@@ -504,15 +504,15 @@ importers:
       '@earendil-works/pi-ai':
         specifier: 0.85.1
         version: 0.85.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@8.1.1)(zod@4.6.1))(supports-color@8.1.1)(ws@8.21.1)(zod@4.6.1)
-      '@get-halo/gcp':
-        specifier: workspace:*
-        version: link:../gcp
       '@sinclair/typebox':
         specifier: ^0.34.52
         version: 0.34.52
       errore:
         specifier: ^0.14.1
         version: 0.14.1
+      google-auth-library:
+        specifier: ^11.0.2
+        version: 11.0.2(supports-color@8.1.1)
     devDependencies:
       '@repo/typescript-config':
         specifier: workspace:*
@@ -603,25 +603,6 @@ importers:
       '@playwright/test':
         specifier: ^1.61.0
         version: 1.62.1
-      '@types/node':
-        specifier: ^22.20.1
-        version: 22.20.1
-      typescript:
-        specifier: 7.0.2
-        version: 7.0.2
-
-  packages/gcp:
-    dependencies:
-      errore:
-        specifier: ^0.14.1
-        version: 0.14.1
-      google-auth-library:
-        specifier: ^11.0.2
-        version: 11.0.2(supports-color@8.1.1)
-    devDependencies:
-      '@repo/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
       '@types/node':
         specifier: ^22.20.1
         version: 22.20.1

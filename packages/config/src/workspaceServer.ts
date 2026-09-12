@@ -3,11 +3,11 @@ import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
-import { readSecret } from "@get-halo/gcp/secrets";
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import { ApplicationMode } from "./ApplicationMode.js";
+import { readGcpSecret } from "./readGcpSecret.js";
 
 const openAiApiKeySecretId = "halo-dev-local-openai-api-key";
 const secretProjectId = "halo-relay";
@@ -247,7 +247,7 @@ async function readInferenceConfig(
     return { backend: "openAI", options };
   }
 
-  const apiKey = await readSecret({
+  const apiKey = await readGcpSecret({
     projectId: secretProjectId,
     secretId: openAiApiKeySecretId,
   });

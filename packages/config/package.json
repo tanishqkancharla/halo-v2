@@ -18,9 +18,9 @@
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.85.1",
-    "@get-halo/gcp": "workspace:*",
     "@sinclair/typebox": "^0.34.52",
-    "errore": "^0.14.1"
+    "errore": "^0.14.1",
+    "google-auth-library": "^11.0.2"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

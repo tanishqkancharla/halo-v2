@@ -148,7 +148,7 @@ They are separate from the Google sign-in session that Halo users will use.
 
 ## Runtime secrets
 
-Secrets live in GCP Secret Manager. Halo processes call `readSecret` at startup,
+Secrets live in GCP Secret Manager. Application config reads them at startup,
 using Application Default Credentials locally and their attached service account
 on GCP. Secret values are never stored in a local environment file or injected as
 process environment variables. The development stack reads these secret names:

@@ -1,10 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { readSecret } from "@get-halo/gcp/secrets";
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import { ApplicationMode } from "./ApplicationMode.js";
+import { readGcpSecret } from "./readGcpSecret.js";
 
 const developmentPort = 8787;
 const secretProjectId = "halo-relay";
@@ -107,12 +107,12 @@ async function readAuthConfiguration(
   secretIds: AuthSecretIds,
 ): Promise<AuthConfiguration | Error> {
   const [secret, googleClientId, googleClientSecret] = await Promise.all([
-    readSecret({ projectId: secretProjectId, secretId: secretIds.secret }),
-    readSecret({
+    readGcpSecret({ projectId: secretProjectId, secretId: secretIds.secret }),
+    readGcpSecret({
       projectId: secretProjectId,
       secretId: secretIds.googleClientId,
     }),
-    readSecret({
+    readGcpSecret({
       projectId: secretProjectId,
       secretId: secretIds.googleClientSecret,
     }),
@@ -172,7 +172,7 @@ async function readCloudRunConfig(): Promise<ControlPlaneConfig | Error> {
       detail: "set GOOGLE_CLIENT_SECRET_ID",
     });
 
-  const databaseUrl = await readSecret({
+  const databaseUrl = await readGcpSecret({
     projectId: secretProjectId,
     secretId: databaseUrlSecretId,
   });

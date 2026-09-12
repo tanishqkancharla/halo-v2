@@ -5,19 +5,19 @@ const auth = new GoogleAuth({
   scopes: ["https://www.googleapis.com/auth/cloud-platform"],
 });
 
-class ReadSecretError extends errore.createTaggedError({
-  name: "ReadSecretError",
+class ReadGcpSecretError extends errore.createTaggedError({
+  name: "ReadGcpSecretError",
   message: "Could not read GCP secret $secretId: $detail",
 }) {}
 
-export async function readSecret(ctx: {
+export async function readGcpSecret(ctx: {
   projectId: string;
   secretId: string;
 }): Promise<string | Error> {
   const url = `https://secretmanager.googleapis.com/v1/projects/${encodeURIComponent(ctx.projectId)}/secrets/${encodeURIComponent(ctx.secretId)}/versions/latest:access`;
   const headers = await auth.getRequestHeaders(url).catch(
     (cause) =>
-      new ReadSecretError({
+      new ReadGcpSecretError({
         secretId: ctx.secretId,
         detail: "authenticate request",
         cause,
@@ -27,7 +27,7 @@ export async function readSecret(ctx: {
 
   const response = await fetch(url, { headers }).catch(
     (cause) =>
-      new ReadSecretError({
+      new ReadGcpSecretError({
         secretId: ctx.secretId,
         detail: "request latest version",
         cause,
@@ -35,14 +35,14 @@ export async function readSecret(ctx: {
   );
   if (response instanceof Error) return response;
   if (!response.ok)
-    return new ReadSecretError({
+    return new ReadGcpSecretError({
       secretId: ctx.secretId,
       detail: `request latest version: HTTP ${response.status}`,
     });
 
   const decoded = await response.json().catch(
     (cause) =>
-      new ReadSecretError({
+      new ReadGcpSecretError({
         secretId: ctx.secretId,
         detail: "decode response",
         cause,
@@ -54,7 +54,7 @@ export async function readSecret(ctx: {
   const body = decoded as { payload?: { data?: string } };
   const data = body.payload?.data;
   if (data === undefined)
-    return new ReadSecretError({
+    return new ReadGcpSecretError({
       secretId: ctx.secretId,
       detail: "empty payload",
     });
