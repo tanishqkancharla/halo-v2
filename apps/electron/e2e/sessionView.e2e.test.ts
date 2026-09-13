@@ -53,9 +53,13 @@ e2eTest(
     });
     await app.page.getByRole("button", { name: "New session" }).click();
     await app.page
+      .getByRole("main")
       .getByLabel("Message", { exact: true })
       .fill("Read the project notes");
-    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await app.page
+      .getByRole("main")
+      .getByRole("button", { name: "Send", exact: true })
+      .click();
     await llm.respond([
       m.assistant("I will read the notes."),
       m.tool.start("read", {
@@ -133,15 +137,26 @@ e2eTest(
   async ({ app, llm }) => {
     await app.page.getByRole("button", { name: "New session" }).click();
     await app.page
+      .getByRole("main")
       .getByLabel("Message", { exact: true })
       .fill("Start a long answer");
-    await app.page.getByRole("button", { name: "Send", exact: true }).click();
-
-    await app.page.getByRole("button", { name: "Stop", exact: true }).click();
     await app.page
+      .getByRole("main")
+      .getByRole("button", { name: "Send", exact: true })
+      .click();
+
+    await app.page
+      .getByRole("main")
+      .getByRole("button", { name: "Stop", exact: true })
+      .click();
+    await app.page
+      .getByRole("main")
       .getByLabel("Message", { exact: true })
       .fill("Answer this instead");
-    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await app.page
+      .getByRole("main")
+      .getByRole("button", { name: "Send", exact: true })
+      .click();
     await llm.respond(m.assistant("Here is the new answer."));
 
     await expect(app.page.getByRole("main")).toContainText(
@@ -155,9 +170,13 @@ e2eTest(
   async ({ app, llm }) => {
     await app.page.getByRole("button", { name: "New session" }).click();
     await app.page
+      .getByRole("main")
       .getByLabel("Message", { exact: true })
       .fill("Start an answer");
-    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await app.page
+      .getByRole("main")
+      .getByRole("button", { name: "Send", exact: true })
+      .click();
     await expect(
       app.page.getByRole("article", { name: "You message" }),
     ).toContainText("Start an answer");
@@ -406,9 +425,13 @@ e2eTest(
     });
     await app.page.getByRole("button", { name: "New session" }).click();
     await app.page
+      .getByRole("main")
       .getByLabel("Message", { exact: true })
       .fill("Read the notes and fetch the report");
-    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await app.page
+      .getByRole("main")
+      .getByRole("button", { name: "Send", exact: true })
+      .click();
     const command = `curl --silent --fail '${http.url("/report")}'`;
     const js = `await tools.files.read({ path: "notes.md" }); return await tools.bash.run({ command: ${JSON.stringify(command)} });`;
     await llm.respond(
@@ -486,9 +509,13 @@ e2eTest(
   async ({ app, llm, http }) => {
     await app.page.getByRole("button", { name: "New session" }).click();
     await app.page
+      .getByRole("main")
       .getByLabel("Message", { exact: true })
       .fill("Fetch both reports and summarize them");
-    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await app.page
+      .getByRole("main")
+      .getByRole("button", { name: "Send", exact: true })
+      .click();
     const firstCommand = `curl --silent --fail '${http.url("/first")}'`;
     const secondCommand = `curl --silent --fail '${http.url("/second")}'`;
     const js = `await tools.bash.run({ command: ${JSON.stringify(firstCommand)} }); return await tools.bash.run({ command: ${JSON.stringify(secondCommand)} });`;
@@ -657,9 +684,13 @@ e2eTest(
   async ({ app, llm, http }) => {
     await app.page.getByRole("button", { name: "New session" }).click();
     await app.page
+      .getByRole("main")
       .getByLabel("Message", { exact: true })
       .fill("Fetch both reports");
-    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await app.page
+      .getByRole("main")
+      .getByRole("button", { name: "Send", exact: true })
+      .click();
     const firstCommand = `curl --silent --fail '${http.url("/first")}'`;
     const secondCommand = `curl --silent --fail '${http.url("/second")}'`;
     await llm.respond([
@@ -788,9 +819,13 @@ e2eTest(
   async ({ app, llm }) => {
     await app.page.getByRole("button", { name: "New session" }).click();
     await app.page
+      .getByRole("main")
       .getByLabel("Message", { exact: true })
       .fill("Explain the plan");
-    await app.page.getByRole("button", { name: "Send", exact: true }).click();
+    await app.page
+      .getByRole("main")
+      .getByRole("button", { name: "Send", exact: true })
+      .click();
     const response = await llm.stream();
     response.write(m.assistant("The first step"));
     await expect(
