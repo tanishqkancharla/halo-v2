@@ -27,6 +27,7 @@ import {
   listenForLoopbackCallback,
   type ListeningLoopbackCallback,
 } from "./LoopbackCallback.js";
+import { openExternalUrl } from "./OpenExternalUrl.js";
 
 class DesktopRequestError extends errore.createTaggedError({
   name: "DesktopRequestError",
@@ -121,11 +122,13 @@ async function openExternal(request: OpenExternalRequest) {
       operation: `open an external ${url.protocol} URL`,
     });
   }
-  return await shell
-    .openExternal(url.toString())
-    .catch(
-      (e) => new DesktopOperationError({ operation: "open the URL", cause: e }),
-    );
+  const opened = await openExternalUrl(url.toString());
+  if (opened instanceof Error) {
+    return new DesktopOperationError({
+      operation: "open the URL",
+      cause: opened,
+    });
+  }
 }
 
 // Executor pending OAuth sessions last OAUTH2_SESSION_TTL_MS (15 minutes).
@@ -180,13 +183,7 @@ async function connectIntegration(args: {
     return started;
   }
 
-  const opened = await shell.openExternal(started.authorizationUrl).catch(
-    (cause) =>
-      new DesktopOperationError({
-        operation: "open the authorization page",
-        cause,
-      }),
-  );
+  const opened = await openExternalUrl(started.authorizationUrl);
   if (opened instanceof Error) {
     await cancelPendingConnection({
       client,
@@ -194,7 +191,10 @@ async function connectIntegration(args: {
       connectionId: started.connectionId,
     });
     await closeOAuthCallback(callback);
-    return opened;
+    return new DesktopOperationError({
+      operation: "open the authorization page",
+      cause: opened,
+    });
   }
 
   pendingOAuthCallbacks.set(started.connectionId, callback);
