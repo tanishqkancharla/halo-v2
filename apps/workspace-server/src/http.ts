@@ -14,6 +14,10 @@ import * as errore from "errore";
 import { handleOAuthCallback } from "./oauth.js";
 import { haloRpcRouter, type HaloContext } from "./router.js";
 import { extensionToolRouter } from "./extensions/extensionsRouter.js";
+import {
+  isExtensionProxyRequest,
+  serveExtensionRequest,
+} from "./extensions/extensionProxy.js";
 
 const localConnectionHost = "127.0.0.1";
 
@@ -185,6 +189,16 @@ export function serveHaloHttp(options: {
 
     if (request.method === "GET" && url.pathname === "/health") {
       response.writeHead(200).end();
+      return;
+    }
+
+    if (isExtensionProxyRequest(url)) {
+      await serveExtensionRequest({
+        extensions: options.context.extensions,
+        request,
+        response,
+        url,
+      });
       return;
     }
 

@@ -24,7 +24,6 @@ export type ElectronConfig = {
   remoteDebugging: boolean;
   useSwiftShader: boolean;
   showMainWindow: boolean;
-  testAuthentication: boolean;
   testWindowEvents: boolean;
   updates:
     | { enabled: true }
@@ -89,7 +88,6 @@ function readConfig(): ElectronConfig | Error {
       !isTest ||
       process.env.HALO_E2E_HEADFUL === "1" ||
       process.env.PWDEBUG === "1",
-    testAuthentication: isTest,
     testWindowEvents: isTest,
     updates:
       mode === ApplicationMode.Production

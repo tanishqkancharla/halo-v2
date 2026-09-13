@@ -4,6 +4,7 @@ import {
   dialog,
   ipcMain,
   Menu,
+  session as electronSession,
   shell,
   type IpcMainEvent,
 } from "electron";
@@ -25,9 +26,10 @@ import { LOG_CHANNELS } from "../shared/channels.js";
 import { readWorkspaceServerConnection } from "@get-halo/workspace-server/connection";
 import { checkForUpdates, startAppUpdates } from "./app/AppUpdate.js";
 import {
-  ControlPlaneAuth,
+  createLocalDesktopAuthentication,
   type DesktopAuthentication,
-} from "./ControlPlaneAuth.js";
+} from "./DesktopAuthentication.js";
+import { ControlPlaneAuth } from "./ControlPlaneAuth.js";
 import { registerDesktopApi } from "./DesktopApi.js";
 import type { HaloRpcConnection } from "../shared/rpc.js";
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -110,38 +112,52 @@ app.whenReady().then(async () => {
 });
 
 async function createDesktopAuthentication(): Promise<DesktopAuthentication> {
-  if (applicationConfig.testAuthentication) {
+  if (applicationConfig.mode === ApplicationMode.Test) {
     const session = testAuthSession();
 
-    return {
-      getSession: async () => await Promise.resolve(session),
-      getWorkspaceConnection: async () => await Promise.resolve(undefined),
-      signIn: async () => await Promise.resolve(session),
-    };
+    return createLocalDesktopAuthentication({
+      dataDir: applicationConfig.dataDir,
+      identity: {
+        getSession: async () => await Promise.resolve(session),
+        signIn: async () => await Promise.resolve(session),
+      },
+    });
   }
 
   const authentication = await ControlPlaneAuth.start({
     origin: applicationConfig.controlPlaneOrigin,
     dataDir: applicationConfig.dataDir,
   });
-  return authentication;
+
+  return applicationConfig.mode === ApplicationMode.Development
+    ? createLocalDesktopAuthentication({
+        dataDir: applicationConfig.dataDir,
+        identity: authentication,
+      })
+    : authentication;
 }
 
 async function getWorkspaceConnection(
   authentication: DesktopAuthentication,
 ): Promise<HaloRpcConnection | Error | undefined> {
-  if (applicationConfig.mode === ApplicationMode.Production) {
-    return await authentication.getWorkspaceConnection();
-  }
+  const connection = await authentication.getWorkspaceConnection();
+  if (connection instanceof Error || connection === undefined)
+    return connection;
 
-  const server = await readWorkspaceServerConnection(applicationConfig.dataDir);
-  if (server instanceof Error || server === undefined) return server;
+  authorizeExtensionRequests(connection);
+  return connection;
+}
 
-  return {
-    origin: server.origin,
-    path: "/rpc",
-    token: server.token,
-  };
+function authorizeExtensionRequests(connection: HaloRpcConnection) {
+  electronSession.defaultSession.webRequest.onBeforeSendHeaders(
+    {
+      urls: [`${connection.origin}${connection.extensionPath}/*`],
+    },
+    (details, callback) => {
+      details.requestHeaders.authorization = `Bearer ${connection.token}`;
+      callback({ requestHeaders: details.requestHeaders });
+    },
+  );
 }
 
 function testAuthSession(): ControlPlaneSession {

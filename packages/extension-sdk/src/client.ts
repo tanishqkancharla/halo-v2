@@ -26,11 +26,18 @@ type SyncClient<Schema extends AnySchema> = {
 export async function connectExtension<Schema extends AnySchema>(
   schema: RuntimeSchemaDefinition<Schema>,
 ) {
+  const viewPath = "/view/";
+  const extensionPath = location.pathname.slice(
+    1,
+    location.pathname.lastIndexOf(viewPath) + 1,
+  );
+  const apiPath = `/${extensionPath}api/` as const;
+  const syncPath = `/${extensionPath}sync/` as const;
   const api = createORPCClient<RouterClient<AnyRouter>>(
-    new RPCLink({ url: "/api/", origin: location.origin }),
+    new RPCLink({ url: apiPath, origin: location.origin }),
   );
   const sync = createORPCClient<SyncClient<Schema>>(
-    new RPCLink({ url: "/sync/", origin: location.origin }),
+    new RPCLink({ url: syncPath, origin: location.origin }),
   );
   const remote: RemoteApi<Schema> = {
     push: async (input) => await sync.push(input),

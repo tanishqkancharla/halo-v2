@@ -10,14 +10,12 @@ import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
-import {
-  type ControlPlaneClient,
-  type ControlPlaneSession,
-} from "@get-halo/shared/controlPlaneContract";
+import { type ControlPlaneClient } from "@get-halo/shared/controlPlaneContract";
 import { SerialQueue } from "@get-halo/shared/SerialQueue";
 import { safeStorage, shell } from "electron";
 import * as errore from "errore";
 import type { HaloRpcConnection } from "../shared/rpc.js";
+import type { DesktopAuthentication } from "./DesktopAuthentication.js";
 
 const loopbackHost = "127.0.0.1";
 const callbackPath = "/auth/callback";
@@ -32,12 +30,6 @@ type ListeningDesktopAuthCallback = {
   callbackUrl: string;
   code: Promise<string | ControlPlaneAuthError>;
   close: () => Promise<undefined | ControlPlaneAuthError>;
-};
-
-export type DesktopAuthentication = {
-  getWorkspaceConnection: () => Promise<HaloRpcConnection | Error | undefined>;
-  getSession: () => Promise<ControlPlaneSession | Error | undefined>;
-  signIn: () => Promise<ControlPlaneSession | Error>;
 };
 
 export class ControlPlaneAuth implements DesktopAuthentication {
@@ -95,6 +87,7 @@ export class ControlPlaneAuth implements DesktopAuthentication {
         origin: this.origin,
         path: "/workspace/rpc",
         token: this.token,
+        extensionPath: "/workspace/extensions",
       } satisfies HaloRpcConnection;
 
       const health = await fetch(`${this.origin}/workspace/health`, {

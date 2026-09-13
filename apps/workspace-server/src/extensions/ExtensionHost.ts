@@ -76,6 +76,12 @@ export class ExtensionHost {
     return id;
   }
 
+  getOrigin(id: string) {
+    const extension = this.processes.get(id);
+    if (extension === undefined || !extension.isRunning()) return undefined;
+    return new URL(extension.url).origin;
+  }
+
   async stop() {
     return await this.actionQueue.run(async () => {
       const processes = [...this.processes.values()];

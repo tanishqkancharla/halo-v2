@@ -1,13 +1,25 @@
 /* oxlint-disable react/iframe-missing-sandbox -- ExtensionHost uses a separate origin; scripts need that origin for API and storage access. */
 import { backgroundColor, flex, Padding, Text } from "maui";
 import { style, useStyles } from "purse-styles";
-import { useExtensionsQuery, useWorkspaceQuery } from "../api/ApiProvider.tsx";
+import {
+  useApiConnection,
+  useExtensionsQuery,
+  useWorkspaceQuery,
+} from "../api/ApiProvider.tsx";
 import { PaneHeader } from "./PaneHeader.js";
 
 export function ExtensionPane({ extensionId }: { extensionId: string }) {
   const workspace = useWorkspaceQuery().data;
+  const connection = useApiConnection();
   const extensions = useExtensionsQuery(workspace);
   const extension = extensions.data?.find((entry) => entry.id === extensionId);
+  const extensionUrl =
+    extension === undefined
+      ? undefined
+      : new URL(
+          `${connection.extensionPath}/${encodeURIComponent(extension.id)}/view/`,
+          connection.origin,
+        ).toString();
   const displayName =
     extension === undefined ? extensionId : extension.displayName;
   const pane = useStyles(styles.pane);
@@ -31,12 +43,12 @@ export function ExtensionPane({ extensionId }: { extensionId: string }) {
           <Text>Extension '{extensionId}' is not running.</Text>
         </Padding>
       )}
-      {extension !== undefined && (
+      {extension !== undefined && extensionUrl !== undefined && (
         <iframe
           key={extension.id}
           className={frame}
           title={extension.displayName}
-          src={extension.url}
+          src={extensionUrl}
           sandbox="allow-scripts allow-same-origin allow-forms"
         />
       )}
