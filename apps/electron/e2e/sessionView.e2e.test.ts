@@ -423,13 +423,31 @@ e2eTest(
 
     const pane = app.page.getByRole("main");
     const summary = pane.getByRole("button", {
-      name: "Running command",
+      name: "Read 1 file",
       exact: true,
     });
     await expect(summary).toBeVisible();
     await expectThinkingVisible(
       summary.getByRole("status", { name: "Working" }),
     );
+    await expect(
+      summary.getByRole("img", { name: "Expand tool activity" }),
+    ).toBeHidden();
+    await expect(
+      pane.getByLabel("Active commands").getByText("Running command", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await summary.hover();
+    await expect(
+      summary.getByRole("img", { name: "Expand tool activity" }),
+    ).toBeVisible();
+    await expect(summary.getByRole("status", { name: "Working" })).toBeHidden();
+    await expect(
+      pane.getByLabel("Active commands").getByText("Running command", {
+        exact: true,
+      }),
+    ).toBeVisible();
     await summary.click();
     await expect(
       pane.getByRole("button", {
@@ -460,6 +478,13 @@ e2eTest(
     await app.open();
 
     const restored = app.page.getByRole("main");
+    await expect(
+      restored.getByRole("button", {
+        name: "Ran 1 command and read 1 file",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(restored.getByLabel("Active commands")).toHaveCount(0);
     await restored
       .getByRole("button", {
         name: "Ran 1 command and read 1 file",
@@ -497,9 +522,7 @@ e2eTest(
     );
     const first = await http.request("/first");
     const pane = app.page.getByRole("main");
-    await pane
-      .getByRole("button", { name: "Running command", exact: true })
-      .click();
+    await pane.getByRole("button", { name: "Working", exact: true }).click();
     const call = pane.getByRole("button", {
       name: `${firstCommand} (bash.run)`,
       exact: true,
@@ -677,9 +700,7 @@ e2eTest(
       http.request("/second"),
     ]);
     const pane = app.page.getByRole("main");
-    await pane
-      .getByRole("button", { name: "Running command", exact: true })
-      .click();
+    await pane.getByRole("button", { name: "Working", exact: true }).click();
     first.respond("First report");
     await pane
       .getByRole("button", { name: `${firstCommand} (bash)`, exact: true })
@@ -687,8 +708,22 @@ e2eTest(
     await expect(
       pane.getByRole("region", { name: "bash", exact: true }),
     ).toContainText("First report");
+    const liveAggregate = pane.getByRole("button", {
+      name: "Ran 1 command",
+      exact: true,
+    });
+    await expect(liveAggregate).toBeVisible();
+    await expectThinkingVisible(
+      liveAggregate.getByRole("status", { name: "Working" }),
+    );
+    await liveAggregate.hover();
     await expect(
-      pane.getByRole("button", { name: "Running command", exact: true }),
+      liveAggregate.getByRole("img", { name: "Expand tool activity" }),
+    ).toBeVisible();
+    await expect(
+      pane.getByLabel("Active commands").getByText("Running command", {
+        exact: true,
+      }),
     ).toBeVisible();
     await expect(
       pane.getByRole("button", {
@@ -704,9 +739,18 @@ e2eTest(
     ).toBeVisible();
     second.respond("Second report");
     await llm.respond(m.assistant("Both reports are ready."));
+    const settled = pane.getByRole("button", {
+      name: "Ran 2 commands",
+      exact: true,
+    });
+    await expect(settled).toBeVisible();
     await expect(
-      pane.getByRole("button", { name: "Ran 2 commands", exact: true }),
+      settled.getByRole("img", { name: "Expand tool activity" }),
     ).toBeVisible();
+    await expect(settled.getByRole("status", { name: "Working" })).toHaveCount(
+      0,
+    );
+    await expect(pane.getByLabel("Active commands")).toHaveCount(0);
   },
 );
 
