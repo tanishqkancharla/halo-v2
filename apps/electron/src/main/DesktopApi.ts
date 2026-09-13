@@ -16,7 +16,7 @@ import {
   type OpenExternalRequest,
 } from "../shared/desktop.js";
 import { getAppInfo, installAppUpdate } from "./app/AppUpdate.js";
-import type { DesktopAuthentication } from "./ControlPlaneAuth.js";
+import type { DesktopAuthentication } from "./DesktopAuthentication.js";
 import type { HaloRpcConnection } from "../shared/rpc.js";
 
 class DesktopRequestError extends errore.createTaggedError({

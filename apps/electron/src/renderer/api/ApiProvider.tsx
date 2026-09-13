@@ -14,6 +14,7 @@ import {
 } from "react";
 import type { HaloClient } from "@get-halo/shared/contract";
 import type { WorkspaceInfo } from "@get-halo/shared/rpc";
+import type { HaloRpcConnection } from "../../shared/rpc.js";
 import { LoadingPage } from "../LoadingPage.tsx";
 import { ConnectionPage } from "../ConnectionPage.tsx";
 import { desktopApi } from "./electron.js";
@@ -24,7 +25,13 @@ import {
 
 type ApiContextValue = {
   api: HaloClient;
+  connection: HaloRpcConnection;
   queryClient: QueryClient;
+};
+
+export type ConnectedHaloApi = {
+  api: HaloClient;
+  connection: HaloRpcConnection;
 };
 
 const ApiContext = createContext<ApiContextValue>(undefined!);
@@ -37,7 +44,7 @@ export function ApiProvider({
 }: {
   createApi: (options: {
     onDisconnect: (error: HaloRpcConnectionError) => void;
-  }) => Promise<Error | HaloClient | undefined>;
+  }) => Promise<ConnectedHaloApi | Error | undefined>;
   children: ReactNode;
 }) {
   const [queryClient] = useState(
@@ -68,7 +75,7 @@ function ResolveApi({
 }: {
   createApi: (options: {
     onDisconnect: (error: HaloRpcConnectionError) => void;
-  }) => Promise<Error | HaloClient | undefined>;
+  }) => Promise<ConnectedHaloApi | Error | undefined>;
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
@@ -94,20 +101,26 @@ function ResolveApi({
     return <ConnectionPage status="disconnected" />;
   }
   if (disconnected) return <ConnectionPage status="disconnected" />;
-  const api = apiQuery.data.api;
-  if (api === undefined) return <ConnectionPage status="waiting" />;
-  if (api instanceof IncompatibleServerError) {
-    return <ConnectionPage status="incompatible" error={api} />;
+  const connected = apiQuery.data.api;
+  if (connected === undefined) return <ConnectionPage status="waiting" />;
+  if (connected instanceof IncompatibleServerError) {
+    return <ConnectionPage status="incompatible" error={connected} />;
   }
-  if (api instanceof Error) {
+  if (connected instanceof Error) {
     return <ConnectionPage status="disconnected" />;
   }
 
-  return <ApiContext value={{ api, queryClient }}>{children}</ApiContext>;
+  return (
+    <ApiContext value={{ ...connected, queryClient }}>{children}</ApiContext>
+  );
 }
 
 export function useApi(): HaloClient {
   return useContext(ApiContext).api;
+}
+
+export function useApiConnection() {
+  return useContext(ApiContext).connection;
 }
 
 export function useWorkspaceQuery() {

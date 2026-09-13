@@ -33,7 +33,6 @@ export async function buildExtension(directory: string) {
       bundle: true,
       format: "esm",
       platform: "browser",
-      publicPath: "/view/assets",
       jsx: "automatic",
       logLevel: "silent",
       metafile: true,
@@ -86,7 +85,27 @@ await runExtension({ router, publicDirectory: fileURLToPath(new URL("./public/",
   const css = Object.values(view.metafile.outputs).some(
     (file) => file.cssBundle !== undefined,
   );
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${css ? '<link rel="stylesheet" href="/view/assets/view.css">' : ""}</head><body><div id="root"></div><script type="module" src="/view/assets/view.js"></script></body></html>`;
+  const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <script>
+      (() => {
+        const viewPath = "/view/";
+        const viewEnd = location.pathname.lastIndexOf(viewPath) + viewPath.length;
+        const base = document.createElement("base");
+        base.href = location.pathname.slice(0, viewEnd);
+        document.head.append(base);
+      })();
+    </script>
+    ${css ? '<link rel="stylesheet" href="./assets/view.css">' : ""}
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./assets/view.js"></script>
+  </body>
+</html>`;
   const files = [
     [join(output, "public", "index.html"), html],
     [
