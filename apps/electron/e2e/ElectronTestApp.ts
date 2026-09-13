@@ -144,12 +144,9 @@ function killIfRunning(child: ChildProcess) {
   }
 }
 
-function whenExited(child: ChildProcess) {
-  return new Promise<void>((resolve) => {
-    if (child.exitCode !== null) {
-      resolve();
-      return;
-    }
+async function whenExited(child: ChildProcess) {
+  if (child.exitCode !== null) return;
+  await new Promise<void>((resolve) => {
     child.once("exit", () => resolve());
   });
 }
