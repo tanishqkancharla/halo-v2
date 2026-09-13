@@ -183,7 +183,9 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", () => {
-  void closePendingOAuthCallbacks();
+  void closePendingOAuthCallbacks().catch((cause) => {
+    console.warn("OAuth callback close failed:", cause);
+  });
   logger.destroy();
 });
 

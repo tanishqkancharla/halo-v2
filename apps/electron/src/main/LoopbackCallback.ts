@@ -15,7 +15,7 @@ export class LoopbackCallbackError extends errore.createTaggedError({
   message: "Halo could not $operation",
 }) {}
 
-export type LoopbackCallbackResult =
+type LoopbackCallbackResult =
   | { code: string; state: string }
   | { providerError: string; state: string | undefined }
   | { cancelled: true };
