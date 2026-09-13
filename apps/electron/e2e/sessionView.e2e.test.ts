@@ -232,19 +232,21 @@ e2eTest(
   },
 );
 
+const googleDriveConnection = {
+  client: "first-party:google",
+  clientOwner: "org",
+  owner: "user",
+  connectionName: "default",
+  integration: "google_drive",
+  template: "googleOAuth2",
+} as const;
+
 e2eTest("shows a connection request", async ({ harness, app }) => {
   await harness.loadSession({
     title: "Drive search",
     messages: [
       m.user("Find my planning document"),
-      m.connectionRequest({
-        client: "google",
-        clientOwner: "org",
-        owner: "user",
-        connectionName: "default",
-        integration: "google_drive",
-        template: "google",
-      }),
+      m.connectionRequest(googleDriveConnection),
     ],
   });
 
@@ -262,14 +264,7 @@ e2eTest(
       title: "Drive search",
       messages: [
         m.user("Find my planning document"),
-        m.connectionRequest({
-          client: "google",
-          clientOwner: "org",
-          owner: "user",
-          connectionName: "default",
-          integration: "google_drive",
-          template: "google",
-        }),
+        m.connectionRequest(googleDriveConnection),
       ],
     });
 
