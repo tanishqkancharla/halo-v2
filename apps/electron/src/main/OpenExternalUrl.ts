@@ -8,6 +8,10 @@ export class OpenExternalUrlError extends errore.createTaggedError({
 }) {}
 
 export async function openExternalUrl(url: string) {
+  // E2E cannot finish Google OAuth. Opening the system browser leaves a child
+  // that GitHub Actions cannot detach, so Playwright teardown never exits.
+  if (process.env.HALO_E2E === "1") return;
+
   if (process.platform !== "linux") {
     return await shell
       .openExternal(url)

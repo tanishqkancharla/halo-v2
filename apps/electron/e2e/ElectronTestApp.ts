@@ -48,7 +48,20 @@ export class ElectronTestApp {
         HALO_USER_DATA: this.artifacts.paths.userData,
       },
     });
-    resources.defer(async () => await electronApp.close());
+    resources.defer(async () => {
+      const child = electronApp.process();
+      const pid = child.pid;
+      // GitHub Actions can keep Halo alive after Connect. Kill if close hangs.
+      const forceQuit = setTimeout(() => {
+        if (pid !== undefined && child.exitCode === null) {
+          child.kill("SIGKILL");
+        }
+      }, 3_000);
+      await electronApp.close().catch((cause) => {
+        console.warn("Electron close failed:", cause);
+      });
+      clearTimeout(forceQuit);
+    });
     const captured = this.artifacts.captureProcess(
       electronApp.process(),
       launch,
