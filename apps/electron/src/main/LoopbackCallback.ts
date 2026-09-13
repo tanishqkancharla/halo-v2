@@ -17,7 +17,8 @@ export class LoopbackCallbackError extends errore.createTaggedError({
 
 export type LoopbackCallbackResult =
   | { code: string; state: string }
-  | { providerError: string; state: string | undefined };
+  | { providerError: string; state: string | undefined }
+  | { cancelled: true };
 
 export type ListeningLoopbackCallback = {
   callbackUrl: string;
@@ -37,9 +38,20 @@ export async function listenForLoopbackCallback(input: { timeoutMs: number }) {
         resolveResult = resolve;
       });
       let timeout: NodeJS.Timeout | undefined;
+      let settled = false;
+      let closed = false;
+
+      const settle = (
+        value: LoopbackCallbackResult | LoopbackCallbackError,
+      ) => {
+        if (settled) return;
+        settled = true;
+        if (timeout !== undefined) clearTimeout(timeout);
+        resolveResult(value);
+      };
 
       const server = createServer((request, response) => {
-        receiveLoopbackCallback({ request, response, settle: resolveResult });
+        receiveLoopbackCallback({ request, response, settle });
       });
       const listenError = (cause: Error) => {
         resolveListen(
@@ -53,8 +65,9 @@ export async function listenForLoopbackCallback(input: { timeoutMs: number }) {
       server.once("error", listenError);
       server.listen(0, loopbackHost, () => {
         server.off("error", listenError);
+        server.unref();
         server.once("error", (cause) => {
-          resolveResult(
+          settle(
             new LoopbackCallbackError({
               operation: "receive the authorization callback",
               cause,
@@ -65,18 +78,21 @@ export async function listenForLoopbackCallback(input: { timeoutMs: number }) {
         // SAFETY: Node returns a TCP address after successfully listening with a numeric port.
         const address = server.address() as AddressInfo;
         timeout = setTimeout(() => {
-          resolveResult(
+          settle(
             new LoopbackCallbackError({
               operation: "wait for the authorization callback",
             }),
           );
         }, input.timeoutMs);
+        timeout.unref();
 
         resolveListen({
           callbackUrl: `http://${loopbackHost}:${address.port}${callbackPath}`,
           result,
           close: async () => {
-            if (timeout !== undefined) clearTimeout(timeout);
+            settle({ cancelled: true });
+            if (closed) return;
+            closed = true;
             return await closeCallbackServer(server);
           },
         });

@@ -5,7 +5,6 @@ import { background, Button, Flex, radius, shadow, Spacer, Text } from "maui";
 import { style, useStyles } from "purse-styles";
 import { connectionRequestLabel } from "@get-halo/shared/connectionRequests";
 import { BrandLogo, brands } from "../../BrandLogo.tsx";
-import { useApi } from "../../api/ApiProvider.tsx";
 import { desktopApi } from "../../api/electron.ts";
 import {
   connectionStateQueryKey,
@@ -38,7 +37,6 @@ export function ExecutorConnectionCard({
   sessionId: string | undefined;
   part: ExecutorConnectionPart;
 }) {
-  const api = useApi();
   const cardClassName = useStyles(card);
   const brandButtonClassName = useStyles(brandButton);
   const queryClient = useQueryClient();
@@ -104,7 +102,7 @@ export function ExecutorConnectionCard({
   const cancel = useMutation({
     mutationFn: async () => {
       if (sessionId === undefined || connection.status !== "connecting") return;
-      await api.sessions.cancelConnection({
+      await desktopApi.cancelIntegration({
         sessionId,
         connectionId: connection.connectionId,
       });

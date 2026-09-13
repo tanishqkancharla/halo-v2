@@ -15,6 +15,7 @@ import type { HaloClient } from "@get-halo/shared/contract";
 import {
   DESKTOP_CHANNEL,
   desktopRequestSchema,
+  type CancelIntegrationRequest,
   type ConnectIntegrationRequest,
   type DesktopRequest,
   type OpenExternalRequest,
@@ -95,6 +96,11 @@ async function handleDesktopRequest(args: {
         request: args.request,
         getConnection: args.getConnection,
       });
+    case "cancelIntegration":
+      return await cancelIntegration({
+        request: args.request,
+        getConnection: args.getConnection,
+      });
     default:
       return new DesktopRequestError({ operation: "desktop API" });
   }
@@ -124,6 +130,15 @@ async function openExternal(request: OpenExternalRequest) {
 
 // Executor pending OAuth sessions last OAUTH2_SESSION_TTL_MS (15 minutes).
 const oauthCallbackTimeoutMs = 15 * 60 * 1_000;
+const pendingOAuthCallbacks = new Map<string, ListeningLoopbackCallback>();
+
+export async function closePendingOAuthCallbacks() {
+  const callbacks = [...pendingOAuthCallbacks.values()];
+  pendingOAuthCallbacks.clear();
+  for (const callback of callbacks) {
+    await closeOAuthCallback(callback);
+  }
+}
 
 async function connectIntegration(args: {
   request: ConnectIntegrationRequest;
@@ -182,6 +197,7 @@ async function connectIntegration(args: {
     return opened;
   }
 
+  pendingOAuthCallbacks.set(started.connectionId, callback);
   void completeIntegrationOAuth({
     callback,
     client,
@@ -193,6 +209,27 @@ async function connectIntegration(args: {
   return started;
 }
 
+async function cancelIntegration(args: {
+  request: CancelIntegrationRequest;
+  getConnection: () => Promise<HaloRpcConnection | Error | undefined>;
+}) {
+  const callback = pendingOAuthCallbacks.get(args.request.connectionId);
+  if (callback !== undefined) await closeOAuthCallback(callback);
+
+  const connection = await args.getConnection();
+  if (connection instanceof Error) return connection;
+  if (connection === undefined) {
+    return new DesktopOperationError({
+      operation: "cancel a connection without a workspace",
+    });
+  }
+  await cancelPendingConnection({
+    client: createWorkspaceClient(connection),
+    sessionId: args.request.sessionId,
+    connectionId: args.request.connectionId,
+  });
+}
+
 async function completeIntegrationOAuth(args: {
   callback: ListeningLoopbackCallback;
   client: HaloClient;
@@ -200,7 +237,10 @@ async function completeIntegrationOAuth(args: {
   connectionId: string;
 }) {
   await using cleanup = new errore.AsyncDisposableStack();
-  cleanup.defer(async () => await closeOAuthCallback(args.callback));
+  cleanup.defer(async () => {
+    pendingOAuthCallbacks.delete(args.connectionId);
+    await closeOAuthCallback(args.callback);
+  });
 
   const received = await args.callback.result;
   if (received instanceof Error) {
@@ -208,7 +248,7 @@ async function completeIntegrationOAuth(args: {
     await cancelPendingConnection(args);
     return;
   }
-  if ("providerError" in received) {
+  if ("cancelled" in received || "providerError" in received) {
     await cancelPendingConnection(args);
     return;
   }

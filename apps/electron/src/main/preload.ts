@@ -32,6 +32,12 @@ const desktopApi: DesktopApi = {
       sessionId: input.sessionId,
       request: input.request,
     }),
+  cancelIntegration: async (input) =>
+    await ipcRenderer.invoke(DESKTOP_CHANNEL, {
+      type: "cancelIntegration",
+      sessionId: input.sessionId,
+      connectionId: input.connectionId,
+    }),
 };
 
 contextBridge.exposeInMainWorld("haloDesktop", desktopApi);

@@ -276,6 +276,9 @@ e2eTest(
     await expect(
       card.getByText("Finish connecting in your browser"),
     ).toBeVisible();
+    await card.getByRole("button", { name: "Cancel" }).click();
+    await expect(card.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(card.getByText("Authorization cancelled")).toBeVisible();
   },
 );
 

@@ -62,6 +62,14 @@ export const desktopRequestSchema = Type.Union([
     },
     { additionalProperties: false },
   ),
+  Type.Object(
+    {
+      type: Type.Literal("cancelIntegration"),
+      sessionId: Type.String(),
+      connectionId: Type.String(),
+    },
+    { additionalProperties: false },
+  ),
 ]);
 
 export type DesktopRequest = Static<typeof desktopRequestSchema>;
@@ -72,6 +80,10 @@ export type OpenExternalRequest = Extract<
 export type ConnectIntegrationRequest = Extract<
   DesktopRequest,
   { type: "connectIntegration" }
+>;
+export type CancelIntegrationRequest = Extract<
+  DesktopRequest,
+  { type: "cancelIntegration" }
 >;
 
 export type DesktopApi = {
@@ -86,6 +98,10 @@ export type DesktopApi = {
     sessionId: string;
     request: ConnectionRequest;
   }) => Promise<ConnectionStarted>;
+  cancelIntegration: (input: {
+    sessionId: string;
+    connectionId: string;
+  }) => Promise<void>;
 };
 
 declare global {
