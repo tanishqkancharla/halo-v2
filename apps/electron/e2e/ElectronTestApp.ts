@@ -1,3 +1,4 @@
+import type { ChildProcess } from "node:child_process";
 import { createHaloRpcClient, readHaloRpcFile, rpcFilePath } from "@halo/cli";
 import type { HaloClient } from "@get-halo/shared/contract";
 import * as errore from "errore";
@@ -49,18 +50,7 @@ export class ElectronTestApp {
       },
     });
     resources.defer(async () => {
-      const child = electronApp.process();
-      const pid = child.pid;
-      // GitHub Actions can keep Halo alive after Connect. Kill if close hangs.
-      const forceQuit = setTimeout(() => {
-        if (pid !== undefined && child.exitCode === null) {
-          child.kill("SIGKILL");
-        }
-      }, 3_000);
-      await electronApp.close().catch((cause) => {
-        console.warn("Electron close failed:", cause);
-      });
-      clearTimeout(forceQuit);
+      await closeElectronApp(electronApp);
     });
     const captured = this.artifacts.captureProcess(
       electronApp.process(),
@@ -101,7 +91,21 @@ export class ElectronTestApp {
     const current = this.current;
     if (current === undefined) return;
     this.current = undefined;
-    await current.resources.disposeAsync();
+    const child = current.electron.process();
+    using cleanup = new errore.DisposableStack();
+    // GitHub Actions can keep Halo alive after Connect. Do not wait on close().
+    const forceQuit = setTimeout(() => killIfRunning(child), 10_000);
+    cleanup.defer(() => clearTimeout(forceQuit));
+    await Promise.race([
+      current.resources.disposeAsync().catch((cause) => {
+        console.warn("Electron teardown failed:", cause);
+      }),
+      new Promise<void>((resolve) => {
+        const giveUp = setTimeout(resolve, 15_000);
+        cleanup.defer(() => clearTimeout(giveUp));
+      }),
+    ]);
+    killIfRunning(child);
   }
 
   async openWindow() {
@@ -120,6 +124,34 @@ export class ElectronTestApp {
     }
     return this.current;
   }
+}
+
+async function closeElectronApp(electronApp: ElectronApplication) {
+  const child = electronApp.process();
+  using cleanup = new errore.DisposableStack();
+  const forceQuit = setTimeout(() => killIfRunning(child), 3_000);
+  cleanup.defer(() => clearTimeout(forceQuit));
+  const closed = electronApp.close().catch((cause) => {
+    console.warn("Electron close failed:", cause);
+  });
+  await Promise.race([closed, whenExited(child)]);
+  killIfRunning(child);
+}
+
+function killIfRunning(child: ChildProcess) {
+  if (child.pid !== undefined && child.exitCode === null) {
+    child.kill("SIGKILL");
+  }
+}
+
+function whenExited(child: ChildProcess) {
+  return new Promise<void>((resolve) => {
+    if (child.exitCode !== null) {
+      resolve();
+      return;
+    }
+    child.once("exit", () => resolve());
+  });
 }
 
 function processEnvironment() {
