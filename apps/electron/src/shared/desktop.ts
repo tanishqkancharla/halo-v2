@@ -1,4 +1,9 @@
 import { type Static, Type } from "@sinclair/typebox";
+import {
+  connectionRequestSchema,
+  type ConnectionRequest,
+} from "@get-halo/shared/connectionRequests";
+import type { ConnectionStarted } from "@get-halo/shared/contract";
 import type { ControlPlaneSession } from "@get-halo/shared/controlPlaneContract";
 import type { HaloRpcConnection } from "./rpc.js";
 
@@ -49,12 +54,36 @@ export const desktopRequestSchema = Type.Union([
     },
     { additionalProperties: false },
   ),
+  Type.Object(
+    {
+      type: Type.Literal("connectIntegration"),
+      sessionId: Type.String(),
+      request: connectionRequestSchema,
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      type: Type.Literal("cancelIntegration"),
+      sessionId: Type.String(),
+      connectionId: Type.String(),
+    },
+    { additionalProperties: false },
+  ),
 ]);
 
 export type DesktopRequest = Static<typeof desktopRequestSchema>;
 export type OpenExternalRequest = Extract<
   DesktopRequest,
   { type: "openExternal" }
+>;
+export type ConnectIntegrationRequest = Extract<
+  DesktopRequest,
+  { type: "connectIntegration" }
+>;
+export type CancelIntegrationRequest = Extract<
+  DesktopRequest,
+  { type: "cancelIntegration" }
 >;
 
 export type DesktopApi = {
@@ -65,6 +94,14 @@ export type DesktopApi = {
   getAppInfo: () => Promise<AppInfo>;
   installAppUpdate: () => Promise<void>;
   openExternal: (request: OpenExternalRequest) => Promise<void>;
+  connectIntegration: (input: {
+    sessionId: string;
+    request: ConnectionRequest;
+  }) => Promise<ConnectionStarted>;
+  cancelIntegration: (input: {
+    sessionId: string;
+    connectionId: string;
+  }) => Promise<void>;
 };
 
 declare global {
