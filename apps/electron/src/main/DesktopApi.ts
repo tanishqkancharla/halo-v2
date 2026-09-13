@@ -6,18 +6,26 @@ import {
   shell,
   type IpcMainInvokeEvent,
 } from "electron";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
 import { Value } from "@sinclair/typebox/value";
 import * as errore from "errore";
 import type { WorkspaceServerConnection } from "@get-halo/workspace-server/connection";
+import type { HaloClient } from "@get-halo/shared/contract";
 import {
   DESKTOP_CHANNEL,
   desktopRequestSchema,
+  type ConnectIntegrationRequest,
   type DesktopRequest,
   type OpenExternalRequest,
 } from "../shared/desktop.js";
+import type { HaloRpcConnection } from "../shared/rpc.js";
 import { getAppInfo, installAppUpdate } from "./app/AppUpdate.js";
 import type { DesktopAuthentication } from "./DesktopAuthentication.js";
-import type { HaloRpcConnection } from "../shared/rpc.js";
+import {
+  listenForLoopbackCallback,
+  type ListeningLoopbackCallback,
+} from "./LoopbackCallback.js";
 
 class DesktopRequestError extends errore.createTaggedError({
   name: "DesktopRequestError",
@@ -82,6 +90,11 @@ async function handleDesktopRequest(args: {
       return installAppUpdate();
     case "openExternal":
       return await openExternal(args.request);
+    case "connectIntegration":
+      return await connectIntegration({
+        request: args.request,
+        getConnection: args.getConnection,
+      });
     default:
       return new DesktopRequestError({ operation: "desktop API" });
   }
@@ -107,6 +120,153 @@ async function openExternal(request: OpenExternalRequest) {
     .catch(
       (e) => new DesktopOperationError({ operation: "open the URL", cause: e }),
     );
+}
+
+// Executor pending OAuth sessions last OAUTH2_SESSION_TTL_MS (15 minutes).
+const oauthCallbackTimeoutMs = 15 * 60 * 1_000;
+
+async function connectIntegration(args: {
+  request: ConnectIntegrationRequest;
+  getConnection: () => Promise<HaloRpcConnection | Error | undefined>;
+}) {
+  const connection = await args.getConnection();
+  if (connection instanceof Error) return connection;
+  if (connection === undefined) {
+    return new DesktopOperationError({
+      operation: "start a connection without a workspace",
+    });
+  }
+
+  const callback = await listenForLoopbackCallback({
+    timeoutMs: oauthCallbackTimeoutMs,
+  });
+  if (callback instanceof Error) return callback;
+
+  const client = createWorkspaceClient(connection);
+  const started = await client.sessions
+    .startConnection({
+      sessionId: args.request.sessionId,
+      request: args.request.request,
+      redirectUri: callback.callbackUrl,
+    })
+    .catch(
+      (cause) =>
+        new DesktopOperationError({
+          operation: "start the connection",
+          cause,
+        }),
+    );
+  if (started instanceof Error) {
+    await closeOAuthCallback(callback);
+    return started;
+  }
+  if (started.status === "connected") {
+    await closeOAuthCallback(callback);
+    return started;
+  }
+
+  const opened = await shell.openExternal(started.authorizationUrl).catch(
+    (cause) =>
+      new DesktopOperationError({
+        operation: "open the authorization page",
+        cause,
+      }),
+  );
+  if (opened instanceof Error) {
+    await cancelPendingConnection({
+      client,
+      sessionId: args.request.sessionId,
+      connectionId: started.connectionId,
+    });
+    await closeOAuthCallback(callback);
+    return opened;
+  }
+
+  void completeIntegrationOAuth({
+    callback,
+    client,
+    sessionId: args.request.sessionId,
+    connectionId: started.connectionId,
+  }).catch((cause) => {
+    console.warn("OAuth completion failed:", cause);
+  });
+  return started;
+}
+
+async function completeIntegrationOAuth(args: {
+  callback: ListeningLoopbackCallback;
+  client: HaloClient;
+  sessionId: string;
+  connectionId: string;
+}) {
+  await using cleanup = new errore.AsyncDisposableStack();
+  cleanup.defer(async () => await closeOAuthCallback(args.callback));
+
+  const received = await args.callback.result;
+  if (received instanceof Error) {
+    console.warn("OAuth callback failed:", received);
+    await cancelPendingConnection(args);
+    return;
+  }
+  if ("providerError" in received) {
+    await cancelPendingConnection(args);
+    return;
+  }
+
+  const completed = await args.client.sessions
+    .completeOAuth({
+      state: received.state,
+      code: received.code,
+    })
+    .catch(
+      (cause) =>
+        new DesktopOperationError({
+          operation: "finish the connection",
+          cause,
+        }),
+    );
+  if (completed instanceof Error) {
+    console.warn("OAuth completion failed:", completed);
+  }
+}
+
+async function cancelPendingConnection(args: {
+  client: HaloClient;
+  sessionId: string;
+  connectionId: string;
+}) {
+  const cancelled = await args.client.sessions
+    .cancelConnection({
+      sessionId: args.sessionId,
+      connectionId: args.connectionId,
+    })
+    .catch(
+      (cause) =>
+        new DesktopOperationError({
+          operation: "cancel the connection",
+          cause,
+        }),
+    );
+  if (cancelled instanceof Error) {
+    console.warn("OAuth cleanup failed:", cancelled);
+  }
+}
+
+async function closeOAuthCallback(callback: ListeningLoopbackCallback) {
+  const closed = await callback.close();
+  if (closed instanceof Error) {
+    console.warn("OAuth callback close failed:", closed);
+  }
+}
+
+function createWorkspaceClient(connection: HaloRpcConnection) {
+  const link = new RPCLink({
+    origin: connection.origin,
+    url: connection.path,
+    headers: { authorization: `Bearer ${connection.token}` },
+  });
+  // SAFETY: HaloRpcConnection points to the Halo router.
+  return createORPCClient(link) as HaloClient;
 }
 
 function assertTrustedSender(args: {

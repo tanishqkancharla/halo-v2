@@ -73,6 +73,7 @@ export const sessionsRouter = os.router({
       const started = await context.connections.startConnection({
         sessionId: input.sessionId,
         request: input.request,
+        redirectUri: input.redirectUri,
         onEvent: async (event) => {
           session.publishConnectionEvent(event);
           if (event.status !== "connected") return;
@@ -100,6 +101,11 @@ export const sessionsRouter = os.router({
       return started;
     },
   ),
+  completeOAuth: os.completeOAuth.handler(async ({ input, context }) => {
+    context.logger.info({ event: "agentSession.completeOAuth" });
+    const completed = await context.connections.completeOAuth(input);
+    if (completed instanceof Error) return orpcErrors.badRequest(completed);
+  }),
   cancelConnection: os.cancelConnection.handler(async ({ input, context }) => {
     context.logger.info({
       event: "agentSession.cancelConnection",

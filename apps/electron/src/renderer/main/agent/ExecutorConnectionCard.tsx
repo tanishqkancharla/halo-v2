@@ -18,9 +18,9 @@ type ExecutorConnectionPart = Extract<
   SessionViewPart,
   { kind: "executorConnection" }
 >;
-class OpenAuthorizationError extends errore.createTaggedError({
-  name: "OpenAuthorizationError",
-  message: "Halo could not open the authorization page",
+class ConnectIntegrationError extends errore.createTaggedError({
+  name: "ConnectIntegrationError",
+  message: "Halo could not start the connection",
 }) {}
 
 const card = style(background.element, radius.lg, shadow.subtle, {
@@ -57,10 +57,13 @@ export function ExecutorConnectionCard({
     mutationFn: async () => {
       // SAFETY: the button is disabled until sessionId is a string.
       const activeSessionId = sessionId as string;
-      const started = await api.sessions.startConnection({
-        sessionId: activeSessionId,
-        request: part.request,
-      });
+      const started = await desktopApi
+        .connectIntegration({
+          sessionId: activeSessionId,
+          request: part.request,
+        })
+        .catch((cause) => new ConnectIntegrationError({ cause }));
+      if (started instanceof Error) throw started;
       if (started.status === "connected") return started;
       const connecting: ConnectionState = {
         status: "connecting",
@@ -69,25 +72,6 @@ export function ExecutorConnectionCard({
         wasConnected,
       };
       queryClient.setQueryData(statusKey, connecting);
-      const opened = await desktopApi
-        .openExternal({
-          type: "openExternal",
-          url: started.authorizationUrl,
-        })
-        .catch((cause) => new OpenAuthorizationError({ cause }));
-      if (opened instanceof Error) {
-        const cancelled = await api.sessions
-          .cancelConnection({
-            sessionId: activeSessionId,
-            connectionId: started.connectionId,
-          })
-          .then(() => undefined)
-          .catch((cause) => new OpenAuthorizationError({ cause }));
-        if (cancelled instanceof Error) {
-          console.warn("OAuth cleanup failed:", cancelled);
-        }
-        throw opened;
-      }
       return started;
     },
     onMutate: () => {
