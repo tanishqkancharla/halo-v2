@@ -90,7 +90,14 @@ export const sessionsRouter = os.router({
           }
         },
       });
-      if (started instanceof Error) return orpcErrors.badRequest(started);
+      if (started instanceof Error) {
+        context.logger.warn({
+          event: "agentSession.startConnectionFailed",
+          sessionId: input.sessionId,
+          error: started,
+        });
+        return orpcErrors.badRequest(started);
+      }
       if (started.status === "authorization-required") return started;
       const notified = await notifyConnectedSession({
         session,
