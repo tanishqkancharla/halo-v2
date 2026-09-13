@@ -272,7 +272,9 @@ e2eTest(
       name: "Google Drive connection",
     });
     await card.getByRole("button", { name: "Connect" }).click();
-    await expect(card.getByRole("button", { name: "Connecting" })).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: "Connecting" }),
+    ).toBeVisible();
     await expect(
       card.getByText("Finish connecting in your browser"),
     ).toBeVisible();
