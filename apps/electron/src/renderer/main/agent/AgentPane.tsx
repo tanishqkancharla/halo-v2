@@ -271,7 +271,6 @@ function SessionViewRow({
 const styles = {
   pane: style(flex({ direction: "column" }), {
     width: "100%",
-    height: "100%",
     marginInline: "auto",
     minWidth: 0,
     minHeight: 0,
