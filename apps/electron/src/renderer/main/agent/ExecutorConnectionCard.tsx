@@ -1,10 +1,25 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button as AriaButton } from "react-aria-components";
 import * as errore from "errore";
-import { background, Button, Flex, radius, shadow, Spacer, Text } from "maui";
+import {
+  backgroundColor,
+  Button,
+  colors,
+  Flex,
+  focusRing,
+  iconSizeValues,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  radius,
+  Text,
+} from "maui";
 import { style, useStyles } from "purse-styles";
+import { Check, DotsHorizontal } from "maui/icons";
 import { connectionRequestLabel } from "@get-halo/shared/ConnectionRequest";
-import { BrandLogo, brands } from "../../BrandLogo.tsx";
+import { googleIntegrationDisplay } from "@get-halo/shared/GoogleIntegrationDisplay";
+import { BrandLogo, brands, LogoImage } from "../../BrandLogo.tsx";
 import { desktopApi } from "../../api/electron.ts";
 import {
   connectionStateQueryKey,
@@ -22,14 +37,6 @@ class ConnectIntegrationError extends errore.createTaggedError({
   message: "Halo could not start the connection",
 }) {}
 
-const card = style(background.element, radius.lg, shadow.subtle, {
-  width: "100%",
-  maxWidth: "400px",
-});
-const brandButton = style({
-  flexShrink: 0,
-});
-
 export function ExecutorConnectionCard({
   sessionId,
   part,
@@ -37,8 +44,6 @@ export function ExecutorConnectionCard({
   sessionId: string | undefined;
   part: ExecutorConnectionPart;
 }) {
-  const cardClassName = useStyles(card);
-  const brandButtonClassName = useStyles(brandButton);
   const queryClient = useQueryClient();
   const statusKey = useMemo(
     () => connectionStateQueryKey(part.request),
@@ -137,8 +142,11 @@ export function ExecutorConnectionCard({
   }, [connection, queryClient, statusKey]);
 
   const status = connection.status;
+  const display = googleIntegrationDisplay(part.request.integration);
   const label = connectionRequestLabel(part.request);
   const brand = brands.google;
+  const menuLabel = `${label} actions`;
+  const canConnect = sessionId !== undefined;
 
   return (
     <section
@@ -146,65 +154,207 @@ export function ExecutorConnectionCard({
       data-session-id={sessionId}
       data-integration={part.request.integration}
       data-testid="executor-connection-card"
-      className={cardClassName}
     >
-      <Flex column gap={6} p={6}>
-        <Flex row gap={4} alignItems="start">
-          <BrandLogo brand="google" size="xl" />
-          <Flex column gap={1}>
-            <Text size="md" fontWeight={600}>
-              {label}
-            </Text>
-            <Text size="sm" color="lowContrast">
-              {status === "connected"
-                ? "Connected"
-                : status === "expired"
-                  ? "Authorization expired"
-                  : status === "cancelled"
-                    ? "Authorization cancelled"
-                    : status === "connecting"
-                      ? "Finish connecting in your browser"
-                      : status === "starting"
-                        ? "Preparing authorization"
-                        : "Connect your account so the agent can continue"}
+      <Flex
+        column
+        gap={1}
+        p={6}
+        shadow="subtle"
+        radius="lg"
+        style={{
+          width: "100%",
+          maxWidth: "400px",
+          backgroundColor: backgroundColor.element,
+        }}
+      >
+        <Flex row gap={4} alignItems="center">
+          {display === undefined ? (
+            <BrandLogo brand="google" size="xl" />
+          ) : (
+            <LogoImage src={display.icon} size="xl" />
+          )}
+          <Text size="md" fontWeight={600} style={{ flex: 1, minWidth: 0 }}>
+            {label}
+          </Text>
+          {status === "idle" ? (
+            <Button
+              variant="primary"
+              variantColor={brand.buttonColor}
+              style={{ color: brand.buttonForeground, flexShrink: 0 }}
+              disabled={!canConnect}
+              onClick={() => connect.mutate()}
+            >
+              Connect
+            </Button>
+          ) : (
+            <Flex row gap={2} alignItems="center" style={{ flexShrink: 0 }}>
+              <ConnectionStatusLabel status={status} />
+              <ConnectionOverflowMenu
+                label={menuLabel}
+                status={status}
+                canConnect={canConnect}
+                cancelPending={cancel.isPending}
+                onCancel={() => cancel.mutate()}
+                onConnect={() => connect.mutate()}
+                onDisconnect={() => {
+                  queryClient.setQueryData(statusKey, idleConnectionState);
+                }}
+              />
+            </Flex>
+          )}
+        </Flex>
+        {display === undefined ? undefined : (
+          <Flex row gap={4} alignItems="start">
+            <span
+              aria-hidden="true"
+              style={{ width: iconSizeValues.xl, flexShrink: 0 }}
+            />
+            <Text size="md" color="lowContrast">
+              {display.description}
             </Text>
           </Flex>
-          <Spacer />
-          <Button
-            variant="primary"
-            variantColor={brand.buttonColor}
-            style={{ color: brand.buttonForeground }}
-            className={brandButtonClassName}
-            disabled={
-              sessionId === undefined ||
-              status === "starting" ||
-              status === "connecting"
-            }
-            onClick={() => connect.mutate()}
-          >
-            {status === "connected"
-              ? "Connect again"
-              : status === "expired"
-                ? "Expired - connect again"
-                : status === "cancelled"
-                  ? "Try again"
-                  : status === "connecting"
-                    ? "Connecting"
-                    : status === "starting"
-                      ? "Starting"
-                      : "Connect"}
-          </Button>
-          {status === "connecting" ? (
-            <Button
-              variant="quiet"
-              disabled={cancel.isPending}
-              onClick={() => cancel.mutate()}
-            >
-              Cancel
-            </Button>
-          ) : undefined}
-        </Flex>
+        )}
       </Flex>
     </section>
   );
 }
+
+function ConnectionStatusLabel({
+  status,
+}: {
+  status: Exclude<ConnectionState["status"], "idle">;
+}) {
+  const color = connectionStatusColor[status];
+  if (status === "connected") {
+    return (
+      <Flex row gap={1} alignItems="center" style={{ color }}>
+        <Check size="sm" />
+        <Text size="sm" fontWeight={500} style={{ color }}>
+          Connected
+        </Text>
+      </Flex>
+    );
+  }
+  return (
+    <Text size="sm" fontWeight={500} style={{ color }}>
+      {connectionStatusCopy[status]}
+    </Text>
+  );
+}
+
+const connectionStatusColor = {
+  starting: colors.blue[11],
+  connecting: colors.blue[11],
+  connected: colors.green[11],
+  cancelled: colors.orange[11],
+  expired: colors.red[11],
+} as const;
+
+const connectionStatusCopy = {
+  starting: "Starting connection...",
+  connecting: "Opened in your browser...",
+  cancelled: "Cancelled",
+  expired: "Expired",
+} as const;
+
+function ConnectionOverflowMenu({
+  label,
+  status,
+  canConnect,
+  cancelPending,
+  onCancel,
+  onConnect,
+  onDisconnect,
+}: {
+  label: string;
+  status: Exclude<ConnectionState["status"], "idle">;
+  canConnect: boolean;
+  cancelPending: boolean;
+  onCancel(): void;
+  onConnect(): void;
+  onDisconnect(): void;
+}) {
+  const buttonClassName = useStyles(menuButton);
+  const items = overflowItems({
+    status,
+    canConnect,
+    cancelPending,
+    onCancel,
+    onConnect,
+    onDisconnect,
+  });
+
+  return (
+    <MenuTrigger placement="bottom end">
+      <AriaButton aria-label={label} className={buttonClassName}>
+        <DotsHorizontal size="sm" />
+      </AriaButton>
+      <Menu aria-label={label}>{items}</Menu>
+    </MenuTrigger>
+  );
+}
+
+function overflowItems({
+  status,
+  canConnect,
+  cancelPending,
+  onCancel,
+  onConnect,
+  onDisconnect,
+}: {
+  status: Exclude<ConnectionState["status"], "idle">;
+  canConnect: boolean;
+  cancelPending: boolean;
+  onCancel(): void;
+  onConnect(): void;
+  onDisconnect(): void;
+}): ReactNode {
+  if (status === "connecting") {
+    return (
+      <MenuItem onAction={onCancel} isDisabled={cancelPending}>
+        Cancel
+      </MenuItem>
+    );
+  }
+  if (status === "connected") {
+    return (
+      <>
+        <MenuItem onAction={onConnect} isDisabled={!canConnect}>
+          Connect different account
+        </MenuItem>
+        <MenuItem onAction={onDisconnect}>Disconnect</MenuItem>
+      </>
+    );
+  }
+  if (status === "cancelled") {
+    return (
+      <MenuItem onAction={onConnect} isDisabled={!canConnect}>
+        Connect
+      </MenuItem>
+    );
+  }
+  if (status === "expired") {
+    return (
+      <MenuItem onAction={onConnect} isDisabled={!canConnect}>
+        Connect
+      </MenuItem>
+    );
+  }
+  return undefined;
+}
+
+const menuButton = style(focusRing(), radius.sm, {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  height: "24px",
+  width: "24px",
+  padding: 0,
+  border: 0,
+  backgroundColor: "transparent",
+  color: colors.gray[11],
+  cursor: "pointer",
+  flexShrink: 0,
+  "&:hover": { backgroundColor: colors.gray[4] },
+  "&[data-disabled]": { opacity: 0.5 },
+});
